@@ -1,0 +1,387 @@
+{
+ "updated": "2026-10-17T17:30:35+00:00",
+ "yt_seen": "2026-10-17T17:30:35+00:00",
+ "parts": {
+  "youtube": {
+   "at": "2026-10-17T16:50:23+00:00",
+   "streams": {
+    "en": [
+     {
+      "on": "youtube",
+      "name": "Mofutari Megumi Ch. もふ多里 恵美",
+      "title": "【Limbus Company】WINRATE NOT WORKING ON CANTO IV (4) HUMBLES ME ?!",
+      "viewers": 68,
+      "url": "https://www.youtube.com/watch?v=Cg-XOA28-hY",
+      "started": "2026-10-17T12:59:58Z",
+      "avatar": "https://yt3.ggpht.com/t26cNQiwReZ2YiUTY63pBcVogebUAD64HirejGYy67azuJZpQ9jHNnNT2ehuYxYyx6Rij8-W2Q=s88-c-k-c0x00ffffff-no-rj",
+      "thumb": "https://i.ytimg.com/vi/Cg-XOA28-hY/mqdefault_live.jpg"
+     }
+    ],
+    "ru": [],
+    "ko": []
+   }
+  },
+  "twitch": {
+   "at": "2026-10-17T17:30:35+00:00",
+   "streams": {
+    "en": [
+     {
+      "on": "twitch",
+      "name": "KiltedDungeoneer",
+      "title": "🕘🔥Re-Playthrough! Canto III! + Zwei Outfit! | !commands",
+      "viewers": 27,
+      "url": "https://www.twitch.tv/kilteddungeoneer",
+      "started": "2026-10-17T17:07:20Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/fc211a5e-0099-4aea-84eb-0ceb2993ea4c-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_kilteddungeoneer-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "mofutarimegumi",
+      "title": "【Limbus Company】WINRATE NOT WORKING ON CANTO IV (4) HUMBLES ME ?!【EN / TAG/ JP】",
+      "viewers": 22,
+      "url": "https://www.twitch.tv/mofutarimegumi",
+      "started": "2026-10-17T12:59:04Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/2ad0b081-1452-441d-8452-7a446707532d-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_mofutarimegumi-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "sukiselki",
+      "title": "CANTO 6 Cathy not dead?",
+      "viewers": 13,
+      "url": "https://www.twitch.tv/sukiselki",
+      "started": "2026-10-17T13:31:35Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/97ecb187-f0b0-460a-9045-b92c0fa9a660-profile_image-300x300.jpeg",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_sukiselki-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "JJWF",
+      "title": "CANTO 10 PART 3 (at last) 🟩",
+      "viewers": 8,
+      "url": "https://www.twitch.tv/jjwf",
+      "started": "2026-10-17T17:27:58Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/f443bae9-29fe-4c19-8238-9aebe7f8dee1-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_jjwf-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "HuniiLemii",
+      "title": "፠ ፧፧ Limbus Company ፧፧ Let's Finish Canto 9!!!  ፧፧ !SongRequest !socials !discord !8Ball !slots !lurk ፧፧ ፠",
+      "viewers": 5,
+      "url": "https://www.twitch.tv/huniilemii",
+      "started": "2026-10-17T16:49:40Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/25d6ed7e-faf7-470e-b81a-6064b4c2ea98-profile_image-300x300.jpeg",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_huniilemii-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "renfa_arviette",
+      "title": "[ Limbus company ] HE IS SERVING HER THE DIVORCE?! HE TAKES THE KIDS?! FEAR AND COMPANY CANTO X - C",
+      "viewers": 2,
+      "url": "https://www.twitch.tv/renfa_arviette",
+      "started": "2026-10-17T17:17:24Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/5ef1eff0-3ded-45bf-881a-8ff41d472391-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_renfa_arviette-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "VaccinatedAlmonds",
+      "title": "Limbus Company throws zoomers into brutal gambling habits, but you can just pirate  Library of Ruina",
+      "viewers": 2,
+      "url": "https://www.twitch.tv/vaccinatedalmonds",
+      "started": "2026-10-17T17:00:06Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/8025c258-eb32-4615-938f-060f0180f190-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_vaccinatedalmonds-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "CaelanVT",
+      "title": "Playing Canto 10, starting part 3",
+      "viewers": 2,
+      "url": "https://www.twitch.tv/caelanvt",
+      "started": "2026-10-17T10:52:53Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/d95f9953-ba9f-4717-a7e6-e5f80be5d4a6-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_caelanvt-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "royafox",
+      "title": "🦊 now playing: try to kil middle...but dont think i can...anyway, hello saturday! hope you find something to play!",
+      "viewers": 1,
+      "url": "https://www.twitch.tv/royafox",
+      "started": "2026-10-17T17:03:35Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/f51290c0-ecfa-4ffb-9d01-29b28c0554a9-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_royafox-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "NeonLunarian",
+      "title": "My Dress-Up Pwie | [VTuber] [English]",
+      "viewers": 1,
+      "url": "https://www.twitch.tv/neonlunarian",
+      "started": "2026-10-17T15:04:21Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/218423d9-df97-4558-8bc9-87dd35f2d91f-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_neonlunarian-440x248.jpg"
+     }
+    ],
+    "ru": [
+     {
+      "on": "twitch",
+      "name": "Alakir_",
+      "title": "🔥 Проходим данж восьмого канто 🔥 Limbus Company",
+      "viewers": 10,
+      "url": "https://www.twitch.tv/alakir_",
+      "started": "2026-10-17T14:06:39Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/b9ca0ffe-e361-4a5f-87ae-33a4659e69ca-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_alakir_-440x248.jpg"
+     },
+     {
+      "on": "twitch",
+      "name": "POVIDLICH",
+      "title": "Он обязательно пройдёт",
+      "viewers": 3,
+      "url": "https://www.twitch.tv/povidlich",
+      "started": "2026-10-17T17:05:48Z",
+      "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/e15c6ba4-a248-494a-adc2-c65ba09cbbb8-profile_image-300x300.png",
+      "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_povidlich-440x248.jpg"
+     }
+    ],
+    "ko": []
+   }
+  }
+ },
+ "errors": {},
+ "en": [
+  {
+   "on": "youtube",
+   "name": "Mofutari Megumi Ch. もふ多里 恵美",
+   "title": "【Limbus Company】WINRATE NOT WORKING ON CANTO IV (4) HUMBLES ME ?!",
+   "viewers": 68,
+   "url": "https://www.youtube.com/watch?v=Cg-XOA28-hY",
+   "started": "2026-10-17T12:59:58Z",
+   "avatar": "https://yt3.ggpht.com/t26cNQiwReZ2YiUTY63pBcVogebUAD64HirejGYy67azuJZpQ9jHNnNT2ehuYxYyx6Rij8-W2Q=s88-c-k-c0x00ffffff-no-rj",
+   "thumb": "https://i.ytimg.com/vi/Cg-XOA28-hY/mqdefault_live.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "KiltedDungeoneer",
+   "title": "🕘🔥Re-Playthrough! Canto III! + Zwei Outfit! | !commands",
+   "viewers": 27,
+   "url": "https://www.twitch.tv/kilteddungeoneer",
+   "started": "2026-10-17T17:07:20Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/fc211a5e-0099-4aea-84eb-0ceb2993ea4c-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_kilteddungeoneer-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "mofutarimegumi",
+   "title": "【Limbus Company】WINRATE NOT WORKING ON CANTO IV (4) HUMBLES ME ?!【EN / TAG/ JP】",
+   "viewers": 22,
+   "url": "https://www.twitch.tv/mofutarimegumi",
+   "started": "2026-10-17T12:59:04Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/2ad0b081-1452-441d-8452-7a446707532d-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_mofutarimegumi-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "sukiselki",
+   "title": "CANTO 6 Cathy not dead?",
+   "viewers": 13,
+   "url": "https://www.twitch.tv/sukiselki",
+   "started": "2026-10-17T13:31:35Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/97ecb187-f0b0-460a-9045-b92c0fa9a660-profile_image-300x300.jpeg",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_sukiselki-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "JJWF",
+   "title": "CANTO 10 PART 3 (at last) 🟩",
+   "viewers": 8,
+   "url": "https://www.twitch.tv/jjwf",
+   "started": "2026-10-17T17:27:58Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/f443bae9-29fe-4c19-8238-9aebe7f8dee1-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_jjwf-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "HuniiLemii",
+   "title": "፠ ፧፧ Limbus Company ፧፧ Let's Finish Canto 9!!!  ፧፧ !SongRequest !socials !discord !8Ball !slots !lurk ፧፧ ፠",
+   "viewers": 5,
+   "url": "https://www.twitch.tv/huniilemii",
+   "started": "2026-10-17T16:49:40Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/25d6ed7e-faf7-470e-b81a-6064b4c2ea98-profile_image-300x300.jpeg",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_huniilemii-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "renfa_arviette",
+   "title": "[ Limbus company ] HE IS SERVING HER THE DIVORCE?! HE TAKES THE KIDS?! FEAR AND COMPANY CANTO X - C",
+   "viewers": 2,
+   "url": "https://www.twitch.tv/renfa_arviette",
+   "started": "2026-10-17T17:17:24Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/5ef1eff0-3ded-45bf-881a-8ff41d472391-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_renfa_arviette-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "VaccinatedAlmonds",
+   "title": "Limbus Company throws zoomers into brutal gambling habits, but you can just pirate  Library of Ruina",
+   "viewers": 2,
+   "url": "https://www.twitch.tv/vaccinatedalmonds",
+   "started": "2026-10-17T17:00:06Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/8025c258-eb32-4615-938f-060f0180f190-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_vaccinatedalmonds-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "CaelanVT",
+   "title": "Playing Canto 10, starting part 3",
+   "viewers": 2,
+   "url": "https://www.twitch.tv/caelanvt",
+   "started": "2026-10-17T10:52:53Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/d95f9953-ba9f-4717-a7e6-e5f80be5d4a6-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_caelanvt-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "royafox",
+   "title": "🦊 now playing: try to kil middle...but dont think i can...anyway, hello saturday! hope you find something to play!",
+   "viewers": 1,
+   "url": "https://www.twitch.tv/royafox",
+   "started": "2026-10-17T17:03:35Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/f51290c0-ecfa-4ffb-9d01-29b28c0554a9-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_royafox-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "NeonLunarian",
+   "title": "My Dress-Up Pwie | [VTuber] [English]",
+   "viewers": 1,
+   "url": "https://www.twitch.tv/neonlunarian",
+   "started": "2026-10-17T15:04:21Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/218423d9-df97-4558-8bc9-87dd35f2d91f-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_neonlunarian-440x248.jpg"
+  }
+ ],
+ "ru": [
+  {
+   "on": "twitch",
+   "name": "Alakir_",
+   "title": "🔥 Проходим данж восьмого канто 🔥 Limbus Company",
+   "viewers": 10,
+   "url": "https://www.twitch.tv/alakir_",
+   "started": "2026-10-17T14:06:39Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/b9ca0ffe-e361-4a5f-87ae-33a4659e69ca-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_alakir_-440x248.jpg"
+  },
+  {
+   "on": "twitch",
+   "name": "POVIDLICH",
+   "title": "Он обязательно пройдёт",
+   "viewers": 3,
+   "url": "https://www.twitch.tv/povidlich",
+   "started": "2026-10-17T17:05:48Z",
+   "avatar": "https://static-cdn.jtvnw.net/jtv_user_pictures/e15c6ba4-a248-494a-adc2-c65ba09cbbb8-profile_image-300x300.png",
+   "thumb": "https://static-cdn.jtvnw.net/previews-ttv/live_user_povidlich-440x248.jpg"
+  }
+ ],
+ "ko": [],
+ "rec": {
+  "list": [
+   {
+    "src": "youtube.com/@Shpep_q",
+    "on": "youtube",
+    "name": "shpep",
+    "url": "https://www.youtube.com/channel/UCc-LLIaW9hJbp3ayhdSLMmw",
+    "avatar": "https://yt3.ggpht.com/78tMq7zCs-xDHlWmrqKd0CHEG7IMczZHtK2LHp643C3-QV4OMBTd_n1qivgZFxNAHUPZviAlWw=s88-c-k-c0x00ffffff-no-rj",
+    "live": null
+   },
+   {
+    "src": "youtube.com/@Hirakut",
+    "on": "youtube",
+    "name": "    Хиракут    ",
+    "url": "https://www.youtube.com/channel/UCCQuLpgEf9EpNmwP_6RYscw",
+    "avatar": "https://yt3.ggpht.com/n1eZo3V8uRvSIU5IT_SGx7v3Ar75oiz2-B8EEUPT2KorpR2n9JcZt93nbDTFdTHX62X9BzIc-K0=s88-c-k-c0x00ffffff-no-rj",
+    "live": null
+   },
+   {
+    "src": "youtube.com/@ilyaKek482",
+    "on": "youtube",
+    "name": "Manudripker482",
+    "url": "https://www.youtube.com/channel/UCo-4xPXTWujF-R1Aikml4ug",
+    "avatar": "https://yt3.ggpht.com/KGFKvUrKvDjWnIuqjn42QxrnxPaL_ZdCHEQGXCZxmsrC-dU5KNU1JJNprIxNVo0MusaWjIB9wA=s88-c-k-c0x00ffffff-no-rj",
+    "live": null
+   },
+   {
+    "src": "youtube.com/@b.i.b.k.a",
+    "on": "youtube",
+    "name": "B.I.B.K.A",
+    "url": "https://www.youtube.com/channel/UCvdngLNJ5GsF0tHoDCWy6JQ",
+    "avatar": "https://yt3.ggpht.com/08fvShAtxOGVxFgAgdS5sis0ZaW3RwUDKd7utqaEBe7uI1_hourbVw98LwAeY72hlyrgilkGdmk=s88-c-k-c0x00ffffff-no-rj",
+    "live": null
+   }
+  ],
+  "who": {
+   "youtube.com/@Shpep_q": {
+    "id": "UCc-LLIaW9hJbp3ayhdSLMmw",
+    "name": "shpep",
+    "at": "2026-10-16T19:47:13+00:00",
+    "avatar": "https://yt3.ggpht.com/78tMq7zCs-xDHlWmrqKd0CHEG7IMczZHtK2LHp643C3-QV4OMBTd_n1qivgZFxNAHUPZviAlWw=s88-c-k-c0x00ffffff-no-rj"
+   },
+   "youtube.com/@Hirakut": {
+    "id": "UCCQuLpgEf9EpNmwP_6RYscw",
+    "name": "    Хиракут    ",
+    "at": "2026-10-16T19:47:13+00:00",
+    "avatar": "https://yt3.ggpht.com/n1eZo3V8uRvSIU5IT_SGx7v3Ar75oiz2-B8EEUPT2KorpR2n9JcZt93nbDTFdTHX62X9BzIc-K0=s88-c-k-c0x00ffffff-no-rj"
+   },
+   "youtube.com/@ilyaKek482": {
+    "id": "UCo-4xPXTWujF-R1Aikml4ug",
+    "name": "Manudripker482",
+    "at": "2026-10-16T19:47:13+00:00",
+    "avatar": "https://yt3.ggpht.com/KGFKvUrKvDjWnIuqjn42QxrnxPaL_ZdCHEQGXCZxmsrC-dU5KNU1JJNprIxNVo0MusaWjIB9wA=s88-c-k-c0x00ffffff-no-rj"
+   },
+   "youtube.com/@b.i.b.k.a": {
+    "id": "UCvdngLNJ5GsF0tHoDCWy6JQ",
+    "name": "B.I.B.K.A",
+    "at": "2026-10-16T20:05:13+00:00",
+    "avatar": "https://yt3.ggpht.com/08fvShAtxOGVxFgAgdS5sis0ZaW3RwUDKd7utqaEBe7uI1_hourbVw98LwAeY72hlyrgilkGdmk=s88-c-k-c0x00ffffff-no-rj"
+   }
+  }
+ },
+ "recommended": [
+  {
+   "src": "youtube.com/@Shpep_q",
+   "on": "youtube",
+   "name": "shpep",
+   "url": "https://www.youtube.com/channel/UCc-LLIaW9hJbp3ayhdSLMmw",
+   "avatar": "https://yt3.ggpht.com/78tMq7zCs-xDHlWmrqKd0CHEG7IMczZHtK2LHp643C3-QV4OMBTd_n1qivgZFxNAHUPZviAlWw=s88-c-k-c0x00ffffff-no-rj",
+   "live": null
+  },
+  {
+   "src": "youtube.com/@Hirakut",
+   "on": "youtube",
+   "name": "    Хиракут    ",
+   "url": "https://www.youtube.com/channel/UCCQuLpgEf9EpNmwP_6RYscw",
+   "avatar": "https://yt3.ggpht.com/n1eZo3V8uRvSIU5IT_SGx7v3Ar75oiz2-B8EEUPT2KorpR2n9JcZt93nbDTFdTHX62X9BzIc-K0=s88-c-k-c0x00ffffff-no-rj",
+   "live": null
+  },
+  {
+   "src": "youtube.com/@ilyaKek482",
+   "on": "youtube",
+   "name": "Manudripker482",
+   "url": "https://www.youtube.com/channel/UCo-4xPXTWujF-R1Aikml4ug",
+   "avatar": "https://yt3.ggpht.com/KGFKvUrKvDjWnIuqjn42QxrnxPaL_ZdCHEQGXCZxmsrC-dU5KNU1JJNprIxNVo0MusaWjIB9wA=s88-c-k-c0x00ffffff-no-rj",
+   "live": null
+  },
+  {
+   "src": "youtube.com/@b.i.b.k.a",
+   "on": "youtube",
+   "name": "B.I.B.K.A",
+   "url": "https://www.youtube.com/channel/UCvdngLNJ5GsF0tHoDCWy6JQ",
+   "avatar": "https://yt3.ggpht.com/08fvShAtxOGVxFgAgdS5sis0ZaW3RwUDKd7utqaEBe7uI1_hourbVw98LwAeY72hlyrgilkGdmk=s88-c-k-c0x00ffffff-no-rj",
+   "live": null
+  }
+ ]
+}
