@@ -4,16 +4,40 @@
 "use strict";
 
 const GM_KEEP = "games", GM_STEPS = [1, 3, 7, 15], GM_WORTH = [1000, 750, 500, 250], GM_ROUNDS = 10;
-const gm = { battle: true, hard: false, group: "", best: {},
+const gm = { battle: true, hard: false, group: "", how: "", best: {},
   ...(() => { try { return JSON.parse(localStorage.getItem(GM_KEEP) || "{}"); } catch { return {}; } })(), game: null };
 const gmAudio = new Audio();
-const gmKeep = () => { try { localStorage.setItem(GM_KEEP, JSON.stringify({ battle: gm.battle, hard: gm.hard, group: gm.group, best: gm.best, vol: gm.vol })); } catch {} };
+const gmKeep = () => { try { localStorage.setItem(GM_KEEP, JSON.stringify({ battle: gm.battle, hard: gm.hard, group: gm.group, how: gm.how, best: gm.best, vol: gm.vol })); } catch {} };
 // how loud the game plays: its own slider under the disc (the corner player's volume until it is moved)
 const gmVol = () => gm.vol != null ? +gm.vol : (typeof mu !== "undefined" && mu.vol) || 0.6;
 const gmGroup = (t) => /^Canto \d+$/.test(t.where) ? t.where : "Other";
 const gmPool = () => mu.tracks.map((t, n) => ({ t, n })).filter(({ t }) => t.ms > 40000 && (!gm.battle || t.battle) && (!gm.group || gmGroup(t) === gm.group));
 const gmSub = (t) => t.where || t.by || "";
-const gmMode = () => (gm.battle ? "b" : "a") + (gm.hard ? "h" : "e") + gm.group;
+const gmMode = () => (gm.battle ? "b" : "a") + (gm.hard ? "h" : "e") + gm.how + gm.group;
+// how the piece is played (gm.how): as it is, backwards, sped up, or with another track over it
+const GM_HOW = [["", "As it is"], ["rev", "Backwards"], ["fast", "Sped up"], ["two", "Two at once"]], GM_FAST = 1.6;
+// the piece of a round for "Backwards" / "Two at once": the longest step's worth of the track cut out (turned
+// around, or mixed with the same of another track) as a sound file of its own -> its object URL, null when it failed
+let gmCtx = null;
+async function gmClip(url, start, rev, url2, start2) {
+  try {
+    gmCtx = gmCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const read = async (u) => gmCtx.decodeAudioData(await (await fetch(u)).arrayBuffer());
+    const a = await read(url), b = url2 ? await read(url2) : null, sr = a.sampleRate, n = Math.floor(GM_STEPS[GM_STEPS.length - 1] * sr);
+    const out = new Int16Array(n * 2), oa = Math.floor(start * sr), ob = Math.floor((start2 || 0) * sr);
+    for (let c = 0; c < 2; c++) {
+      const da = a.getChannelData(Math.min(c, a.numberOfChannels - 1)), db = b && b.getChannelData(Math.min(c, b.numberOfChannels - 1));
+      for (let i = 0; i < n; i++) {
+        const v = db ? ((da[oa + i] || 0) + (db[ob + i] || 0)) * 0.6 : da[oa + i] || 0;
+        out[(rev ? n - 1 - i : i) * 2 + c] = Math.max(-1, Math.min(1, v)) * 32767;
+      }
+    }
+    const h = new DataView(new ArrayBuffer(44)), text = (at, s) => [...s].forEach((ch, i) => h.setUint8(at + i, ch.charCodeAt(0)));
+    text(0, "RIFF"); h.setUint32(4, 36 + out.byteLength, true); text(8, "WAVEfmt "); h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 2, true);
+    h.setUint32(24, sr, true); h.setUint32(28, sr * 4, true); h.setUint16(32, 4, true); h.setUint16(34, 16, true); text(36, "data"); h.setUint32(40, out.byteLength, true);
+    return URL.createObjectURL(new Blob([h, out], { type: "audio/wav" }));
+  } catch { return null; }
+}
 // Daily challenge: the same ten rounds for everybody until the game's daily reset (21:00 UTC) — every draw of a game
 // goes through gmRnd, which a daily game seeds with the day; its first score of the day is kept, and the result can
 // be copied as a line of squares.
@@ -99,6 +123,9 @@ function gmWarmDrop(keep = []) {
 }
 
 function gmStop() {
+  if (gm.clip) URL.revokeObjectURL(gm.clip);
+  gm.clip = null;
+  gmAudio.playbackRate = 1;
   clearTimeout(gm.timer);
   cancelAnimationFrame(gm.raf);
   gmAudio.pause();
@@ -201,6 +228,7 @@ function gmDrawStart() {
     ${!mu.tracks.length ? `<p class="muted">The soundtrack isn't read yet: the game's sound files or a snapshot are missing.</p>` : `
     <div class="dbrow">${chip(gm.battle, 'data-b="1"', "Battle themes")}${chip(!gm.battle, 'data-b=""', "All tracks")}<span class="gap"></span>
       ${chip(!gm.hard, 'data-h=""', "Easy · 4 answers")}${chip(gm.hard, 'data-h="1"', "Hard · type the name")}</div>
+    <div class="dbrow">${GM_HOW.map(([k, name]) => chip(gm.how === k, `data-how="${k}"`, name)).join("")}</div>
     <div class="dbrow">${chip(!gm.group, 'data-g=""', "Everything")}${groups.map((g) => chip(gm.group === g, `data-g="${esc(g)}"`, esc(g))).join("")}</div>
     <div class="gmstart"><span class="gmscore">${n} TRACKS · BEST <i>${gm.best[gmMode()] || 0}</i></span>
       ${gmDailyBtn("track", !mu.tracks.some((t) => t.battle))}<button class="gmbtn" id="gmgo" ${n < 8 ? "disabled" : ""}>Start · ${GM_ROUNDS} rounds</button></div>
@@ -208,6 +236,7 @@ function gmDrawStart() {
   const main = $("#main"), set = (sel, key, f) => main.querySelectorAll(sel).forEach((b) => b.onclick = () => { gm[key] = f(b); gmKeep(); gmDrawStart(); });
   set("[data-b]", "battle", (b) => !!b.dataset.b);
   set("[data-h]", "hard", (b) => !!b.dataset.h);
+  set("[data-how]", "how", (b) => b.dataset.how);
   set("[data-g]", "group", (b) => b.dataset.g);
   if ($("#gmgo")) $("#gmgo").onclick = () => gmNew();
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gmNew(true);
@@ -224,8 +253,8 @@ function gmNew(daily) {
   const duel = daily === true ? gmDuelTake("track") : null;
   gmDailyEnd();
   if (daily === true) {
-    gm.mine = { battle: gm.battle, hard: gm.hard, group: gm.group };
-    Object.assign(gm, { battle: true, hard: false, group: "" });
+    gm.mine = { battle: gm.battle, hard: gm.hard, group: gm.group, how: gm.how };
+    Object.assign(gm, { battle: true, hard: false, group: "", how: "" });
     gmRnd = gmDaySeed("track", duel);
   }
   const pool = gmPool();
@@ -261,7 +290,17 @@ function gmRound() {
   gmAudio.load();
   gmAudio.volume = gmVol();
   gmAudio.onloadedmetadata = () => { g.loading = false; gmPlay(); };
-  gmFetch(ans.n).then((u) => { if (gm.game === g && g.ans === ans) gmAudio.src = u || "/api/music_audio?n=" + ans.n; });
+  const mine = () => gm.game === g && g.ans === ans;
+  gmFetch(ans.n).then(async (u) => {
+    g.real = u || "/api/music_audio?n=" + ans.n;
+    if (gm.how === "rev" || gm.how === "two") {  // (the other track of "Two at once": any but this one, from a spot of its own)
+      const over = gm.how === "two" && g.pool[(at + 1 + Math.floor(Math.random() * (g.pool.length - 1))) % g.pool.length];
+      const clip = await gmClip(g.real, g.start, gm.how === "rev", over && "/api/music_audio?n=" + over.n, over && 5 + Math.random() * Math.max(1, over.t.ms / 1000 - 30));
+      if (!mine()) return clip && URL.revokeObjectURL(clip);
+      gm.clip = clip;
+    }
+    if (mine()) gmAudio.src = gm.clip || g.real;
+  });
   gmAudio.onerror = () => {  // unreadable: another track takes the round
     toast("This track could not be read from the game's files.");
     if ((g.fails = (g.fails || 0) + 1) > 4) { gmStop(); gmWarmDrop(); gm.game = null; return gmDrawStart(); }
@@ -274,7 +313,9 @@ function gmRound() {
 function gmPlay() {
   const g = gm.game;
   clearTimeout(gm.timer);
-  gmAudio.currentTime = g.start;
+  gmAudio.currentTime = gm.clip ? 0 : g.start;
+  gmAudio.playbackRate = gm.how === "fast" ? GM_FAST : 1;
+  gmAudio.preservesPitch = false;
   gmAudio.play().catch(() => {});
   g.t0 = performance.now();
   gm.timer = setTimeout(() => { if (!g.done) gmAudio.pause(); gmRing(); }, GM_STEPS[g.step] * 1000);
@@ -370,7 +411,13 @@ function gmScore(ok, pick, said) {
   g.done = { ok, pick, points, text: said };
   g.log.push({ n: g.ans.n, ok, points, at: GM_STEPS[g.step], said: said || "—", clean: !g.step && !Object.keys(g.hints).length });
   clearTimeout(gm.timer);
-  gmAudio.play().catch(() => {});  // the track plays on until Next
+  gmAudio.playbackRate = 1;
+  if (gm.clip) {  // a cut-out piece gives way to the track itself, from the same spot
+    gmAudio.onloadedmetadata = () => { gmAudio.currentTime = g.start; gmAudio.play().catch(() => {}); setTimeout(gmRing, 80); };
+    gmAudio.src = g.real;
+    URL.revokeObjectURL(gm.clip);
+    gm.clip = null;
+  } else gmAudio.play().catch(() => {});  // the track plays on until Next
   gmDrawRound();
   setTimeout(gmRing, 80);
 }
