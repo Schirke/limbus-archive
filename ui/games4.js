@@ -121,7 +121,7 @@ function ggEnd() {
   if (!g.got.includes(null)) s.full = (s.full || 0) + 1;
   if (!g.daily) s.best = Math.max(s.best || 0, g.score);
   gxKeep();
-  if (g.daily) gmDailyOver("grid", g, g.score);
+  gmOver("grid", g, g.score);
   ggDraw();
 }
 
@@ -238,7 +238,7 @@ function goScore(odd, share) {
 
 function goResult() {
   const g = go.game, s = gx.odd = gx.odd || {};
-  if (g.daily) gmDailyOver("odd", g, g.score);
+  gmOver("odd", g, g.score);
   const record = !g.daily && g.score > (s.best || 0);
   if (!g.daily) s.best = Math.max(s.best || 0, g.score);
   gxKeep();

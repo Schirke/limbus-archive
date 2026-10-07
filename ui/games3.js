@@ -289,7 +289,7 @@ function gpAnswer(key) {
 
 function gpResult() {
   const g = gp.game;
-  if (g.daily) gmDailyOver(gp.page, g, g.score);
+  gmOver(gp.page, g, g.score);
   const tag = g.daily ? gmDayTag(g) : "";
   gpDailyEnd();
   const mode = gpMode(), record = !g.daily && g.score > (gp.best[mode] || 0);
@@ -388,7 +388,7 @@ function gwEnd() {
     gx.wordle.best = Math.min(gx.wordle.best || 99, g.tries.length);
   }
   gxKeep();
-  if (g.daily) gmDailyOver("wordle", g, won ? `${g.tries.length} / ${GW_TRIES}` : `X / ${GW_TRIES}`);
+  gmOver("wordle", g, won ? `${g.tries.length} / ${GW_TRIES}` : `X / ${GW_TRIES}`);
   gwDraw();
 }
 
@@ -529,7 +529,7 @@ function gcSend() {
       gx.conn.best = Math.min(gx.conn.best == null ? 99 : gx.conn.best, g.miss);
     }
     gxKeep();
-    if (g.daily) gmDailyOver("conn", g, won ? (g.miss ? `${g.miss} MISS` : "PERFECT") : "LOST");
+    gmOver("conn", g, won ? (g.miss ? `${g.miss} MISS` : "PERFECT") : "LOST");
   }
   gcDraw();
 }

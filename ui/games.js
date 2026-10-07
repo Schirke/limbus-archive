@@ -90,6 +90,65 @@ const gmDuelTake = (game) => { const d = gmDuelNext && gmDuelNext.game === game 
 const gmDaySeed = (game, duel) => gmSeed((duel ? "duel" + duel.seed : gmDay()) + game);
 // the end of a daily game (g.daily; g.duel when it is a duel): its result is kept, shown and copied
 function gmDailyOver(game, g, score) { if (g.duel) g.duel.mine = score; else gmDailyKeep(game, score); }
+
+// Lunacy: what the games pay and Extraction spends (kept in the browser, like the scores). A finished game pays by
+// how well it went; a Daily pays a pull's worth, the first one of a day adds for the days in a row, all of a day's
+// add a ten; a duel won and the achievements (GM_ACH, once each) pay too.
+const GM_PULL = 130, GM_WALLET = "games_wallet";
+const gmW = { lunacy: 10 * GM_PULL, streak: 0, day: "", ach: {}, played: {}, pulls: 0, r3: 0, ego: 0, feat: 0,
+  ...(() => { try { return JSON.parse(localStorage.getItem(GM_WALLET) || "{}"); } catch { return {}; } })() };
+const gmWKeep = () => { try { localStorage.setItem(GM_WALLET, JSON.stringify(gmW)); } catch {} };
+// [key, name, what it takes, lunacy]
+const GM_ACH = [["first", "First steps", "Finish any game", 130], ["daily", "Daily bread", "Finish a Daily challenge", 260],
+  ["allday", "Clocked in", "Finish every Daily of one day", 1300], ["streak3", "Three in a row", "A Daily three days running", 390],
+  ["streak7", "A full week", "A Daily seven days running", 1300], ["streak30", "Company loyalty", "A Daily thirty days running", 6500],
+  ["perfect", "Ten of ten", "Every round right in a guessing game", 650], ["hard", "The hard way", "10,000 or more in a Hard game", 650],
+  ["wordle3", "Mind reader", "Limbus Wordle in three tries or fewer", 650], ["connp", "No loose ends", "Connections without a mistake", 650],
+  ["gridfull", "Nine of nine", "A full Limbus Grid", 650], ["oddp", "Sharp eye", "10,000 in Odd one out", 650], ["duel", "Duelist", "Beat a friend's result in a duel", 390],
+  ["every", "Jack of all trades", "Play every game once", 1300], ["r3", "Gold", "Extract a 000", 130], ["feat", "The one I wanted", "Extract the featured 000", 650],
+  ["ego10", "Collector", "Extract ten E.G.O", 650], ["pulls100", "Just one more ten", "A hundred pulls", 1300]];
+// pays for what happened; `got`: [lunacy, why] lines, achievements by key — one message for all of it
+function gmPay(got, ach = []) {
+  for (const k of ach) { const a = GM_ACH.find((x) => x[0] === k); if (a && !gmW.ach[k]) { gmW.ach[k] = gmDay(); got.push([a[3], `★ ${a[1]}`]); } }
+  got = got.filter(([n]) => n > 0);
+  if (!got.length) return gmWKeep();
+  gmW.lunacy += got.reduce((s, [n]) => s + n, 0);
+  gmWKeep();
+  toast(got.map(([n, why]) => `<b>+${n}</b> lunacy · ${esc(why)}`).join("<br>") + `<br><span class="small">You have ${gmW.lunacy.toLocaleString("en")} — <a href="#/gamegacha">Extraction</a></span>`, 7000);
+}
+// the end of any game: its Daily / duel result is kept, and it pays
+function gmOver(game, g, score) {
+  const daily = g.daily && !g.duel, firstToday = daily && gmDailyDone(game) == null;
+  if (g.daily) gmDailyOver(game, g, score);
+  if (g.paid) return;
+  g.paid = true;
+  const num = typeof score === "number", wordle = game === "wordle" && g.tries.includes(g.ans), conn = game === "conn" && g.miss < GC_MISS;
+  const q = game === "wordle" ? (wordle ? (GW_TRIES + 1 - g.tries.length) / GW_TRIES : 0) : game === "conn" ? (conn ? 1 - g.miss / GC_MISS : 0)
+    : game === "grid" ? Math.min(1, score / 2500) : num ? Math.min(1, score / 10000) : 0;
+  const got = [[Math.max(10, Math.round(q * 10) * 10), "a game played"]], ach = ["first"], rounds = Array.isArray(g.log) && g.log.length >= 10;
+  gmW.played[game] = 1;
+  if (GM_SCORED.every(([k]) => gmW.played[k])) ach.push("every");
+  if (rounds && game !== "odd" && g.log.every((r) => r.ok)) ach.push("perfect");
+  if (num && score >= 10000 && (game === "track" ? gm.hard : ["id", "skill", "char"].includes(game) ? gi.hard : ["enemy", "splash", "atlas"].includes(game) ? gp.hard : false)) ach.push("hard");
+  if (wordle && g.tries.length <= 3) ach.push("wordle3");
+  if (conn && !g.miss) ach.push("connp");
+  if (game === "grid" && !g.got.includes(null)) ach.push("gridfull");
+  if (game === "odd" && score >= 10000) ach.push("oddp");
+  if (g.duel && g.duel.their != null && /^\d+$/.test(g.duel.their) && num && score > +g.duel.their) { got.push([200, "a duel won"]); ach.push("duel"); }
+  if (firstToday) {
+    got.push([GM_PULL, "a Daily challenge"]);
+    ach.push("daily");
+    const today = gmDay(), before = new Date(new Date(today + "T12:00:00Z") - 864e5).toISOString().slice(0, 10);
+    if (gmW.day !== today) {  // the first Daily of the day: the days in a row
+      gmW.streak = gmW.day === before ? gmW.streak + 1 : 1;
+      gmW.day = today;
+      if (gmW.streak > 1) got.push([50 * Math.min(10, gmW.streak), `${gmW.streak} days in a row`]);
+      for (const n of [3, 7, 30]) if (gmW.streak >= n) ach.push("streak" + n);
+    }
+    if (GM_SCORED.every(([k]) => gmDailyDone(k) != null)) { got.push([10 * GM_PULL, "every Daily of the day"]); ach.push("allday"); }
+  }
+  gmPay(got, ach);
+}
 function gmDayTag(g) {
   if (!g.duel) return `DAILY ${gmDay()}`;
   const d = g.duel, num = (v) => /^\d+$/.test(String(v)) ? +v : null, a = num(d.mine), b = num(d.their);
@@ -163,7 +222,7 @@ const GM_GAMES = [
     gmIcon('<circle cx="6" cy="7" r="2.6"/><circle cx="12" cy="7" r="2.6"/><circle cx="18" cy="7" r="2.6"/><rect x="9.4" y="14.4" width="5.2" height="5.2"/>')],
   ["grid", "#/gamegrid", "Limbus Grid", "A 3 × 3 grid with a condition on every row and column — name an Identity for each cell. Nine tries.",
     gmIcon('<rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M10.6 12l1.1 1.1 1.9-2.2"/>')],
-  ["gacha", "#/gamegacha", "Extraction", "Pull tens at the game's rates and count the lunacy it would have cost. How long until the 000 you wanted?",
+  ["gacha", "#/gamegacha", "Extraction", "Spend the lunacy the games pay: pull tens at the game's rates. How long until the 000 you wanted?",
     gmIcon('<rect x="4" y="3" width="11" height="15" rx="1"/><rect x="9" y="6" width="11" height="15" rx="1"/><path d="M14.5 10.5l1 2.1 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2-1.6-1.5 2.2-.3z"/>'), true],
   ["dare", "#/gamedare", "Challenge roulette", "A random team and a rule to play it by — for a run that got too easy.",
     gmIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="2.2"/>'), true]];
@@ -199,15 +258,17 @@ function gmBest(game) {
 function gmHub() {
   document.querySelector('#subnav [data-group="games"]').hidden = true;  // the tiles are the menu here
   const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_SCORED.filter(([k]) => gmDailyDone(k) != null).length;
-  const mode = gmOfDay(), today = gmDailyDone(mode[0]);
-  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="Got a duel link? Paste it and press Enter" autocomplete="off"><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_SCORED.length}</i></span></div>
+  const mode = gmOfDay(), today = gmDailyDone(mode[0]), yesterday = new Date(new Date(gmDay() + "T12:00:00Z") - 864e5).toISOString().slice(0, 10);
+  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="Got a duel link? Paste it and press Enter" autocomplete="off"><a class="gmscore gmwallet" href="#/gamegacha" title="Games pay lunacy — spend it in Extraction">LUNACY <i>${gmW.lunacy.toLocaleString("en")}</i>${gmW.streak > 1 && [gmDay(), yesterday].includes(gmW.day) ? ` · <i>${gmW.streak}</i> DAYS IN A ROW` : ""}</a><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_SCORED.length}</i></span></div>
     <div class="gmday"><a class="gmart" data-game="${mode[0]}" href="${mode[1]}">${mode[4]}</a><div class="gmdaybody">
       <div class="gmkick">MODE OF THE DAY</div><a class="gmname" href="${mode[1]}">${mode[2]}</a><p>${mode[3]}</p>
       <div class="gmscore">BEST ${gmBest(mode[0]) ? `<i>${gmBest(mode[0])}</i>` : "—"} &nbsp;·&nbsp; DAILY ${today == null ? "—" : `<i>${today}</i>`}</div>
       <div class="gmplay"><a class="gmbtn" href="${mode[1]}">Play</a>${today == null ? `<a class="toggle" href="${mode[1]}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${mode[1]}/duel" title="${GM_DUEL}">Duel</a></div></div></div>
     <div class="gmcols">${GM_GROUPS.map(([group, keys]) => `<div><div class="gmgrp">${group}</div>${keys.map((key) => { const [k, href, name, , pic, toy] = GM_GAMES.find((g) => g[0] === key), best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
       return `<div class="gmtile ${k === mode[0] ? "on" : ""}"><a class="gmtmain" href="${href}"><span class="gmtpic" data-game="${k}">${pic}</span><span><b>${name}</b><small>${toy ? "A TOY" : `BEST ${best ? `<i>${best}</i>` : "—"}`}</small></span></a>
-        ${toy ? "" : day == null ? `<a class="gmdot" href="${href}/daily" title="Today's Daily: not played yet — start it"></a>` : `<span class="gmdot done" title="Today's Daily: ${day}"></span>`}</div>`; }).join("")}</div>`).join("")}</div>`;
+        ${toy ? "" : day == null ? `<a class="gmdot" href="${href}/daily" title="Today's Daily: not played yet — start it"></a>` : `<span class="gmdot done" title="Today's Daily: ${day}"></span>`}</div>`; }).join("")}</div>`).join("")}</div>
+    <div class="gmgrp gmachhead">Achievements <small>${GM_ACH.filter(([k]) => gmW.ach[k]).length} / ${GM_ACH.length} · each pays lunacy once</small></div>
+    <div class="gmach">${GM_ACH.map(([k, name, what, n]) => `<span class="${gmW.ach[k] ? "done" : ""}" title="${esc(what)}"><b>${esc(name)}</b><small>${esc(what)}</small><i>${gmW.ach[k] ? "✓" : "+" + n}</i></span>`).join("")}</div>`;
   // a duel link from a friend opens its game here too (the link itself leads to the website)
   $("#gmduel").onkeydown = (e) => {
     if (e.key !== "Enter") return;
@@ -455,7 +516,7 @@ function gmScore(ok, pick, said) {
 
 function gmResult() {
   const g = gm.game;
-  if (g.daily) gmDailyOver("track", g, g.score);
+  gmOver("track", g, g.score);
   const tag = g.daily ? gmDayTag(g) : "";
   gmDailyEnd();
   const mode = gmMode(), best = g.daily ? gm.best[mode] || 0 : Math.max(gm.best[mode] || 0, g.score), record = !g.daily && g.score > (gm.best[mode] || 0);

@@ -1,5 +1,5 @@
 // Games → the two toys (no score, no Daily):
-// Extraction — pulls at the game's standard rates, with a count of what they would have cost;
+// Extraction — pulls at the game's standard rates, paid with the lunacy the games give (games.js gmW);
 // Challenge roulette — a random team and a rule to play it by.
 "use strict";
 
@@ -48,10 +48,14 @@ function gaRoll(safe) {
 }
 
 function gaPull(n) {
-  if (!ga.data.r[1].length || !ga.data.r[3].length) return;
+  if (!ga.data.r[1].length || !ga.data.r[3].length || gmW.lunacy < n * GM_PULL) return;
+  gmW.lunacy -= n * GM_PULL;
   ga.last = Array.from({ length: n }, (_, i) => gaRoll(n === 10 && i === 9));
   gaKeep();
+  Object.assign(gmW, { pulls: gmW.pulls + n, r3: gmW.r3 + ga.last.filter((r) => r.kind === "r3").length, ego: gmW.ego + ga.last.filter((r) => r.kind === "ego").length });
   gaDraw();
+  gmPay([], [gmW.r3 ? "r3" : "", ga.last.some((r) => r.feat) ? "feat" : "", gmW.ego >= 10 ? "ego10" : "", gmW.pulls >= 100 ? "pulls100" : ""].filter(Boolean));
+  if ($(".gawallet b")) $(".gawallet b").textContent = gmW.lunacy.toLocaleString("en");
 }
 
 function gaDraw() {
@@ -61,11 +65,13 @@ function gaDraw() {
     <b>${esc(r.x.title)}</b><i>${esc(r.x.sub)}</i></div>`;
   const top = Object.entries(st.got).map(([k, n]) => [d.by.get(k), n]).filter(([x]) => x && (x.ego || x.rank === 3));
   $("#main").innerHTML = `<h1>Extraction</h1>
-    <div class="sub">Pulls at the game's standard rates: 000 — 2.9% (half of them the featured Identity), E.G.O — 1.3%, 00 — 12.8%; the tenth of a ten is never less than a 00. A toy: nothing is spent, and the game's own banners differ in what they hold.</div>
+    <div class="sub">Pulls at the game's standard rates: 000 — 2.9% (half of them the featured Identity), E.G.O — 1.3%, 00 — 12.8%; the tenth of a ten is never less than a 00. Paid with the lunacy the games give: a finished game, a Daily, days in a row, a duel won, achievements.</div>
     ${!d.r[1].length || !d.r[3].length ? `<p class="muted">Nothing to pull yet: the game's files or a snapshot are missing.</p>` : `
     <div class="gmstart"><label class="gafeat">Featured <select id="gafeat">${d.new.map((x) => `<option value="${x.id}" ${x.id === st.feat ? "selected" : ""}>${esc(x.title)} — ${esc(x.sub)}</option>`).join("")}</select></label>
-      <span class="grow"></span><button class="toggle" id="gareset">Start over</button><button class="toggle gaone" id="ga1">Extract × 1</button><button class="gmbtn" id="ga10">Extract × 10</button></div>
-    <div class="gastats gmscore"><span>PULLS <b>${st.pulls}</b></span><span>LUNACY <b>${(st.pulls * GA_COST).toLocaleString("en")}</b></span>
+      <span class="grow"></span><span class="gmscore gawallet">LUNACY <b>${gmW.lunacy.toLocaleString("en")}</b></span><button class="toggle" id="gareset" title="Forget what was pulled — the lunacy stays">Start over</button>
+      <button class="toggle gaone" id="ga1" ${gmW.lunacy < GM_PULL ? "disabled" : ""}>Extract × 1 · ${GM_PULL}</button><button class="gmbtn" id="ga10" ${gmW.lunacy < 10 * GM_PULL ? "disabled" : ""}>Extract × 10 · ${10 * GM_PULL}</button></div>
+    ${gmW.lunacy < GM_PULL ? `<p class="muted">Out of lunacy — <a href="#/games">play a game</a>: today's Dailies pay the most.</p>` : ""}
+    <div class="gastats gmscore"><span>PULLS <b>${st.pulls}</b></span><span>SPENT <b>${(st.pulls * GA_COST).toLocaleString("en")}</b></span>
       <span>000 <i>${st.n.r3}</i> ${pct(st.n.r3)}</span><span>E.G.O <i>${st.n.ego}</i> ${pct(st.n.ego)}</span><span>00 <b>${st.n.r2}</b> ${pct(st.n.r2)}</span><span>0 <b>${st.n.r1}</b></span>
       <span>SINCE THE LAST 000 <b>${st.since}</b></span><span>FEATURED ${st.featAt == null ? "<b>—</b>" : `AT PULL <i>${st.featAt}</i>`}</span>
       <span title="${GA_PITY} pulls on one banner buy its featured unit outright">IDEALITY <b>${st.pulls % GA_PITY} / ${GA_PITY}</b></span></div>

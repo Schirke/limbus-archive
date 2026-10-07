@@ -225,7 +225,7 @@ function giAnswer(key) {
 
 function giResult() {
   const g = gi.game;
-  if (g.daily) gmDailyOver(giGame(), g, g.score);
+  gmOver(giGame(), g, g.score);
   const tag = g.daily ? gmDayTag(g) : "", game = giGame();
   giDailyEnd();
   const mode = giMode(), record = !g.daily && g.score > (gi.best[mode] || 0);
