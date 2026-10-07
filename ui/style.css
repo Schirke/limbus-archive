@@ -31,7 +31,9 @@ pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
   border: 1px solid transparent; border-radius: 17px; white-space: nowrap; }
 #nav a:hover, #navset:hover, #navsup:hover { color: var(--text); }
 #nav a.active, #navset.active, #navsup.active { color: var(--gold); border-color: var(--gold); background: rgba(201,162,39,.08); }
-#navset, #navsup { font-size: 17px; padding: 3px 9px; }
+#navset { font-size: 17px; padding: 3px 9px; }
+#navsup { display: flex; align-items: center; gap: 7px; padding: 6px 13px; color: var(--gold); border-color: var(--gold); background: rgba(201,162,39,.08); }
+#navsup:hover, #navsup.active { color: var(--gold); background: rgba(201,162,39,.18); }
 #statusbox { margin-left: auto; position: relative; }
 #statusbtn { font: 12px Consolas, "Cascadia Mono", monospace; letter-spacing: .5px; color: var(--muted); background: none; border-radius: 17px; padding: 6px 12px; white-space: nowrap; }
 #statusbtn .ok { color: var(--add); } #statusbtn .bad { color: var(--rem); } #statusbtn.news { color: var(--gold); border-color: var(--gold); }
