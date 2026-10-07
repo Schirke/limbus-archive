@@ -1075,3 +1075,22 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gdslot small { display: block; font: 11px Consolas, monospace; letter-spacing: 1px; color: var(--gold); }
 .gdslot b { display: block; padding: 2px 8px 0; color: #fff; font: 15px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
 .gdslot i { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; padding: 0 6px; font-style: normal; color: var(--muted); font-size: 12px; } .gdslot i img { width: 26px; height: 26px; object-fit: cover; }
+/* Games' page: the mode of the day on top, every game as a tile in its column (games.js gmHub) */
+.gmday { display: grid; grid-template-columns: 430px 1fr; max-width: 1240px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); margin-bottom: 8px; }
+.gmday .gmart { height: 190px; border-bottom: 0; border-right: 1px solid var(--line); } .gmday .gmart svg { width: 84px; height: 84px; } .gmday .gmart.pics img { height: 190px; }
+.gmdaybody { display: flex; flex-direction: column; gap: 7px; padding: 18px 24px; } .gmdaybody .gmkick { color: var(--gold); }
+.gmdaybody .gmname { font-size: 32px; } .gmdaybody p { flex: 1; margin: 0; max-width: 620px; color: var(--muted); line-height: 1.5; }
+.gmdaybody .gmplay { height: 38px; } .gmdaybody .gmplay .gmbtn { flex: none; width: 190px; display: grid; place-items: center; padding: 0; }
+.gmcols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; max-width: 1240px; }
+@media (max-width: 1000px) { .gmcols { grid-template-columns: repeat(2, minmax(0, 1fr)); } .gmday { grid-template-columns: 1fr; } }
+.gmgrp { margin: 14px 0 9px; padding-bottom: 6px; border-bottom: 1px solid var(--line); font: 20px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); }
+.gmtile { display: flex; align-items: center; background: var(--panel); border: 1px solid var(--line); margin-bottom: 5px; } .gmtile:hover, .gmtile.on { border-color: var(--gold); }
+.gmtmain { flex: 1; min-width: 0; display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 11px; align-items: center; padding: 6px; text-decoration: none; }
+.gmtpic { width: 56px; height: 56px; display: grid; place-items: center; color: var(--gold); background: #161315; overflow: hidden; }
+.gmtpic svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.gmtpic img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; } .gmtpic[data-game="skill"] img, .gmtpic[data-game="enemy"] img { object-fit: contain; }
+.gmtmain b { display: block; font: 17px/1.1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; font-weight: normal; color: #fff; }
+.gmtmain small { font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 1px; color: var(--muted); } .gmtmain small i { font-style: normal; color: var(--gold); }
+.gmdot { flex: none; width: 30px; height: 30px; margin-right: 6px; display: grid; place-items: center; } .gmdot::after { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--gold); }
+a.gmdot:hover::after { background: var(--gold); } .gmdot.done::after { background: var(--add); border-color: var(--add); }
+#subnav a.gmdaily, a.gmdaily { display: inline-grid; place-items: center; text-decoration: none; }

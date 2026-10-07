@@ -59,7 +59,9 @@ function gmDailyKeep(game, score) {
   } catch {}
 }
 const gmDailyBtn = (game, off) => { const done = gmDailyDone(game);
-  return `<button class="toggle gmdaily" id="gmdaily" ${off ? "disabled" : ""} title="The same ten rounds for everybody today, on fixed settings">Daily challenge${done == null ? "" : ` · done: ${done}`}</button>`; };
+  return `<button class="toggle gmdaily" id="gmdaily" ${off ? "disabled" : ""} title="The same ten rounds for everybody today, on fixed settings">Daily challenge${done == null ? "" : ` · done: ${done}`}</button>`
+    + `<a class="toggle gmdaily" href="${GM_GAMES.find(([k]) => k === game)[1]}/duel" title="${GM_DUEL}">Duel</a>`; };
+const GM_DUEL = "A game to send to a friend: play it, then copy the link with your result — the link opens the same rounds";
 // log: [{ok, clean}] — a square per round: right at once, right with hints or more of the piece, missed
 function gmShare(title, score, log) {
   const text = `Limbus Archive · ${title} · Daily ${gmDay()}\n${score} pts · ${log.filter((r) => r.ok).length}/${log.length}\n${log.map((r) => r.ok ? (r.clean ? "🟩" : "🟨") : "⬛").join("")}`;
@@ -165,6 +167,17 @@ const GM_GAMES = [
   ["dare", "#/gamedare", "Challenge roulette", "A random team and a rule to play it by — for a run that got too easy.",
     gmIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="2.2"/>'), true]];
 const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
+// the games' page: the columns its tiles stand in
+const GM_GROUPS = [["By ear", ["track", "id", "char"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas"]], ["Puzzles", ["wordle", "conn", "odd", "grid"]], ["Toys", ["gacha", "dare"]]];
+// Mode of the day: the game shown big on the games' page — another one after every daily reset, never a toy; each
+// comes once before any comes again (the order is drawn anew for every round of them)
+function gmOfDay() {
+  const n = Math.floor((Date.now() + 3 * 3600e3) / 864e5), len = GM_SCORED.length, round = Math.floor(n / len);
+  const order = (r) => { const rnd = gmSeed("mode" + r); return GM_SCORED.map((g) => [rnd(), g]).sort((a, b) => a[0] - b[0]).map((p) => p[1]); };
+  const mine = order(round);
+  if (mine[0] === order(round - 1)[len - 1]) [mine[0], mine[1]] = [mine[1], mine[0]];  // (not the same game two days running)
+  return mine[n % len];
+}
 document.querySelectorAll("#subnav [data-game]").forEach((a) => { a.innerHTML = GM_GAMES.find(([k]) => k === a.dataset.game)[4]; });
 
 // the line under the menu inside a game: back to the games' page, the game's name, the other games by their pictures
@@ -183,15 +196,17 @@ function gmBest(game) {
 }
 
 function gmHub() {
-  document.querySelector('#subnav [data-group="games"]').hidden = true;  // the cards are the menu here
+  document.querySelector('#subnav [data-group="games"]').hidden = true;  // the tiles are the menu here
   const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_SCORED.filter(([k]) => gmDailyDone(k) != null).length;
+  const mode = gmOfDay(), today = gmDailyDone(mode[0]);
   $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="Got a duel link? Paste it and press Enter" autocomplete="off"><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_SCORED.length}</i></span></div>
-    <div class="gmhub">${GM_GAMES.map(([k, href, name, what, pic, toy]) => { const best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
-      if (toy) return `<div class="gmcard"><a class="gmart" data-game="${k}" href="${href}">${pic}</a><div class="gmcbody"><a class="gmname" href="${href}">${name}</a><p>${what}</p>
-        <div class="gmscore gmstat"><span>NO SCORE — A TOY</span></div><div class="gmplay"><a class="gmbtn" href="${href}">Open</a></div></div></div>`;
-      return `<div class="gmcard"><a class="gmart" data-game="${k}" href="${href}">${pic}</a><div class="gmcbody"><a class="gmname" href="${href}">${name}</a><p>${what}</p>
-        <div class="gmscore gmstat"><span>BEST ${best ? `<i>${best}</i>` : "—"}</span><span>DAILY ${day == null ? "—" : `<i>${day}</i>`}</span></div>
-        <div class="gmplay"><a class="gmbtn" href="${href}">Play</a>${day == null ? `<a class="toggle" href="${href}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${href}/duel" title="A game to send to a friend: play it, then copy the link with your result — the link opens the same rounds">Duel</a></div></div></div>`; }).join("")}</div>`;
+    <div class="gmday"><a class="gmart" data-game="${mode[0]}" href="${mode[1]}">${mode[4]}</a><div class="gmdaybody">
+      <div class="gmkick">MODE OF THE DAY</div><a class="gmname" href="${mode[1]}">${mode[2]}</a><p>${mode[3]}</p>
+      <div class="gmscore">BEST ${gmBest(mode[0]) ? `<i>${gmBest(mode[0])}</i>` : "—"} &nbsp;·&nbsp; DAILY ${today == null ? "—" : `<i>${today}</i>`}</div>
+      <div class="gmplay"><a class="gmbtn" href="${mode[1]}">Play</a>${today == null ? `<a class="toggle" href="${mode[1]}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${mode[1]}/duel" title="${GM_DUEL}">Duel</a></div></div></div>
+    <div class="gmcols">${GM_GROUPS.map(([group, keys]) => `<div><div class="gmgrp">${group}</div>${keys.map((key) => { const [k, href, name, , pic, toy] = GM_GAMES.find((g) => g[0] === key), best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
+      return `<div class="gmtile ${k === mode[0] ? "on" : ""}"><a class="gmtmain" href="${href}"><span class="gmtpic" data-game="${k}">${pic}</span><span><b>${name}</b><small>${toy ? "A TOY" : `BEST ${best ? `<i>${best}</i>` : "—"}`}</small></span></a>
+        ${toy ? "" : day == null ? `<a class="gmdot" href="${href}/daily" title="Today's Daily: not played yet — start it"></a>` : `<span class="gmdot done" title="Today's Daily: ${day}"></span>`}</div>`; }).join("")}</div>`).join("")}</div>`;
   // a duel link from a friend opens its game here too (the link itself leads to the website)
   $("#gmduel").onkeydown = (e) => {
     if (e.key !== "Enter") return;
@@ -201,13 +216,15 @@ function gmHub() {
   gmHubPics();
 }
 
-// the cards' pictures: three of the game's own for each game, the same ones for everybody (the preset of
-// /api/game_cards, server.py CARD_PRESET; the web copy keeps them in a pack of its own). The first three that load
-// are drawn, in the list's order; a card keeps its drawn icon until then (and where there are none).
+// the games' pictures: three of the game's own for each game, the same ones for everybody (the preset of
+// /api/game_cards, server.py CARD_PRESET; the web copy keeps them in a pack of its own). The mode of the day gets
+// the first three that load, in the list's order, a tile the first one; the drawn icon stays until then (and where
+// there are none).
 function gmHubPics() {
   const some = (a) => a.slice(0, 6);
   const put = async (game, urls) => {
-    const el = document.querySelector(`.gmart[data-game="${game}"]`);
+    const el = document.querySelector(`.gmart[data-game="${game}"]`), tile = document.querySelector(`.gmtpic[data-game="${game}"]`);
+    if (tile && urls[0]) { const im = new Image(); im.onload = () => tile.isConnected && tile.replaceChildren(im); im.src = urls[0]; }
     if (!el) return;
     const got = (await Promise.all(some(urls).map((u) => new Promise((ok) => { const im = new Image(); im.onload = () => ok(im); im.onerror = () => ok(null); im.src = u; }))))
       .filter(Boolean).slice(0, 3);
