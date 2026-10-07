@@ -529,6 +529,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/community":  # live streams of the game, a list made on GitHub
                 from . import community
                 return self._json(community.streams())
+            if p == "/api/bilibili":  # the game's videos on Bilibili (the Community page's tab)
+                from . import bilibili
+                return self._json(bilibili.videos(q.get("period", "week"), q.get("sort", "views"), svc.translator))
             if p == "/api/quiz":  # voice lines for Games -> Guess the Identity
                 return self._json(svc.quiz())
             if p == "/api/game_pics":  # pictures of the Games: the jukebox covers (the track's card), the story's

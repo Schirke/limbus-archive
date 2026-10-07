@@ -40,7 +40,11 @@ cmRead();
 setInterval(cmRead, 180000);
 setInterval(() => { const el = $(".cmstamp"); if (el) el.outerHTML = cmStamp(el.dataset.at); }, 30000);
 
-routes.community = async () => {
+// The page's two tabs: the live streams, the videos on Bilibili.
+const cmTabs = (on) => `<div class="cmtabs">${[["", "Live streams"], ["bilibili", "Bilibili"]].map(([k, n]) => `<a class="${on === k ? "on" : ""}" href="#/community${k ? "/" + k : ""}">${n}</a>`).join("")}</div>`;
+
+routes.community = async (args) => {
+  if (args && args[0] === "bilibili") return cmBili();
   $("#main").innerHTML = `<h1>Community</h1><div class="sub">Who streams Limbus Company right now.</div><p class="muted">Reading the list…</p>`;
   let d = await api("/api/community").catch(() => ({}));
   cmTab(d);
@@ -54,7 +58,7 @@ routes.community = async () => {
     const rows = every.filter((s) => (cm.lang === "all" || s.lang === CM_LANGS.find(([k]) => k === cm.lang)[1]) && (!cm.site || s.on === cm.site))
       .sort((a, b) => cm.sort === "new" ? started(b) - started(a) : cm.sort === "long" ? (started(a) || 9e15) - (started(b) || 9e15) : b.viewers - a.viewers);
     $("#main").innerHTML = `<h1>Community</h1>
-      <div class="sub">Who streams Limbus Company right now, on Twitch and YouTube.</div>
+      <div class="sub">Who streams Limbus Company right now, on Twitch and YouTube.</div>${cmTabs("")}
       <div class="dbrow">${chips(CM_LANGS, "lang")}<span class="gap"></span>${chips(CM_SITES, "site")}
         <span class="grow"></span><span class="gmscore">${d.updated ? `${rows.length} LIVE` : ""}</span>${d.updated ? cmStamp(d.updated) : ""}</div>
       <div class="dbrow">${chips(CM_SORTS, "sort")}<span class="grow"></span><span class="muted small" title="The Community button in the menu shows who is live while a stream has this many viewers">Show in the menu a stream with</span>${chips(CM_BIG, "big")}</div>
@@ -75,5 +79,44 @@ routes.community = async () => {
   };
   draw();
   // a newer list read while the page is open (cmRead) is shown at once
-  cm.fresh = (doc) => { if (location.hash.split("/")[1] !== "community") return void (cm.fresh = null); if (doc && doc.updated && doc.updated !== d.updated) { take(doc); draw(); } };
+  cm.fresh = (doc) => { if (location.hash.split("/")[1] !== "community" || location.hash.split("/")[2]) return void (cm.fresh = null); if (doc && doc.updated && doc.updated !== d.updated) { take(doc); draw(); } };
 };
+
+// Bilibili: the game's videos there (/api/bilibili: Bilibili's own search by the game's Chinese name, asked by the app,
+// kept 10 minutes) — of the last day, the last week or of all time, the most watched first or the newest first.
+// A title is shown as it is, with its English translation under it.
+const CB_PERIODS = [["day", "Last 24 hours"], ["week", "Last week"], ["all", "All time"]];
+const CB_SORTS = [["views", "Most watched"], ["new", "Newest"]];
+const cb = { period: "week", sort: "views", ...(() => { try { return JSON.parse(localStorage.getItem("community_bili") || "{}"); } catch { return {}; } })() };
+
+async function cmBili() {
+  if (!CB_PERIODS.some(([k]) => k === cb.period)) cb.period = "week";
+  if (!CB_SORTS.some(([k]) => k === cb.sort)) cb.sort = "views";
+  const chips = (list, key) => list.map(([k, n]) => `<button class="toggle ${cb[key] === k ? "on" : ""}" data-cb${key}="${k}">${n}</button>`).join("");
+  const head = (right) => `<h1>Community</h1>
+    <div class="sub">Limbus Company videos on Bilibili.</div>${cmTabs("bilibili")}
+    <div class="dbrow">${chips(CB_PERIODS, "period")}<span class="gap"></span>${chips(CB_SORTS, "sort")}<span class="grow"></span>${right || ""}</div>`;
+  const wire = () => {
+    for (const key of ["period", "sort"])
+      document.querySelectorAll(`[data-cb${key}]`).forEach((b) => b.onclick = () => {
+        cb[key] = b.dataset["cb" + key];
+        try { localStorage.setItem("community_bili", JSON.stringify(cb)); } catch {}
+        cmBili();
+      });
+  };
+  const asked = cb.period + cb.sort;
+  $("#main").innerHTML = head() + `<p class="muted">Asking Bilibili…</p>`;
+  wire();
+  const d = await api(`/api/bilibili?period=${cb.period}&sort=${cb.sort}`).catch(() => ({ error: "no answer" }));
+  if (location.hash.split("/")[2] !== "bilibili" || asked !== cb.period + cb.sort) return;
+  const rows = d.videos || [];
+  $("#main").innerHTML = head(d.updated ? `<span class="gmscore">${rows.length} VIDEOS</span>${cmStamp(d.updated).replace("every 5 minutes", "every 10 minutes")}` : "")
+    + (d.error ? `<p class="muted">Bilibili's list could not be read (${esc(d.error)}).</p>`
+    : !rows.length ? `<p class="muted">No videos here.</p>`
+    : `<div class="cbgrid">${rows.map((v, i) => `<a class="cbcard" href="${esc(v.url)}" target="_blank" title="${esc(v.title)}&#10;Open the video on Bilibili">
+        <span class="cmpic"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(v.thumb)}@480w_270h_1c.webp" onerror="this.remove()"><i>${i + 1}</i><em>${esc(v.length)}</em></span>
+        <b>${esc(v.title)}</b>${v.en ? `<span class="cben">${esc(v.en)}</span>` : ""}
+        <span class="cbby">${esc(v.name)}</span>
+        <small><u>${cmK(v.views)} views</u>${v.likes ? `${cmK(v.likes)} likes · ` : ""}${cmAgo(v.at).replace(/^(\d+) h \d+ min ago$/, (m, h) => h < 24 ? m : `${Math.floor(h / 24)} d ago`)}</small></a>`).join("")}</div>`);
+  wire();
+}

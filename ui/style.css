@@ -704,6 +704,18 @@ button.gihint { cursor: pointer; } button.gihint:hover { border-color: var(--gol
 .cmstamp.old { color: var(--gold); } .cmstamp.old i { background: var(--gold); }
 .cmstamp.stale { color: #fff; border-color: var(--red); } .cmstamp.stale i { background: var(--red); }
 .cmview { text-align: right; color: var(--muted); font-size: 12px; } .cmview b { display: block; font: 26px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; color: #fff; font-weight: normal; }
+.cmtabs { display: flex; gap: 22px; margin: 4px 0 14px; border-bottom: 1px solid var(--line); }
+.cmtabs a { padding: 6px 2px 8px; color: var(--muted); text-decoration: none; font: 20px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.cmtabs a:hover { color: #fff; } .cmtabs a.on { color: var(--gold); border-bottom-color: var(--gold); }
+.cbgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 14px; }
+.cbcard { display: grid; gap: 4px; align-content: start; padding: 0 0 10px; background: var(--panel); border: 1px solid var(--line); color: var(--text); text-decoration: none; min-width: 0; }
+.cbcard:hover { border-color: var(--gold); }
+.cbcard > :not(.cmpic) { margin: 0 10px; }
+.cbcard .cmpic i { background: rgba(0, 0, 0, .75); } .cbcard .cmpic em { position: absolute; right: 6px; bottom: 6px; padding: 1px 6px; background: rgba(0, 0, 0, .75); color: #fff; font: 11px Consolas, monospace; font-style: normal; }
+.cbcard b { margin-top: 6px; font-weight: normal; font-size: 14px; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cben { color: var(--muted); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.cbby { color: var(--gold); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cbcard small { color: var(--muted); font-size: 12px; } .cbcard small u { text-decoration: none; color: #fff; margin-right: 8px; }
 /* Patches -> News: the developers' update notices from Steam (news.js) */
 .nwfeed { display: grid; grid-template-columns: 400px 1fr; border: 1px solid var(--line); background: var(--panel); height: calc(100vh - 250px); min-height: 420px; }
 .nwlist { overflow-y: auto; border-right: 1px solid var(--line); }
