@@ -7,7 +7,7 @@
 // ------------------------------------------------------------------ shared
 const GX_KEEP = "games_more";
 const gx = { wordle: {}, conn: {}, plain: false, ...(() => { try { return JSON.parse(localStorage.getItem(GX_KEEP) || "{}"); } catch { return {}; } })() };
-const gxKeep = () => { try { localStorage.setItem(GX_KEEP, JSON.stringify({ wordle: gx.wordle, conn: gx.conn, plain: gx.plain })); } catch {} };
+const gxKeep = () => { try { localStorage.setItem(GX_KEEP, JSON.stringify({ wordle: gx.wordle, conn: gx.conn, plain: gx.plain, grid: gx.grid })); } catch {} };
 function gxCopy(text) {
   const done = () => toast("Copied — paste it anywhere.");
   const old = () => { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); done(); };
@@ -32,19 +32,21 @@ function gxType(inp, box, from, pick) {
   };
   inp.focus();
 }
-// the Identities as the two puzzles see them
+// the Identities as the puzzles see them
 let gxIdsP = null;
 const gxIds = () => gxIdsP || (gxIdsP = api("/api/units").then((u) => ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => {
   const top = (s) => s.up[Math.max(...Object.keys(s.up).map(Number))] || {};
   return { key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName, sinner: x.sinner, season: giSeason(u, x.season) || "—",
     date: x.date || "", rank: x.rank, kw: (x.keywords || []).map((k) => u.keywords[k] || k), assoc: x.assoc || [],
-    atk: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).atk).filter(Boolean))], pic: giThumb(x.img.thumb) }; })).catch(() => []));
+    atk: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).atk).filter(Boolean))],
+    sins: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).sin).filter(Boolean))], resist: x.resist || {}, pic: giThumb(x.img.thumb) }; })).catch(() => []));
 // what the games' page shows as a game's best (games.js gmBest)
 function gxBest(game) {
   if (game === "enemy") return Math.max(0, ...Object.entries(gp.best).filter(([k]) => k !== "canto").map(([, v]) => v));
   if (game === "canto") return gp.best.canto || 0;
   if (game === "wordle") return gx.wordle.best ? `${gx.wordle.best} / ${GW_TRIES}` : 0;
   if (game === "conn") return gx.conn.best == null ? 0 : gx.conn.best ? `${gx.conn.best} MISS` : "PERFECT";
+  if (game === "grid") return (gx.grid || {}).best || 0;
 }
 
 // ------------------------------------------------------------------ a picture that opens in steps: enemy, pixel art, Canto
@@ -60,8 +62,8 @@ const gpPool = () => gpCanto() ? gp.data.scenes : gp.who === "id" ? gp.data.ids 
 const gpWorth = () => Math.max(100, GP_WORTH[gp.game.step] - GP_HINT * Object.keys(gp.game.hints).length) * (gp.hard && !gpCanto() ? 2 : 1);
 
 window.addEventListener("hashchange", () => { if (!/^#\/game(enemy|canto)/.test(location.hash)) { gp.game = null; gpDailyEnd(); } });
-routes.gameenemy = (args = []) => gpOpen("enemy", args[0] === "daily");
-routes.gamecanto = (args = []) => gpOpen("canto", args[0] === "daily");
+routes.gameenemy = (args = []) => gpOpen("enemy", gmAuto("enemy", args));
+routes.gamecanto = (args = []) => gpOpen("canto", gmAuto("canto", args));
 
 async function gpOpen(page, daily) {
   gp.page = page;
@@ -82,7 +84,7 @@ async function gpOpen(page, daily) {
   }
   if (gp.page !== page) return;
   gpDrawStart();
-  if (daily && gmDailyDone(page) == null && $("#gmdaily") && !$("#gmdaily").disabled) gpNew(true);
+  if (daily && $("#gmdaily") && !$("#gmdaily").disabled) gpNew(true);
 }
 
 function gpDrawStart() {
@@ -114,13 +116,14 @@ function gpDailyEnd() {
 }
 
 function gpNew(daily) {
+  const duel = daily === true ? gmDuelTake(gp.page) : null;
   gpDailyEnd();
   if (daily === true) {
     gp.mine = { who: gp.who, look: gp.look, hard: gp.hard };
     Object.assign(gp, { who: "enemy", look: "sil", hard: false });
-    gmRnd = gmSeed(gmDay() + gp.page);
+    gmRnd = gmDaySeed(gp.page, duel);
   }
-  gp.game = { daily: daily === true, pool: gpPool().slice(), round: -1, score: 0, streak: 0, top: 0, log: [], asked: new Set() };
+  gp.game = { daily: daily === true, duel, pool: gpPool().slice(), round: -1, score: 0, streak: 0, top: 0, log: [], asked: new Set() };
   gpRound();
 }
 
@@ -234,20 +237,21 @@ function gpAnswer(key) {
 
 function gpResult() {
   const g = gp.game;
-  if (g.daily) gmDailyKeep(gp.page, g.score);
+  if (g.daily) gmDailyOver(gp.page, g, g.score);
+  const tag = g.daily ? gmDayTag(g) : "";
   gpDailyEnd();
   const mode = gpMode(), record = !g.daily && g.score > (gp.best[mode] || 0);
   if (!g.daily) gp.best[mode] = Math.max(gp.best[mode] || 0, g.score);
   gpKeep();
   $("#main").innerHTML = `<h1>${gpTitle()}</h1>
     <div class="gmtop"><span class="gmbig">${g.score}</span><span class="gmscore">${g.log.filter((r) => r.ok).length} OF ${g.log.length} · BEST STREAK ×${g.top} · BEST <i>${gp.best[mode] || 0}</i>${record ? " · NEW RECORD" : ""}</span>
-      <span class="grow"></span>${g.daily ? `<span class="gmscore">DAILY ${gmDay()}</span><button class="toggle" id="gpcopy">Copy the result</button>` : ""}<button class="toggle" id="gpback">Settings</button><button class="gmbtn" id="gpagain">Play again</button></div>
+      <span class="grow"></span>${g.daily ? `<span class="gmscore">${tag}</span><button class="toggle" id="gpcopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="gpback">Settings</button><button class="gmbtn" id="gpagain">Play again</button></div>
     <table class="gmlog"><tr><th>#</th><th></th><th>${gpCanto() ? "FROM" : "WHO"}</th><th>YOUR ANSWER</th><th>OPENED</th><th>HINTS</th><th>POINTS</th></tr>
     ${g.log.map((r, i) => `<tr><td>${i + 1}</td><td><img class="gplogpic" src="${r.ans.thumb || r.ans.pic}"></td><td>${esc(r.ans.name)}<i>${esc(r.ans.sub)}</i></td>
       <td class="${r.ok ? "ok" : "bad"}">${esc(r.said)}</td><td>${r.step + 1} / ${GP_WORTH.length}</td><td>${r.hints || ""}</td><td>${r.points}</td></tr>`).join("")}</table>`;
   $("#gpagain").onclick = () => gpNew();
   $("#gpback").onclick = () => { gp.game = null; gpDrawStart(); };
-  if ($("#gpcopy")) $("#gpcopy").onclick = () => gmShare(gpTitle(), g.score, g.log.map((r) => ({ ok: r.ok, clean: !r.step && !r.hints })));
+  if ($("#gpcopy")) $("#gpcopy").onclick = () => gmCopyResult(gp.page, g, () => gmShare(gpTitle(), g.score, g.log.map((r) => ({ ok: r.ok, clean: !r.step && !r.hints }))));
 }
 
 // ------------------------------------------------------------------ Limbus Wordle
@@ -260,10 +264,11 @@ routes.gamewordle = async (args = []) => {
   gw.game = null;
   gmCrumb("wordle");
   $("#main").innerHTML = `<h1>Limbus Wordle</h1><div class="sub">Reading the game's files…</div>`;
+  const auto = gmAuto("wordle", args);
   gw.ids = await gxIds();
   if (!location.hash.startsWith("#/gamewordle")) return;
   gwDrawStart();
-  if (args[0] === "daily" && gmDailyDone("wordle") == null && gw.ids.length) gwNew(true);
+  if (auto && gw.ids.length) gwNew(true);
 };
 
 function gwDrawStart() {
@@ -279,8 +284,8 @@ function gwDrawStart() {
 }
 
 function gwNew(daily) {
-  const rnd = daily === true ? gmSeed(gmDay() + "wordle") : Math.random;
-  gw.game = { daily: daily === true, ans: gw.ids[Math.floor(rnd() * gw.ids.length)], tries: [], over: false };
+  const duel = daily === true ? gmDuelTake("wordle") : null, rnd = daily === true ? gmDaySeed("wordle", duel) : Math.random;
+  gw.game = { daily: daily === true, duel, ans: gw.ids[Math.floor(rnd() * gw.ids.length)], tries: [], over: false };
   gwDraw();
 }
 
@@ -298,8 +303,8 @@ function gwCells(x, a) {
 function gwDraw() {
   const g = gw.game, a = g.ans, won = g.tries.includes(a);
   $("#main").innerHTML = `<h1>Limbus Wordle</h1>
-    <div class="gmtop"><span class="gmscore">TRY <b>${Math.min(GW_TRIES, g.tries.length + (g.over ? 0 : 1))} / ${GW_TRIES}</b>${g.daily ? ` · DAILY ${gmDay()}` : ""}</span><span class="grow"></span>
-      ${g.over ? `${g.daily ? `<button class="toggle" id="gwcopy">Copy the result</button>` : ""}<button class="toggle" id="gwback">Back</button><button class="gmbtn" id="gwagain">Play again</button>` : `<button class="toggle" id="gwquit">Give up</button>`}</div>
+    <div class="gmtop"><span class="gmscore">TRY <b>${Math.min(GW_TRIES, g.tries.length + (g.over ? 0 : 1))} / ${GW_TRIES}</b>${g.daily ? ` · ${gmDayTag(g)}` : ""}</span><span class="grow"></span>
+      ${g.over ? `${g.daily ? `<button class="toggle" id="gwcopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="gwback">Back</button><button class="gmbtn" id="gwagain">Play again</button>` : `<button class="toggle" id="gwquit">Give up</button>`}</div>
     ${g.over ? `<div class="gwend ${won ? "ok" : ""}"><img src="${a.pic}"><div><div class="gmkick">${won ? `SOLVED IN ${g.tries.length} / ${GW_TRIES}` : "NOT THIS TIME — IT WAS"}</div>
       <div class="gmq">${esc(a.title)}</div><span class="muted">${esc(a.sub)}</span> · <a href="#/db/${a.id}">Open in the database →</a></div></div>`
     : `<div class="gwtype"><input id="gwin" class="dbq" placeholder="Identity or Sinner…" autocomplete="off"><div id="gwsugg" class="gmsugg"></div></div>`}
@@ -311,8 +316,8 @@ function gwDraw() {
   if ($("#gwquit")) $("#gwquit").onclick = () => gwEnd();
   if ($("#gwagain")) $("#gwagain").onclick = () => gwNew();
   if ($("#gwback")) $("#gwback").onclick = () => { gw.game = null; gwDrawStart(); };
-  if ($("#gwcopy")) $("#gwcopy").onclick = () => gxCopy(`Limbus Archive · Limbus Wordle · Daily ${gmDay()}\n${won ? g.tries.length : "X"}/${GW_TRIES}\n`
-    + g.tries.map((x) => gwCells(x, a).map(([, c]) => c === "ok" ? "🟩" : c === "part" ? "🟨" : "⬛").join("")).join("\n"));
+  if ($("#gwcopy")) $("#gwcopy").onclick = () => gmCopyResult("wordle", g, () => gxCopy(`Limbus Archive · Limbus Wordle · Daily ${gmDay()}\n${won ? g.tries.length : "X"}/${GW_TRIES}\n`
+    + g.tries.map((x) => gwCells(x, a).map(([, c]) => c === "ok" ? "🟩" : c === "part" ? "🟨" : "⬛").join("")).join("\n")));
 }
 
 function gwTry(key) {
@@ -331,7 +336,7 @@ function gwEnd() {
     gx.wordle.best = Math.min(gx.wordle.best || 99, g.tries.length);
   }
   gxKeep();
-  if (g.daily) gmDailyKeep("wordle", won ? `${g.tries.length} / ${GW_TRIES}` : `X / ${GW_TRIES}`);
+  if (g.daily) gmDailyOver("wordle", g, won ? `${g.tries.length} / ${GW_TRIES}` : `X / ${GW_TRIES}`);
   gwDraw();
 }
 
@@ -342,6 +347,7 @@ window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/g
 
 routes.gameconn = async (args = []) => {
   gc.game = null;
+  const auto = gmAuto("conn", args);
   gmCrumb("conn");
   $("#main").innerHTML = `<h1>Connections</h1><div class="sub">Reading the game's files…</div>`;
   gc.ids = await gxIds();
@@ -356,7 +362,7 @@ routes.gameconn = async (args = []) => {
   }
   gc.cats = Object.values(by).filter((c) => c.has.size >= 4);
   gcDrawStart();
-  if (args[0] === "daily" && gmDailyDone("conn") == null && gc.cats.length >= 4) gcNew(true);
+  if (auto && gc.cats.length >= 4) gcNew(true);
 };
 
 function gcDrawStart() {
@@ -421,9 +427,9 @@ function gcMake(rnd) {
 }
 
 function gcNew(daily) {
-  const made = gcMake(daily === true ? gmSeed(gmDay() + "conn") : Math.random);
+  const duel = daily === true ? gmDuelTake("conn") : null, made = gcMake(daily === true ? gmDaySeed("conn", duel) : Math.random);
   if (!made) return toast("Could not make a puzzle from the game's files.");
-  gc.game = { daily: daily === true, plain: gx.plain && daily !== true, ...made, found: [], sel: new Set(), miss: 0, tries: [], over: false };
+  gc.game = { daily: daily === true, duel, plain: gx.plain && daily !== true, ...made, found: [], sel: new Set(), miss: 0, tries: [], over: false };
   gcDraw();
 }
 
@@ -431,8 +437,8 @@ function gcDraw() {
   const g = gc.game, left = g.tiles.filter((x) => !g.found.some((gr) => gr.keys.includes(x.key))), won = g.found.length === 4 && g.miss < GC_MISS;
   const bar = (gr) => `<div class="gcbar c${gr.n}"><small>${GC_KINDS[gr.kind]}</small><b>${esc(gr.name)}</b><span>${gr.keys.map((k) => esc(g.tiles.find((x) => x.key === k).title)).join(" · ")}</span></div>`;
   $("#main").innerHTML = `<h1>Connections</h1>
-    <div class="gmtop"><span class="gmscore">MISTAKES LEFT <b>${"●".repeat(GC_MISS - g.miss)}${"○".repeat(g.miss)}</b>${g.daily ? ` · DAILY ${gmDay()}` : ""}</span><span class="grow"></span>
-      ${g.over ? `${g.daily ? `<button class="toggle" id="gccopy">Copy the result</button>` : ""}<button class="toggle" id="gcback">Back</button><button class="gmbtn" id="gcagain">Play again</button>`
+    <div class="gmtop"><span class="gmscore">MISTAKES LEFT <b>${"●".repeat(GC_MISS - g.miss)}${"○".repeat(g.miss)}</b>${g.daily ? ` · ${gmDayTag(g)}` : ""}</span><span class="grow"></span>
+      ${g.over ? `${g.daily ? `<button class="toggle" id="gccopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="gcback">Back</button><button class="gmbtn" id="gcagain">Play again</button>`
       : `<button class="toggle" id="gcmix">Shuffle</button><button class="toggle" id="gcnone" ${g.sel.size ? "" : "disabled"}>Deselect</button><button class="gmbtn" id="gcsend" ${g.sel.size === 4 ? "" : "disabled"}>Submit</button>`}</div>
     ${g.over ? `<div class="gmkick gcend">${won ? (g.miss ? `SOLVED WITH ${g.miss} MISTAKE${g.miss > 1 ? "S" : ""}` : "PERFECT — NO MISTAKES") : "OUT OF MISTAKES — THE GROUPS WERE"}</div>` : ""}
     <div class="gcbox">${g.found.map(bar).join("")}
@@ -447,8 +453,8 @@ function gcDraw() {
   if ($("#gcsend")) $("#gcsend").onclick = gcSend;
   if ($("#gcagain")) $("#gcagain").onclick = () => gcNew();
   if ($("#gcback")) $("#gcback").onclick = () => { gc.game = null; gcDrawStart(); };
-  if ($("#gccopy")) $("#gccopy").onclick = () => gxCopy(`Limbus Archive · Connections · Daily ${gmDay()}\n${won ? (g.miss ? `${g.miss} mistake${g.miss > 1 ? "s" : ""}` : "perfect") : "lost"}\n`
-    + g.tries.map((t) => t.map((n) => ["🟨", "🟩", "🟦", "🟪"][n]).join("")).join("\n"));
+  if ($("#gccopy")) $("#gccopy").onclick = () => gmCopyResult("conn", g, () => gxCopy(`Limbus Archive · Connections · Daily ${gmDay()}\n${won ? (g.miss ? `${g.miss} mistake${g.miss > 1 ? "s" : ""}` : "perfect") : "lost"}\n`
+    + g.tries.map((t) => t.map((n) => ["🟨", "🟩", "🟦", "🟪"][n]).join("")).join("\n")));
 }
 
 function gcSend() {
@@ -471,7 +477,7 @@ function gcSend() {
       gx.conn.best = Math.min(gx.conn.best == null ? 99 : gx.conn.best, g.miss);
     }
     gxKeep();
-    if (g.daily) gmDailyKeep("conn", won ? (g.miss ? `${g.miss} MISS` : "PERFECT") : "LOST");
+    if (g.daily) gmDailyOver("conn", g, won ? (g.miss ? `${g.miss} MISS` : "PERFECT") : "LOST");
   }
   gcDraw();
 }

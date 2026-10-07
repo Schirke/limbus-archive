@@ -909,6 +909,8 @@ CARD_PRESET = {
                "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11110_normal.png"],
     "conn": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10109_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10412_normal.png",
              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10302_normal.png"],
+    "grid": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10211_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10810_normal.png",
+             "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10605_normal.png"],
 }
 
 

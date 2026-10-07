@@ -24,10 +24,10 @@ function giStop() {
 }
 window.addEventListener("hashchange", () => { if (!/^#\/game(id|skill|char)/.test(location.hash)) { giStop(); gi.game = null; giDailyEnd(); } });
 
-routes.gameid = (args = []) => giOpen("id", args[0] === "daily");
-routes.gameskill = (args = []) => giOpen("skill", args[0] === "daily");
-routes.gamechar = (args = []) => giOpen("char", args[0] === "daily");
-async function giOpen(page, daily) {  // daily: opened by the "Daily" button of the games' page — the challenge starts at once
+routes.gameid = (args = []) => giOpen("id", gmAuto("id", args));
+routes.gameskill = (args = []) => giOpen("skill", gmAuto("skill", args));
+routes.gamechar = (args = []) => giOpen("char", gmAuto("char", args));
+async function giOpen(page, daily) {  // daily: opened by the "Daily" / "Duel" button of the games' page — the challenge starts at once
   giStop();
   gi.page = page;
   gi.game = null;
@@ -54,7 +54,7 @@ async function giOpen(page, daily) {  // daily: opened by the "Daily" button of 
       sinners: (units || {}).sinners || [] };
   }
   giDrawStart();
-  if (daily && gi.page === page && gmDailyDone(giGame()) == null && $("#gmdaily") && !$("#gmdaily").disabled) giNew(true);
+  if (daily && gi.page === page && $("#gmdaily") && !$("#gmdaily").disabled) giNew(true);
 }
 
 // who can be asked with the current chips; a line by its text needs a text
@@ -107,13 +107,14 @@ function giDailyEnd() {
 }
 
 function giNew(daily) {
+  const duel = daily === true ? gmDuelTake(giGame()) : null;
   giDailyEnd();
   if (daily === true) {
     gi.mine = { who: gi.who, text: gi.text, hard: gi.hard, sinner: gi.sinner };
     Object.assign(gi, { who: "ids", text: false, hard: false, sinner: 0 });
-    gmRnd = gmSeed(gmDay() + giGame());
+    gmRnd = gmDaySeed(giGame(), duel);
   }
-  gi.game = { daily: daily === true, pool: giPool(), round: -1, score: 0, streak: 0, top: 0, log: [], asked: new Set() };
+  gi.game = { daily: daily === true, duel, pool: giPool(), round: -1, score: 0, streak: 0, top: 0, log: [], asked: new Set() };
   if (typeof muAudio !== "undefined") muAudio.pause();
   giRound();
 }
@@ -221,7 +222,8 @@ function giAnswer(key) {
 
 function giResult() {
   const g = gi.game;
-  if (g.daily) gmDailyKeep(giGame(), g.score);
+  if (g.daily) gmDailyOver(giGame(), g, g.score);
+  const tag = g.daily ? gmDayTag(g) : "", game = giGame();
   giDailyEnd();
   const mode = giMode(), record = !g.daily && g.score > (gi.best[mode] || 0);
   if (!g.daily) gi.best[mode] = Math.max(gi.best[mode] || 0, g.score);
@@ -229,12 +231,12 @@ function giResult() {
   giStop();
   $("#main").innerHTML = `<h1>${giTitle()}</h1>
     <div class="gmtop"><span class="gmbig">${g.score}</span><span class="gmscore">${g.log.filter((r) => r.ok).length} OF ${g.log.length} · BEST STREAK ×${g.top} · BEST <i>${gi.best[mode] || 0}</i>${record ? " · NEW RECORD" : ""}</span>
-      <span class="grow"></span>${g.daily ? `<span class="gmscore">DAILY ${gmDay()}</span><button class="toggle" id="gicopy">Copy the result</button>` : ""}<button class="toggle" id="giback">Settings</button><button class="gmbtn" id="giagain">Play again</button></div>
+      <span class="grow"></span>${g.daily ? `<span class="gmscore">${tag}</span><button class="toggle" id="gicopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="giback">Settings</button><button class="gmbtn" id="giagain">Play again</button></div>
     <table class="gmlog"><tr><th>#</th><th>WHO</th><th>${giSkill() ? "SKILL" : "LINE"}</th><th>YOUR ANSWER</th><th>HINTS</th><th>POINTS</th><th></th></tr>
     ${g.log.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.ans.name)}</td><td class="giline">${esc(r.line.text || "—")}<i>${esc(r.line.when)}</i></td>
       <td class="${r.ok ? "ok" : "bad"}">${esc(r.said)}</td><td>${r.hints || ""}</td><td>${r.points}</td><td>${giSkill() ? `<img class="gilogpic" src="${r.line.pic}">` : `<button class="toggle" data-say="${esc(r.line.s)}">▶</button>`}</td></tr>`).join("")}</table>`;
   $("#giagain").onclick = () => giNew();
-  if ($("#gicopy")) $("#gicopy").onclick = () => gmShare(giTitle(), g.score, g.log.map((r) => ({ ok: r.ok, clean: !r.hints })));
+  if ($("#gicopy")) $("#gicopy").onclick = () => gmCopyResult(game, g, () => gmShare(giTitle(), g.score, g.log.map((r) => ({ ok: r.ok, clean: !r.hints }))));
   $("#giback").onclick = () => { gi.game = null; giDrawStart(); };
   document.querySelectorAll("[data-say]").forEach((b) => b.onclick = () => { giAudio.src = "/api/quiz_audio?s=" + encodeURIComponent(b.dataset.say); giAudio.play().catch(() => {}); });
 }

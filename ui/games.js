@@ -39,9 +39,41 @@ const gmDailyBtn = (game, off) => { const done = gmDailyDone(game);
 // log: [{ok, clean}] — a square per round: right at once, right with hints or more of the piece, missed
 function gmShare(title, score, log) {
   const text = `Limbus Archive · ${title} · Daily ${gmDay()}\n${score} pts · ${log.filter((r) => r.ok).length}/${log.length}\n${log.map((r) => r.ok ? (r.clean ? "🟩" : "🟨") : "⬛").join("")}`;
+  gmCopy(text);
+}
+function gmCopy(text) {
   const done = () => toast("Copied — paste it anywhere.");
   const old = () => { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); done(); };
   navigator.clipboard?.writeText ? navigator.clipboard.writeText(text).then(done, old) : old();
+}
+
+// A duel: a Daily challenge drawn from a seed of its own instead of the day — the same rounds for whoever opens the
+// link "<game>/duel/<seed>.<the sender's result>". Played on the Daily's fixed settings; it leaves today's Daily alone.
+const GM_SITE = "https://limbus.shpep.workers.dev";
+let gmDuelNext = null;
+// what a game's page was opened for (the part of the address after the game): true = start the challenge at once
+function gmAuto(game, args) {
+  gmDuelNext = null;
+  if (args[0] !== "duel") return args[0] === "daily" && gmDailyDone(game) == null;
+  const [seed, their] = (args[1] || "").split(".");
+  gmDuelNext = { game, seed: /^[a-z0-9]{4,12}$/.test(seed || "") ? seed : Math.random().toString(36).slice(2, 8).padEnd(6, "0"),
+    their: their ? their.replace(/_/g, " ").replace(/-/g, "/").slice(0, 14) : null };
+  return true;
+}
+const gmDuelTake = (game) => { const d = gmDuelNext && gmDuelNext.game === game ? gmDuelNext : null; gmDuelNext = null; return d; };
+const gmDaySeed = (game, duel) => gmSeed((duel ? "duel" + duel.seed : gmDay()) + game);
+// the end of a daily game (g.daily; g.duel when it is a duel): its result is kept, shown and copied
+function gmDailyOver(game, g, score) { if (g.duel) g.duel.mine = score; else gmDailyKeep(game, score); }
+function gmDayTag(g) {
+  if (!g.duel) return `DAILY ${gmDay()}`;
+  const d = g.duel, num = (v) => /^\d+$/.test(String(v)) ? +v : null, a = num(d.mine), b = num(d.their);
+  return `DUEL${d.their == null ? "" : ` · THEIRS <i>${esc(d.their)}</i>${a == null || b == null ? "" : a > b ? " · <b>YOU WIN</b>" : a < b ? " · <b>THEY WIN</b>" : " · <b>A DRAW</b>"}`}`;
+}
+const gmCopyLabel = (g) => g.duel ? "Copy the duel link" : "Copy the result";
+function gmCopyResult(game, g, share) {
+  if (!g.duel) return share();
+  const [, href, name] = GM_GAMES.find(([k]) => k === game);
+  gmCopy(`Limbus Archive · ${name} · Duel\nMy result: ${g.duel.mine} — can you beat it?\n${GM_SITE}/${href}/duel/${g.duel.seed}.${String(g.duel.mine).replace(/ /g, "_").replace(/\//g, "-")}`);
 }
 
 const gmShuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(gmRnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -92,7 +124,9 @@ const GM_GAMES = [
   ["wordle", "#/gamewordle", "Limbus Wordle", "One hidden Identity, eight tries: each shows the Sinner, season, rarity, archetype, damage and faction it shares.",
     gmIcon('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17.5l2.5 2.5 4.5-5"/>')],
   ["conn", "#/gameconn", "Connections", "Sixteen Identities, four groups of four with something in common. Four mistakes allowed.",
-    gmIcon('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h7M6 8.5v7M18 8.5v7M8.5 18h7"/>')]];
+    gmIcon('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h7M6 8.5v7M18 8.5v7M8.5 18h7"/>')],
+  ["grid", "#/gamegrid", "Limbus Grid", "A 3 × 3 grid with a condition on every row and column — name an Identity for each cell. Nine tries.",
+    gmIcon('<rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M10.6 12l1.1 1.1 1.9-2.2"/>')]];
 document.querySelectorAll("#subnav [data-game]").forEach((a) => { a.innerHTML = GM_GAMES.find(([k]) => k === a.dataset.game)[4]; });
 
 // the line under the menu inside a game: back to the games' page, the game's name, the other games by their pictures
@@ -113,11 +147,17 @@ function gmBest(game) {
 function gmHub() {
   document.querySelector('#subnav [data-group="games"]').hidden = true;  // the cards are the menu here
   const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_GAMES.filter(([k]) => gmDailyDone(k) != null).length;
-  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_GAMES.length}</i></span></div>
+  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="Got a duel link? Paste it and press Enter" autocomplete="off"><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_GAMES.length}</i></span></div>
     <div class="gmhub">${GM_GAMES.map(([k, href, name, what, pic]) => { const best = gmBest(k), day = gmDailyDone(k);
       return `<div class="gmcard"><a class="gmart" data-game="${k}" href="${href}">${pic}</a><div class="gmcbody"><a class="gmname" href="${href}">${name}</a><p>${what}</p>
         <div class="gmscore gmstat"><span>BEST ${best ? `<i>${best}</i>` : "—"}</span><span>DAILY ${day == null ? "—" : `<i>${day}</i>`}</span></div>
-        <div class="gmplay"><a class="gmbtn" href="${href}">Play</a>${day == null ? `<a class="toggle" href="${href}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}</div></div></div>`; }).join("")}</div>`;
+        <div class="gmplay"><a class="gmbtn" href="${href}">Play</a>${day == null ? `<a class="toggle" href="${href}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${href}/duel" title="A game to send to a friend: play it, then copy the link with your result — the link opens the same rounds">Duel</a></div></div></div>`; }).join("")}</div>`;
+  // a duel link from a friend opens its game here too (the link itself leads to the website)
+  $("#gmduel").onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    const m = /#\/[a-z/]+\/duel\/[\w.%-]+/.exec(e.target.value);
+    m ? (location.hash = m[0]) : toast("That is not a duel link.");
+  };
   gmHubPics();
 }
 
@@ -143,11 +183,12 @@ routes.games = async (args = []) => {
   gmWarmDrop();
   gm.game = null;
   if (args[0] !== "track") return gmHub();
+  const auto = gmAuto("track", args.slice(1));
   gmCrumb("track");
   if (!mu.tracks.length) mu.tracks = await api("/api/music").catch(() => []);
   if (!location.hash.startsWith("#/games/track")) return;
   gmDrawStart();
-  if (args[1] === "daily" && gmDailyDone("track") == null && $("#gmdaily") && !$("#gmdaily").disabled) gmNew(true);
+  if (auto && $("#gmdaily") && !$("#gmdaily").disabled) gmNew(true);
 };
 
 function gmDrawStart() {
@@ -180,14 +221,15 @@ function gmDailyEnd() {
 }
 
 function gmNew(daily) {
+  const duel = daily === true ? gmDuelTake("track") : null;
   gmDailyEnd();
   if (daily === true) {
     gm.mine = { battle: gm.battle, hard: gm.hard, group: gm.group };
     Object.assign(gm, { battle: true, hard: false, group: "" });
-    gmRnd = gmSeed(gmDay() + "track");
+    gmRnd = gmDaySeed("track", duel);
   }
   const pool = gmPool();
-  gm.game = { daily: daily === true, pool, order: gmShuffle(pool.map((_, i) => i)).slice(0, GM_ROUNDS), round: -1, score: 0, streak: 0, top: 0, log: [] };
+  gm.game = { daily: daily === true, duel, pool, order: gmShuffle(pool.map((_, i) => i)).slice(0, GM_ROUNDS), round: -1, score: 0, streak: 0, top: 0, log: [] };
   if (typeof muAudio !== "undefined") muAudio.pause();
   document.body.classList.add("quiz");  // the corner player would give the name away
   gmRound();
@@ -335,7 +377,8 @@ function gmScore(ok, pick, said) {
 
 function gmResult() {
   const g = gm.game;
-  if (g.daily) gmDailyKeep("track", g.score);
+  if (g.daily) gmDailyOver("track", g, g.score);
+  const tag = g.daily ? gmDayTag(g) : "";
   gmDailyEnd();
   const mode = gmMode(), best = g.daily ? gm.best[mode] || 0 : Math.max(gm.best[mode] || 0, g.score), record = !g.daily && g.score > (gm.best[mode] || 0);
   if (!g.daily) gm.best[mode] = best;
@@ -344,12 +387,12 @@ function gmResult() {
   gmWarmDrop();
   $("#main").innerHTML = `<h1>Guess the track</h1>
     <div class="gmtop"><span class="gmbig">${g.score}</span><span class="gmscore">${g.log.filter((r) => r.ok).length} OF ${g.log.length} · BEST STREAK ×${g.top} · BEST <i>${best}</i>${record ? " · NEW RECORD" : ""}</span>
-      <span class="grow"></span>${g.daily ? `<span class="gmscore">DAILY ${gmDay()}</span><button class="toggle" id="gmcopy">Copy the result</button>` : ""}<button class="toggle" id="gmback">Settings</button><button class="gmbtn" id="gmagain">Play again</button></div>
+      <span class="grow"></span>${g.daily ? `<span class="gmscore">${tag}</span><button class="toggle" id="gmcopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="gmback">Settings</button><button class="gmbtn" id="gmagain">Play again</button></div>
     <table class="gmlog"><tr><th>#</th><th>TRACK</th><th>YOUR ANSWER</th><th>AT</th><th>POINTS</th><th></th></tr>
     ${g.log.map((r, i) => { const t = mu.tracks[r.n]; return `<tr><td>${i + 1}</td><td>${esc(t.name)}<i>${esc(typeof muSub === "function" ? muSub(t) : t.where)}</i></td>
       <td class="${r.ok ? "ok" : "bad"}">${esc(r.said)}</td><td>${r.ok ? r.at + " s" : ""}</td><td>${r.points}</td><td><button class="toggle" data-play="${r.n}">▶ play</button></td></tr>`; }).join("")}</table>`;
   $("#gmagain").onclick = () => gmNew();
-  if ($("#gmcopy")) $("#gmcopy").onclick = () => gmShare("Guess the track", g.score, g.log);
+  if ($("#gmcopy")) $("#gmcopy").onclick = () => gmCopyResult("track", g, () => gmShare("Guess the track", g.score, g.log));
   $("#gmback").onclick = () => { gm.game = null; gmDrawStart(); };
   document.querySelectorAll("[data-play]").forEach((b) => b.onclick = () => { if (typeof muPlay === "function") { mu.min = false; muPlay(+b.dataset.play); } });
 }
