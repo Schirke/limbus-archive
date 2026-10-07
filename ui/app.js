@@ -203,7 +203,7 @@ const routes = {};
 function route() {
   const [, name = "patches", ...rest] = location.hash.split("/");
   const sub = document.querySelector(`#subnav a[data-route="${name}"]`);
-  const group = sub ? sub.parentElement.dataset.group : ({ scan: "patches" })[name] || name;
+  const group = sub ? sub.parentElement.dataset.group : ({ scan: "patches", vsroom: "versus" })[name] || name;
   document.querySelectorAll("#top a[data-group]").forEach((a) => a.classList.toggle("active", a.dataset.group === group));
   document.querySelectorAll("#subnav div").forEach((d) => { d.hidden = d.dataset.group !== group; });
   document.querySelectorAll("#subnav a").forEach((a) => a.classList.toggle("active", a === sub));
@@ -2216,7 +2216,7 @@ async function vsPage(auto) {
   vs.auto = auto;  // (the Auto Battler tab: the team fight with roles, cooldowns and a boss; Versus: duels)
   vs.team = auto || !!vs.vteam;
   const main = $("#main");
-  main.innerHTML = `<h1>${auto ? "Auto Battler" : `Versus <label class="vsteamsw" title="Team fight: several a side (many vs many, or many vs one boss). Render makes its video; Live does not play teams yet."><input type="checkbox" id="vsteam" ${vs.team ? "checked" : ""}> Team</label>`}</h1><div class="sub">${auto ? "Teams fight by the autobattler rules: roles, cooldowns, targets, a boss against several. Pick fighters for each side." : "Pit two characters against each other — Identities, E.G.O or enemies — in the game's own animations and effects."}</div>
+  main.innerHTML = `<h1>${auto ? "Auto Battler" : `Versus <label class="vsteamsw" title="Team fight: several a side (many vs many, or many vs one boss). Render makes its video; Live does not play teams yet."><input type="checkbox" id="vsteam" ${vs.team ? "checked" : ""}> Team</label><a class="toggle vsroomlink" href="#/vsroom" title="Pick and fight: two players each pick a fighter in secret, then the same fight plays on everybody's screen; the others watch and bet">Online room</a>`}</h1><div class="sub">${auto ? "Teams fight by the autobattler rules: roles, cooldowns, targets, a boss against several. Pick fighters for each side." : "Pit two characters against each other — Identities, E.G.O or enemies — in the game's own animations and effects."}</div>
     <div id="vsbody"><div class="muted">Loading…</div></div>`;
   if (!anim.data) anim.data = await api("/api/characters");
   if (!vs.maps) vs.maps = await api("/api/battle_maps").catch(() => []);

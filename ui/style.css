@@ -1077,6 +1077,19 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gjboard.whole { gap: 0; }
 .gjtile { background-repeat: no-repeat; cursor: grab; } .gjtile:hover { filter: brightness(1.15); } .gjtile.on { outline: 3px solid var(--gold); outline-offset: -3px; }
 .gjboard.whole .gjtile, .gjbox .gmafter ~ .gjboard .gjtile { cursor: default; filter: none; }
+/* Versus: the online room (versusroom.js) */
+.vsroomlink { margin-left: 14px; padding: 4px 12px; font: 13px Consolas, monospace; letter-spacing: 0; text-transform: none; text-decoration: none; vertical-align: middle; }
+.vrfight { max-width: 1240px; margin: 12px 0 18px; padding: 16px 20px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+.vrvs { display: flex; align-items: center; gap: 26px; margin-top: 10px; } .vrvs > span { font: 34px "LC Bebas", "Segoe UI", sans-serif; color: var(--muted); letter-spacing: 2px; }
+.vrface { display: grid; grid-template-columns: 86px auto; grid-template-rows: auto auto; column-gap: 14px; align-items: center; }
+.vrface img, .vrface .vrq { grid-row: 1 / 3; width: 86px; height: 86px; object-fit: cover; object-position: top; background: var(--panel2); border: 1px solid var(--line); }
+.vrface .vrq { display: grid; place-items: center; font: 40px "LC Bebas", "Segoe UI", sans-serif; color: var(--muted); }
+.vrface b { align-self: end; color: #fff; font: 22px/1.1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; font-weight: normal; }
+.vrface i { align-self: start; font-style: normal; color: var(--muted); } .vrface.win img { border-color: var(--gold); } .vrface.win b { color: var(--gold); } .vrface.lost { opacity: .5; }
+.vrtag { color: var(--gold) !important; } .vrnote { margin: 6px 0 12px; }
+.vrpick { display: flex; align-items: center; gap: 14px; max-width: 620px; padding: 10px; background: var(--panel); border: 1px solid var(--line); }
+.vrpick img { width: 72px; height: 72px; object-fit: cover; object-position: top; } .vrpick > div { flex: 1; min-width: 0; }
+.vrpick b { display: block; color: #fff; font-weight: normal; } .vrpick i { display: block; font-style: normal; color: var(--muted); font-size: 12.5px; margin-bottom: 6px; } .vrpick label { color: var(--muted); font-size: 13px; }
 /* Games: Extraction, Challenge roulette (games5.js) */
 .gastats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; margin: 12px 0 16px; letter-spacing: 1px; } .gastats .toggle { margin-left: auto; }
 .gatop { margin: 22px 0 8px; }

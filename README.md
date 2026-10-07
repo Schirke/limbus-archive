@@ -103,6 +103,10 @@ and WIN, an E.G.O cut-in and battle music.
 fighters on a random stage (or the Versus page's picks), with the fight's sounds, music, intro card and WIN.
 Nothing is saved.
 
+**Online room** (pick and fight): make a room and send its code. Two players each pick a fighter and
+its last skill in secret; at the host's Start the same fight plays on everybody's screen in Versus
+Live. The others in the room watch and may bet lunacy on a side. Everybody needs the app.
+
 <p align="center"><a href="docs/versus.webp"><img src="docs/versus.webp" width="760" alt="Versus"></a></p>
 
 ### Files
