@@ -111,15 +111,16 @@ function glLobby() {
         ${host ? `<div class="dbrow">${GM_SCORED.map((g) => chip(g[0] === game[0], `data-game="${g[0]}"`, esc(g[2]))).join("")}</div>
           <div class="dbrow">${chip(mode === "race", 'data-mode="race"', "Race · each at their own pace")}${chip(mode === "first", 'data-mode="first"', "First to answer · rounds in step", !GL_FIRST.includes(game[0]))}</div>
           <div class="dbrow"><span class="muted">Players, up to</span>${[2, 3, 4, 5, 6, 7, 8].map((n) => chip(max === n, `data-max="${n}"`, n, n < r.players.length)).join("")}</div>
-          <div class="gmstart"><button class="gmbtn" id="glstart" ${r.players.length < 2 || s.status === "play" ? "disabled" : ""}>Start the match</button>
-            <span class="muted small">${r.players.length < 2 ? "Waiting for somebody to come in." : mode === "first" ? `The first right answer takes a round; ${GL_ROUND} s a round.` : "The same rounds for everybody; the best result wins."}</span></div>`
+          <div class="gmstart">${s.status === "play" ? `<button class="toggle" id="glstop">End the match</button>` : `<button class="gmbtn" id="glstart" ${r.players.length < 2 ? "disabled" : ""}>Start the match</button>`}
+            <span class="muted small">${s.status === "play" ? "Stops it for everybody, without a result — if it got stuck." : r.players.length < 2 ? "Waiting for somebody to come in." : mode === "first" ? `The first right answer takes a round; ${GL_ROUND} s a round.` : "The same rounds for everybody; the best result wins."}</span></div>`
         : `<p><b>${esc(game[2])}</b> · ${mode === "first" ? "First to answer" : "Race"} · up to ${max} players</p><p class="muted">The host starts the match.</p>`}</div></div>`;
     if (host && (s.game !== game[0] || s.mode !== mode || !s.max)) glSet({ game: game[0], mode, max });  // (what the page shows is what the room has)
     const set = (sel, f) => document.querySelectorAll(sel).forEach((b) => b.onclick = () => glSet(f(b)));
     set("#main [data-game]", (b) => ({ game: b.dataset.game, mode: GL_FIRST.includes(b.dataset.game) ? mode : "race" }));
     set("#main [data-mode]", (b) => ({ mode: b.dataset.mode }));
     set("#main [data-max]", (b) => ({ max: +b.dataset.max }));
-    if ($("#glstart")) $("#glstart").onclick = () => glSet({ status: "play", n: (s.n || 0) + 1, seed: Math.random().toString(36).slice(2, 8).padEnd(6, "0"), ids: r.players.map((p) => p.id), results: null });
+    if ($("#glstart")) $("#glstart").onclick = () => glSet({ status: "play", n: Date.now(), seed: Math.random().toString(36).slice(2, 8).padEnd(6, "0"), ids: r.players.map((p) => p.id), results: null });
+    if ($("#glstop")) $("#glstop").onclick = () => glSet({ status: "", results: null });
     if ($("#glrename")) $("#glrename").onclick = () => { gl.ws.onclose = null; glClose(); gl.code = code; gl.nick = ""; glLobby(); };
   }
   if ($("#glcopy")) $("#glcopy").onclick = () => gmCopy(`Limbus Archive · a live match — come in:\n${link}\n(in the app: Games → paste the code ${code.toUpperCase()})`);
@@ -131,8 +132,8 @@ function glGot(m) {
   if (m.t === "room") {
     gl.room = m;
     const s = m.state;
-    if (s.status === "play" && s.n !== gl.n && (s.ids || []).includes(gl.id) && glGameOf(s.game)) {  // a match starts: the game's page, by the seed
-      gl.n = s.n;
+    if (s.status === "play" && s.n + "." + s.seed !== gl.n && (s.ids || []).includes(gl.id) && glGameOf(s.game)) {  // a match starts: the game's page, by the seed
+      gl.n = s.n + "." + s.seed;  // (with the seed: a room made anew counts its matches from 1 again)
       gl.match = { game: s.game, mode: s.mode, n: s.n, ids: s.ids, by: {}, pts: {}, rounds: {}, said: "", t0: 0 };
       document.body.classList.add("gllive");
       document.body.classList.toggle("glfirst", s.mode === "first");
