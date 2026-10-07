@@ -1047,3 +1047,31 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gobox .gctile:disabled { cursor: default; } .gobox .gctile.plain b { margin-top: 7px; } .gobox .gctile.plain i { display: block; margin-bottom: 7px; }
 .goopts { margin-top: 14px; }
 .gologpic { width: 40px; height: 40px; object-fit: cover; object-position: top; margin-right: 4px; vertical-align: middle; opacity: .55; } .gologpic.odd { opacity: 1; outline: 1px solid var(--gold); }
+/* Games: Extraction, Challenge roulette (games5.js) */
+.gafeat { color: var(--muted); font-size: 13px; } .gafeat select { margin-left: 8px; height: 34px; max-width: 420px; }
+.gaone { height: 36px; padding: 0 16px; border: 1px solid var(--gold); color: var(--gold); border-radius: 0; }
+.gastats { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 4px 0 16px; letter-spacing: 1px; }
+.gagrid { display: grid; grid-template-columns: repeat(5, 190px); gap: 8px; min-height: 120px; }
+@keyframes gaIn { from { opacity: 0; transform: translateY(16px) scale(.9); } }
+@keyframes gaGlow { 50% { box-shadow: 0 0 22px 2px rgba(214,170,44,.55); } }
+.gacard { position: relative; padding-bottom: 8px; text-align: center; background: var(--panel2); border: 1px solid var(--line); border-top: 3px solid #6b6266; overflow: hidden; animation: gaIn .35s both; }
+.gacard img { display: block; width: 100%; height: 130px; object-fit: cover; object-position: center 20%; margin-bottom: 7px; }
+.gacard b { display: block; padding: 0 8px; color: #fff; font: 15px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
+.gacard i { font-style: normal; color: var(--muted); font-size: 12px; }
+.gacard em { position: absolute; top: 5px; left: 6px; padding: 0 6px; font: 15px "LC Bebas", "Segoe UI", sans-serif; font-style: normal; letter-spacing: 2px; background: rgba(20,17,19,.85); color: #cfc6ca; }
+.gacard u { position: absolute; top: 6px; right: 6px; padding: 1px 5px; font: 10px Consolas, monospace; letter-spacing: 1px; text-decoration: none; background: var(--add); color: #111; }
+.gacard.r2 { border-top-color: #c0503c; } .gacard.r2 em { color: #ff9a85; }
+.gacard.r3 { border-color: var(--gold); border-top-color: var(--gold); animation: gaIn .35s both, gaGlow 1.6s ease-in-out .4s 2; } .gacard.r3 em { color: var(--gold); }
+.gacard.ego { border-color: #8a6fd1; border-top-color: #8a6fd1; animation: gaIn .35s both, gaGlow 1.6s ease-in-out .4s 2; } .gacard.ego em { color: #c5b2ff; }
+.gacard.feat::after { content: "FEATURED"; position: absolute; left: 0; right: 0; top: 112px; font: 10px Consolas, monospace; letter-spacing: 3px; color: #111; background: var(--gold); }
+.gatop { margin: 22px 0 8px; }
+.gahave { display: flex; flex-wrap: wrap; gap: 4px; max-width: 990px; } .gahave span { position: relative; width: 52px; height: 52px; border: 1px solid var(--gold); overflow: hidden; } .gahave span.ego { border-color: #8a6fd1; }
+.gahave img { width: 100%; height: 100%; object-fit: cover; object-position: top; } .gahave em { position: absolute; right: 0; bottom: 0; padding: 0 3px; font: 11px Consolas, monospace; font-style: normal; background: rgba(20,17,19,.9); color: var(--gold); }
+.gdrule { display: flex; align-items: center; gap: 16px; max-width: 1240px; margin: 14px 0; padding: 14px 18px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--gold); }
+.gdrule small { font: 11px Consolas, monospace; letter-spacing: 2px; color: var(--muted); white-space: nowrap; } .gdrule b { flex: 1; font: 22px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.2px; font-weight: normal; color: #fff; }
+.gdteam { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; max-width: 1240px; }
+.gdslot { padding: 0 0 9px; text-align: center; background: var(--panel2); border: 1px solid var(--line); border-radius: 0; cursor: pointer; overflow: hidden; } .gdslot:hover { border-color: var(--gold); }
+.gdslot > img { display: block; width: 100%; height: 120px; object-fit: cover; object-position: center 20%; margin-bottom: 7px; }
+.gdslot small { display: block; font: 11px Consolas, monospace; letter-spacing: 1px; color: var(--gold); }
+.gdslot b { display: block; padding: 2px 8px 0; color: #fff; font: 15px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
+.gdslot i { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; padding: 0 6px; font-style: normal; color: var(--muted); font-size: 12px; } .gdslot i img { width: 26px; height: 26px; object-fit: cover; }

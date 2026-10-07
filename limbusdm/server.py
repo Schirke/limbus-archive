@@ -915,6 +915,10 @@ CARD_PRESET = {
               "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10212_normal.png"],
     "odd": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10106_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10306_normal.png",
             "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10713_normal.png"],
+    "gacha": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10513_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10214_normal.png",
+              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11012_normal.png"],
+    "dare": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10801_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10401_normal.png",
+             "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10701_normal.png"],
     "grid": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10211_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10810_normal.png",
              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10605_normal.png"],
 }

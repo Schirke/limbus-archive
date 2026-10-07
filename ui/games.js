@@ -133,7 +133,7 @@ function gmStop() {
 }
 window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/games/track")) { gmStop(); gmWarmDrop(); gm.game = null; gmDailyEnd(); } });
 
-// [game (the key of its Daily challenge), page, name, what it is, picture]
+// [game (the key of its Daily challenge), page, name, what it is, picture, a toy: no score, no Daily]
 const gmIcon = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
 const GM_GAMES = [
   ["track", "#/games/track", "Guess the track", "A piece of the game's soundtrack from a random spot — name it.",
@@ -159,7 +159,12 @@ const GM_GAMES = [
   ["odd", "#/gameodd", "Odd one out", "Four Identities, three with something in common. Find the one that doesn't belong — and say what the others share.",
     gmIcon('<circle cx="6" cy="7" r="2.6"/><circle cx="12" cy="7" r="2.6"/><circle cx="18" cy="7" r="2.6"/><rect x="9.4" y="14.4" width="5.2" height="5.2"/>')],
   ["grid", "#/gamegrid", "Limbus Grid", "A 3 × 3 grid with a condition on every row and column — name an Identity for each cell. Nine tries.",
-    gmIcon('<rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M10.6 12l1.1 1.1 1.9-2.2"/>')]];
+    gmIcon('<rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M10.6 12l1.1 1.1 1.9-2.2"/>')],
+  ["gacha", "#/gamegacha", "Extraction", "Pull tens at the game's rates and count the lunacy it would have cost. How long until the 000 you wanted?",
+    gmIcon('<rect x="4" y="3" width="11" height="15" rx="1"/><rect x="9" y="6" width="11" height="15" rx="1"/><path d="M14.5 10.5l1 2.1 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2-1.6-1.5 2.2-.3z"/>'), true],
+  ["dare", "#/gamedare", "Challenge roulette", "A random team and a rule to play it by — for a run that got too easy.",
+    gmIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="2.2"/>'), true]];
+const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
 document.querySelectorAll("#subnav [data-game]").forEach((a) => { a.innerHTML = GM_GAMES.find(([k]) => k === a.dataset.game)[4]; });
 
 // the line under the menu inside a game: back to the games' page, the game's name, the other games by their pictures
@@ -179,9 +184,11 @@ function gmBest(game) {
 
 function gmHub() {
   document.querySelector('#subnav [data-group="games"]').hidden = true;  // the cards are the menu here
-  const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_GAMES.filter(([k]) => gmDailyDone(k) != null).length;
-  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="Got a duel link? Paste it and press Enter" autocomplete="off"><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_GAMES.length}</i></span></div>
-    <div class="gmhub">${GM_GAMES.map(([k, href, name, what, pic]) => { const best = gmBest(k), day = gmDailyDone(k);
+  const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_SCORED.filter(([k]) => gmDailyDone(k) != null).length;
+  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="Got a duel link? Paste it and press Enter" autocomplete="off"><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_SCORED.length}</i></span></div>
+    <div class="gmhub">${GM_GAMES.map(([k, href, name, what, pic, toy]) => { const best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
+      if (toy) return `<div class="gmcard"><a class="gmart" data-game="${k}" href="${href}">${pic}</a><div class="gmcbody"><a class="gmname" href="${href}">${name}</a><p>${what}</p>
+        <div class="gmscore gmstat"><span>NO SCORE — A TOY</span></div><div class="gmplay"><a class="gmbtn" href="${href}">Open</a></div></div></div>`;
       return `<div class="gmcard"><a class="gmart" data-game="${k}" href="${href}">${pic}</a><div class="gmcbody"><a class="gmname" href="${href}">${name}</a><p>${what}</p>
         <div class="gmscore gmstat"><span>BEST ${best ? `<i>${best}</i>` : "—"}</span><span>DAILY ${day == null ? "—" : `<i>${day}</i>`}</span></div>
         <div class="gmplay"><a class="gmbtn" href="${href}">Play</a>${day == null ? `<a class="toggle" href="${href}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${href}/duel" title="A game to send to a friend: play it, then copy the link with your result — the link opens the same rounds">Duel</a></div></div></div>`; }).join("")}</div>`;

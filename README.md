@@ -129,22 +129,34 @@ under their official names, with the Canto and the boss a theme belongs to. Sear
 
 ### Games
 
-Six guessing games, ten rounds each, Easy with four answers or Hard typing the name; hints cost
-points. And two puzzles.
+Guessing games, ten rounds each, Easy with four answers or Hard typing the name; hints cost
+points. Puzzles. And two toys.
 
 - **Guess the track:** a piece of the soundtrack plays from a random spot, and the sooner you name it
-  the more it is worth.
+  the more it is worth. Also backwards, sped up, or with another track over it.
 - **Guess the Identity:** a voice line of an Identity or a boss, by ear or by its text.
 - **Guess the character:** a voiced line from the story — who says it?
 - **Guess the skill:** a skill's picture — whose skill is it?
 - **Guess the enemy:** a black silhouette that opens in steps; or an Identity in big pixels.
 - **Guess the Canto:** a piece of a background from the story that zooms out.
+- **Guess the art:** the same over the art of Identities and E.G.O.
+- **In pieces:** an Identity's moving art as the game keeps it — cut into parts on a sheet; the
+  parts come in steps.
+- **Odd one out:** four Identities, three with something in common — find the fourth and say what
+  the others share.
 - **Limbus Wordle:** one hidden Identity, eight tries; each try shows what it shares with the hidden
   one — Sinner, season, rarity, archetype, damage, faction.
 - **Connections:** sixteen Identities, four groups of four with something in common.
+- **Limbus Grid:** a 3 × 3 grid with a condition on every row and column — name an Identity for
+  each cell, nine tries.
+- **Extraction** (a toy): pulls at the game's rates, with the lunacy they would have cost.
+- **Challenge roulette** (a toy): a random team and a rule to play it by.
 
 **Daily challenge:** the same game for everybody, new at the game's daily reset; the result copies
 as a line of squares to share.
+
+**Duel:** play a game, copy the link with your result, send it — the link opens the same rounds for
+a friend to beat.
 
 <p align="center"><a href="docs/games.webp"><img src="docs/games.webp" width="760" alt="Games"></a></p>
 
