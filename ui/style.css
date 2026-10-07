@@ -1078,7 +1078,8 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gmtmain small { font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 1px; color: var(--muted); } .gmtmain small i { font-style: normal; color: var(--gold); }
 .gmdot { flex: none; width: 30px; height: 30px; margin-right: 6px; display: grid; place-items: center; } .gmdot::after { content: ""; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--gold); }
 a.gmdot:hover::after { background: var(--gold); } .gmdot.done::after { background: var(--add); border-color: var(--add); }
-#subnav a.gmdaily, a.gmdaily { display: inline-grid; place-items: center; text-decoration: none; }
+#subnav a.gmdaily, a.gmdaily { display: inline-flex; align-items: center; text-decoration: none; }
+.gmplay .toggle { grid-auto-flow: column; }
 /* Games: lunacy and achievements (games.js gmW, GM_ACH) */
 .gmhubhead .gmwallet { margin-left: 0; text-decoration: none; padding: 7px 12px; border: 1px solid var(--line); } .gmhubhead .gmwallet:hover { border-color: var(--gold); }
 .gawallet { padding: 7px 12px; border: 1px solid var(--line); } .gawallet b { color: var(--gold); }
@@ -1147,3 +1148,22 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 .gmgrade small { font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 3px; color: var(--muted); }
 .gmgrade b { font: 34px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2.5px; text-transform: uppercase; font-weight: normal; }
 .gmgrade.t0 { color: #8d8388; } .gmgrade.t1 { color: #6fb7c9; } .gmgrade.t2 { color: var(--gold); } .gmgrade.t3 { color: #ff4d4d; text-shadow: 0 0 18px rgba(255,77,77,.55); }
+/* Games: a duel's invite next to the game's name; live matches (games.js gmDuelBar, games6.js) */
+#gmduelbar { position: absolute; z-index: 4; display: flex; align-items: center; gap: 12px; padding: 5px 6px 5px 14px; background: var(--panel); border: 1px solid var(--gold); }
+#gmduelbar .toggle { padding: 6px 14px; background: var(--gold); border-color: var(--gold); color: #111; font-weight: 600; border-radius: 0; }
+#subnav .gmcrumb a.gmlivenav { margin-right: 10px; padding: 5px 12px; border: 1px solid var(--line); color: var(--gold); font: 13px Consolas, monospace; } #subnav .gmcrumb a.gmlivenav.active { border-color: var(--gold); }
+.glin { width: 300px; margin: 0; height: 34px; } .glerr { color: var(--rem); }
+.glroom { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 6px; } .glroom .gmscore b { font: 24px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 4px; color: var(--gold); margin-left: 6px; }
+.glcols { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 26px; max-width: 1240px; } .glcols .gmgrp small { font: 12px Consolas, monospace; color: var(--muted); margin-left: 8px; }
+.glrow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 4px; background: var(--panel); border: 1px solid var(--line); } .glrow.me { border-color: var(--gold); } .glrow.gone { opacity: .45; }
+.glrow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; } .glrow small { color: var(--muted); font: 12px Consolas, monospace; }
+.glrow i { font: 14px Consolas, monospace; font-style: normal; color: var(--gold); min-width: 46px; text-align: right; } .glrow em { font: 11px Consolas, monospace; font-style: normal; letter-spacing: 1.5px; color: var(--muted); }
+.glrow b { width: 18px; color: var(--muted); font-weight: normal; } .glrow .toggle { padding: 2px 8px; font-size: 12px; }
+.glres { max-width: 560px; margin: 14px 0 4px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); } .glres .gmkick { margin-bottom: 9px; }
+.glres .glrow.win span { color: var(--gold); font: 20px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; }
+#glpanel { position: fixed; right: 18px; top: 150px; z-index: 44; width: 250px; padding: 12px; background: rgba(27,23,25,.96); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+#glpanel .glhead { margin-bottom: 9px; font: 12px Consolas, monospace; letter-spacing: 2px; color: var(--gold); } #glpanel .glrow { padding: 6px 9px; background: var(--panel2); }
+.gltime { height: 4px; margin-bottom: 7px; background: var(--line); } .gltime i { display: block; height: 100%; width: 100%; background: var(--gold); }
+.glsaid { min-height: 32px; margin-bottom: 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
+/* (rounds in step: the room moves everybody on, not the player) */
+body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #gmquit, body.glfirst #giquit, body.glfirst #gpquit { display: none; }

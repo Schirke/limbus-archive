@@ -39,7 +39,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
             "project": "", "url": ""}
 # the pages the site is written for (each has its part in Exporter); any other page of the UI is opened on the site
 # only when the check finds it asking for nothing the site lacks (verify)
-BASE_OPEN = ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamegacha", "gamedare", "community", "support", "buffs"]
+BASE_OPEN = ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamegacha", "gamedare", "live", "community", "support", "buffs"]
 # requests the check never fetches by itself: the app's own state and controls, renders, the game's raw files, and the
 # ones a part of Exporter makes its own way
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
@@ -81,9 +81,26 @@ def build_info(svc) -> dict:
             "game": re.sub(r"_\d{8}-\d{6}$", "", sid)}
 
 
+def worker_config(svc) -> str:
+    """The site's server as wrangler takes it: data/site_worker with the Worker's script (ui/site/worker.js: the files
+    as they are, and the rooms of the Games' live matches — a Durable Object) and its config, written anew each time.
+    -> the config's path."""
+    folder = os.path.join(svc.data_dir, "site_worker")
+    os.makedirs(folder, exist_ok=True)
+    shutil.copyfile(os.path.join(resource_dir(), "ui", "site", "worker.js"), os.path.join(folder, "worker.js"))
+    cfg = {"name": config(svc)["project"], "main": "worker.js", "compatibility_date": "2025-09-01",
+           "assets": {"directory": packed_dir(svc), "binding": "ASSETS"},
+           "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "Room"}]},
+           "migrations": [{"tag": "v1", "new_sqlite_classes": ["Room"]}]}
+    path = os.path.join(folder, "wrangler.jsonc")
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=1)
+    return path
+
+
 def deploy_command(svc) -> str:
     """The upload as a command to run by hand (it sends data/site_packed as it was prepared last)."""
-    return f'npx wrangler deploy --name {config(svc)["project"]} --assets "{packed_dir(svc)}" --compatibility-date 2026-10-01'
+    return f'npx wrangler deploy -c "{worker_config(svc)}"'
 
 
 def status(svc) -> dict:
@@ -928,8 +945,8 @@ def deploy(svc, progress=None) -> str:
     if not npx:
         raise RuntimeError("Node.js isn't installed — the upload runs Cloudflare's wrangler through npx")
     # run from the data folder: wrangler keeps its own files next to where it runs and reads a config it finds there
-    p = subprocess.Popen([npx, "--yes", "wrangler@4", "deploy", "--name", cfg["project"], "--assets", packed_dir(svc),
-                          "--compatibility-date", "2026-10-01"], cwd=svc.data_dir, stdin=subprocess.DEVNULL,
+    conf = worker_config(svc)
+    p = subprocess.Popen([npx, "--yes", "wrangler@4", "deploy", "-c", conf], cwd=os.path.dirname(conf), stdin=subprocess.DEVNULL,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     tail, url = [], cfg["url"]

@@ -157,8 +157,10 @@ points. Puzzles. And two toys.
 **Daily challenge:** the same game for everybody, new at the game's daily reset; the result copies
 as a line of squares to share.
 
-**Duel:** play a game, copy the link with your result, send it — the link opens the same rounds for
-a friend to beat.
+**Duel:** the same rounds for you and a friend. *By link* — the invite is there from the first round;
+send it, each plays in their own time, and the result page's link carries the result to beat. *Live* —
+a room for two to eight under nicknames, everybody at once: a **race** (each at their own pace) or
+**first to answer** (rounds in step, the first right answer takes the round). Live needs the website.
 
 **Lunacy:** the games pay it — a finished game, a Daily, days in a row, a duel won, eighteen
 achievements — and Extraction spends it.
