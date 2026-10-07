@@ -7,7 +7,9 @@ const GM_KEEP = "games", GM_STEPS = [1, 3, 7, 15], GM_WORTH = [1000, 750, 500, 2
 const gm = { battle: true, hard: false, group: "", best: {},
   ...(() => { try { return JSON.parse(localStorage.getItem(GM_KEEP) || "{}"); } catch { return {}; } })(), game: null };
 const gmAudio = new Audio();
-const gmKeep = () => { try { localStorage.setItem(GM_KEEP, JSON.stringify({ battle: gm.battle, hard: gm.hard, group: gm.group, best: gm.best })); } catch {} };
+const gmKeep = () => { try { localStorage.setItem(GM_KEEP, JSON.stringify({ battle: gm.battle, hard: gm.hard, group: gm.group, best: gm.best, vol: gm.vol })); } catch {} };
+// how loud the game plays: its own slider under the disc (the corner player's volume until it is moved)
+const gmVol = () => gm.vol != null ? +gm.vol : (typeof mu !== "undefined" && mu.vol) || 0.6;
 const gmGroup = (t) => /^Canto \d+$/.test(t.where) ? t.where : "Other";
 const gmPool = () => mu.tracks.map((t, n) => ({ t, n })).filter(({ t }) => t.ms > 40000 && (!gm.battle || t.battle) && (!gm.group || gmGroup(t) === gm.group));
 const gmSub = (t) => t.where || t.by || "";
@@ -215,7 +217,7 @@ function gmRound() {
   gmAudio.onerror = null;
   gmAudio.removeAttribute("src");  // the last round's track must not play on while this one is fetched
   gmAudio.load();
-  gmAudio.volume = mu.vol || 0.6;
+  gmAudio.volume = gmVol();
   gmAudio.onloadedmetadata = () => { g.loading = false; gmPlay(); };
   gmFetch(ans.n).then((u) => { if (gm.game === g && g.ans === ans) gmAudio.src = u || "/api/music_audio?n=" + ans.n; });
   gmAudio.onerror = () => {  // unreadable: another track takes the round
@@ -264,6 +266,7 @@ function gmDrawRound() {
     <div class="gmstage"><div><button id="gmdisc" class="gmdisc" title="Play it again"><div>…</div></button>
       <div class="gmsteps">${steps}</div>
       ${d || g.step >= GM_STEPS.length - 1 ? "" : `<button class="toggle gmmore" id="gmmore">Hear more · −${(GM_WORTH[g.step] - GM_WORTH[g.step + 1]) * (gm.hard ? 2 : 1)}</button>`}
+      <label class="gmvol">Volume <input id="gmvol" type="range" min="0" max="1" step="0.01" value="${gmVol()}"></label>
       <div class="gihints">${hints.map(hint).join("")}</div></div>
     <div><div class="gmkick">${d ? (d.ok ? `+${d.points} · ANSWERED AT ${GM_STEPS[g.step]} s` : "MISSED") : `WORTH ${worth} NOW`}</div>
       <div class="gmq">${d ? esc(t.name) : gm.hard ? "Name the track" : g.places ? "Where does this play?" : "Which track is this?"}</div>
@@ -273,6 +276,8 @@ function gmDrawRound() {
       : `<div class="gmopts">${g.places ? g.places.map(place).join("") : g.opts.map(opt).join("")}</div>`}
       ${d ? `<div class="gmafter"><span>${fought}${esc([t.where, t.by].filter(Boolean).join(" · "))}</span><button class="gmbtn" id="gmnext">${g.round + 1 < g.order.length ? "Next" : "Result"}</button></div>` : ""}</div></div>`;
   $("#gmquit").onclick = () => { gmStop(); gmWarmDrop(); gm.game = null; gmDailyEnd(); gmDrawStart(); };
+  $("#gmvol").oninput = (e) => { gmAudio.volume = gm.vol = +e.target.value; };
+  $("#gmvol").onchange = gmKeep;
   $("#gmdisc").onclick = () => { if (g.loading) return; if (d) { gmAudio.paused ? gmAudio.play().catch(() => {}) : gmAudio.pause(); setTimeout(gmRing, 50); } else gmPlay(); };
   document.querySelectorAll("[data-hint]").forEach((b) => b.onclick = () => { g.hints[b.dataset.hint] = 1; gmDrawRound(); });
   if ($("#gmmore")) $("#gmmore").onclick = () => { g.step++; gmDrawRound(); if (!g.loading) gmPlay(); };

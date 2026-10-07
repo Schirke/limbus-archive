@@ -585,6 +585,8 @@ body.quiz #player { display: none; }
 .gmsteps { display: flex; gap: 4px; justify-content: center; margin-top: 16px; font: 12px Consolas, monospace; }
 .gmsteps span { padding: 3px 9px; border: 1px solid var(--line); color: var(--muted); } .gmsteps .done { background: var(--gold); color: #111; border-color: var(--gold); } .gmsteps .cur { border-color: var(--gold); color: var(--gold); }
 .gmmore { display: block; margin: 10px auto 0; border-radius: 0; }
+.gmvol { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 14px; color: var(--muted); font-size: 13px; }
+.gmvol input { width: 140px; padding: 0; accent-color: var(--gold); cursor: pointer; }
 .gmkick { font: 12px Consolas, monospace; letter-spacing: 3px; color: var(--muted); }
 .gmq { font: 26px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; margin: 4px 0 16px; }
 .gmopts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
