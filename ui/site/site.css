@@ -1,0 +1,16 @@
+/* the web copy only (limbusdm/site.py) */
+body.site #statusbox, body.site #navset { display: none; }
+/* the status button pushed the right side of the header to the edge: without it the timers do */
+body.site #timers { margin-left: auto; }
+@media (max-width: 1100px) { body.site #navsup { margin-left: auto; } }
+a.apponly { opacity: .55; }
+a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; margin-left: 5px; padding: 1px 4px;
+  border: 1px solid currentColor; border-radius: 4px; opacity: .8; vertical-align: 1px; }
+#sitefoot { display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; margin-top: 40px; padding: 14px 24px;
+  border-top: 1px solid rgba(255, 255, 255, .08); font-size: 12px; opacity: .7; }
+/* Animations on the site: Spine and battle animations — no tabs, links and exports that need the game's files */
+body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site #agif, body.site #enanim, body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
+body.site .fxapp { opacity: .4; cursor: default; }
+body.site #fxnote { flex-basis: 100%; }
+/* the music player sits above the footer, not over its links */
+body.site #player { bottom: 58px; }
