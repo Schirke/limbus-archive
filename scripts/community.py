@@ -99,7 +99,7 @@ def wanted():
     with urllib.request.urlopen(req, timeout=30) as r:
         lines = json.load(r)
     out = []
-    for line in lines if isinstance(lines, list) else []:
+    for line in [x for line in (lines if isinstance(lines, list) else []) for x in re.split(r"[\s,;]+", str(line)) if x]:
         m = re.search(r"twitch\.tv/([A-Za-z0-9_]+)", line)
         if m:
             out.append((line, "twitch", m.group(1).lower()))

@@ -138,7 +138,7 @@ async function cmBili() {
     const st = await api("/api/state");
     if (!st.site_publish || location.hash.split("/")[1] !== "settings") return;
     $("#main").insertAdjacentHTML("beforeend", `<h2>Community · recommended channels</h2><div class="card" id="cmrecbox">
-      <div class="muted small">Shown in the corner of the Community page, in the app and on the site; who is live is marked. A link a line — YouTube (youtube.com/@name or youtube.com/channel/UC…) or Twitch (twitch.tv/name). The order here is the order there.</div>
+      <div class="muted small">Shown in the corner of the Community page, in the app and on the site; who is live is marked. One link a line (or with spaces / commas between them) — YouTube (youtube.com/@name or youtube.com/channel/UC…) or Twitch (twitch.tv/name). The order here is the order there.</div>
       <textarea class="mono" id="cmreclines" spellcheck="false" placeholder="Reading the list from GitHub…" disabled></textarea>
       <div><button class="primary" id="cmrecsave" disabled>Save</button> <span class="muted small" id="cmrecsaid"></span></div>
       <div id="cmrecnow"></div></div>`);

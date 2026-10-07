@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import subprocess
 import time
 import urllib.request
@@ -60,7 +61,7 @@ def recommended() -> dict:
 
 
 def save_recommended(lines: list) -> dict:
-    lines = [str(x).strip() for x in lines if str(x).strip()][:40]
+    lines = [x for line in lines for x in re.split(r"[\s,;]+", str(line)) if x][:40]  # (links typed in one line too)
     try:
         try:
             _gh(f"repos/{REPO}/git/ref/heads/{BRANCH}")
