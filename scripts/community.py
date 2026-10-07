@@ -6,7 +6,11 @@ written to streams.json. Run by .github/workflows/community.yml on a timer; the 
     YOUTUBE_API_KEY                          a key with "YouTube Data API v3" at console.cloud.google.com
 
 Either service is skipped without its key. YouTube lets a key search about 100 times a day (a search per language
-each time), so its part is asked anew every 50 minutes and carried over in between."""
+each time), so its part is asked anew every 50 minutes and carried over in between.
+
+The recommended channels (the pictures in the page's corner) are the links in recommended.json on the
+`community-config` branch, written by the owner's app (limbusdm/community.py): each gets its name and picture, and
+whether it is live right now — with any game, not this one alone."""
 import datetime
 import json
 import os
@@ -19,6 +23,9 @@ GAME, TOP, LANGS = "Limbus Company", 30, ("en", "ru", "ko")  # TOP: streams kept
 YOUTUBE_EVERY = 48 * 60  # seconds
 LETTERS = (("ru", "[а-яё]"), ("ko", "[가-힣]"))  # a language told by its letters
 OUT = sys.argv[1] if len(sys.argv) > 1 else "streams.json"
+REPO = os.environ.get("GITHUB_REPOSITORY") or "Schirke/limbus-archive"
+WHO_EVERY = 24 * 3600  # seconds a YouTube channel's name and picture are kept
+TW = {}  # the headers Twitch took, for the recommended channels
 
 
 def call(url, params=None, headers=None, data=None):
@@ -34,6 +41,7 @@ def twitch(cid, secret):
                                                              "grant_type": "client_credentials"})["access_token"]
     head = {"Client-Id": cid, "Authorization": "Bearer " + token}
     games = call("https://api.twitch.tv/helix/games", {"name": GAME}, head)["data"]
+    TW.update(head)
     out = {}
     for lang in LANGS:  # the busiest first, as Twitch lists them
         rows = call("https://api.twitch.tv/helix/streams", {"game_id": games[0]["id"], "language": lang, "first": TOP},
@@ -82,6 +90,100 @@ def youtube(key):
     return out
 
 
+def wanted():
+    """The owner's list: [(the line, "twitch" | "youtube", login | channel id | @handle)]."""
+    req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/contents/recommended.json?ref=community-config",
+                                 headers={"Accept": "application/vnd.github.raw", "User-Agent": "LimbusArchive"})
+    if os.environ.get("GH_TOKEN"):
+        req.add_header("Authorization", "Bearer " + os.environ["GH_TOKEN"])
+    with urllib.request.urlopen(req, timeout=30) as r:
+        lines = json.load(r)
+    out = []
+    for line in lines if isinstance(lines, list) else []:
+        m = re.search(r"twitch\.tv/([A-Za-z0-9_]+)", line)
+        if m:
+            out.append((line, "twitch", m.group(1).lower()))
+            continue
+        m = re.search(r"/channel/(UC[\w-]{22})", line) or re.search(r"(?:youtube\.com/|^)(@[^/?#\s]+)", line.strip())
+        if m:
+            out.append((line, "youtube", urllib.parse.unquote(m.group(1))))
+    return out
+
+
+def page(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0", "Accept-Language": "en"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def recommended(old, now, yt):
+    """The recommended channels in the owner's order: {"src", "on", "name", "url", "avatar", "live"}, live = None or
+    {"title", "viewers", "url"}. `old` = this part as written the last time: what can't be asked now stays as it was."""
+    was = {r["src"]: r for r in old.get("list") or []}
+    who, rows = dict(old.get("who") or {}), []
+    want = wanted()
+    logins = [key for _, on, key in want if on == "twitch"]
+    faces, live = {}, {}
+    if logins and TW:
+        api = "https://api.twitch.tv/helix/"
+        faces = {u["login"]: u for u in call(api + "users", {"login": logins[:100]}, TW)["data"]}
+        live = {s["user_login"]: s for s in call(api + "streams", {"user_login": logins[:100], "first": 100}, TW)["data"]}
+    api, found = "https://www.googleapis.com/youtube/v3/", {}
+    for src, on, key in want:
+        if on != "youtube" or not yt:
+            continue
+        w = who.get(src)
+        if not w or (now - datetime.datetime.fromisoformat(w["at"])).total_seconds() >= WHO_EVERY:
+            try:
+                got = call(api + "channels", {"part": "snippet", "id" if key.startswith("UC") else "forHandle": key, "key": yt}).get("items")
+                if got:
+                    sn = got[0]["snippet"]
+                    w = who[src] = {"id": got[0]["id"], "name": sn["title"], "at": now.isoformat(timespec="seconds"),
+                                    "avatar": ((sn.get("thumbnails") or {}).get("default") or {}).get("url") or ""}
+            except Exception as e:
+                print("recommended:", src, problem(e))
+        if not w:
+            continue
+        # what may be on air: the channel's newest videos (its feed: no key spent) and what its /live page shows
+        ids = []
+        try:
+            ids = re.findall(r"<yt:videoId>([\w-]{11})<", page("https://www.youtube.com/feeds/videos.xml?channel_id=" + w["id"]))[:4]
+        except Exception as e:
+            print("recommended: feed of", w["name"], problem(e))
+        try:
+            m = re.search(r'<link rel="canonical" href="https://www\.youtube\.com/watch\?v=([\w-]{11})"',
+                          page(f"https://www.youtube.com/channel/{w['id']}/live"))
+            if m and m.group(1) not in ids:
+                ids.append(m.group(1))
+        except Exception as e:
+            print("recommended: live page of", w["name"], problem(e))
+        found[src] = ids
+    on_air, asked = {}, True  # video id -> the stream
+    ids = sorted({i for v in found.values() for i in v})
+    try:
+        for n in range(0, len(ids), 50):
+            for v in call(api + "videos", {"part": "snippet,liveStreamingDetails", "id": ",".join(ids[n:n + 50]), "key": yt})["items"]:
+                if v["snippet"].get("liveBroadcastContent") == "live":
+                    on_air[v["id"]] = {"title": v["snippet"]["title"], "url": "https://www.youtube.com/watch?v=" + v["id"],
+                                       "viewers": int((v.get("liveStreamingDetails") or {}).get("concurrentViewers") or 0)}
+    except Exception as e:
+        asked = False
+        print("recommended: videos", problem(e))
+    for src, on, key in want:
+        if on == "twitch" and key in faces:
+            u, s = faces[key], live.get(key)
+            rows.append({"src": src, "on": on, "name": u["display_name"], "url": "https://www.twitch.tv/" + key,
+                         "avatar": u.get("profile_image_url") or "",
+                         "live": s and {"title": s["title"], "viewers": s["viewer_count"], "url": "https://www.twitch.tv/" + key}})
+        elif on == "youtube" and src in who and yt:
+            w = who[src]
+            rows.append({"src": src, "on": on, "name": w["name"], "url": "https://www.youtube.com/channel/" + w["id"], "avatar": w["avatar"],
+                         "live": next((on_air[i] for i in found.get(src, []) if i in on_air), None) if asked else (was.get(src) or {}).get("live")})
+        elif src in was:
+            rows.append(was[src])
+    return {"list": rows, "who": {src: who[src] for src, _, _ in want if src in who}}
+
+
 def problem(e):
     """An error to publish: what the service answered, without the key a URL in it may carry."""
     said = ""
@@ -127,10 +229,16 @@ def main():
     if not parts:
         print("no API keys in the secrets, or nothing answered: nothing written", errors or "")
         return
+    try:
+        rec = recommended(old.get("rec") or {}, now, yt)
+    except Exception as e:  # (no list: the branch isn't there, GitHub didn't answer) — as it was
+        rec = old.get("rec") or {}
+        print("recommended:", problem(e))
     doc = {"updated": now.isoformat(timespec="seconds"), "parts": parts, "errors": errors}
     for lang in LANGS:
         rows = [s for p in parts.values() for s in (p.get("streams") or {}).get(lang) or []]
         doc[lang] = sorted(rows, key=lambda s: -s["viewers"])[:TOP]
+    doc["rec"], doc["recommended"] = rec, rec.get("list") or []
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(doc, f, ensure_ascii=False, indent=1)
     print({lang: len(doc[lang]) for lang in LANGS}, errors or "")

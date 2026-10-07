@@ -40,6 +40,16 @@ cmRead();
 setInterval(cmRead, 180000);
 setInterval(() => { const el = $(".cmstamp"); if (el) el.outerHTML = cmStamp(el.dataset.at); }, 30000);
 
+// The recommended channels in the page's corner (the owner's list, see the end of the file): round pictures that open
+// the channel; who is live right now comes first, in a red ring.
+const cmInit = (name) => [...String(name).replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("").toUpperCase();
+function cmRec(d) {
+  const list = [...((d || cm.last || {}).recommended || [])].sort((a, b) => !!b.live - !!a.live);
+  return !list.length ? "" : `<div class="cmrec"><span>Recommended</span><div>${list.map((c) => `<a class="${c.live ? "live" : ""}" href="${esc(c.url)}" target="_blank" title="${esc(c.name)} · ${c.on === "twitch" ? "Twitch" : "YouTube"}${c.live ? `&#10;Live now: ${esc(c.live.title)}${c.live.viewers ? ` · ${cmK(c.live.viewers)} watching` : ""}` : ""}&#10;Open the channel in the browser">
+    <span class="cmav" data-i="${esc(cmInit(c.name))}">${c.avatar ? `<img src="${esc(c.avatar)}" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>${c.live ? "<i>LIVE</i>" : ""}<b>${esc(c.name)}</b></a>`).join("")}</div></div>`;
+}
+const cmHead = (sub, d) => `<div class="cmhead"><div><h1>Community</h1><div class="sub">${sub}</div></div>${cmRec(d)}</div>`;
+
 // The page's two tabs: the live streams, the videos on Bilibili.
 const cmTabs = (on) => `<div class="cmtabs">${[["", "Live streams"], ["bilibili", "Bilibili"]].map(([k, n]) => `<a class="${on === k ? "on" : ""}" href="#/community${k ? "/" + k : ""}">${n}</a>`).join("")}</div>`;
 
@@ -57,8 +67,7 @@ routes.community = async (args) => {
     const started = (s) => new Date(s.started || 0).getTime();
     const rows = every.filter((s) => (cm.lang === "all" || s.lang === CM_LANGS.find(([k]) => k === cm.lang)[1]) && (!cm.site || s.on === cm.site))
       .sort((a, b) => cm.sort === "new" ? started(b) - started(a) : cm.sort === "long" ? (started(a) || 9e15) - (started(b) || 9e15) : b.viewers - a.viewers);
-    $("#main").innerHTML = `<h1>Community</h1>
-      <div class="sub">Who streams Limbus Company right now, on Twitch and YouTube.</div>${cmTabs("")}
+    $("#main").innerHTML = `${cmHead("Who streams Limbus Company right now, on Twitch and YouTube.", d)}${cmTabs("")}
       <div class="dbrow">${chips(CM_LANGS, "lang")}<span class="gap"></span>${chips(CM_SITES, "site")}
         <span class="grow"></span><span class="gmscore">${d.updated ? `${rows.length} LIVE` : ""}</span>${d.updated ? cmStamp(d.updated) : ""}</div>
       <div class="dbrow">${chips(CM_SORTS, "sort")}<span class="grow"></span><span class="muted small" title="The Community button in the menu shows who is live while a stream has this many viewers">Show in the menu a stream with</span>${chips(CM_BIG, "big")}</div>
@@ -79,7 +88,7 @@ routes.community = async (args) => {
   };
   draw();
   // a newer list read while the page is open (cmRead) is shown at once
-  cm.fresh = (doc) => { if (location.hash.split("/")[1] !== "community" || location.hash.split("/")[2]) return void (cm.fresh = null); if (doc && doc.updated && doc.updated !== d.updated) { take(doc); draw(); } };
+  cm.fresh = (doc) => { if (location.hash.split("/")[1] !== "community" || location.hash.split("/")[2]) return void (cm.fresh = null); if (doc && doc.updated && doc.updated !== d.updated) { const y = $("#main").scrollTop; take(doc); draw(); $("#main").scrollTop = y; } };
 };
 
 // Bilibili: the game's videos there (/api/bilibili: Bilibili's own search by the game's Chinese name, asked by the app,
@@ -93,8 +102,7 @@ async function cmBili() {
   if (!CB_PERIODS.some(([k]) => k === cb.period)) cb.period = "week";
   if (!CB_SORTS.some(([k]) => k === cb.sort)) cb.sort = "views";
   const chips = (list, key) => list.map(([k, n]) => `<button class="toggle ${cb[key] === k ? "on" : ""}" data-cb${key}="${k}">${n}</button>`).join("");
-  const head = (right) => `<h1>Community</h1>
-    <div class="sub">Limbus Company videos on Bilibili.</div>${cmTabs("bilibili")}
+  const head = (right) => `${cmHead("Limbus Company videos on Bilibili.")}${cmTabs("bilibili")}
     <div class="dbrow">${chips(CB_PERIODS, "period")}<span class="gap"></span>${chips(CB_SORTS, "sort")}<span class="grow"></span>${right || ""}</div>`;
   const wire = () => {
     for (const key of ["period", "sort"])
@@ -119,4 +127,38 @@ async function cmBili() {
         <span class="cbby">${esc(v.name)}</span>
         <small><u>${cmK(v.views)} views</u>${v.likes ? `${cmK(v.likes)} likes · ` : ""}${cmAgo(v.at).replace(/^(\d+) h \d+ min ago$/, (m, h) => h < 24 ? m : `${Math.floor(h / 24)} d ago`)}</small></a>`).join("")}</div>`);
   wire();
+}
+
+// Settings, for the owner alone (where the web copy is set up): the recommended channels — links, one a line, kept on
+// GitHub (/api/community_rec); the list made there every 5 minutes then carries their names, pictures and who is live.
+{
+  const settings = routes.settings;
+  routes.settings = async () => {
+    await settings();
+    const st = await api("/api/state");
+    if (!st.site_publish || location.hash.split("/")[1] !== "settings") return;
+    $("#main").insertAdjacentHTML("beforeend", `<h2>Community · recommended channels</h2><div class="card" id="cmrecbox">
+      <div class="muted small">Shown in the corner of the Community page, in the app and on the site; who is live is marked. A link a line — YouTube (youtube.com/@name or youtube.com/channel/UC…) or Twitch (twitch.tv/name). The order here is the order there.</div>
+      <textarea class="mono" id="cmreclines" spellcheck="false" placeholder="Reading the list from GitHub…" disabled></textarea>
+      <div><button class="primary" id="cmrecsave" disabled>Save</button> <span class="muted small" id="cmrecsaid"></span></div>
+      <div id="cmrecnow"></div></div>`);
+    const now = (lines) => { const got = (cm.last || {}).recommended || [], miss = lines.filter((l) => !got.some((c) => c.src === l));
+      $("#cmrecnow").innerHTML = cmRec({ recommended: got.filter((c) => lines.includes(c.src)) }) + (miss.length ? `<div class="muted small">Not on the page yet: ${miss.map(esc).join(", ")} — a new link shows up within 5–10 minutes; one that never does is not a channel's address.</div>` : ""); };
+    const d = await api("/api/community_rec").catch(() => ({ lines: [], error: "no answer" }));
+    if (!$("#cmreclines")) return;
+    $("#cmreclines").value = d.lines.join("\n");
+    $("#cmreclines").placeholder = "https://www.youtube.com/@name";
+    $("#cmrecsaid").innerHTML = d.error ? `<span class="bad">GitHub could not be read: ${esc(d.error)}</span>` : "";
+    $("#cmreclines").disabled = $("#cmrecsave").disabled = !!d.error;
+    now(d.lines);
+    $("#cmrecsave").onclick = async () => {
+      $("#cmrecsave").disabled = true;
+      $("#cmrecsaid").textContent = "Saving…";
+      const r = await api("/api/community_rec", { lines: $("#cmreclines").value.split("\n") }).catch(() => ({ error: "no answer" }));
+      if (!$("#cmrecsave")) return;
+      $("#cmrecsave").disabled = false;
+      $("#cmrecsaid").innerHTML = r.error ? `<span class="bad">Not saved: ${esc(r.error)}</span>` : "Saved — on the page within 5–10 minutes";
+      if (!r.error) { $("#cmreclines").value = r.lines.join("\n"); now(r.lines); }
+    };
+  };
 }

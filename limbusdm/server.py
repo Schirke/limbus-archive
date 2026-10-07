@@ -529,6 +529,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/community":  # live streams of the game, a list made on GitHub
                 from . import community
                 return self._json(community.streams())
+            if p == "/api/community_rec":  # the recommended channels as the owner wrote them (Settings)
+                from . import community
+                return self._json(community.recommended())
             if p == "/api/bilibili":  # the game's videos on Bilibili (the Community page's tab)
                 from . import bilibili
                 return self._json(bilibili.videos(q.get("period", "week"), q.get("sort", "views"), svc.translator))
@@ -695,6 +698,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json({"ok": True})
             if p == "/api/check":
                 return self._json({"state": svc.check_version(start=True)})
+            if p == "/api/community_rec":
+                from . import community
+                return self._json(community.save_recommended(b.get("lines") or []))
             if p == "/api/settings":
                 svc.save_settings(b)
                 return self._json(svc.settings)

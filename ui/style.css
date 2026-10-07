@@ -716,6 +716,17 @@ button.gihint { cursor: pointer; } button.gihint:hover { border-color: var(--gol
 .cben { color: var(--muted); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .cbby { color: var(--gold); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cbcard small { color: var(--muted); font-size: 12px; } .cbcard small u { text-decoration: none; color: #fff; margin-right: 8px; }
+.cmhead { display: flex; align-items: flex-start; gap: 24px; } .cmhead > :first-child { flex: 1; min-width: 0; }
+.cmrec { flex: none; max-width: 60%; display: grid; gap: 6px; justify-items: end; }
+.cmrec > span { color: var(--muted); font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 2px; text-transform: uppercase; }
+.cmrec > div { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 10px; }
+.cmrec a { position: relative; width: 62px; display: grid; justify-items: center; gap: 4px; color: var(--muted); text-decoration: none; }
+.cmrec .cmav { width: 46px; height: 46px; border: 2px solid var(--line); font-size: 15px; }
+.cmrec a:hover .cmav { border-color: var(--gold); } .cmrec a:hover b { color: #fff; }
+.cmrec b { max-width: 100%; font-weight: normal; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmrec a.live .cmav { border-color: var(--red); box-shadow: 0 0 0 2px rgba(224, 72, 58, .3), 0 0 14px rgba(224, 72, 58, .55); } .cmrec a.live b { color: #fff; }
+.cmrec a i { position: absolute; top: 37px; left: 50%; transform: translateX(-50%); padding: 0 5px; background: var(--red); color: #fff; font: 10px/14px Consolas, monospace; letter-spacing: 1px; font-style: normal; }
+#cmrecbox { display: grid; gap: 10px; max-width: 900px; } #cmrecbox textarea { min-height: 120px; width: 100%; } #cmrecbox .cmrec { justify-items: start; max-width: none; } #cmrecbox .cmrec > div { justify-content: flex-start; }
 /* Patches -> News: the developers' update notices from Steam (news.js) */
 .nwfeed { display: grid; grid-template-columns: 400px 1fr; border: 1px solid var(--line); background: var(--panel); height: calc(100vh - 250px); min-height: 420px; }
 .nwlist { overflow-y: auto; border-right: 1px solid var(--line); }
