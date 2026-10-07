@@ -965,3 +965,36 @@ details.an-opts summary { cursor: pointer; }
 #sitebox .ok { color: var(--add); } #sitebox .bad { color: var(--rem); }
 .sitelog summary { cursor: pointer; }
 .sitelogrow { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* ---- Story map (ui/stages.js) */
+.sthead { margin: 16px 0 8px; font-size: 20px; } .sthead em { font: 12px Consolas, monospace; color: var(--muted); margin-left: 12px; font-style: normal; }
+.dbrow a.toggle { height: 36px; min-width: 38px; padding: 0 8px; border: 1px solid var(--line); background: var(--panel); display: inline-flex; align-items: center; justify-content: center; color: var(--text); text-decoration: none; font-size: 13px; }
+.dbrow a.toggle:hover, .dbrow a.toggle.on { border-color: var(--gold); color: var(--gold); }
+.stmap { overflow: auto; border: 1px solid var(--line); background: #000; cursor: grab; user-select: none; }
+.stmap.drag { cursor: grabbing; } .stmap.drag a { pointer-events: none; }
+.stcanvas { position: relative; }
+.stcanvas img, .stcanvas svg { position: absolute; left: 0; top: 0; pointer-events: none; }
+.stcanvas polyline { fill: none; stroke: #e9e1d4; stroke-opacity: .55; stroke-width: 2; stroke-dasharray: 6 5; }
+.stnode { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; border: 2px solid #c0392b; background: #1b1113; color: #fff;
+  font: 11px/20px Consolas, monospace; text-align: center; text-decoration: none; box-shadow: 0 0 6px #000; }
+.stnode.story { width: 12px; height: 12px; margin: -6px 0 0 -6px; border-color: #8fa3b5; background: #1d2730; }
+.stnode.dungeon, .stnode.other { border-color: var(--gold); border-radius: 4px; }
+.stnode:hover { transform: scale(1.25); z-index: 2; }
+.stnode.on { background: var(--gold); border-color: #fff; color: #000; transform: scale(1.35); z-index: 3; }
+.stnomap { margin: 6px 0; }
+.stwrap { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 22px; margin-top: 14px; align-items: start; }
+.stlist { position: relative; max-height: 620px; overflow: hidden auto; padding-right: 4px; }
+.stwrap .encard { max-height: 620px; min-height: 0; } .stwrap .enname { font-size: 26px; flex-wrap: wrap; }
+.strow { display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; border: 1px solid transparent; border-bottom-color: var(--line); color: var(--text); text-decoration: none; font-size: 13px; }
+.strow span { font: 12px Consolas, monospace; color: var(--muted); min-width: 42px; } .strow .r { flex: none; min-width: 0; white-space: nowrap; }
+.strow i { font-style: normal; width: 14px; text-align: center; color: #c0392b; } .strow.dungeon i, .strow.other i { color: var(--gold); }
+.strow b { flex: 1 1 0; min-width: 0; font-weight: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strow.story { color: var(--muted); } .strow.story i { color: #8fa3b5; }
+.strow:hover, .strow.on { border-color: var(--gold); background: var(--panel); }
+.stnote { margin: 12px 0; }
+.stwave { border: 1px solid var(--line); background: var(--panel); padding: 10px 12px; margin-top: 8px; }
+.stwhead { display: flex; gap: 12px; align-items: center; font: 13px Consolas, monospace; color: #c9bfb2; } .stwhead b { color: #fff; font-weight: normal; }
+.stthemes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; } .sttrack { font-size: 12px; padding: 3px 9px; }
+.stunits { display: grid; grid-template-columns: repeat(auto-fill, 112px); gap: 6px; margin-top: 8px; }
+.stunits.more { grid-template-columns: repeat(auto-fill, 84px); }
+@media (max-width: 1100px) { .stwrap { grid-template-columns: 260px minmax(0, 1fr); } }

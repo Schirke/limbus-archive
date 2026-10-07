@@ -20,7 +20,7 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 # (304) while the snapshot and the app are the same ones (the ETag), so nothing is cut out of the bundles twice.
 KEEP = "max-age=3600"
 # Lists that only a new snapshot changes and that take a while to put together: answered from memory after the first time.
-PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types"}
+PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages"}
 
 
 def _etag(svc) -> str:
@@ -569,6 +569,17 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/buff_video":
                 full = svc.buff_fx.video(q.get("name", ""))
                 return self._file_live(full, "video/webm") if full else self._json({"error": "not rendered"}, 404)
+            if p == "/api/stages":  # the story map: chapters, nodes, fights (+ what its ids are in the other lists)
+                from .viewer import battle_maps
+                db = svc.stage_db()
+                want = set(db.get("units") or [])
+                entry = {i: e["id"] for e in svc.enemy_db()["list"] for v in e["variants"] for i in v["ids"] if i in want}
+                try:
+                    tracks = svc.music().get("events") or {}
+                except Exception:
+                    tracks = {}  # (no sound banks read: the themes are listed by their event names)
+                return self._json({"chapters": db["chapters"], "tile": db.get("tile") or 2048, "units": entry, "tracks": tracks,
+                                   "maps": [m["name"] for m in battle_maps(svc)]})
             if p == "/api/enemies":  # the handbook's list; an entry's skill and passive texts come with /api/enemy
                 db = svc.enemy_db()
                 # a Spine-drawn enemy is shown by a picture of its idle pose, taken by the page (the game's portrait

@@ -915,6 +915,37 @@ class Service:
         self._quiz = (sid, db)
         return db
 
+    def stage_db(self) -> dict:
+        """The story map of the latest snapshot (see stages.build): chapters, their nodes on the map and the fights."""
+        import re
+
+        from . import stages
+        sid = self.latest_snapshot_id()
+        if not sid:
+            return {"chapters": []}
+        cached = getattr(self, "_stages", None)
+        if cached and cached[0] == sid:
+            return cached[1]
+        rel = f"stage_db/{sid}.json.gz"
+        db = self.store.read_json(rel)
+        if db is None or db.get("v") != stages.VERSION:
+            tiles: dict[str, dict[str, str]] = {}
+            con = sqlite3.connect(self.ensure_browse())
+            try:
+                rows = con.execute("select distinct c from o where type = 'Texture2D' and c like '%/Sprite/StageMap/%'").fetchall()
+            finally:
+                con.close()
+            for (c,) in rows:
+                m = re.search(r"/StageMap/(\w+)/\1_(\d+)_(\d+)\.png$", c)
+                if m:
+                    tiles.setdefault(m.group(1), {})[f"{int(m.group(2))}_{int(m.group(3))}"] = c
+            loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
+            db = stages.build(self.static_tables(["part", "dungeonMap"] + list(stages.FIGHT_TABLES)), loc, tiles)
+            db["v"] = stages.VERSION
+            self.store.write_json(rel, db)
+        self._stages = (sid, db)
+        return db
+
     def enemy_db(self) -> dict:
         """The enemy handbook of the latest snapshot (see enemies.build), with each entry's portrait path and
         whether the skill renderer has its battle prefab."""

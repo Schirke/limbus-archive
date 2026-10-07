@@ -55,6 +55,15 @@ passives and the stages it is fought in. Sort by Canto, name, HP, speed or level
 
 <p align="center"><a href="docs/enemies.webp"><img src="docs/enemies.webp" width="760" alt="Enemy handbook"></a></p>
 
+### Story map
+
+Every chapter as the game lays it out: the map with its stage nodes, drag it about and pick a node to
+see who is fought there, wave by wave, on which arena and to which battle theme. Dungeons list the
+fights inside them. An enemy opens in the handbook, a theme plays in the corner player, and **Play in
+Versus** takes the fight's enemy, arena and theme to the Versus page.
+
+<p align="center"><a href="docs/stages.webp"><img src="docs/stages.webp" width="760" alt="Story map"></a></p>
+
 ### Buff effects
 
 The buffs and debuffs that have an effect of their own in the game's files (Shin, Prey, the Warden's
