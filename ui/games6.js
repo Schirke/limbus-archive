@@ -9,7 +9,7 @@
 "use strict";
 
 const GL_KEEP = "games_live", GL_ROUND = 30, GL_WIN = 200;
-const GL_FIRST = ["track", "id", "char", "skill", "enemy", "canto", "splash", "atlas"];  // the games "First to answer" can run
+const GL_FIRST = ["track", "id", "char", "skill", "enemy", "canto", "splash", "atlas", "buff"];  // the games "First to answer" can run
 const gl = { nick: "", id: "", ...(() => { try { return JSON.parse(localStorage.getItem(GL_KEEP) || "{}"); } catch { return {}; } })(),
   ws: null, code: "", room: null, match: null, n: 0, want: "", timer: 0, paid: 0, retry: 0, shut: true };
 if (!gl.id) gl.id = Math.random().toString(36).slice(2, 12);
@@ -24,13 +24,14 @@ const glSay = (data) => glSend({ t: "msg", data });
 // the running game of an engine, and how it stands: [done steps, of how many, score as shown]
 function glGame(k) {
   return k === "track" ? gm.game : ["id", "skill", "char"].includes(k) ? gi.game : ["enemy", "canto", "splash", "atlas"].includes(k) ? gp.game
-    : k === "wordle" ? gw.game : k === "conn" ? gc.game : k === "grid" ? gg.game : k === "odd" ? go.game : null;
+    : k === "wordle" ? gw.game : k === "conn" ? gc.game : k === "grid" ? gg.game : k === "odd" ? go.game
+    : k === "chain" ? gn.game : k === "buff" ? gb.game : k === "mix" ? gy.game : k === "jig" ? gj.game : null;
 }
 function glStand(k, g) {
   if (k === "wordle") return [g.tries.length, GW_TRIES, g.over && g.tries.includes(g.ans) ? "solved" : ""];
   if (k === "conn") return [g.found.length, 4, g.miss ? `${g.miss} miss` : ""];
   if (k === "grid") return [g.got.filter(Boolean).length, 9, g.score];
-  return [(g.log || []).length, 10, g.score];
+  return [(g.log || []).length, g.of || 10, g.score];
 }
 
 function glClose() {
@@ -189,8 +190,8 @@ function glNext(r) {
   if (!g || g.round !== r) return;
   const round = x.rounds[r] = x.rounds[r] || { ans: {}, first: "" };
   if (!round.first) x.said = `Round ${r + 1}: nobody took it`;
-  if (!g.done) x.game === "track" ? gmAnswer(null, "") : GL_FIRST.slice(1, 4).includes(x.game) ? giAnswer(null) : gpAnswer(null);
-  setTimeout(() => { const now = glGame(x.game); if (gl.match === x && now === g && g.round === r) { const b = $("#gmnext") || $("#ginext") || $("#gpnext"); b && b.click(); } }, 2400);
+  if (!g.done) x.game === "track" ? gmAnswer(null, "") : x.game === "buff" ? gbAnswer(null) : GL_FIRST.slice(1, 4).includes(x.game) ? giAnswer(null) : gpAnswer(null);
+  setTimeout(() => { const now = glGame(x.game); if (gl.match === x && now === g && g.round === r) { const b = $("#gmnext") || $("#ginext") || $("#gpnext") || $("#gbnext"); b && b.click(); } }, 2400);
 }
 // my game has ended (games.js gmOver calls this)
 function glOver(game, g, score) {

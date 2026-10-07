@@ -151,7 +151,7 @@ function gmOver(game, g, score) {
   if (g.paid) return;
   g.paid = true;
   setTimeout(() => typeof glOver === "function" && glOver(game, g, score));  // (a live match hears of it, with the grade set below)
-  const hard = game === "track" ? gm.hard : ["id", "skill", "char"].includes(game) ? gi.hard : ["enemy", "splash", "atlas"].includes(game) ? gp.hard : false;
+  const hard = game === "track" ? gm.hard : ["id", "skill", "char"].includes(game) ? gi.hard : ["enemy", "splash", "atlas"].includes(game) ? gp.hard : !!g.hard;
   const num = typeof score === "number", wordle = game === "wordle" && g.tries.includes(g.ans), conn = game === "conn" && g.miss < GC_MISS;
   const q = game === "wordle" ? (wordle ? (GW_TRIES + 1 - g.tries.length) / GW_TRIES : 0) : game === "conn" ? (conn ? 1 - g.miss / GC_MISS : 0)
     : game === "grid" ? Math.min(1, score / 2500) : num ? Math.min(1, score / 10000) : 0;
@@ -265,10 +265,18 @@ const GM_GAMES = [
   ["gacha", "#/gamegacha", "Extraction", "The game's extraction, with its banners, chances, sounds and voices — paid with the lunacy the games give.",
     gmIcon('<rect x="4" y="3" width="11" height="15" rx="1"/><rect x="9" y="6" width="11" height="15" rx="1"/><path d="M14.5 10.5l1 2.1 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2-1.6-1.5 2.2-.3z"/>'), true],
   ["dare", "#/gamedare", "Challenge roulette", "A random team and a rule to play it by — for a run that got too easy.",
-    gmIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="2.2"/>'), true]];
+    gmIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="2.2"/>'), true],
+  ["mix", "#/gamemix", "Mixed up", "A piece of a track cut into parts and shuffled — listen and put them back in order.",
+    gmIcon('<rect x="2.5" y="6" width="4.2" height="12"/><rect x="9.9" y="6" width="4.2" height="12"/><rect x="17.3" y="6" width="4.2" height="12"/><path d="M4.6 3.2c2.5-1.6 5-1.6 7.4 0M10.6 1.6L12 3.2l-1.9.9"/>')],
+  ["buff", "#/gamebuff", "Guess the buff", "The effect of a buff or a debuff, as it looks on the one who has it — which one is it?",
+    gmIcon('<path d="M12 2.5l2.2 5.6 5.8.4-4.5 3.8 1.5 5.8-5-3.2-5 3.2 1.5-5.8L4 8.5l5.8-.4z"/><path d="M12 19.5v2M5 20l1-1.6M19 20l-1-1.6"/>')],
+  ["chain", "#/gamechain", "Chain", "From one Identity to another, each step sharing the Sinner or a faction with the one before — in the fewest links.",
+    gmIcon('<rect x="2.5" y="8.5" width="9" height="7" rx="3.5"/><rect x="12.5" y="8.5" width="9" height="7" rx="3.5"/><path d="M9 12h6"/>')],
+  ["jig", "#/gamejig", "Jigsaw", "An Identity's art cut into tiles and shuffled — put it together against the clock.",
+    gmIcon('<rect x="3" y="3" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/><rect x="14.5" y="2.2" width="7" height="7" transform="rotate(12 18 5.7)"/><rect x="3" y="13" width="8" height="8"/>')]];
 const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
 // the games' page: the columns its tiles stand in
-const GM_GROUPS = [["By ear", ["track", "id", "char"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas"]], ["Puzzles", ["wordle", "conn", "odd", "grid"]], ["Toys", ["gacha", "dare"]]];
+const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig"]], ["Toys", ["gacha", "dare"]]];
 // Mode of the day: the game shown big on the games' page — another one after every daily reset, never a toy; each
 // comes once before any comes again (the order is drawn anew for every round of them)
 function gmOfDay() {
@@ -291,6 +299,7 @@ function gmBest(game) {
   const of = (o) => Math.max(0, ...Object.values(o || {}));
   if (game === "track") return of(gm.best);
   if (typeof gxBest === "function" && gxBest(game) !== undefined) return gxBest(game);  // the games of games3.js
+  if (typeof gzBest === "function" && gzBest(game) !== undefined) return gzBest(game);  // the games of games7.js
   const mine = (k) => /^s[he]\d/.test(k) ? "skill" : /^c[tv][he]$/.test(k) ? "char" : "id";
   return of(Object.fromEntries(Object.entries(gi.best || {}).filter(([k]) => mine(k) === game)));
 }

@@ -149,6 +149,11 @@ points. Puzzles. And two toys.
 - **Connections:** sixteen Identities, four groups of four with something in common.
 - **Limbus Grid:** a 3 × 3 grid with a condition on every row and column — name an Identity for
   each cell, nine tries.
+- **Chain:** from one Identity to another, each step sharing the Sinner or a faction with the one
+  before — in the fewest links.
+- **Jigsaw:** an Identity's art cut into tiles and shuffled — put it together against the clock.
+- **Mixed up:** a piece of a track cut into parts and shuffled — listen and put them back in order.
+- **Guess the buff:** the effect of a buff or a debuff plays — which one is it?
 - **Extraction** (a toy): the game's own extraction — its banners with their real pools and chances,
   the orb in chains, every 000 and E.G.O shown with its line and voice, the ten cards. All of it with
   the game's pictures and sounds.

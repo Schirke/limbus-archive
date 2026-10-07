@@ -1049,6 +1049,34 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gobox .gctile:disabled { cursor: default; } .gobox .gctile.plain b { margin-top: 7px; } .gobox .gctile.plain i { display: block; margin-bottom: 7px; }
 .goopts { margin-top: 14px; }
 .gologpic { width: 40px; height: 40px; object-fit: cover; object-position: top; margin-right: 4px; vertical-align: middle; opacity: .55; } .gologpic.odd { opacity: 1; outline: 1px solid var(--gold); }
+/* Games: Chain, Guess the buff, Mixed up, Jigsaw (games7.js) */
+.gnbox, .gybox, .gjbox { max-width: 1100px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+.gnrow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 6px; margin-bottom: 16px; }
+.gntile { width: 150px; padding-bottom: 8px; text-align: center; background: var(--panel2); border: 1px solid var(--line); overflow: hidden; }
+.gntile.from { border-color: var(--gold); } .gntile.to { border-color: var(--add); }
+.gntile img { display: block; width: 100%; height: 96px; object-fit: cover; object-position: center 20%; margin-bottom: 7px; }
+.gntile b { display: block; padding: 0 6px; color: #fff; font: 15px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
+.gntile i { display: block; font-style: normal; color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+.gntile em { display: inline-block; margin: 1px 2px; padding: 1px 6px; border: 1px solid var(--line); font: 11px Consolas, monospace; font-style: normal; color: var(--text); }
+.gntile em.sinner { color: var(--gold); } .gntile em.season { color: var(--sus); }
+.gnlink { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 92px; padding: 0 4px; text-align: center; border-top: 1px solid var(--gold); border-bottom: 1px solid var(--gold); }
+.gnlink small { font: 10px Consolas, monospace; letter-spacing: 2px; color: var(--muted); } .gnlink b { color: var(--gold); font-weight: normal; font-size: 12.5px; }
+.gnlink.open { border-style: dashed; border-color: var(--line); } .gnlink.open b { font: 26px "LC Bebas", "Segoe UI", sans-serif; color: var(--muted); }
+.gnrow.small .gntile { width: 116px; } .gnrow.small .gntile img { height: 64px; } .gnrow.small .gntile b { font-size: 13px; } .gnrow.small .gnlink { min-width: 78px; }
+.gnway { margin: 4px 0 8px; } .gnbtns { display: flex; gap: 8px; margin-top: 10px; }
+.gbvid { background: #0b090a radial-gradient(#2a2427, #0b090a); border: 1px solid var(--line); } .gbvid video { display: block; width: 100%; aspect-ratio: 16 / 9; }
+.gbdesc { display: flex; gap: 12px; align-items: flex-start; margin-top: 14px; color: var(--muted); font-size: 13px; white-space: pre-line; } .gbdesc img { width: 44px; height: 44px; object-fit: contain; flex: none; }
+.gyrow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-width: 760px; } .gyrow.n6 { grid-template-columns: repeat(6, 1fr); max-width: 1040px; }
+.gycard { position: relative; padding: 10px 10px 8px; text-align: center; background: var(--panel2); border: 1px solid var(--line); cursor: grab; user-select: none; }
+.gycard:hover { border-color: var(--gold); } .gycard.on { border-color: var(--gold); background: #3a3013; } .gycard.play { outline: 2px solid var(--gold); outline-offset: -2px; }
+.gycard.ok { border-color: var(--gold); background: #2a2412; cursor: default; }
+.gycard small { position: absolute; top: 4px; left: 8px; font: 12px Consolas, monospace; color: var(--muted); }
+.gycard canvas { display: block; width: 100%; height: 70px; margin: 8px 0; pointer-events: none; } .gycard button { border-radius: 0; padding: 3px 18px; }
+.gybtns { display: flex; align-items: center; gap: 10px; margin-top: 14px; max-width: 1040px; } .gybtns .gmvol { margin: 0 0 0 8px; } .gybtns .toggle { border-radius: 0; }
+.gjboard { display: grid; gap: 2px; background: #0b090a; border: 1px solid var(--line); }
+.gjboard.whole { gap: 0; }
+.gjtile { background-repeat: no-repeat; cursor: grab; } .gjtile:hover { filter: brightness(1.15); } .gjtile.on { outline: 3px solid var(--gold); outline-offset: -3px; }
+.gjboard.whole .gjtile, .gjbox .gmafter ~ .gjboard .gjtile { cursor: default; filter: none; }
 /* Games: Extraction, Challenge roulette (games5.js) */
 .gastats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; margin: 12px 0 16px; letter-spacing: 1px; } .gastats .toggle { margin-left: auto; }
 .gatop { margin: 22px 0 8px; }

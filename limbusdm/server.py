@@ -932,6 +932,14 @@ CARD_PRESET = {
              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10701_normal.png"],
     "grid": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10211_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10810_normal.png",
              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10605_normal.png"],
+    "mix": ["Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_14_1.png", "Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_24_1.png",
+            "Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_24_3.png"],
+    "buff": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10415_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10513_normal.png",
+             "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10214_normal.png"],
+    "chain": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10106_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10206_normal.png",
+              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10906_normal.png"],
+    "jig": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10310_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11208_normal.png",
+            "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10609_normal.png"],
 }
 
 
