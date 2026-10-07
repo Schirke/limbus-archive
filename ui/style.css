@@ -1163,7 +1163,7 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 .glrow b { width: 18px; color: var(--muted); font-weight: normal; } .glrow .toggle { padding: 2px 8px; font-size: 12px; }
 .glres { max-width: 560px; margin: 14px 0 4px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); } .glres .gmkick { margin-bottom: 9px; }
 .glres .glrow.win span { color: var(--gold); font: 20px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; }
-#glpanel { position: fixed; right: 18px; top: 150px; z-index: 44; width: 250px; padding: 12px; background: rgba(27,23,25,.96); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+#glpanel { position: fixed; right: 18px; top: 150px; z-index: 44; width: 250px; padding: 12px; background: rgba(27,23,25,.96); border: 1px solid var(--line); border-top: 2px solid var(--gold); } body:has(#glpanel) #main { padding-right: 296px; }
 #glpanel .glhead { margin-bottom: 9px; font: 12px Consolas, monospace; letter-spacing: 2px; color: var(--gold); } #glpanel .glrow { padding: 6px 9px; background: var(--panel2); }
 .gltime { height: 4px; margin-bottom: 7px; background: var(--line); } .gltime i { display: block; height: 100%; width: 100%; background: var(--gold); }
 .glsaid { min-height: 32px; margin-bottom: 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
