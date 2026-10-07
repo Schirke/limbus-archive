@@ -1,0 +1,15 @@
+data/
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec.bak
+settings.json
+LimbusDatamine/
+LimbusArchive/
+ui/icon.ico
+*.spec
+HANDOFF.md
+.wrangler/
+unity/

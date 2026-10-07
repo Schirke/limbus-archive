@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Versus engine view</title>
+<!-- A test page for the Versus fight engine (limbusdm/versus_engine.py): the fights it decided, beat by beat, as a
+     schematic stage. in the app (Versus page, "Engine view") it asks /api/versus_plan with the page's query; versus_engine.write_view() can also fill FIGHTS offline. -->
+<style>
+  :root { --bg: #15161a; --card: #1f2127; --ink: #e8e8ea; --muted: #8a8d96; --line: #3a3d46; --l: #5aa9ff; --r: #ff6b5a; --gold: #f2c14e; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  select, button { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; }
+  button { cursor: pointer; }
+  [hidden] { display: none !important; }
+  /* a team fight's roster: who is what (roles, skill tags) */
+  .roster { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin-bottom: 8px; font-size: 12.5px; }
+  .roster .u { display: flex; gap: 8px; align-items: center; }
+  .roster img, .roster .ph { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; border: 2px solid currentColor; background: #111; flex: none; }
+  .roster .tag { display: inline-block; border-radius: 8px; padding: 0 6px; margin: 1px 3px 1px 0; font-size: 11.5px; background: #2b2e36; }
+  .roster .sk { color: var(--muted); font-size: 11.5px; }
+  .legend { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .card { background: var(--card); border-radius: 10px; padding: 12px; margin: 12px 0; }
+  svg { width: 100%; height: auto; display: block; }
+  .beat { font-size: 20px; min-height: 2.8em; margin-top: 8px; }
+  .muted { color: var(--muted); }
+  ol { margin: 0; padding-left: 3.2em; max-height: 340px; overflow: auto; font: 12.5px/1.5 ui-monospace, monospace; }
+  li { cursor: pointer; }
+  li.on { color: var(--gold); }
+  .hp { height: 10px; background: #000; border-radius: 3px; overflow: hidden; flex: 1; min-width: 120px; }
+  .hp > div { height: 100%; transition: width .25s; }
+</style>
+</head>
+<body>
+<main>
+  <div class="row"><b>Versus engine</b><select id="fight"></select>
+    <button id="reroll" title="The same two, another seed">🎲 New seed</button><button id="prev">◀</button><button id="play">▶ Play</button><button id="next">▶|</button>
+    <span id="tctl" hidden><select id="tmode" title="How the team fight goes"><option value="one">Exchanges · one at a time</option><option value="all">Exchanges · all at once</option><option value="aggro">Aggro · real time</option><option value="duels">Duels · each its own</option></select>
+      <label class="muted" title="Clashes the fight is sized for">Rounds <input id="trounds" type="number" min="1" max="99" style="width:4em"></label>
+      <select id="speed" title="Playback speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" style="width:220px;vertical-align:middle"></span>
+    <span class="muted" id="pos"></span></div>
+  <div class="card">
+    <div id="roster" class="roster" hidden></div>
+    <div class="row" id="duo"><span id="nl" style="color:var(--l)"></span><div class="hp"><div id="hl" style="background:var(--l)"></div></div>
+      <div class="hp"><div id="hr" style="background:var(--r)"></div></div><span id="nr" style="color:var(--r)"></span></div>
+    <svg id="stage" viewBox="-5 -1.6 10 3.3"></svg>
+    <div class="beat" id="beat"></div>
+  </div>
+  <div class="card"><ol id="list"></ol></div>
+</main>
+<script>
+const FIGHTS = /*FIGHTS*/[];
+let f = null, k = 0, timer = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+function short(i) { const n = f.names[i]; const s = n.includes(" - ") ? n.split(" - ")[0] : n; return f.names[0] === f.names[1] ? s + (i ? " R" : " L") : s; }
+function text(s) {
+  const sk = (n) => (String(n || "").match(/S\d+/) || [n || ""])[0];
+  let what = s.act;
+  if (s.act === "clash" && s.defense) what = `clash ${sk(s.skills[s.who])} (clash ${s.nth[0]} of ${s.nth[1]})`;
+  else if (s.act === "clash") what = `clash ${sk(s.skills[0])} ${s.pow[0]} vs ${s.pow[1]} ${sk(s.skills[1])} (clash ${s.nth[0]} of ${s.nth[1]})`;
+  else if (s.skill) what += ` ${sk(s.skill)}` + (s.coins ? ` x${s.coins}` : "");
+  if (s.defense) what += ` on ${s.defense.toLowerCase()}`;
+  const who = s.who >= 0 ? short(s.who) : "both";
+  return `${who}: ${what} [${s.rng[0]} → ${s.rng[1]}] ` + s.result.replace(/#0/g, short(0)).replace(/#1/g, short(1));
+}
+function draw() {
+  if (f.team) return drawTeam();
+  const s = f.steps[k], prev = f.steps[Math.max(0, k - 1)], R = f.rules;
+  let g = `<line x1="${-R.wall}" x2="${R.wall}" y1="0.5" y2="0.5" stroke="#3a3d46" stroke-width="0.04"/>`;
+  for (const w of [-R.wall, R.wall]) g += `<rect x="${w - (w < 0 ? 0.15 : 0)}" y="-1.2" width="0.15" height="1.7" fill="#3a3d46"/>`;
+  // where they were (faint) and are now; an arrow for who moved
+  for (const i of [0, 1]) {
+    const c = i ? "var(--r)" : "var(--l)";
+    g += `<circle cx="${prev.x[i]}" cy="0.05" r="0.22" fill="none" stroke="${c}" stroke-opacity="0.35" stroke-width="0.03"/>`;
+    g += `<rect x="${s.x[i] - 0.18}" y="-0.75" width="0.36" height="1.2" rx="0.12" fill="${c}"/>`;
+    g += `<text x="${s.x[i]}" y="${0.85 + 0.3 * i}" fill="${c}" font-size="0.24" text-anchor="middle">${esc(short(i))}</text>`;
+    if (s.act === "clash" && !s.defense) g += `<text x="${s.x[i]}" y="-0.95" fill="${i === s.loser ? "#888" : "var(--gold)"}" font-size="0.36" text-anchor="middle" font-weight="bold">${s.pow[i]}</text>`;
+  }
+  const gap = Math.abs(s.x[1] - s.x[0]).toFixed(2);
+  g += `<text x="0" y="1.6" fill="#8a8d96" font-size="0.22" text-anchor="middle">${s.rng[1]} · ${gap} bodies apart</text>`;
+  $("#stage").innerHTML = g;
+  $("#beat").textContent = text(s);
+  $("#hl").style.width = (100 * s.hp[0] / f.hpMax[0]) + "%";
+  $("#hr").style.width = (100 * s.hp[1] / f.hpMax[1]) + "%";
+  $("#pos").textContent = `${k + 1} / ${f.steps.length} · HP ${s.hp[0]} / ${s.hp[1]}`;
+  document.querySelectorAll("#list li").forEach((li, i) => li.classList.toggle("on", i === k));
+  document.querySelectorAll("#list li")[k]?.scrollIntoView({ block: "nearest" });
+}
+// a team fight (limbusdm/versus_team.py), played in real time on the engine's clock: the stage seen from above (x
+// across, depth up: farther from the camera), each one its face in a ring of its side's colour, HP and cooldown bars
+// under it; a clash sparks between the two, a blow pops its damage over the one hit, the fallen grey out
+const TV = { clock: 0, speed: 1, playing: false, last: 0, raf: 0, kf: null, hp: null, fx: null, busy: null, faces: {} };
+const sideC = (i) => f.side[i] ? "var(--r)" : "var(--l)";
+// the roles (versus_team.ROLES) and skill tags: a mark on the unit's ring, a word and what it does in the roster
+const ROLE = { boss: ["★", "boss", "alone vs several: short cooldown, can't be interrupted in its later skills, its mass skills sweep all around it, turns on shooters"],
+  nimble: ["⚡", "nimble", "acts first, short cooldown"], slow: ["⛰", "slow", "fights only in its zone, long cooldown"],
+  range: ["◎", "range", "shoots from afar: can't be clashed"], mass: ["✸", "mass", "goes where they stand together; hits those near"],
+  universal: ["◆", "universal", "the nearest free one"] };
+const roleMarks = (i) => (f.roles[i] || []).filter((r) => r !== "universal" || f.roles[i].length === 1).map((r) => ROLE[r]?.[0] || "").join("");
+function roster() {
+  const face = (i) => faceOf(i) ? `<img src="${faceOf(i)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'ph'}))">` : `<span class="ph"></span>`;
+  const col = (sd) => f.names.map((nm, i) => f.side[i] !== sd ? "" : `<div class="u" style="color:${sideC(i)}">${face(i)}<div>
+      <b title="${esc(nm)}">${esc(f.short[i])}</b> ${i === f.boss && f.bossPower && f.bossPower !== 1 ? `<span class="tag" title="its HP and damage x the square root of this each: set so that it wins about half of its fights against this team">strength x${f.bossPower}</span>` : ""}${(f.roles[i] || []).filter((r) => r !== "universal" || f.roles[i].length === 1).map((r) => `<span class="tag" title="${esc(ROLE[r]?.[2] || "")}">${ROLE[r]?.[0] || ""} ${esc(r)}</span>`).join("")}
+      <div class="sk">${Object.entries(f.tags?.[i]?.skills || {}).map(([g, v]) => `${esc(g)}: ${v.map((x) => ROLE[x]?.[0] + " " + x).join(", ")}`).join(" · ") || "no range / mass skills"}${f.tags?.[i]?.auto ? ` <i>(${esc(f.tags[i].auto)})</i>` : ""}</div></div></div>`).join("");
+  $("#roster").innerHTML = `<div>${col(0)}</div><div>${col(1)}</div><div class="legend" style="grid-column:1/3">${Object.values(ROLE).map(([m, w, d]) => `${m} <b>${w}</b>: ${d}`).join(" · ")}</div>`;
+}
+const ease = (k) => k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+const hitAt = (s) => s.act === "clash" ? s.t + s.dur * 0.6 : s.t + s.dur * 0.75;
+function teamPrep() {
+  // each one's moves: from where it was to where the step leaves it, over the step (a run in, a walk back) or its
+  // last moment (knocked back by a blow); its HP after each blow; the sparks, numbers and falls to show
+  const n = f.names.length, kf = [], hp = [], busy = [], fx = [];
+  for (let i = 0; i < n; i++) { kf.push([[0, f.steps[0].x[i][0], f.steps[0].x[i][1]]]); hp.push([[0, f.hpMax[i]]]); busy.push([]); }
+  let prev = f.steps[0];
+  for (const s of f.steps.slice(1)) {
+    const mv = s.act === "run-in" || s.act === "return" ? s.dur : Math.min(0.3, s.dur);
+    const from = s.act === "clash" ? s.t + s.dur * 0.6 : s.t + Math.max(0, s.dur - mv);
+    for (let i = 0; i < n; i++) {
+      const a = prev.x[i], b = s.x[i];
+      if (a[0] !== b[0] || a[1] !== b[1]) {
+        const K = kf[i], end = Math.max(from + 0.05, s.act === "clash" ? from + 0.25 : s.t + s.dur);
+        const st = Math.max(from, K[K.length - 1][0]);
+        K.push([st, a[0], a[1]], [Math.max(st + 0.05, end), b[0], b[1]]);
+      }
+      if (prev.hp[i] !== s.hp[i]) hp[i].push([hitAt(s), s.hp[i]]);
+    }
+    for (const i of new Set([s.who, s.tgt, s.att, s.def, ...(s.extras || []).map((e) => e.who)]))
+      if (i != null && i >= 0 && s.act !== "falls") busy[i].push([s.t, s.t + s.dur]);
+    const ht = hitAt(s);
+    if (s.act === "clash") fx.push({ t: ht, kind: "clash", a: s.att, b: s.def, win: s.who });
+    if (s.act === "clash") for (const e of s.extras || []) fx.push({ t: ht + 0.05, kind: "hit", v: s.def, dmg: e.dmg, small: true, from: e.who });
+    if (["whole", "shot", "strong", "counter", "interrupt", "blow"].includes(s.act) && s.tgt != null) {
+      fx.push({ t: ht, kind: "hit", v: s.tgt, dmg: s.dmg, from: s.who, big: s.final || s.act === "strong", shot: s.act === "shot", small: s.act === "blow" });
+      for (const e of s.side || []) fx.push({ t: ht + 0.08, kind: "hit", v: e.who, dmg: e.dmg, small: true, from: s.who });
+    }
+    if (s.act === "falls") fx.push({ t: s.t, kind: "fall", v: s.who });
+    prev = s;
+  }
+  Object.assign(TV, { kf, hp, busy, fx });
+}
+function posAt(i, t) {
+  const K = TV.kf[i];
+  let j = K.length - 1;
+  while (j > 0 && K[j][0] > t) j--;
+  if (j === K.length - 1) return [K[j][1], K[j][2]];
+  const [t0, x0, z0] = K[j], [t1, x1, z1] = K[j + 1];
+  const e = t1 > t0 ? ease(Math.min(1, Math.max(0, (t - t0) / (t1 - t0)))) : 1;
+  return [x0 + (x1 - x0) * e, z0 + (z1 - z0) * e];
+}
+function hpAt(i, t) { let v = f.hpMax[i]; for (const [a, h] of TV.hp[i]) if (a <= t) v = h; return v; }
+const aggAt = (i, t) => (f.aggs || [])[i]?.find(([a, b]) => t >= a && t < b);
+function cdAt(i, t) {
+  // aggro: how long it keeps at its target (draining); else its cooldown bar: filling up while it waits for its next
+  // turn, full when ready, none while it fights
+  if (f.flow === "aggro") { const a = aggAt(i, t); return a ? { k: 1 - (t - a[0]) / (a[1] - a[0]), aggro: true } : { k: 0, aggro: true }; }
+  if (TV.busy[i].some(([a, b]) => t >= a && t < b)) return { busy: true };
+  const c = (f.cds || [])[i]?.find(([a, b]) => t >= a && t < b);
+  return c ? { k: (t - c[0]) / (c[1] - c[0]) } : { k: 1 };
+}
+function faceOf(i) {
+  if (TV.faces[i] !== undefined) return TV.faces[i];
+  const id = f.ids?.[i];
+  TV.faces[i] = f.faces?.[i] || (id && location.protocol.startsWith("http") ? `/api/fighter_face?id=${encodeURIComponent(id)}` : "");
+  return TV.faces[i];
+}
+function teamFaces() {
+  // (in the app: pictures of those without one are made by the player in the background, then the faces show)
+  if (!location.protocol.startsWith("http") || !f.ids) return;
+  fetch("/api/fighter_pics", { method: "POST", headers: { "Content-Type": "application/json", "X-Limbus-Datamine": "1" }, body: JSON.stringify({ ids: f.ids }) })
+    .then((r) => r.json()).then(function poll(st) {
+      const have = new Set(st.have || []), want = f.ids.filter((id) => !have.has(id));
+      f.ids.forEach((id, i) => { if (have.has(id)) TV.faces[i] = `/api/fighter_face?id=${encodeURIComponent(id)}&t=${st.t || 0}`; });
+      roster();
+      if (!TV.playing) drawTeam();
+      if (want.length && st.busy) setTimeout(() => fetch("/api/fighter_pics").then((r) => r.json()).then(poll), 2500);
+    }).catch(() => {});
+}
+function drawTeam() {
+  const t = TV.clock, W = f.wall, D = f.depth, n = f.names.length, R = 0.34;
+  let g = `<defs><clipPath id="cc"><circle r="${R}"/></clipPath>
+    <radialGradient id="spark"><stop offset="0" stop-color="#fff"/><stop offset="0.35" stop-color="#ffd76a"/><stop offset="1" stop-color="#ff9f1a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="blood"><stop offset="0" stop-color="#ffb3a6" stop-opacity="0.9"/><stop offset="1" stop-color="#ff3b2f" stop-opacity="0"/></radialGradient></defs>`;
+  g += `<rect x="${-W}" y="${-D - 0.5}" width="${2 * W}" height="${2 * D + 1}" rx="0.2" fill="#1b1d22" stroke="#3a3d46" stroke-width="0.04"/>`;
+  for (let i = 0; i < n; i++) g += `<circle cx="${f.home[i][0]}" cy="${-f.home[i][1]}" r="0.1" fill="none" stroke="${sideC(i)}" stroke-opacity="0.2" stroke-width="0.03"/>`;
+  const P = []; for (let i = 0; i < n; i++) P.push(posAt(i, t));
+  // who is at whom now: the steps going on
+  const now = f.steps.filter((s) => s.t <= t && t < s.t + Math.max(s.dur, 0.05));
+  for (const s of now) {
+    const a = s.act === "clash" ? s.att : s.who, b = s.act === "clash" ? s.def : s.tgt;
+    if (a == null || b == null || a < 0 || b < 0 || s.act === "falls") continue;
+    const c = s.act === "run-in" || s.act === "return" ? "#8a8d96" : "var(--gold)";
+    g += `<line x1="${P[a][0]}" y1="${-P[a][1]}" x2="${P[b][0]}" y2="${-P[b][1]}" stroke="${c}" stroke-opacity="0.55" stroke-width="0.05" ${s.act === "shot" ? 'stroke-dasharray="0.15 0.1"' : ""}/>`;
+    for (const e of s.extras || []) g += `<line x1="${P[e.who][0]}" y1="${-P[e.who][1]}" x2="${P[s.def ?? s.tgt][0]}" y2="${-P[s.def ?? s.tgt][1]}" stroke="#ff9f43" stroke-opacity="0.5" stroke-width="0.04" stroke-dasharray="0.12 0.08"/>`;
+  }
+  // (aggro) whom each one is after: a thin dotted line
+  if (f.flow === "aggro") for (let i = 0; i < n; i++) {
+    const a = aggAt(i, t);
+    if (a && hpAt(i, t) > 0 && P[a[2]]) g += `<line x1="${P[i][0]}" y1="${-P[i][1]}" x2="${P[a[2]][0]}" y2="${-P[a[2]][1]}" stroke="${sideC(i)}" stroke-opacity="0.3" stroke-width="0.025" stroke-dasharray="0.05 0.08"/>`;
+  }
+  // the units, farther ones first (drawn under nearer ones)
+  const order = [...Array(n).keys()].sort((a, b) => P[b][1] - P[a][1]);
+  for (const i of order) {
+    const [x, z] = P[i], y = -z, hp = hpAt(i, t), dead = hp <= 0 && TV.fx.some((e) => e.kind === "fall" && e.v === i && e.t <= t);
+    const hurt = TV.fx.find((e) => e.kind === "hit" && e.v === i && t >= e.t && t < e.t + 0.25);
+    const face = faceOf(i), boss = i === f.boss, r = boss ? R * 1.25 : R;
+    g += `<g transform="translate(${x},${y}) scale(${boss ? 1.25 : 1})" opacity="${dead ? 0.35 : 1}">`;
+    g += `<circle r="${R + 0.05}" fill="#111" stroke="${hurt ? "#fff" : sideC(i)}" stroke-width="${hurt ? 0.09 : 0.06}"/>`;
+    g += face ? `<image href="${face}" x="${-R}" y="${-R}" width="${2 * R}" height="${2 * R}" clip-path="url(#cc)" preserveAspectRatio="xMidYMid slice" ${dead ? 'style="filter:grayscale(1)"' : ""} onerror="this.remove()"/>`
+      : `<text y="0.1" font-size="0.28" text-anchor="middle" fill="${sideC(i)}">${esc(f.short[i].slice(0, 2))}</text>`;
+    if (hurt) g += `<circle r="${R}" fill="url(#blood)" opacity="${1 - (t - hurt.t) / 0.25}"/>`;
+    const marks = roleMarks(i);
+    if (marks) g += `<text x="${R * 0.8}" y="${-R * 0.75}" font-size="0.22" text-anchor="middle" fill="${boss ? "var(--gold)" : "#e8e8ea"}" stroke="#000" stroke-width="0.02" paint-order="stroke">${marks}</text>`;
+    g += `</g>`;
+    // HP and cooldown under it
+    const bw = r * 2.2, bx = x - bw / 2, by = y + r + 0.12, cd = cdAt(i, t);
+    g += `<rect x="${bx}" y="${by}" width="${bw}" height="0.09" fill="#000"/><rect x="${bx}" y="${by}" width="${bw * Math.max(0, hp) / f.hpMax[i]}" height="0.09" fill="${sideC(i)}"/>`;
+    if (!dead) g += `<rect x="${bx}" y="${by + 0.12}" width="${bw}" height="0.05" fill="#000" opacity="0.7"/>` +
+      (cd.busy ? `<rect x="${bx}" y="${by + 0.12}" width="${bw}" height="0.05" fill="var(--gold)" opacity="0.35"/>`
+        : `<rect x="${bx}" y="${by + 0.12}" width="${bw * cd.k}" height="0.05" fill="${cd.aggro ? "#ff9f43" : cd.k >= 1 ? "#e8e8ea" : "#7f8796"}"/>`);
+    g += `<text x="${x}" y="${by + 0.42}" fill="${dead ? "#666" : sideC(i)}" font-size="0.2" text-anchor="middle">${esc(f.short[i])}</text>`;
+  }
+  // the clash sparks and the numbers of the blows
+  for (const e of TV.fx) {
+    const age = t - e.t;
+    if (e.kind === "clash" && age >= 0 && age < 0.35) {
+      const k = age / 0.35, a = P[e.a], b = P[e.b], mx = (a[0] + b[0]) / 2, my = -(a[1] + b[1]) / 2;
+      g += `<circle cx="${mx}" cy="${my}" r="${0.15 + 0.45 * k}" fill="url(#spark)" opacity="${1 - k}"/>`;
+      for (let q = 0; q < 6; q++) {
+        const an = q * Math.PI / 3 + e.t * 7, l1 = 0.1 + 0.5 * k, l2 = l1 + 0.18;
+        g += `<line x1="${mx + Math.cos(an) * l1}" y1="${my + Math.sin(an) * l1}" x2="${mx + Math.cos(an) * l2}" y2="${my + Math.sin(an) * l2}" stroke="#ffe39a" stroke-width="0.035" opacity="${1 - k}"/>`;
+      }
+    }
+    if (e.kind === "hit" && age >= 0 && age < 0.9 && e.dmg > 0) {
+      const p = P[e.v], k = age / 0.9, s = e.big ? 0.42 : e.small ? 0.24 : 0.32;
+      const pop = age < 0.08 ? 0.6 + 5 * age : 1;
+      g += `<text x="${p[0] + (e.small ? 0.25 : 0)}" y="${-p[1] - R - 0.25 - 0.5 * k}" font-size="${s * pop}" font-weight="bold" text-anchor="middle"
+        fill="${e.small ? "#ffc9a8" : "#ffe08a"}" stroke="#000" stroke-width="0.02" paint-order="stroke" opacity="${1 - k * k}">${e.dmg}</text>`;
+    }
+  }
+  $("#stage").setAttribute("viewBox", `${-W - 0.3} ${-D - 1.0} ${2 * W + 0.6} ${2 * D + 1.9}`);
+  $("#stage").innerHTML = g;
+  const cur = now.filter((s) => s.act !== "start");
+  const shown = cur.length ? cur : f.steps.filter((s) => s.t <= t).slice(-1);
+  $("#beat").textContent = shown.map((s) => s.text + (s.armor ? " [armor]" : "")).join("  ·  ");
+  $("#pos").textContent = `${t.toFixed(1)} / ${f.time} s`;
+  $("#scrub").value = t;
+  const idx = new Set(shown.map((s) => f.steps.indexOf(s)));
+  document.querySelectorAll("#list li").forEach((li, i) => li.classList.toggle("on", idx.has(i)));
+  const on = document.querySelector("#list li.on");
+  if (on && TV.playing) on.scrollIntoView({ block: "nearest" });
+}
+function teamTick(ts) {
+  if (!TV.playing) return;
+  const dt = TV.last ? Math.min(0.1, (ts - TV.last) / 1000) : 0;
+  TV.last = ts;
+  TV.clock = Math.min(f.time + 1, TV.clock + dt * TV.speed);
+  drawTeam();
+  if (TV.clock >= f.time + 1) return teamStop();
+  TV.raf = requestAnimationFrame(teamTick);
+}
+function teamPlay() {
+  if (TV.playing) return teamStop();
+  if (TV.clock >= f.time + 1) TV.clock = 0;
+  TV.playing = true; TV.last = 0; $("#play").textContent = "❚❚ Pause";
+  TV.raf = requestAnimationFrame(teamTick);
+}
+function teamStop() { TV.playing = false; cancelAnimationFrame(TV.raf); $("#play").textContent = "▶ Play"; }
+function teamJump(dir) {
+  // the previous / next step's start
+  const ts = [...new Set(f.steps.map((s) => s.t))].sort((a, b) => a - b);
+  const t = dir > 0 ? ts.find((x) => x > TV.clock + 1e-3) : [...ts].reverse().find((x) => x < TV.clock - 1e-3);
+  if (t != null) { TV.clock = t; drawTeam(); }
+}
+function openTeam() {
+  teamStop();
+  Object.assign(TV, { clock: 0, faces: {} });
+  teamPrep();
+  $("#tctl").hidden = false;
+  $("#tmode").value = f.flow === "aggro" ? "aggro" : f.flow === "duels" ? "duels" : Q.get("allAtOnce") ? "all" : "one";
+  $("#trounds").value = Q.get("rounds") || 20;
+  $("#tmode").disabled = $("#trounds").disabled = !location.protocol.startsWith("http");
+  $("#roster").hidden = false;
+  roster();
+  $("#scrub").max = f.time + 1;
+  $("#list").innerHTML = f.steps.map((s) => `<li>${s.t.toFixed(2).padStart(6)} e${s.eng} ${esc(s.text)}</li>`).join("") + `<li class="muted">winner: the ${f.winner ? "right" : "left"} side</li>`;
+  document.querySelectorAll("#list li").forEach((li, j) => li.onclick = () => { if (j < f.steps.length) { TV.clock = f.steps[j].t; drawTeam(); } });
+  drawTeam();
+  teamFaces();
+}
+function open(i) {
+  f = FIGHTS[i]; k = 0;
+  $("#duo").hidden = !!f.team;
+  if (f.team) return openTeam();
+  $("#tctl").hidden = true; $("#roster").hidden = true;
+  $("#stage").setAttribute("viewBox", "-5 -1.6 10 3.3");
+  $("#nl").textContent = f.names[0]; $("#nr").textContent = f.names[1];
+  $("#list").innerHTML = f.steps.map((s) => `<li>${esc(text(s))}</li>`).join("") + `<li class="muted">winner: ${esc(short(f.winner))}</li>`;
+  document.querySelectorAll("#list li").forEach((li, j) => li.onclick = () => { if (j < f.steps.length) { k = j; draw(); } });
+  draw();
+}
+function stop() { clearInterval(timer); timer = null; $("#play").textContent = "▶ Play"; if (f?.team) teamStop(); }
+$("#speed").onchange = (e) => { TV.speed = +e.target.value; };
+// (team) another way to fight it, or another size: decided again, same seed
+$("#tmode").onchange = (e) => { Q.delete("allAtOnce"); Q.delete("flow"); if (e.target.value === "all") Q.set("allAtOnce", "1"); if (e.target.value === "aggro" || e.target.value === "duels") Q.set("flow", e.target.value); plan(false); };
+$("#trounds").onchange = (e) => { Q.set("rounds", Math.max(1, Math.min(99, +e.target.value || 20))); plan(false); };
+$("#scrub").oninput = (e) => { TV.clock = +e.target.value; drawTeam(); };
+$("#play").onclick = () => {
+  if (f.team) return teamPlay();
+  if (timer) return stop();
+  $("#play").textContent = "❚❚ Pause";
+  timer = setInterval(() => { if (k + 1 >= f.steps.length) return stop(); k++; draw(); }, 700);
+};
+$("#prev").onclick = () => { if (f.team) return teamJump(-1); k = Math.max(0, k - 1); draw(); };
+$("#next").onclick = () => { if (f.team) return teamJump(1); k = Math.min(f.steps.length - 1, k + 1); draw(); };
+const vsTitle = (d) => d.team ? [0, 1].map((sd) => d.short.filter((_, i) => d.side[i] === sd).join(", ")).join(" vs ") : `${d.names[0]} vs ${d.names[1]}`;
+$("#fight").innerHTML = FIGHTS.map((x, i) => `<option value="${i}">${esc(vsTitle(x))} (seed ${x.seed})</option>`).join("");
+$("#fight").onchange = (e) => { stop(); open(+e.target.value); };
+const Q = new URLSearchParams(location.search);
+async function plan(reseed) {
+  stop();
+  if (reseed || !Q.get("seed")) Q.set("seed", Math.floor(Math.random() * 1e9));
+  $("#beat").textContent = "Deciding the fight…";
+  try {
+    const r = await fetch("/api/versus_plan?" + Q);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    FIGHTS.length = 0; FIGHTS.push(d);
+    $("#fight").innerHTML = `<option>${esc(vsTitle(d))} (seed ${d.seed})</option>`;
+    open(0);
+  } catch (e) { $("#beat").textContent = "Couldn't decide the fight: " + e.message; }
+}
+$("#reroll").onclick = () => plan(true);
+if (FIGHTS.length) open(0); else if (Q.get("left") || Q.get("lefts")) plan(false); else $("#beat").textContent = "No fights in this file.";
+</script>
+</body>
+</html>

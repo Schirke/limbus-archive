@@ -1,0 +1,66 @@
+# The Community page of the app: the top live Limbus Company streams (Twitch + YouTube; English, Russian, Korean),
+# written to streams.json on the community-data branch. Needs the secrets named in scripts/community.py.
+#
+# GitHub's timer starts this about once a day instead of every quarter of an hour, so a run doesn't count on it:
+# it writes the list every 5 minutes for an hour and then starts the next run itself. The timer only brings the
+# chain back when it broke; a run that finds another one going leaves at once.
+name: Community streams
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      chain:
+        description: "Started by the run before it (leave empty)"
+        required: false
+permissions:
+  contents: write
+  actions: write
+jobs:
+  streams:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Is another run going
+        id: other
+        if: ${{ !inputs.chain }}
+        run: |
+          n=$(gh run list -R "$GITHUB_REPOSITORY" --workflow community.yml --limit 20 --json databaseId,status \
+              --jq "[.[] | select(.status != \"completed\" and .databaseId != $GITHUB_RUN_ID)] | length")
+          echo "others: $n"
+          [ "$n" = "0" ] || echo "busy=1" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: ${{ !steps.other.outputs.busy }}
+      - name: Ask Twitch and YouTube, every 5 minutes for an hour
+        if: ${{ !steps.other.outputs.busy }}
+        env:
+          TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # the data branch in its own folder: one commit, amended and pushed over itself
+          if git fetch -q origin community-data; then
+            git worktree add -q --detach data FETCH_HEAD
+          else
+            git worktree add -q --detach data
+            git -C data checkout -q --orphan community-data
+            git -C data rm -rfq .
+          fi
+          end=$(( $(date +%s) + 55 * 60 ))
+          while :; do
+            python scripts/community.py data/streams.json || true
+            if [ -f data/streams.json ]; then
+              git -C data add streams.json
+              git -C data commit -qm "streams" --amend 2>/dev/null || git -C data commit -qm "streams" || true
+              git -C data push -qf origin HEAD:refs/heads/community-data || true
+            fi
+            [ $(( $(date +%s) + 300 )) -lt $end ] || break
+            sleep 300
+          done
+      - name: The next run
+        if: ${{ !steps.other.outputs.busy }}
+        run: gh workflow run community.yml -R "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f chain=1

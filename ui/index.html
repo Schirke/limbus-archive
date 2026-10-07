@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Limbus Archive</title>
+<link rel="icon" href="/ui/icon.png">
+<link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+<header id="top">
+  <a class="brand" href="#/patches"><img class="logo" src="/ui/icon.png" alt="">Limbus <b>Archive</b></a>
+  <nav id="nav">
+    <a href="#/patches" data-group="patches">Patches</a>
+    <a href="#/db" data-group="db">Database</a>
+    <a href="#/versus" data-group="versus">Versus</a>
+    <a href="#/autobattler" data-group="autobattler">Auto Battler</a>
+    <a href="#/games" data-group="games">Games</a>
+    <a href="#/community" data-group="community" id="navcommunity" hidden>Community</a>
+    <a href="#/teams" data-group="tools">Tools</a>
+  </nav>
+  <div id="statusbox"><button id="statusbtn"></button><div id="status" class="status hidden"></div></div>
+  <div id="timers"></div>
+  <a href="#/support" data-group="support" id="navsup" title="Support the project">♥</a>
+  <a href="#/settings" data-group="settings" id="navset" title="Settings">⚙</a>
+</header>
+<nav id="subnav">
+  <div data-group="db"><a href="#/db" data-route="db">Identities & E.G.O</a><a href="#/enemies" data-route="enemies">Enemies</a><a href="#/buffs" data-route="buffs">Buff effects</a><a href="#/anim" data-route="anim">Animations</a><a href="#/browse" data-route="browse">Files</a></div>
+  <div data-group="patches"><a href="#/patches" data-route="patches">Reports</a><a href="#/news" data-route="news">News</a><a href="#/snapshots" data-route="snapshots">Snapshots</a></div>
+  <div data-group="games" class="gmcrumb"><a href="#/games" data-route="games" class="back">‹ Games</a><span id="gmcrumb"></span><span class="grow"></span><a href="#/games/track" data-game="track" title="Guess the track"></a><a href="#/gameid" data-route="gameid" data-game="id" title="Guess the Identity"></a><a href="#/gamechar" data-route="gamechar" data-game="char" title="Guess the character"></a><a href="#/gameskill" data-route="gameskill" data-game="skill" title="Guess the skill"></a><a href="#/gameenemy" data-route="gameenemy" data-game="enemy" title="Guess the enemy"></a><a href="#/gamecanto" data-route="gamecanto" data-game="canto" title="Guess the Canto"></a><a href="#/gamewordle" data-route="gamewordle" data-game="wordle" title="Limbus Wordle"></a><a href="#/gameconn" data-route="gameconn" data-game="conn" title="Connections"></a></div>
+  <div data-group="tools"><a href="#/teams" data-route="teams">Team builder</a><a href="#/redraw" data-route="redraw" id="navredraw" hidden>AI redraw</a></div>
+</nav>
+<main id="main"></main>
+<div id="modal" class="modal hidden"><div class="modal-box"><button class="close" id="modal-close">×</button><div id="modal-body"></div></div></div>
+<div id="toast" class="toast hidden"></div>
+<script src="/ui/app.js"></script>
+<script src="/ui/db.js"></script>
+<script src="/ui/enemies.js"></script>
+<script src="/ui/buffs.js"></script>
+<script src="/ui/redraw.js"></script>
+<script src="/ui/music.js"></script>
+<script src="/ui/games.js"></script>
+<script src="/ui/games2.js"></script>
+<script src="/ui/games3.js"></script>
+<script src="/ui/community.js"></script>
+<script src="/ui/news.js"></script>
+<script src="/ui/support.js"></script>
+</body>
+</html>

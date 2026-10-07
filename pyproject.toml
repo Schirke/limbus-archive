@@ -1,0 +1,16 @@
+[project]
+name = "limbus-archive"
+version = "0.1.0"
+description = "Limbus Company archive: patch reports, game files, animations"
+requires-python = ">=3.12"
+dependencies = [
+    "imageio-ffmpeg>=0.6.0",
+    "pywebview>=6.2.1",
+    "unitypy>=1.25.4",
+    "websocket-client>=1.9.2",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.22.3",
+]
