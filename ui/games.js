@@ -133,7 +133,8 @@ function gmStop() {
   gmAudio.pause();
   document.body.classList.remove("quiz");
 }
-window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/games/track")) { gmStop(); gmWarmDrop(); gm.game = null; gmDailyEnd(); } });
+// (only when this game was on: the page a click leads to may have started its own game already, with its own seed)
+window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/games/track") && (gm.game || gm.mine)) { gmStop(); gmWarmDrop(); gm.game = null; gmDailyEnd(); } });
 
 // [game (the key of its Daily challenge), page, name, what it is, picture, a toy: no score, no Daily]
 const gmIcon = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;

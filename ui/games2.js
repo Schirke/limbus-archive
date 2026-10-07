@@ -22,7 +22,7 @@ function giStop() {
   giAudio.pause();
   document.body.classList.remove("quiz");
 }
-window.addEventListener("hashchange", () => { if (!/^#\/game(id|skill|char)/.test(location.hash)) { giStop(); gi.game = null; giDailyEnd(); } });
+window.addEventListener("hashchange", () => { if (!/^#\/game(id|skill|char)/.test(location.hash) && (gi.game || gi.mine)) { giStop(); gi.game = null; giDailyEnd(); } });
 
 routes.gameid = (args = []) => giOpen("id", gmAuto("id", args));
 routes.gameskill = (args = []) => giOpen("skill", gmAuto("skill", args));

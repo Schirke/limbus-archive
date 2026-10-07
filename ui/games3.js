@@ -85,7 +85,7 @@ function gpParts(text) {
 }
 const gpWorth = () => Math.max(100, GP_WORTH[gp.game.step] - GP_HINT * Object.keys(gp.game.hints).length) * (gp.hard && !gpCanto() ? 2 : 1);
 
-window.addEventListener("hashchange", () => { if (!/^#\/game(enemy|canto|splash|atlas)/.test(location.hash)) { gp.game = null; gpDailyEnd(); } });
+window.addEventListener("hashchange", () => { if (!/^#\/game(enemy|canto|splash|atlas)/.test(location.hash) && (gp.game || gp.mine)) { gp.game = null; gpDailyEnd(); } });
 routes.gamesplash = (args = []) => gpOpen("splash", gmAuto("splash", args));
 routes.gameatlas = (args = []) => gpOpen("atlas", gmAuto("atlas", args));
 routes.gameenemy = (args = []) => gpOpen("enemy", gmAuto("enemy", args));
