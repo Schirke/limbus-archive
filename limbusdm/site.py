@@ -132,6 +132,12 @@ def _read_json(path: str) -> dict:
         return {}
 
 
+def _bilibili_live() -> dict:
+    from . import bilibili, community
+    return {url_key("/api/bilibili", period=p, sort=s): community.URL.replace("streams.json", f"bilibili_{p}_{s}.json")
+            for p in bilibili.PERIODS for s in bilibili.SORTS}
+
+
 def url_key(path: str, /, **q) -> str:
     """A request as the service worker names it: the path and its parameters sorted, not encoded."""
     parts = sorted(f"{k}={v}" for k, v in q.items() if v is not None)
@@ -895,7 +901,8 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
                "tr": sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "tr")) if fn.endswith(".json.gz"))
                if os.path.isdir(os.path.join(self.out, "d", "tr")) else [],
                # answered from the net by the visitor's browser itself: the list of live streams, made on GitHub
-               "live": {"/api/community": __import__("limbusdm.community", fromlist=["URL"]).URL},
+               # and Bilibili's videos (scripts/bilibili.py writes them there: a browser can't ask Bilibili)
+               "live": {"/api/community": __import__("limbusdm.community", fromlist=["URL"]).URL, **_bilibili_live()},
                "inline": {"/api/state": state, "/api/marks": {}, "/api/appnotes": {}, "/api/mods_owned": [], "/api/patchnotes?new=1": {"id": None},
                           "/api/game_cards": (ms.get("cards") or {}).get("cards") or {}}}
         with open(os.path.join(self.out, "d", "index.json"), "w", encoding="utf-8") as f:

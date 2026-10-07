@@ -1,5 +1,6 @@
 # The Community page of the app: the top live Limbus Company streams (Twitch + YouTube; English, Russian, Korean),
 # written to streams.json on the community-data branch. Needs the secrets named in scripts/community.py.
+# The same run writes Bilibili's videos (scripts/bilibili.py) there for the website.
 #
 # GitHub's timer starts this about once a day instead of every quarter of an hour, so a run doesn't count on it:
 # it writes the list every minute for an hour and then starts the next run itself. The timer only brings the
@@ -53,10 +54,17 @@ jobs:
           fi
           next=$(date +%s)
           end=$(( next + 55 * 60 ))
+          turn=0
           while :; do
             python scripts/community.py data/streams.json || true
+            # Bilibili's videos for the website (the app asks Bilibili itself): every ten minutes
+            if [ $(( turn % 10 )) -eq 0 ]; then
+              python scripts/bilibili.py data "$RUNNER_TEMP/bilibili_tr.json" || true
+            fi
+            turn=$(( turn + 1 ))
             if [ -f data/streams.json ]; then
               git -C data add streams.json
+              git -C data add bilibili_*.json 2>/dev/null || true
               git -C data commit -qm "streams" --amend 2>/dev/null || git -C data commit -qm "streams" || true
               git -C data push -qf origin HEAD:refs/heads/community-data || true
             fi
