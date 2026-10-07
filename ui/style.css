@@ -1141,3 +1141,9 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 .gecard span { position: absolute; left: -8px; right: -8px; top: 100%; margin-top: 9px; text-align: center; font: 13.5px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #efe6d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px #000; }
 .gebtns { position: absolute; left: 0; right: 0; bottom: 34px; display: flex; justify-content: center; gap: 28px; } .gebtns button { width: 230px; height: 70px; font-size: 20px; }
 .gewallet button { margin-left: 14px; padding: 4px 12px; vertical-align: 4px; background: rgba(0,0,0,.5); border: 1px dashed #8a7240; color: #f3e6c2; font: 12px Consolas, monospace; letter-spacing: 1px; cursor: pointer; } .gewallet button:hover { border-color: #f4c430; }
+/* Games: the grade of a finished game (games.js gmGrade) */
+@keyframes gmGradeIn { from { opacity: 0; transform: translateX(-18px) skewX(-8deg); } }
+.gmgrade { display: inline-flex; align-items: baseline; gap: 14px; margin: 14px 0 0; padding: 6px 22px 4px 14px; border-left: 4px solid currentColor; background: linear-gradient(90deg, rgba(255,255,255,.06), transparent); animation: gmGradeIn .45s both; }
+.gmgrade small { font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 3px; color: var(--muted); }
+.gmgrade b { font: 34px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2.5px; text-transform: uppercase; font-weight: normal; }
+.gmgrade.t0 { color: #8d8388; } .gmgrade.t1 { color: #6fb7c9; } .gmgrade.t2 { color: var(--gold); } .gmgrade.t3 { color: #ff4d4d; text-shadow: 0 0 18px rgba(255,77,77,.55); }

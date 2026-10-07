@@ -116,20 +116,35 @@ function gmPay(got, ach = []) {
   gmWKeep();
   toast(got.map(([n, why]) => `<b>+${n}</b> lunacy · ${esc(why)}`).join("<br>") + `<br><span class="small">You have ${gmW.lunacy.toLocaleString("en")} — <a href="#/gamegacha">Extraction</a></span>`, 7000);
 }
-// the end of any game: its Daily / duel result is kept, and it pays
+// The grade a finished game gets, by its share of the most it could have scored (Vlad's names and steps: of 10,000 —
+// up to 3,000 LARP, 4,000-5,000 Tourist, 6,000-8,000 Limbus enjoyer, 9,000 and more Dantehhh; a Hard game counts
+// of 20,000, the puzzles by their own measure)
+const GM_GRADES = [[0.9, "Dantehhh"], [0.6, "Limbus enjoyer"], [0.4, "Tourist"], [0, "LARP"]];
+function gmGrade(q) {
+  const at = GM_GRADES.findIndex(([from]) => q >= from);
+  return { name: GM_GRADES[at][1], tier: GM_GRADES.length - 1 - at };
+}
+// the end of any game: its Daily / duel result is kept, it is graded, and it pays
 function gmOver(game, g, score) {
   const daily = g.daily && !g.duel, firstToday = daily && gmDailyDone(game) == null;
   if (g.daily) gmDailyOver(game, g, score);
   if (g.paid) return;
   g.paid = true;
+  const hard = game === "track" ? gm.hard : ["id", "skill", "char"].includes(game) ? gi.hard : ["enemy", "splash", "atlas"].includes(game) ? gp.hard : false;
   const num = typeof score === "number", wordle = game === "wordle" && g.tries.includes(g.ans), conn = game === "conn" && g.miss < GC_MISS;
   const q = game === "wordle" ? (wordle ? (GW_TRIES + 1 - g.tries.length) / GW_TRIES : 0) : game === "conn" ? (conn ? 1 - g.miss / GC_MISS : 0)
     : game === "grid" ? Math.min(1, score / 2500) : num ? Math.min(1, score / 10000) : 0;
+  // (the grade: a Hard game's points are doubled, so it is measured against twice as much)
+  g.grade = gmGrade(game === "grid" ? g.got.filter(Boolean).length / 9 : num && hard ? Math.min(1, score / 20000) : q);  // (a grid: by its cells)
+  setTimeout(() => {  // (the result's page is drawn by the game right after this)
+    const top = $("#main .gmtop");
+    if (top && !$("#main .gmgrade")) top.insertAdjacentHTML("beforebegin", `<div class="gmgrade t${g.grade.tier}"><small>YOUR GRADE</small><b>${g.grade.name}</b></div>`);
+  });
   const got = [[Math.max(10, Math.round(q * 10) * 10), "a game played"]], ach = ["first"], rounds = Array.isArray(g.log) && g.log.length >= 10;
   gmW.played[game] = 1;
   if (GM_SCORED.every(([k]) => gmW.played[k])) ach.push("every");
   if (rounds && game !== "odd" && g.log.every((r) => r.ok)) ach.push("perfect");
-  if (num && score >= 10000 && (game === "track" ? gm.hard : ["id", "skill", "char"].includes(game) ? gi.hard : ["enemy", "splash", "atlas"].includes(game) ? gp.hard : false)) ach.push("hard");
+  if (num && score >= 10000 && hard) ach.push("hard");
   if (wordle && g.tries.length <= 3) ach.push("wordle3");
   if (conn && !g.miss) ach.push("connp");
   if (game === "grid" && !g.got.includes(null)) ach.push("gridfull");
