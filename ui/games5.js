@@ -112,7 +112,8 @@ function gaHome() {
   const rate = (g) => { const all = b.groups.reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) || 1;
     return (100 * b.groups.filter((x) => x.g === g || x.g === g + "_pickup").reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) / all).toFixed(1) + "%"; };
   const up = b.groups.filter((x) => String(x.g).endsWith("_pickup")).flatMap((x) => x.ids).map(gaU);
-  $("#gehome").innerHTML = `<div class="gewallet">LUNACY <b>${gmW.lunacy.toLocaleString("en")}</b></div>
+  // TEMPORARY (Vlad, 2026-10-08: "to test with, we'll take it out later"): the "+1300" button gives lunacy for nothing
+  $("#gehome").innerHTML = `<div class="gewallet">LUNACY <b>${gmW.lunacy.toLocaleString("en")}</b><button id="getest" title="For testing: lunacy for nothing. To be removed.">+ 1300 · test</button></div>
     <div class="getiles">${ga.data.banners.map((x) => `<img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">`).join("")}</div>
     <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.illust ? gaFull(b.illust) : ""}')"></div>${b.typo ? `<img class="getypo" src="${gaFull(b.typo)}">` : ""}
       <div class="geinfo">${b.end ? `<div class="geend">Until ${esc(b.end.slice(0, 10))}</div>` : ""}
@@ -123,6 +124,7 @@ function gaHome() {
       <div class="gepull"><button id="ge1" ${gmW.lunacy < GA_COST ? "disabled" : ""}>Extract 1<small>◆ ${GA_COST}</small></button><button id="ge10" ${gmW.lunacy < 10 * GA_COST ? "disabled" : ""}>Extract 10<small>◆ ${10 * GA_COST}</small></button></div>
       ${gmW.lunacy < GA_COST ? `<a class="gebroke" href="#/games">Out of lunacy — play a game: today's Dailies pay the most</a>` : ""}</div>`;
   document.querySelectorAll("#gehome [data-b]").forEach((el) => el.onclick = () => { ga.banner = ga.data.banners.find((x) => x.id === +el.dataset.b); st.banner = ga.banner.id; gaKeep(); gaSnd("gacha_whoosh", 0.4); gaHome(); });
+  $("#getest").onclick = () => { gmW.lunacy += 10 * GA_COST; gmWKeep(); gaHome(); };
   $("#ge1").onclick = () => gaPull(1);
   $("#ge10").onclick = () => gaPull(10);
   $("#geall").onchange = (e) => { st.all = e.target.checked; gaKeep(); };
