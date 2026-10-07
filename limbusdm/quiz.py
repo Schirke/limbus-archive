@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-VERSION = 5
+VERSION = 7
 CHAR_LINES, CHAR_MIN = 40, 5  # lines kept of a story character (spread over the story), fewest to be asked about
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"]
 # the developers' notes call some bosses by a short name: note's word -> the start of the English name
@@ -39,12 +39,21 @@ def _text(s) -> str:
 
 
 def _where(stem: str) -> tuple[float, str]:
-    """(order, label) of a story file by its name: "S1040B" = Canto 10, "1D306A" = Canto 3, "E614A" = an Intervallo."""
-    m = re.match(r"S(\d+)\d\d[A-Z]", stem) or re.match(r"\d+D(\d)\d\d", stem)
+    """(order, label) of a story file by its name: "S1040B" = Canto 10 (S + the Canto + two digits; S0.. = the
+    Prologue, "S9991B" = Canto 9's last pages), "3D309A" = Canto 3's dungeon (the Canto comes FIRST there), "E614A" = an
+    Intervallo after Canto 6, "E0..X" / "ES…" = the events, "P10102" = an Identity's own story."""
+    m, d = re.match(r"T?S(\d{3,4})", stem), re.match(r"(\d+)D\d{3}", stem)
+    if m or d:
+        n = int(d.group(1)) if d else int(m.group(1)[:-2])
+        if n > 20:  # ("S9991": four digits, but not a Canto past the ninth)
+            n = int(m.group(1)[0])
+        return n + (0.2 if d else 0.0), f"Canto {n}" if n else "Prologue"
+    m = re.match(r"E([1-9])\d\d", stem)
     if m:
-        return float(m.group(1)), f"Canto {int(m.group(1))}" if int(m.group(1)) else "Prologue"
-    m = re.match(r"E(\d)", stem)
-    return (int(m.group(1)) + 0.5, "Intervallo") if m else (99.0, "Story")
+        return int(m.group(1)) + 0.5, f"Intervallo after Canto {m.group(1)}"
+    if re.match(r"E0|ES", stem):
+        return 90.0, "Event"
+    return (95.0, "Identity story") if stem.startswith("P") else (99.0, "Story")
 
 
 def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], portraits: dict | None = None) -> list[dict]:

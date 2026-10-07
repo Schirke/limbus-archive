@@ -190,7 +190,7 @@ function giDraw() {
   if ($("#gitype")) {
     const inp = $("#gitype"), from = a.char ? gi.data.chars : a.boss ? gi.data.bosses : gi.data.all;
     inp.oninput = () => {
-      const q = inp.value.trim().toLowerCase(), hits = q.length < 2 ? [] : from.filter((x) => x.name.toLowerCase().includes(q));
+      const q = gmPlain(inp.value.trim()), hits = q.length < 2 ? [] : from.filter((x) => gmPlain(x.name).includes(q));
       $("#gisugg").innerHTML = hits.map((x, i) => `<div data-k="${x.key}" class="${i ? "" : "on"}">${esc(x.title)}<i>${esc(x.sub)}</i></div>`).join("");
       $("#gisugg").querySelectorAll("div").forEach((r) => r.onclick = () => giAnswer(r.dataset.k));
     };

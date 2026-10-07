@@ -178,6 +178,8 @@ function gmCopyResult(game, g, share) {
   gmCopy(`Limbus Archive · ${name} · Duel\nMy result: ${g.duel.mine} — can you beat it?\n${GM_SITE}/${href}/duel/${g.duel.seed}.${String(g.duel.mine).replace(/ /g, "_").replace(/\//g, "-")}`);
 }
 
+// a name as it is searched: without the marks over its letters ("Ryōshū" is found by "ryo", "Öufi" by "oufi")
+const gmPlain = (s) => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const gmShuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(gmRnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // a track with a number for a name ("Canto VIII Battle 16") can't be told from its neighbours by ear alone
 const gmNumbered = (t) => /Battle \d+$|battle theme( \d+)?$/.test(t.name);
@@ -478,8 +480,8 @@ function gmDrawRound() {
   document.querySelectorAll(".gmopts button").forEach((b) => b.onclick = () => b.dataset.w != null ? gmAnswerPlace(b.dataset.w) : gmAnswer(+b.dataset.n));
   if ($("#gmtype")) {
     const inp = $("#gmtype"), draw = () => {
-      const q = inp.value.trim().toLowerCase();
-      const hits = q.length < 2 ? [] : g.pool.filter(({ t: o }) => (o.name + " " + o.where + " " + o.who.join(" ")).toLowerCase().includes(q));
+      const q = gmPlain(inp.value.trim());
+      const hits = q.length < 2 ? [] : g.pool.filter(({ t: o }) => gmPlain(o.name + " " + o.where + " " + o.who.join(" ")).includes(q));
       $("#gmsugg").innerHTML = hits.map(({ t: o, n }) => `<div data-n="${n}" class="${n === hits[0].n ? "on" : ""}">${esc(o.name)}<i>${esc([o.where, o.fights && o.fights <= 3 ? o.who[0] : ""].filter(Boolean).join(" · "))}</i></div>`).join("");
       $("#gmsugg").querySelectorAll("div").forEach((r) => r.onclick = () => gmAnswer(+r.dataset.n));
     };
