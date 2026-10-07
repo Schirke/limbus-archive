@@ -241,8 +241,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if not full.startswith(os.path.normpath(ui_dir)):
                     return self._send(403, b"", "text/plain")
                 return self._file(full)
-            if p == "/api/appnotes":  # what's new in the app since the version seen last ({} when seen)
+            if p == "/api/appnotes":  # what's new in the app since the version seen last ({} when seen); all=1: the last releases
                 from . import appnotes
+                if q.get("all"):
+                    return self._json(appnotes.history())
                 return self._json(appnotes.pending(svc.data_dir))
             if p == "/api/skill_slots":  # how the game numbers an Identity's skill animations (Service.skill_slots)
                 return self._json(svc.skill_slots(_fx_id(q["id"])))

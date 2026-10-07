@@ -124,12 +124,18 @@ async function showNotes(rid) {
 // what's new in the app after it updated: the release notes since the version seen last (from GitHub)
 function showAppNotes(a) {
   const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-    .map((l) => /^[-*] /.test(l) ? `<li>${l.slice(2)}</li>` : `<div>${l}</div>`).join("");
-  modal(`<h2 style="margin-top:0">Limbus Archive ${esc(a.version)} — what's new</h2>
-    ${a.notes.length ? a.notes.map((n) => `<div style="margin:10px 0 4px"><b>${esc(n.tag)}</b></div><ul style="margin:0;padding-left:20px;max-width:720px">${md(n.body)}</ul>`).join("")
+    .map((l) => /^[-*] /.test(l) ? `<li>${l.slice(2)}</li>` : /^#+ /.test(l) ? `<div><b>${l.replace(/^#+ /, "")}</b></div>` : `<div>${l}</div>`).join("");
+  // a.history = the last releases, opened by the status box's button
+  modal(`<h2 style="margin-top:0">Limbus Archive ${a.history ? "" : esc(a.version) + " "}— what's new</h2>
+    ${a.notes.length ? a.notes.map((n) => `<div style="margin:10px 0 4px"><b>${esc(n.tag)}</b>${n.date ? ` <span class="small muted">${esc(n.date)}</span>` : ""}</div><ul style="margin:0;padding-left:20px;max-width:720px">${md(n.body)}</ul>`).join("")
       : `<div class="muted">Couldn't read the notes — <a href="${esc(a.page)}" target="_blank">see the releases on GitHub</a>.</div>`}`);
+  if (a.history) return;
   api("/api/appnotes_seen", {}).catch(() => {});
   return new Promise((ok) => { closeModal.then = ok; });
+}
+async function showAppHistory() {
+  $("#status").classList.add("hidden");
+  try { showAppNotes(await api("/api/appnotes?all=1")); } catch (e) { toast(esc(e.message)); }
 }
 // at the start: the app's own notes after an update, then a game patch that came in while the app was closed
 (async () => {
@@ -151,7 +157,8 @@ function renderStatus() {
       : ` — <a href="${esc(up.page || "#")}" target="_blank">download</a>`}</div>`;
   }
   h += `<div title="${esc(s.watch.last_check || "")}">Game: ${esc(s.watch.state)}</div>
-    <button class="toggle" style="margin-top:6px" onclick="checkAll()" ${j && j.running ? "disabled" : ""}>Check for updates</button>`;
+    <button class="toggle" style="margin-top:6px" onclick="checkAll()" ${j && j.running ? "disabled" : ""}>Check for updates</button>
+    <button class="toggle" style="margin-top:6px" onclick="showAppHistory()">What's new</button>`;
   if (j && j.running) h += `<div style="margin-top:6px">${esc(j.kind)}: ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}</div><div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div>`;
   $("#status").innerHTML = h;
   const b = $("#statusbtn");
