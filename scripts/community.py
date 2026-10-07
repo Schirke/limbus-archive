@@ -5,8 +5,10 @@ written to streams.json. Run by .github/workflows/community.yml on a timer; the 
     TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET   an app registered at dev.twitch.tv
     YOUTUBE_API_KEY                          a key with "YouTube Data API v3" at console.cloud.google.com
 
-Either service is skipped without its key. YouTube lets a key search about 100 times a day (a search per language
-each time), so its part is asked anew every 50 minutes and carried over in between.
+Either service is skipped without its key. The script runs every minute: Twitch is asked each time. YouTube lets a
+key spend 10,000 units a day and a search costs 100 (one per language each time), so new streams are looked for once
+an hour; in between, every 2 minutes, the streams already found are asked how many watch them now (1 unit) and the
+ones that ended are dropped.
 
 The recommended channels (the pictures in the page's corner) are the links in recommended.json on the
 `community-config` branch, written by the owner's app (limbusdm/community.py): each gets its name and picture, and
@@ -20,7 +22,9 @@ import urllib.parse
 import urllib.request
 
 GAME, TOP, LANGS = "Limbus Company", 30, ("en", "ru", "ko")  # TOP: streams kept per language
-YOUTUBE_EVERY = 48 * 60  # seconds
+YOUTUBE_EVERY = 60 * 60  # seconds between YouTube searches
+YOUTUBE_SEEN = 110  # seconds between YouTube's cheap questions (the found streams' viewers, the recommended channels)
+KEPT = os.environ.get("COMMUNITY_KEPT") or ""  # a file for Twitch's token between the runs of one job (never published)
 LETTERS = (("ru", "[а-яё]"), ("ko", "[가-힣]"))  # a language told by its letters
 OUT = sys.argv[1] if len(sys.argv) > 1 else "streams.json"
 REPO = os.environ.get("GITHUB_REPOSITORY") or "Schirke/limbus-archive"
@@ -37,10 +41,29 @@ def call(url, params=None, headers=None, data=None):
 
 
 def twitch(cid, secret):
+    try:
+        with open(KEPT, encoding="utf-8") as f:
+            kept = json.load(f)
+    except (OSError, ValueError):
+        kept = {}
+    if kept.get("cid") == cid:
+        try:
+            return twitch_streams({"Client-Id": cid, "Authorization": "Bearer " + kept["token"]}, kept["games"])
+        except Exception as e:  # (the token ran out)
+            print("Twitch: the kept token —", problem(e))
     token = call("https://id.twitch.tv/oauth2/token", data={"client_id": cid, "client_secret": secret,
                                                              "grant_type": "client_credentials"})["access_token"]
     head = {"Client-Id": cid, "Authorization": "Bearer " + token}
     games = call("https://api.twitch.tv/helix/games", {"name": GAME}, head)["data"]
+    out = twitch_streams(head, games)
+    if KEPT:
+        with open(KEPT, "w", encoding="utf-8") as f:
+            json.dump({"cid": cid, "token": token, "games": games}, f)
+    return out
+
+
+def twitch_streams(head, games):
+    TW.clear()
     TW.update(head)
     out = {}
     for lang in LANGS:  # the busiest first, as Twitch lists them
@@ -87,6 +110,25 @@ def youtube(key):
                               "url": "https://www.youtube.com/watch?v=" + v["id"], "started": live.get("actualStartTime") or "",
                               "avatar": faces.get(sn["channelId"], ""),
                               "thumb": (sn["thumbnails"].get("medium") or sn["thumbnails"]["default"])["url"]})
+    return out
+
+
+def youtube_now(key, streams):
+    """The found streams as they are now: viewers and title asked anew, the ended ones left out."""
+    api = "https://www.googleapis.com/youtube/v3/"
+    ids = sorted({s["url"].rsplit("=", 1)[-1] for rows in streams.values() for s in rows})
+    live = {}
+    for n in range(0, len(ids), 50):
+        for v in call(api + "videos", {"part": "snippet,liveStreamingDetails", "id": ",".join(ids[n:n + 50]), "key": key})["items"]:
+            if "concurrentViewers" in (v.get("liveStreamingDetails") or {}):
+                live[v["id"]] = (int(v["liveStreamingDetails"]["concurrentViewers"]), v["snippet"]["title"])
+    out = {}
+    for lang, rows in streams.items():
+        out[lang] = []
+        for s in rows:
+            now = live.get(s["url"].rsplit("=", 1)[-1])
+            if now:
+                out[lang].append({**s, "viewers": now[0], "title": now[1]})
     return out
 
 
@@ -219,22 +261,34 @@ def main():
                     print("Twitch: the ID and the secret are in each other's place — read the other way round")
                 except Exception as e2:
                     errors["twitch"] += " | the other way round: " + problem(e2)
+    since = lambda at: (now - datetime.datetime.fromisoformat(at)).total_seconds() if at else 9e9
+    # YouTube's cheap questions are not asked every minute: a day's units wouldn't last
+    seen = old.get("yt_seen") or ""
+    turn = bool(yt) and since(seen) >= YOUTUBE_SEEN
     if yt:
-        last = (parts.get("youtube") or {}).get("at")
-        if not last or (now - datetime.datetime.fromisoformat(last)).total_seconds() >= YOUTUBE_EVERY:
+        if since((parts.get("youtube") or {}).get("at")) >= YOUTUBE_EVERY:
             try:
                 parts["youtube"] = {"at": now.isoformat(timespec="seconds"), "streams": youtube(yt)}
             except Exception as e:
                 errors["youtube"] = problem(e)
+        elif turn and any((parts["youtube"].get("streams") or {}).values()):
+            try:
+                parts["youtube"]["streams"] = youtube_now(yt, parts["youtube"]["streams"])
+            except Exception as e:
+                errors["youtube"] = problem(e)
+        elif (old.get("errors") or {}).get("youtube"):  # (not asked this time: what it said the last time stays)
+            errors["youtube"] = old["errors"]["youtube"]
+    if turn:
+        seen = now.isoformat(timespec="seconds")
     if not parts:
         print("no API keys in the secrets, or nothing answered: nothing written", errors or "")
         return
     try:
-        rec = recommended(old.get("rec") or {}, now, yt)
+        rec = recommended(old.get("rec") or {}, now, yt if turn else "")
     except Exception as e:  # (no list: the branch isn't there, GitHub didn't answer) — as it was
         rec = old.get("rec") or {}
         print("recommended:", problem(e))
-    doc = {"updated": now.isoformat(timespec="seconds"), "parts": parts, "errors": errors}
+    doc = {"updated": now.isoformat(timespec="seconds"), "yt_seen": seen, "parts": parts, "errors": errors}
     for lang in LANGS:
         rows = [s for p in parts.values() for s in (p.get("streams") or {}).get(lang) or []]
         doc[lang] = sorted(rows, key=lambda s: -s["viewers"])[:TOP]

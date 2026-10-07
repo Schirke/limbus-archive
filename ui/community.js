@@ -1,8 +1,8 @@
 // Community: who streams the game right now — the live streams on Twitch and YouTube: everything together
 // ("Popular") or English, Russian, Korean; sorted by viewers or by when they started, one site or both.
-// (/api/community: a list made on GitHub every quarter of an hour, see scripts/community.py. The menu item shows up
+// (/api/community: a list made on GitHub every minute, see scripts/community.py. The menu item shows up
 // once there is such a list.) While somebody big is live — a stream with at least `cm.big` viewers — the menu item
-// turns into a live mark with the streamer's picture, name and viewers (cmTab; the list is read anew every 3 minutes).
+// turns into a live mark with the streamer's picture, name and viewers (cmTab; the list is read anew every minute).
 // The page says when the list was made (cmStamp): green while fresh, gold after 20 minutes, red after an hour.
 "use strict";
 
@@ -33,11 +33,11 @@ function cmTab(d) {
 // When the list was made: a plate that keeps counting while the page is open.
 function cmStamp(iso) {
   const min = (Date.now() - new Date(iso)) / 60000, at = new Date(iso);
-  return `<span class="cmstamp ${min < 20 ? "" : min < 60 ? "old" : "stale"}" data-at="${esc(iso)}" title="The list was made ${esc(at.toLocaleString())}. It is made anew every 5 minutes${min < 60 ? "" : " — this one is old: the streams below may be over"}."><i></i>${min < 60 ? "Updated" : "Last update"} ${cmAgo(iso)}</span>`;
+  return `<span class="cmstamp ${min < 20 ? "" : min < 60 ? "old" : "stale"}" data-at="${esc(iso)}" title="The list was made ${esc(at.toLocaleString())}. It is made anew every minute${min < 60 ? "" : " — this one is old: the streams below may be over"}."><i></i>${min < 60 ? "Updated" : "Last update"} ${cmAgo(iso)}</span>`;
 }
 const cmRead = () => api("/api/community").then((d) => { cmTab(d); if (cm.fresh) cm.fresh(d); }).catch(() => {});
 cmRead();
-setInterval(cmRead, 180000);
+setInterval(cmRead, 60000);
 setInterval(() => { const el = $(".cmstamp"); if (el) el.outerHTML = cmStamp(el.dataset.at); }, 30000);
 
 // The recommended channels in the page's corner (the owner's list, see the end of the file): round pictures that open
@@ -118,7 +118,7 @@ async function cmBili() {
   const d = await api(`/api/bilibili?period=${cb.period}&sort=${cb.sort}`).catch(() => ({ error: "no answer" }));
   if (location.hash.split("/")[2] !== "bilibili" || asked !== cb.period + cb.sort) return;
   const rows = d.videos || [];
-  $("#main").innerHTML = head(d.updated ? `<span class="gmscore">${rows.length} VIDEOS</span>${cmStamp(d.updated).replace("every 5 minutes", "every 10 minutes")}` : "")
+  $("#main").innerHTML = head(d.updated ? `<span class="gmscore">${rows.length} VIDEOS</span>${cmStamp(d.updated).replace("every minute", "every 10 minutes")}` : "")
     + (d.error ? `<p class="muted">Bilibili's list could not be read (${esc(d.error)}).</p>`
     : !rows.length ? `<p class="muted">No videos here.</p>`
     : `<div class="cbgrid">${rows.map((v, i) => `<a class="cbcard" href="${esc(v.url)}" target="_blank" title="${esc(v.title)}&#10;Open the video on Bilibili">
@@ -130,7 +130,7 @@ async function cmBili() {
 }
 
 // Settings, for the owner alone (where the web copy is set up): the recommended channels — links, one a line, kept on
-// GitHub (/api/community_rec); the list made there every 5 minutes then carries their names, pictures and who is live.
+// GitHub (/api/community_rec); the list made there every minute then carries their names, pictures and who is live.
 {
   const settings = routes.settings;
   routes.settings = async () => {

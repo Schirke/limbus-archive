@@ -2,7 +2,7 @@
 # written to streams.json on the community-data branch. Needs the secrets named in scripts/community.py.
 #
 # GitHub's timer starts this about once a day instead of every quarter of an hour, so a run doesn't count on it:
-# it writes the list every 5 minutes for an hour and then starts the next run itself. The timer only brings the
+# it writes the list every minute for an hour and then starts the next run itself. The timer only brings the
 # chain back when it broke; a run that finds another one going leaves at once.
 name: Community streams
 on:
@@ -33,12 +33,13 @@ jobs:
           [ "$n" = "0" ] || echo "busy=1" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         if: ${{ !steps.other.outputs.busy }}
-      - name: Ask Twitch and YouTube, every 5 minutes for an hour
+      - name: Ask Twitch and YouTube, every minute for an hour
         if: ${{ !steps.other.outputs.busy }}
         env:
           TWITCH_CLIENT_ID: ${{ secrets.TWITCH_CLIENT_ID }}
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          COMMUNITY_KEPT: ${{ runner.temp }}/community_kept.json
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -50,7 +51,8 @@ jobs:
             git -C data checkout -q --orphan community-data
             git -C data rm -rfq .
           fi
-          end=$(( $(date +%s) + 55 * 60 ))
+          next=$(date +%s)
+          end=$(( next + 55 * 60 ))
           while :; do
             python scripts/community.py data/streams.json || true
             if [ -f data/streams.json ]; then
@@ -58,8 +60,10 @@ jobs:
               git -C data commit -qm "streams" --amend 2>/dev/null || git -C data commit -qm "streams" || true
               git -C data push -qf origin HEAD:refs/heads/community-data || true
             fi
-            [ $(( $(date +%s) + 300 )) -lt $end ] || break
-            sleep 300
+            next=$(( next + 60 ))
+            [ $next -lt $end ] || break
+            wait=$(( next - $(date +%s) ))
+            [ $wait -le 0 ] || sleep $wait
           done
       - name: The next run
         if: ${{ !steps.other.outputs.busy }}
