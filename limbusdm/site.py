@@ -690,6 +690,24 @@ class Exporter:
             self.write_manifest("extra", extra)
         return m
 
+    def gacha(self) -> dict:
+        """Games → Extraction (ui/games5.js): the banners' list, their pictures, the extraction's own pictures and
+        sounds, the lines E.G.O say. (The Identities' lines are among the quiz's, the art among the units'.)"""
+        from . import gacha
+        old = self.read_manifest("gacha")
+        sid = self.svc.latest_snapshot_id()
+        have = old.get("urls", {}) if old.get("id") == sid else {}
+        g = gacha.build(self.svc)
+        keys = ["/api/gacha"] + [url_key("/api/gacha_ui", n=n) for n in gacha.UI_USED]
+        keys += [url_key("/api/asset_img", path=b[k]) for b in g["banners"] for k in ("tile", "typo", "illust") if b.get(k)]
+        sounds = [url_key("/api/quiz_audio", s=s) for s in sorted(set(g["snd"].values()))]
+        voices = [url_key("/api/quiz_audio", s=v[0]) for v in g["lines"].values() if v[0]]
+        got = self.fetch_all(keys + sounds + voices, {k: f for k, f in have.items() if k != "/api/gacha"}, "site: Games (Extraction)")
+        urls, groups = _grouped(got, [(keys + sounds, PACK), (voices, VOICE_PACK)])
+        m = {"kind": "gacha", "id": sid, "urls": urls, "groups": groups}
+        self.write_manifest("gacha", m)
+        return m
+
     CARDS = 9  # pictures kept for each card of the Games page (it draws three)
 
     def cards(self) -> dict:
@@ -789,6 +807,7 @@ class Exporter:
             self.quiz()
             self.cards()
             self.scenes()
+            self.gacha()
         self.units()
         self.small()
         self.buffs()

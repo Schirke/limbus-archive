@@ -149,7 +149,9 @@ points. Puzzles. And two toys.
 - **Connections:** sixteen Identities, four groups of four with something in common.
 - **Limbus Grid:** a 3 × 3 grid with a condition on every row and column — name an Identity for
   each cell, nine tries.
-- **Extraction** (a toy): pulls at the game's rates, with the lunacy they would have cost.
+- **Extraction** (a toy): the game's own extraction — its banners with their real pools and chances,
+  the orb in chains, every 000 and E.G.O shown with its line and voice, the ten cards. All of it with
+  the game's pictures and sounds.
 - **Challenge roulette** (a toy): a random team and a rule to play it by.
 
 **Daily challenge:** the same game for everybody, new at the game's daily reset; the result copies
@@ -157,6 +159,9 @@ as a line of squares to share.
 
 **Duel:** play a game, copy the link with your result, send it — the link opens the same rounds for
 a friend to beat.
+
+**Lunacy:** the games pay it — a finished game, a Daily, days in a row, a duel won, eighteen
+achievements — and Extraction spends it.
 
 <p align="center"><a href="docs/games.webp"><img src="docs/games.webp" width="760" alt="Games"></a></p>
 

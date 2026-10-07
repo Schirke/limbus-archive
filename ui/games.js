@@ -60,7 +60,7 @@ function gmDailyKeep(game, score) {
 }
 const gmDailyBtn = (game, off) => { const done = gmDailyDone(game);
   return `<button class="toggle gmdaily" id="gmdaily" ${off ? "disabled" : ""} title="The same ten rounds for everybody today, on fixed settings">Daily challenge${done == null ? "" : ` · done: ${done}`}</button>`
-    + `<a class="toggle gmdaily" href="${GM_GAMES.find(([k]) => k === game)[1]}/duel" title="${GM_DUEL}">Duel</a>`; };
+    + `<a class="toggle gmdaily" href="${GM_GAMES.find(([k]) => k === game)[1]}/duel" title="${GM_DUEL}">${GM_SWORDS}Duel</a>`; };
 const GM_DUEL = "A game to send to a friend: play it, then copy the link with your result — the link opens the same rounds";
 // log: [{ok, clean}] — a square per round: right at once, right with hints or more of the piece, missed
 function gmShare(title, score, log) {
@@ -152,9 +152,11 @@ function gmOver(game, g, score) {
 function gmDayTag(g) {
   if (!g.duel) return `DAILY ${gmDay()}`;
   const d = g.duel, num = (v) => /^\d+$/.test(String(v)) ? +v : null, a = num(d.mine), b = num(d.their);
-  return `DUEL${d.their == null ? "" : ` · THEIRS <i>${esc(d.their)}</i>${a == null || b == null ? "" : a > b ? " · <b>YOU WIN</b>" : a < b ? " · <b>THEY WIN</b>" : " · <b>A DRAW</b>"}`}`;
+  return `${GM_SWORDS} DUEL${d.their == null ? "" : ` · THEIRS <i>${esc(d.their)}</i>${a == null || b == null ? "" : a > b ? " · <b>YOU WIN</b>" : a < b ? " · <b>THEY WIN</b>" : " · <b>A DRAW</b>"}`}`;
 }
-const gmCopyLabel = (g) => g.duel ? "Copy the duel link" : "Copy the result";
+const GM_SWORDS = `<svg class="gmswords" viewBox="0 0 24 24"><path d="M4 3l10.5 10.5M4 3v3.2M4 3h3.2M12 16l3-3M13.2 17.8l4.6-4.6M16.5 16.5L20.5 20.5"/><path d="M20 3L9.5 13.5M20 3v3.2M20 3h-3.2M12 16l-3-3M10.8 17.8l-4.6-4.6M7.5 16.5L3.5 20.5"/></svg>`;
+// (a duel's result is only worth something sent: its button is the one to see — every result page marks it by this text)
+const gmCopyLabel = (g) => g.duel ? `${GM_SWORDS}<span class="gmduelcopy">Copy the duel link — send it to a friend</span>` : "Copy the result";
 function gmCopyResult(game, g, share) {
   if (!g.duel) return share();
   const [, href, name] = GM_GAMES.find(([k]) => k === game);
@@ -222,7 +224,7 @@ const GM_GAMES = [
     gmIcon('<circle cx="6" cy="7" r="2.6"/><circle cx="12" cy="7" r="2.6"/><circle cx="18" cy="7" r="2.6"/><rect x="9.4" y="14.4" width="5.2" height="5.2"/>')],
   ["grid", "#/gamegrid", "Limbus Grid", "A 3 × 3 grid with a condition on every row and column — name an Identity for each cell. Nine tries.",
     gmIcon('<rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M10.6 12l1.1 1.1 1.9-2.2"/>')],
-  ["gacha", "#/gamegacha", "Extraction", "Spend the lunacy the games pay: pull tens at the game's rates. How long until the 000 you wanted?",
+  ["gacha", "#/gamegacha", "Extraction", "The game's extraction, with its banners, chances, sounds and voices — paid with the lunacy the games give.",
     gmIcon('<rect x="4" y="3" width="11" height="15" rx="1"/><rect x="9" y="6" width="11" height="15" rx="1"/><path d="M14.5 10.5l1 2.1 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2-1.6-1.5 2.2-.3z"/>'), true],
   ["dare", "#/gamedare", "Challenge roulette", "A random team and a rule to play it by — for a run that got too easy.",
     gmIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6L5.6 18.4"/><circle cx="12" cy="12" r="2.2"/>'), true]];
@@ -263,7 +265,7 @@ function gmHub() {
     <div class="gmday"><a class="gmart" data-game="${mode[0]}" href="${mode[1]}">${mode[4]}</a><div class="gmdaybody">
       <div class="gmkick">MODE OF THE DAY</div><a class="gmname" href="${mode[1]}">${mode[2]}</a><p>${mode[3]}</p>
       <div class="gmscore">BEST ${gmBest(mode[0]) ? `<i>${gmBest(mode[0])}</i>` : "—"} &nbsp;·&nbsp; DAILY ${today == null ? "—" : `<i>${today}</i>`}</div>
-      <div class="gmplay"><a class="gmbtn" href="${mode[1]}">Play</a>${today == null ? `<a class="toggle" href="${mode[1]}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${mode[1]}/duel" title="${GM_DUEL}">Duel</a></div></div></div>
+      <div class="gmplay"><a class="gmbtn" href="${mode[1]}">Play</a>${today == null ? `<a class="toggle" href="${mode[1]}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}<a class="toggle" href="${mode[1]}/duel" title="${GM_DUEL}">${GM_SWORDS}Duel</a></div></div></div>
     <div class="gmcols">${GM_GROUPS.map(([group, keys]) => `<div><div class="gmgrp">${group}</div>${keys.map((key) => { const [k, href, name, , pic, toy] = GM_GAMES.find((g) => g[0] === key), best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
       return `<div class="gmtile ${k === mode[0] ? "on" : ""}"><a class="gmtmain" href="${href}"><span class="gmtpic" data-game="${k}">${pic}</span><span><b>${name}</b><small>${toy ? "A TOY" : `BEST ${best ? `<i>${best}</i>` : "—"}`}</small></span></a>
         ${toy ? "" : day == null ? `<a class="gmdot" href="${href}/daily" title="Today's Daily: not played yet — start it"></a>` : `<span class="gmdot done" title="Today's Daily: ${day}"></span>`}</div>`; }).join("")}</div>`).join("")}</div>

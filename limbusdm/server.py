@@ -20,7 +20,7 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 # (304) while the snapshot and the app are the same ones (the ETag), so nothing is cut out of the bundles twice.
 KEEP = "max-age=3600"
 # Lists that only a new snapshot changes and that take a while to put together: answered from memory after the first time.
-PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages"}
+PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha"}
 
 
 def _etag(svc) -> str:
@@ -557,6 +557,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if not hit:
                     return self._json({"error": "no such line"}, 404)
                 return self._send(200, export_wav(*hit)[0], "audio/wav", {"Cache-Control": "max-age=86400"})
+            if p == "/api/gacha":  # Games → Extraction: the game's banners, pools, lines and sounds
+                from . import gacha
+                return self._json(gacha.build(svc))
+            if p == "/api/gacha_ui":  # one picture of the extraction's screens, cut from the game's main build
+                from . import gacha
+                got = gacha.ui_png(q.get("n", ""), svc.game.data, svc.ui_cache_dir())
+                if got is None:
+                    return self._send(404, b"no picture", "text/plain")
+                return self._send(200, got[0], got[1], {"Cache-Control": "max-age=86400"})
             if p == "/api/news":  # the developers' update notices from Steam, tied to the archive's patches
                 from . import news
                 return self._json(news.patches(svc, bool(q.get("force"))))

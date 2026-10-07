@@ -1048,22 +1048,7 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .goopts { margin-top: 14px; }
 .gologpic { width: 40px; height: 40px; object-fit: cover; object-position: top; margin-right: 4px; vertical-align: middle; opacity: .55; } .gologpic.odd { opacity: 1; outline: 1px solid var(--gold); }
 /* Games: Extraction, Challenge roulette (games5.js) */
-.gafeat { color: var(--muted); font-size: 13px; } .gafeat select { margin-left: 8px; height: 34px; max-width: 420px; }
-.gaone { height: 36px; padding: 0 16px; border: 1px solid var(--gold); color: var(--gold); border-radius: 0; }
-.gastats { display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 4px 0 16px; letter-spacing: 1px; }
-.gagrid { display: grid; grid-template-columns: repeat(5, 190px); gap: 8px; min-height: 120px; }
-@keyframes gaIn { from { opacity: 0; transform: translateY(16px) scale(.9); } }
-@keyframes gaGlow { 50% { box-shadow: 0 0 22px 2px rgba(214,170,44,.55); } }
-.gacard { position: relative; padding-bottom: 8px; text-align: center; background: var(--panel2); border: 1px solid var(--line); border-top: 3px solid #6b6266; overflow: hidden; animation: gaIn .35s both; }
-.gacard img { display: block; width: 100%; height: 130px; object-fit: cover; object-position: center 20%; margin-bottom: 7px; }
-.gacard b { display: block; padding: 0 8px; color: #fff; font: 15px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
-.gacard i { font-style: normal; color: var(--muted); font-size: 12px; }
-.gacard em { position: absolute; top: 5px; left: 6px; padding: 0 6px; font: 15px "LC Bebas", "Segoe UI", sans-serif; font-style: normal; letter-spacing: 2px; background: rgba(20,17,19,.85); color: #cfc6ca; }
-.gacard u { position: absolute; top: 6px; right: 6px; padding: 1px 5px; font: 10px Consolas, monospace; letter-spacing: 1px; text-decoration: none; background: var(--add); color: #111; }
-.gacard.r2 { border-top-color: #c0503c; } .gacard.r2 em { color: #ff9a85; }
-.gacard.r3 { border-color: var(--gold); border-top-color: var(--gold); animation: gaIn .35s both, gaGlow 1.6s ease-in-out .4s 2; } .gacard.r3 em { color: var(--gold); }
-.gacard.ego { border-color: #8a6fd1; border-top-color: #8a6fd1; animation: gaIn .35s both, gaGlow 1.6s ease-in-out .4s 2; } .gacard.ego em { color: #c5b2ff; }
-.gacard.feat::after { content: "FEATURED"; position: absolute; left: 0; right: 0; top: 112px; font: 10px Consolas, monospace; letter-spacing: 3px; color: #111; background: var(--gold); }
+.gastats { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; margin: 12px 0 16px; letter-spacing: 1px; } .gastats .toggle { margin-left: auto; }
 .gatop { margin: 22px 0 8px; }
 .gahave { display: flex; flex-wrap: wrap; gap: 4px; max-width: 990px; } .gahave span { position: relative; width: 52px; height: 52px; border: 1px solid var(--gold); overflow: hidden; } .gahave span.ego { border-color: #8a6fd1; }
 .gahave img { width: 100%; height: 100%; object-fit: cover; object-position: top; } .gahave em { position: absolute; right: 0; bottom: 0; padding: 0 3px; font: 11px Consolas, monospace; font-style: normal; background: rgba(20,17,19,.9); color: var(--gold); }
@@ -1104,3 +1089,54 @@ a.gmdot:hover::after { background: var(--gold); } .gmdot.done::after { backgroun
 .gmach b { display: block; padding-right: 38px; font: 15px/1.1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; color: #fff; }
 .gmach small { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; line-height: 1.3; }
 .gmach i { position: absolute; top: 7px; right: 9px; font: 12px Consolas, monospace; font-style: normal; color: var(--gold); } .gmach span.done i { color: var(--add); }
+/* Games: a duel's marks (games.js GM_SWORDS) */
+.gmswords { width: 15px; height: 15px; margin-right: 6px; vertical-align: -2px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.gmscore .gmswords { color: var(--gold); margin-right: 2px; }
+button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); border-color: var(--gold); color: #111; font-weight: 600; border-radius: 0; animation: gmDuelCall 1.6s ease-in-out 3; }
+@keyframes gmDuelCall { 50% { box-shadow: 0 0 0 5px rgba(201,162,39,.35); } }
+/* Games: Extraction — the game's screens on a 1280 x 720 stage scaled to the page (games5.js) */
+#gebox { position: relative; max-width: 1280px; overflow: hidden; background: #000; border: 1px solid var(--line); }
+#gestage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; user-select: none; }
+.gescr { position: absolute; inset: 0; display: none; } .gescr.on { display: block; } .gescr canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#geskip { position: absolute; top: 16px; right: 20px; z-index: 5; width: 112px; cursor: pointer; opacity: .85; } #geskip:hover { opacity: 1; } #geskip[hidden] { display: none; }
+#gehome { background: #120a09 url(/api/gacha_ui?n=MainUI_Gacha_5) center / cover; } #gehome::before { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 60% 45%, rgba(70,22,16,.55) 0, rgba(10,6,6,.86) 75%); }
+.gewallet { position: absolute; top: 22px; right: 40px; font: 14px Consolas, monospace; letter-spacing: 2px; color: #cdbfae; } .gewallet b { margin-left: 6px; font: 26px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2px; color: #ff6b6b; }
+.getiles { position: absolute; left: 34px; top: 66px; bottom: 30px; width: 292px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.getiles img { width: 100%; display: block; cursor: pointer; opacity: .5; border: 2px solid transparent; } .getiles img:hover { opacity: .8; } .getiles img.on { opacity: 1; border-color: #f4c430; }
+.geshow { position: absolute; left: 348px; right: 34px; top: 66px; bottom: 30px; overflow: hidden; background: #0d0808; border: 2px solid #6b5631; box-shadow: 0 0 0 4px #17110d, 0 0 0 5px #3c2f1c; }
+.geart { position: absolute; inset: 0; background: center 22% / cover; } .geart::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(10,6,6,.93) 0, rgba(10,6,6,.4) 42%, transparent 68%), linear-gradient(0deg, rgba(10,6,6,.92) 0, transparent 34%); }
+.getypo { position: absolute; left: 22px; top: 18px; width: 370px; }
+.geinfo { position: absolute; left: 34px; top: 236px; color: #b7aa9c; font-size: 13.5px; line-height: 1.8; } .geinfo b { color: #fff; font-weight: normal; } .geend { font: 13px Consolas, monospace; color: #e7dcc6; }
+.geup { display: flex; gap: 5px; margin-top: 8px; } .geup img { width: 48px; height: 48px; object-fit: cover; object-position: top; border: 1px solid #f4c430; } .geup img.ego { border-color: #4f8dff; border-radius: 50%; }
+.geall { position: absolute; left: 34px; bottom: 88px; color: #b7aa9c; font-size: 13px; cursor: pointer; } .geall input { vertical-align: -2px; margin-right: 6px; }
+.gepity { position: absolute; left: 34px; bottom: 56px; font: 13px Consolas, monospace; letter-spacing: 1px; color: #9d9189; } .gepity b { color: #f4c430; font-weight: normal; }
+.gepity button, .gepull button, .gebtns button { background: url(/api/gacha_ui?n=MainUI_Gacha_3_4) center / 100% 100%; border: 0; color: #fff3d6; cursor: pointer; font: 22px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2px; text-shadow: 0 2px 3px #000; }
+.gepity button { margin-left: 12px; padding: 7px 18px; font-size: 16px; }
+.gepull { position: absolute; right: 24px; bottom: 20px; display: flex; gap: 12px; } .gepull button { width: 210px; height: 78px; } .gepull button:hover, .gebtns button:hover { filter: brightness(1.25); }
+.gepull button:disabled, .gebtns button:disabled { filter: grayscale(1) brightness(.6); cursor: default; } .gepull small, .gebtns small { display: block; font: 12px Consolas, monospace; letter-spacing: 1px; color: #ffb0b0; text-shadow: none; }
+.gebroke { position: absolute; left: 34px; bottom: 22px; color: #ff8a8a; font-size: 13px; }
+#gerev { background: #000; cursor: pointer; }
+.gelogo { position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px; object-fit: contain; opacity: 0; transform: scale(.8); transition: opacity .45s, transform 1.4s ease-out; filter: drop-shadow(0 0 18px rgba(255,255,255,.25)); } .gelogo.on { opacity: 1; transform: none; }
+.gequote { position: absolute; left: 22%; right: 22%; top: 58%; text-align: center; font-size: 16px; line-height: 1.6; white-space: pre-line; opacity: 0; transition: opacity .5s; } .gequote.on { opacity: 1; }
+.gepic { position: absolute; inset: 0; background: center / cover; opacity: 0; } .gepic.on { opacity: 1; }
+.gevig { position: absolute; inset: 0; box-shadow: inset 0 0 90px 46px #000; border-radius: 38px; opacity: 0; transition: opacity 1s; pointer-events: none; } .gevig.on { opacity: 1; }
+.gering { position: absolute; left: 50%; top: 45%; width: 440px; height: 440px; margin: -220px 0 0 -220px; border-radius: 50%; background: center / cover; box-shadow: 0 0 0 10px #1d49b8, 0 0 0 14px #0b1c4d, 0 0 60px 8px #2a55c8; opacity: 0; transition: opacity .5s; } .gering.on { opacity: 1; }
+.gering i { position: absolute; inset: -14px; background: url(/api/gacha_ui?n=MainUI_Gacha_4_Card_EgoRing) center / 100% 100%; mix-blend-mode: screen; }
+.geflash { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+.geplate { position: absolute; right: 8%; bottom: 20%; text-align: right; opacity: 0; transform: translateX(46px); transition: all .35s; } .geplate.on { opacity: 1; transform: none; } .geplate.ego { right: 20%; bottom: 14%; }
+.gese { display: inline-block; padding: 1px 12px; font: 15px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #111; transform: skewX(-12deg) rotate(-4deg); }
+.geti { max-width: 520px; margin: 4px 0 2px auto; font: 23px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; text-shadow: 0 2px 6px #000, 0 0 2px #000; transform: rotate(-4deg); }
+.gewho { display: inline-block; padding: 2px 30px; font: 42px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2px; text-transform: uppercase; transform: skewX(-12deg) rotate(-4deg); box-shadow: 5px 5px 0 rgba(0,0,0,.55); }
+.gerk { height: 62px; margin-left: 4px; vertical-align: -14px; transform: rotate(-4deg); } .gerk.ego { height: 40px; vertical-align: -30px; }
+.gesmall { position: absolute; left: 22%; right: 22%; bottom: 5%; text-align: center; font-size: 13.5px; line-height: 1.5; white-space: pre-line; opacity: 0; transition: opacity .5s; text-shadow: 0 1px 4px #000, 0 0 2px #000; } .gesmall.on { opacity: 1; }
+.gegrid { position: absolute; left: 50%; top: 112px; transform: translateX(-50%); display: grid; grid-template-columns: repeat(5, 204px); gap: 34px 18px; } .gegrid.one { grid-template-columns: 204px; top: 250px; }
+@keyframes gePop { from { opacity: 0; transform: scale(.55) rotate(-5deg); } }
+.gecard { position: relative; height: 142px; animation: gePop .3s both; }
+.gecard i { position: absolute; inset: 9px 12px; background: #111 center 18% / cover; } .gecard .gefr { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.gecard .gern { position: absolute; left: 2px; bottom: -8px; height: 44px; filter: drop-shadow(0 2px 3px #000); }
+.gecard.r3 { filter: drop-shadow(0 0 14px rgba(244,196,48,.75)); cursor: pointer; } .gecard.r2 { filter: drop-shadow(0 0 8px rgba(210,69,47,.5)); }
+.gecard.ego { width: 142px; margin: 0 auto; filter: drop-shadow(0 0 14px rgba(79,141,255,.85)); cursor: pointer; } .gecard.ego i { inset: 8px; border-radius: 50%; } .gecard.ego .gefr { filter: hue-rotate(190deg) saturate(3) brightness(1.2); }
+.gecard em { position: absolute; right: -22px; bottom: -6px; padding: 0 8px; background: #d9661e; color: #fff; font: 15px "LC Bebas", "Segoe UI", sans-serif; font-style: normal; letter-spacing: 2px; transform: rotate(-4deg); }
+.gecard u { position: absolute; right: -6px; top: -12px; padding: 1px 8px; background: #d21f1f; color: #fff; font: 14px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-decoration: none; transform: rotate(7deg); z-index: 2; }
+.gecard span { position: absolute; left: -8px; right: -8px; top: 100%; margin-top: 9px; text-align: center; font: 13.5px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; color: #efe6d6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 3px #000; }
+.gebtns { position: absolute; left: 0; right: 0; bottom: 34px; display: flex; justify-content: center; gap: 28px; } .gebtns button { width: 230px; height: 70px; font-size: 20px; }
