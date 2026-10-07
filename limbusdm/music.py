@@ -14,7 +14,7 @@ import re
 
 from . import content, units
 
-VERSION = 2
+VERSION = 3
 NEAR = 60  # ms an event's length may differ from its sample's
 BOSS_FIGHTS = 3  # a theme heard in so few story fights is somebody's own: named after who is fought there
 STORY_TABLES = ("battle-story", "battle-ab", "battle-dungeon")
@@ -128,7 +128,7 @@ def build(tables: dict, loc_dir: str, samples: list[tuple]) -> dict:
     for ev in where:
         events.setdefault(ev, None)
     found = _resolve(events, samples)
-    tracks, by_sample = [], {}
+    tracks, by_sample, events_of = [], {}, {}  # events_of: {event: its track's number} (stages name events)
 
     def add(ev, name, by, battle):
         s, w = found.get(ev), where.get(ev) or {}
@@ -136,12 +136,14 @@ def build(tables: dict, loc_dir: str, samples: list[tuple]) -> dict:
             return False
         t = by_sample.get(_norm(s[0]))
         if t:  # the same recording under another event: one track, which keeps the fights of both
+            events_of[ev] = tracks.index(t)
             if w.get("waves") and not t["fights"]:
                 t.update(where=w["label"], who=w["who"], fights=w["waves"], battle=True)
             return True
         t = by_sample[_norm(s[0])] = {"event": ev, "name": name, "by": by, "battle": battle, "bank": s[2], "i": s[3], "ms": s[1],
                                       "where": w.get("label") or "", "who": w.get("who") or [], "fights": w.get("waves") or 0}
         tracks.append(t)
+        events_of[ev] = len(tracks) - 1
         return True
 
     missing = []
@@ -165,7 +167,7 @@ def build(tables: dict, loc_dir: str, samples: list[tuple]) -> dict:
         used[name] += 1
         if not add(ev, name + (f" {used[name]}" if used[name] > 1 else ""), "", True):
             missing.append(ev)
-    return {"tracks": tracks, "missing": missing}
+    return {"tracks": tracks, "missing": missing, "events": events_of}
 
 
 KEEP = 40  # tracks kept converted in data/music_cache (about 4 MB each)
