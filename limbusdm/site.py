@@ -39,7 +39,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
             "project": "", "url": ""}
 # the pages the site is written for (each has its part in Exporter); any other page of the UI is opened on the site
 # only when the check finds it asking for nothing the site lacks (verify)
-BASE_OPEN = ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "community", "support", "buffs"]
+BASE_OPEN = ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "community", "support", "buffs"]
 # requests the check never fetches by itself: the app's own state and controls, renders, the game's raw files, and the
 # ones a part of Exporter makes its own way
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"

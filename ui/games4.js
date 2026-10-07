@@ -1,5 +1,6 @@
 // Games → Limbus Grid: a 3 × 3 grid, a condition on every row and column — name an Identity for each cell that meets
 // both. Nine tries; the fewer Identities fit a cell, the more it is worth.
+// Games → Odd one out: four Identities, three with something in common — find the fourth.
 // Shares the styles, the Identities' list (gxIds) and the Daily challenge / duels of games.js / games3.js.
 "use strict";
 
@@ -122,4 +123,132 @@ function ggEnd() {
   gxKeep();
   if (g.daily) gmDailyOver("grid", g, g.score);
   ggDraw();
+}
+
+// ------------------------------------------------------------------ Odd one out
+// Four Identities: three have something in common (Sinner, archetype, season, faction or rarity), one doesn't.
+// Find the odd one (600), then say what the other three share (400 more).
+const GO_ROUNDS = 10, GO_KINDS = { sinner: "SINNER", kw: "ARCHETYPE", season: "SEASON", assoc: "FACTION", rank: "RARITY" };
+const go = { game: null, ids: [], cats: [] };
+window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/gameodd")) go.game = null; });
+
+routes.gameodd = async (args = []) => {
+  go.game = null;
+  const auto = gmAuto("odd", args);
+  gmCrumb("odd");
+  $("#main").innerHTML = `<h1>Odd one out</h1><div class="sub">Reading the game's files…</div>`;
+  go.ids = await gxIds();
+  if (!location.hash.startsWith("#/gameodd")) return;
+  const by = {}, put = (kind, name, x) => { if (name && name !== "—") (by[kind + "|" + name] = by[kind + "|" + name] || { kind, name, has: new Set() }).has.add(x.key); };
+  for (const x of go.ids) {
+    put("sinner", x.sub, x);
+    put("season", x.season, x);
+    put("rank", "0".repeat(x.rank), x);
+    x.kw.forEach((k) => put("kw", k, x));
+    x.assoc.forEach((k) => put("assoc", k, x));
+  }
+  go.cats = Object.values(by);
+  goDrawStart();
+  if (auto && go.ids.length >= 8) goNew(true);
+};
+
+function goDrawStart() {
+  const s = gx.odd || {};
+  $("#main").innerHTML = `<h1>Odd one out</h1>
+    <div class="sub">Four Identities. Three have something in common — the Sinner, an archetype, the season, a faction or the rarity — and one doesn't. Find the odd one, then say what the other three share.</div>
+    ${go.ids.length < 8 ? `<p class="muted">Nothing to ask yet: the game's files or a snapshot are missing.</p>` : `
+    <div class="dbrow"><button class="toggle ${s.names ? "" : "on"}" data-names="">Pictures only</button><button class="toggle ${s.names ? "on" : ""}" data-names="1">With names · easier</button></div>
+    <div class="gmstart"><span class="gmscore">${go.ids.length} IDENTITIES · BEST <i>${s.best || 0}</i></span>
+      ${gmDailyBtn("odd")}<button class="gmbtn" id="gogo">Start · ${GO_ROUNDS} rounds</button></div>
+    <div class="muted small">The odd one is worth 600, what the three share 400 more. Only one answer fits: no other three of the four have anything of that sort in common.</div>`}`;
+  document.querySelectorAll("[data-names]").forEach((b) => b.onclick = () => { (gx.odd = gx.odd || {}).names = !!b.dataset.names; gxKeep(); goDrawStart(); });
+  if ($("#gogo")) $("#gogo").onclick = () => goNew();
+  if ($("#gmdaily")) $("#gmdaily").onclick = () => gmDailyDone("odd") == null ? goNew(true) : toast("Today's Daily is done — a new one comes with the daily reset.");
+}
+
+// a round: three of one group and one from outside it, such that no other three of the four share a group;
+// with three more groups to offer as what the three have in common (ones some of the three belong to, if there are)
+function goMake(rnd) {
+  const pick = (a) => a[Math.floor(rnd() * a.length)], mix = (a) => a.map((x) => [rnd(), x]).sort((p, q) => p[0] - q[0]).map((p) => p[1]);
+  const big = go.cats.filter((c) => c.has.size >= 3);
+  for (let n = 0; n < 500; n++) {
+    const cat = pick(big), three = mix([...cat.has]).slice(0, 3), odd = pick(go.ids).key;
+    if (cat.has.has(odd) || (cat.kind === "sinner" && rnd() < 0.7)) continue;  // (three faces of one Sinner are the easy round: fewer of those)
+    const four = [...three, odd];
+    if (go.cats.some((c) => c !== cat && four.filter((k) => c.has.has(k)).length === 3)) continue;
+    const near = mix(go.cats.filter((c) => c !== cat && three.some((k) => c.has.has(k)) && !three.every((k) => c.has.has(k))));
+    const far = mix(go.cats.filter((c) => c !== cat && !near.includes(c) && !four.every((k) => c.has.has(k))));
+    return { cat, odd, tiles: mix(four).map((k) => go.ids.find((x) => x.key === k)), opts: mix([cat, ...near.concat(far).slice(0, 3)]) };
+  }
+  return null;
+}
+
+function goNew(daily) {
+  const duel = daily === true ? gmDuelTake("odd") : null;
+  go.game = { daily: daily === true, duel, rnd: daily === true ? gmDaySeed("odd", duel) : Math.random, names: daily === true ? false : !!(gx.odd || {}).names,
+    round: -1, score: 0, streak: 0, top: 0, log: [] };
+  goRound();
+}
+
+function goRound() {
+  const g = go.game, made = ++g.round < GO_ROUNDS && goMake(g.rnd);
+  if (!made) return goResult();
+  Object.assign(g, made, { pick: null, said: null });
+  goDraw();
+}
+
+function goDraw() {
+  const g = go.game, picked = g.pick != null, right = g.pick === g.odd, over = picked && (!right || g.said != null);
+  const tile = (x) => `<button class="gctile ${g.names ? "" : "plain"} ${!picked ? "" : x.key === g.odd ? "ok" : x.key === g.pick ? "bad" : "dim"}" data-k="${x.key}" ${picked ? "disabled" : ""}>
+    <img src="${x.pic}" onerror="this.remove()">${g.names || over ? `<b>${esc(x.title)}</b><i>${esc(x.sub)}</i>` : ""}</button>`;
+  const opt = (c, i) => `<button class="gmopt ${over ? (c === g.cat ? "ok" : i === g.said ? "bad" : "dim") : ""}" data-c="${i}" ${over ? "disabled" : ""}><b>${esc(c.name)}</b><i>${GO_KINDS[c.kind]}</i></button>`;
+  $("#main").innerHTML = `<h1>Odd one out</h1>
+    <div class="gmtop"><span class="gmscore">ROUND <b>${g.round + 1} / ${GO_ROUNDS}</b></span><span class="grow"></span>
+      <span class="gmscore">SCORE <b>${g.score}</b> &nbsp; STREAK <i>×${g.streak}</i></span><button class="toggle" id="goquit">Quit</button></div>
+    <div class="gobox"><div class="gmkick">${!picked ? "WORTH 600 + 400" : over ? (right ? `+${600 + (g.opts[g.said] === g.cat ? 400 : 0)}` : "MISSED") : "+600 · 400 MORE FOR WHAT THEY SHARE"}</div>
+      <div class="gmq">${!picked ? "Which one doesn't belong?" : over ? `The other three: ${esc(g.cat.name)}` : "What do the other three have in common?"}</div>
+      <div class="gcgrid">${g.tiles.map(tile).join("")}</div>
+      ${picked && right ? `<div class="gmopts goopts">${g.opts.map(opt).join("")}</div>` : ""}
+      ${over ? `<div class="gmafter"><span>${GO_KINDS[g.cat.kind]} · ${esc(g.cat.name)}</span><button class="gmbtn" id="gonext">${g.round + 1 < GO_ROUNDS ? "Next" : "Result"}</button></div>` : ""}</div>`;
+  $("#goquit").onclick = () => { go.game = null; goDrawStart(); };
+  document.querySelectorAll(".gctile").forEach((b) => b.onclick = () => goPick(b.dataset.k));
+  document.querySelectorAll(".goopts button").forEach((b) => b.onclick = () => goSay(+b.dataset.c));
+  if ($("#gonext")) { $("#gonext").onclick = goRound; $("#gonext").focus(); }
+}
+
+function goPick(key) {
+  const g = go.game;
+  g.pick = key;
+  if (key !== g.odd) goScore(false, false);
+  goDraw();
+}
+function goSay(i) {
+  const g = go.game;
+  g.said = i;
+  goScore(true, g.opts[i] === g.cat);
+  goDraw();
+}
+function goScore(odd, share) {
+  const g = go.game, points = odd ? 600 + (share ? 400 : 0) : 0;
+  g.streak = odd ? g.streak + 1 : 0;
+  g.top = Math.max(g.top, g.streak);
+  g.score += points;
+  g.log.push({ tiles: g.tiles, odd: g.odd, cat: g.cat, ok: odd, clean: share, points });
+}
+
+function goResult() {
+  const g = go.game, s = gx.odd = gx.odd || {};
+  if (g.daily) gmDailyOver("odd", g, g.score);
+  const record = !g.daily && g.score > (s.best || 0);
+  if (!g.daily) s.best = Math.max(s.best || 0, g.score);
+  gxKeep();
+  $("#main").innerHTML = `<h1>Odd one out</h1>
+    <div class="gmtop"><span class="gmbig">${g.score}</span><span class="gmscore">${g.log.filter((r) => r.ok).length} OF ${g.log.length} · BEST STREAK ×${g.top} · BEST <i>${s.best || 0}</i>${record ? " · NEW RECORD" : ""}</span>
+      <span class="grow"></span>${g.daily ? `<span class="gmscore">${gmDayTag(g)}</span><button class="toggle" id="gocopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="goback">Settings</button><button class="gmbtn" id="goagain">Play again</button></div>
+    <table class="gmlog"><tr><th>#</th><th>THE FOUR</th><th>THE THREE SHARE</th><th>POINTS</th></tr>
+    ${g.log.map((r, i) => `<tr><td>${i + 1}</td><td>${r.tiles.map((x) => `<img class="gologpic ${x.key === r.odd ? "odd" : ""}" src="${x.pic}" title="${esc(x.name)}">`).join("")}</td>
+      <td class="${r.ok ? (r.clean ? "ok" : "") : "bad"}">${esc(r.cat.name)}<i>${GO_KINDS[r.cat.kind]}</i></td><td>${r.points}</td></tr>`).join("")}</table>`;
+  $("#goagain").onclick = () => goNew();
+  $("#goback").onclick = () => { go.game = null; goDrawStart(); };
+  if ($("#gocopy")) $("#gocopy").onclick = () => gmCopyResult("odd", g, () => gmShare("Odd one out", g.score, g.log));
 }

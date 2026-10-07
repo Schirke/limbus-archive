@@ -909,6 +909,12 @@ CARD_PRESET = {
                "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11110_normal.png"],
     "conn": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10109_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10412_normal.png",
              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10302_normal.png"],
+    "splash": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10411_normal.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20205_awaken_profile.png",
+               "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10908_normal.png"],
+    "atlas": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10105_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10612_normal.png",
+              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10212_normal.png"],
+    "odd": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10106_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10306_normal.png",
+            "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10713_normal.png"],
     "grid": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10211_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10810_normal.png",
              "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10605_normal.png"],
 }

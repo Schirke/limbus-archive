@@ -152,6 +152,12 @@ const GM_GAMES = [
     gmIcon('<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 17.5l2.5 2.5 4.5-5"/>')],
   ["conn", "#/gameconn", "Connections", "Sixteen Identities, four groups of four with something in common. Four mistakes allowed.",
     gmIcon('<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.5 6h7M6 8.5v7M18 8.5v7M8.5 18h7"/>')],
+  ["splash", "#/gamesplash", "Guess the art", "A small piece of an Identity's or an E.G.O's art that zooms out — whose art is it?",
+    gmIcon('<rect x="3" y="3" width="18" height="18"/><rect x="11" y="6" width="7" height="7"/><path d="M11 13l-5 5M6 14.5V18h3.5"/>')],
+  ["atlas", "#/gameatlas", "In pieces", "An Identity's moving art as the game keeps it — cut into parts on a sheet. The parts come in steps: who is it?",
+    gmIcon('<circle cx="7" cy="7" r="3.2"/><rect x="13" y="4" width="7" height="5"/><path d="M4 14h6l-1 6H5z"/><path d="M14 13l6 2-3 5-4-2z"/>')],
+  ["odd", "#/gameodd", "Odd one out", "Four Identities, three with something in common. Find the one that doesn't belong — and say what the others share.",
+    gmIcon('<circle cx="6" cy="7" r="2.6"/><circle cx="12" cy="7" r="2.6"/><circle cx="18" cy="7" r="2.6"/><rect x="9.4" y="14.4" width="5.2" height="5.2"/>')],
   ["grid", "#/gamegrid", "Limbus Grid", "A 3 × 3 grid with a condition on every row and column — name an Identity for each cell. Nine tries.",
     gmIcon('<rect x="3" y="3" width="18" height="18"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M10.6 12l1.1 1.1 1.9-2.2"/>')]];
 document.querySelectorAll("#subnav [data-game]").forEach((a) => { a.innerHTML = GM_GAMES.find(([k]) => k === a.dataset.game)[4]; });

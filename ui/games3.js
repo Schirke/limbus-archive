@@ -1,5 +1,6 @@
 // Games → Guess the enemy (a silhouette or a picture in big pixels that opens in steps; "Pixel art" = the same over
-// Identities), Guess the Canto (a piece of a story background that zooms out), Limbus Wordle (name the Identity by
+// Identities), Guess the Canto (a piece of a story background that zooms out), Guess the art (the same over the
+// Identities' and E.G.O's art), In pieces (an Identity's animated art as the game keeps it: cut into parts), Limbus Wordle (name the Identity by
 // what each try has in common with it) and Connections (16 Identities, four groups of four).
 // Shares the styles and the Daily challenge of games.js / games2.js.
 "use strict";
@@ -7,7 +8,7 @@
 // ------------------------------------------------------------------ shared
 const GX_KEEP = "games_more";
 const gx = { wordle: {}, conn: {}, plain: false, ...(() => { try { return JSON.parse(localStorage.getItem(GX_KEEP) || "{}"); } catch { return {}; } })() };
-const gxKeep = () => { try { localStorage.setItem(GX_KEEP, JSON.stringify({ wordle: gx.wordle, conn: gx.conn, plain: gx.plain, grid: gx.grid })); } catch {} };
+const gxKeep = () => { try { localStorage.setItem(GX_KEEP, JSON.stringify({ wordle: gx.wordle, conn: gx.conn, plain: gx.plain, grid: gx.grid, odd: gx.odd })); } catch {} };
 function gxCopy(text) {
   const done = () => toast("Copied — paste it anywhere.");
   const old = () => { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); done(); };
@@ -42,26 +43,51 @@ const gxIds = () => gxIdsP || (gxIdsP = api("/api/units").then((u) => ((u || {})
     sins: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).sin).filter(Boolean))], resist: x.resist || {}, pic: giThumb(x.img.thumb) }; })).catch(() => []));
 // what the games' page shows as a game's best (games.js gmBest)
 function gxBest(game) {
-  if (game === "enemy") return Math.max(0, ...Object.entries(gp.best).filter(([k]) => k !== "canto").map(([, v]) => v));
+  if (game === "enemy") return Math.max(0, ...Object.entries(gp.best).filter(([k]) => /^(enemy|id)/.test(k)).map(([, v]) => v));
   if (game === "canto") return gp.best.canto || 0;
+  if (game === "splash" || game === "atlas") return Math.max(0, ...Object.entries(gp.best).filter(([k]) => k.startsWith(game)).map(([, v]) => v));
   if (game === "wordle") return gx.wordle.best ? `${gx.wordle.best} / ${GW_TRIES}` : 0;
   if (game === "conn") return gx.conn.best == null ? 0 : gx.conn.best ? `${gx.conn.best} MISS` : "PERFECT";
   if (game === "grid") return (gx.grid || {}).best || 0;
+  if (game === "odd") return (gx.odd || {}).best || 0;
 }
 
-// ------------------------------------------------------------------ a picture that opens in steps: enemy, pixel art, Canto
+// ------------------------------------------------------------------ a picture that opens in steps: enemy, pixel art, Canto, art, pieces
 const GP_KEEP = "games_pic", GP_ROUNDS = 10, GP_WORTH = [1000, 750, 500, 250], GP_HINT = 250;
-const gp = { page: "enemy", who: "enemy", look: "sil", hard: false, best: {},
+const gp = { page: "enemy", who: "enemy", look: "sil", what: "id", hard: false, best: {},
   ...(() => { try { return JSON.parse(localStorage.getItem(GP_KEEP) || "{}"); } catch { return {}; } })(), game: null, data: null };
-const gpKeep = () => { try { localStorage.setItem(GP_KEEP, JSON.stringify({ who: gp.who, look: gp.look, hard: gp.hard, best: gp.best })); } catch {} };
+const gpKeep = () => { try { localStorage.setItem(GP_KEEP, JSON.stringify({ who: gp.who, look: gp.look, what: gp.what, hard: gp.hard, best: gp.best })); } catch {} };
 const gpCanto = () => gp.page === "canto";
-const gpTitle = () => gpCanto() ? "Guess the Canto" : "Guess the enemy";
-const gpPix = () => !gpCanto() && (gp.who === "id" || gp.look === "pix");
-const gpMode = () => gpCanto() ? "canto" : gp.who + (gp.who === "id" ? "" : gp.look) + (gp.hard ? "h" : "e");
-const gpPool = () => gpCanto() ? gp.data.scenes : gp.who === "id" ? gp.data.ids : gp.data.enemies;
+const gpSplash = () => gp.page === "splash", gpAtlas = () => gp.page === "atlas";
+// the answer is an Identity (or an E.G.O): the wrong ones are the same Sinner's, the hint is the season
+const gpOfId = () => gpSplash() || gpAtlas() || (gp.page === "enemy" && gp.who === "id");
+const gpTitle = () => ({ canto: "Guess the Canto", splash: "Guess the art", atlas: "In pieces" })[gp.page] || "Guess the enemy";
+const gpPix = () => gp.page === "enemy" && (gp.who === "id" || gp.look === "pix");
+const gpMode = () => gpCanto() ? "canto" : gpSplash() ? "splash" + gp.what + (gp.hard ? "h" : "e") : gpAtlas() ? "atlas" + (gp.hard ? "h" : "e")
+  : gp.who + (gp.who === "id" ? "" : gp.look) + (gp.hard ? "h" : "e");
+const gpPool = () => gpCanto() ? gp.data.scenes : gpSplash() ? (gp.what === "ego" ? gp.data.egos : gp.data.arts) : gpAtlas() ? gp.data.atlas
+  : gp.who === "id" ? gp.data.ids : gp.data.enemies;
+// the parts an atlas page is cut into ("name" lines, each followed by "bounds: x, y, w, h"; a turned part lies on its side)
+function gpParts(text) {
+  const lines = text.split(/\r?\n/), parts = [];
+  let i = lines.findIndex((l) => /\.png$/i.test(l.trim())), cur = null;
+  const page = i < 0 ? "" : lines[i].trim();
+  for (i++; i < lines.length && lines[i].trim() && !/\.png$/i.test(lines[i].trim()); i++) {
+    const m = /^\s*(\w+)\s*:\s*(.*)$/.exec(lines[i]), n = m ? m[2].split(",").map(Number) : [];
+    if (!m) parts.push(cur = {});
+    else if (!cur) continue;
+    else if (m[1] === "bounds") [cur.x, cur.y, cur.w, cur.h] = n;
+    else if (m[1] === "xy") [cur.x, cur.y] = n;
+    else if (m[1] === "size") [cur.w, cur.h] = n;
+    else if (m[1] === "rotate") cur.turned = !/^(false|0)$/.test(m[2].trim());
+  }
+  return { page, parts: parts.filter((p) => p.w > 0 && p.h > 0).map((p) => p.turned ? { x: p.x, y: p.y, w: p.h, h: p.w } : p) };
+}
 const gpWorth = () => Math.max(100, GP_WORTH[gp.game.step] - GP_HINT * Object.keys(gp.game.hints).length) * (gp.hard && !gpCanto() ? 2 : 1);
 
-window.addEventListener("hashchange", () => { if (!/^#\/game(enemy|canto)/.test(location.hash)) { gp.game = null; gpDailyEnd(); } });
+window.addEventListener("hashchange", () => { if (!/^#\/game(enemy|canto|splash|atlas)/.test(location.hash)) { gp.game = null; gpDailyEnd(); } });
+routes.gamesplash = (args = []) => gpOpen("splash", gmAuto("splash", args));
+routes.gameatlas = (args = []) => gpOpen("atlas", gmAuto("atlas", args));
 routes.gameenemy = (args = []) => gpOpen("enemy", gmAuto("enemy", args));
 routes.gamecanto = (args = []) => gpOpen("canto", gmAuto("canto", args));
 
@@ -77,10 +103,19 @@ async function gpOpen(page, daily) {
     const enemies = ((en || {}).list || []).filter((e) => thumbs.has(e.app) && !/^\?+$/.test(e.name) && !seen.has(e.name) && seen.add(e.name))
       .map((e) => ({ key: "e" + e.id, id: e.id, name: e.name, title: e.name, sub: e.group, pic: `/api/enemy_thumb?app=${encodeURIComponent(e.app)}` }));
     const ids = ((units || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title,
-      sub: x.sinnerName, sinner: x.sinner, season: giSeason(units, x.season), pic: giThumb(x.img.thumb) }));
+      sub: x.sinnerName, sinner: x.sinner, season: giSeason(units, x.season), pic: giThumb(x.img.thumb), art: x.img.art }));
+    const full = (p) => `/api/asset_img?path=${encodeURIComponent(p)}`;
+    const arts = ids.filter((x) => x.art).map((x) => ({ ...x, thumb: x.pic, pic: full(x.art) }));
+    const egos = ((units || {}).egos || []).filter((e) => e.img && e.img.art).map((e) => ({ key: "g" + e.id, id: e.id, name: e.name + " " + e.sinnerName, title: e.name,
+      sub: e.sinnerName, sinner: e.sinner, season: giSeason(units, e.season), thumb: e.img.thumb ? giThumb(e.img.thumb) : "", pic: full(e.img.art) }));
     const scenes = Object.entries((pics || {}).story || {}).flatMap(([n, list]) => list.map((p) => ({ key: p, canto: +n, name: "Canto " + n, title: "Canto " + n, sub: "",
       pic: `/api/asset_img?path=${encodeURIComponent("Assets/Resources_moved/Story/Backgrounds/" + p)}`, thumb: giThumb("Assets/Resources_moved/Story/Backgrounds/" + p) })));
-    gp.data = { enemies, ids, scenes, cantos: [...new Set(scenes.map((s) => s.canto))].sort((a, b) => a - b) };
+    gp.data = { enemies, ids, arts, egos, scenes, atlas: [], cantos: [...new Set(scenes.map((s) => s.canto))].sort((a, b) => a - b) };
+  }
+  if (page === "atlas" && !gp.data.atlas.length) {  // the Identities whose art moves: the first skeleton of each is the art itself
+    const chars = await api("/api/characters").catch(() => null), sk = new Map();
+    for (const s of (chars || {}).sinners || []) for (const x of s.ids) if (x.spine && x.spine[0]) sk.set(x.id, x.spine[0]);
+    gp.data.atlas = gp.data.ids.filter((x) => sk.has(x.id)).map((x) => ({ ...x, thumb: x.pic, pic: "", base: `/spine/${encodeURIComponent(sk.get(x.id).bundle)}/${sk.get(x.id).atlas}.2/` }));
   }
   if (gp.page !== page) return;
   gpDrawStart();
@@ -91,24 +126,29 @@ function gpDrawStart() {
   const pool = gpPool(), chip = (on, attr, text) => `<button class="toggle ${on ? "on" : ""}" ${attr}>${text}</button>`;
   $("#main").innerHTML = `<h1>${gpTitle()}</h1>
     <div class="sub">${gpCanto() ? "A small piece of a background from the story — it zooms out in steps. Name the Canto it is from; the sooner, the more points."
+      : gpSplash() ? "A small piece of an Identity's or an E.G.O's art — it zooms out in steps. Name whose art it is; the sooner, the more points."
+      : gpAtlas() ? "An Identity's moving art the way the game keeps it: cut into parts, laid out on a sheet. The parts come in steps. Name the Identity; the sooner, the more points."
       : "A picture that opens in steps: a black silhouette or big pixels first. Name who it is; the sooner, the more points."}</div>
-    ${pool.length < 8 ? `<p class="muted">Nothing to ask yet: the game's files or a snapshot are missing${gpCanto() || gp.who === "id" ? "" : ", or the handbook hasn't made the enemies' pictures yet (open Database → Enemies once)"}.</p>` : `
-    ${gpCanto() ? "" : `<div class="dbrow">${chip(gp.who === "enemy", 'data-w="enemy"', "Enemies")}${chip(gp.who === "id", 'data-w="id"', "Identities · pixel art")}<span class="gap"></span>
+    ${pool.length < 8 && !(gpSplash() && gp.data.arts.length >= 8) ? `<p class="muted">Nothing to ask yet: the game's files or a snapshot are missing${gp.page !== "enemy" || gp.who === "id" ? "" : ", or the handbook hasn't made the enemies' pictures yet (open Database → Enemies once)"}.</p>` : `
+    ${gpSplash() || gpAtlas() ? `<div class="dbrow">${gpSplash() ? `${chip(gp.what !== "ego", 'data-a="id"', "Identities")}${chip(gp.what === "ego", 'data-a="ego"', "E.G.O")}<span class="gap"></span>` : ""}
+      ${chip(!gp.hard, 'data-h=""', "Easy · 4 answers")}${chip(gp.hard, 'data-h="1"', "Hard · type the name")}</div>` : gpCanto() ? "" : `<div class="dbrow">${chip(gp.who === "enemy", 'data-w="enemy"', "Enemies")}${chip(gp.who === "id", 'data-w="id"', "Identities · pixel art")}<span class="gap"></span>
       ${gp.who === "enemy" ? `${chip(gp.look === "sil", 'data-l="sil"', "Silhouette")}${chip(gp.look === "pix", 'data-l="pix"', "Pixels")}<span class="gap"></span>` : ""}
       ${chip(!gp.hard, 'data-h=""', "Easy · 4 answers")}${chip(gp.hard, 'data-h="1"', "Hard · type the name")}</div>`}
-    <div class="gmstart"><span class="gmscore">${pool.length} ${gpCanto() ? "PICTURES" : gp.who === "id" ? "IDENTITIES" : "ENEMIES"} · BEST <i>${gp.best[gpMode()] || 0}</i></span>
+    <div class="gmstart"><span class="gmscore">${pool.length} ${gpCanto() ? "PICTURES" : gpSplash() && gp.what === "ego" ? "E.G.O" : gpOfId() ? "IDENTITIES" : "ENEMIES"} · BEST <i>${gp.best[gpMode()] || 0}</i></span>
       ${gmDailyBtn(gp.page, pool.length < 8)}<button class="gmbtn" id="gpgo">Start · ${GP_ROUNDS} rounds</button></div>
     <div class="muted small">${gpCanto() ? "Backgrounds of the main story, Canto 2 to the latest."
+      : gpSplash() || gpAtlas() ? "Easy: four answers, all of the same Sinner. Hard: type the name, points are doubled. A hint costs points too."
       : "Easy: four answers — enemies met next to this one, or the same Sinner's other Identities. Hard: type the name, points are doubled. A hint costs points too."}</div>`}`;
   const main = $("#main"), set = (sel, key, f) => main.querySelectorAll(sel).forEach((b) => b.onclick = () => { gp[key] = f(b); gpKeep(); gpDrawStart(); });
   set("[data-w]", "who", (b) => b.dataset.w);
   set("[data-l]", "look", (b) => b.dataset.l);
+  set("[data-a]", "what", (b) => b.dataset.a);
   set("[data-h]", "hard", (b) => !!b.dataset.h);
   if ($("#gpgo")) $("#gpgo").onclick = () => gpNew();
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gpNew(true);
 }
 
-// a daily game runs on fixed settings (enemies, silhouette, Easy); the player's own come back after it
+// a daily game runs on fixed settings (enemies, silhouette / Identities' art, Easy); the player's own come back after it
 function gpDailyEnd() {
   if (gp.mine) Object.assign(gp, gp.mine);
   gp.mine = null;
@@ -119,8 +159,8 @@ function gpNew(daily) {
   const duel = daily === true ? gmDuelTake(gp.page) : null;
   gpDailyEnd();
   if (daily === true) {
-    gp.mine = { who: gp.who, look: gp.look, hard: gp.hard };
-    Object.assign(gp, { who: "enemy", look: "sil", hard: false });
+    gp.mine = { who: gp.who, look: gp.look, what: gp.what, hard: gp.hard };
+    Object.assign(gp, { who: "enemy", look: "sil", what: "id", hard: false });
     gmRnd = gmDaySeed(gp.page, duel);
   }
   gp.game = { daily: daily === true, duel, pool: gpPool().slice(), round: -1, score: 0, streak: 0, top: 0, log: [], asked: new Set() };
@@ -135,7 +175,7 @@ function gpRound() {
   g.asked.add(ans.key);
   // wrong answers: enemies next to this one in the handbook's order, the same Sinner's other Identities
   const all = gpPool(), at = all.indexOf(ans);
-  let near = gpCanto() ? [] : gp.who === "id" ? all.filter((x) => x !== ans && x.sinner === ans.sinner)
+  let near = gpCanto() ? [] : gpOfId() ? all.filter((x) => x !== ans && x.sinner === ans.sinner)
     : all.filter((x) => x !== ans).sort((a, b) => Math.abs(all.indexOf(a) - at) - Math.abs(all.indexOf(b) - at)).slice(0, 8);
   // (the spot a Canto's picture is zoomed into is drawn here, so a daily game shows the same piece to everybody)
   Object.assign(g, { ans, opts: gmShuffle([ans, ...gmShuffle(near).slice(0, 3)]), step: 0, hints: {}, done: null, img: null, fx: 0.2 + gmRnd() * 0.6, fy: 0.2 + gmRnd() * 0.6 });
@@ -159,7 +199,14 @@ function gpRound() {
     gpPaint();
   };
   im.onerror = drop;
-  im.src = ans.pic;
+  if (gpAtlas()) {  // the sheet's picture is named in the skeleton's atlas, with the parts it is cut into
+    fetch(ans.base + "skeleton.atlas").then((r) => r.ok ? r.text() : Promise.reject()).then((t) => {
+      const a = gpParts(t), rnd = gmSeed(ans.key);
+      if (!a.page || a.parts.length < 4) return drop();
+      g.parts = a.parts.map((p) => [rnd(), p]).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+      im.src = ans.base + encodeURIComponent(a.page);
+    }).catch(drop);
+  } else im.src = ans.pic;
   gpDraw();
 }
 
@@ -167,16 +214,20 @@ function gpPaint() {
   const g = gp.game, cv = $("#gpcv"), im = g && g.img;
   if (!cv || !im) return;
   const open = !!g.done, s = g.step;
-  if (gpCanto()) cv.height = Math.round(cv.width * Math.min(0.75, im.height / im.width));
+  if (gp.page !== "enemy") cv.height = Math.round(cv.width * Math.min(gpAtlas() ? 1 : 0.75, im.height / im.width));
   const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
   ctx.clearRect(0, 0, W, H);
   cv.style.filter = "";
-  if (gpCanto()) {
-    const z = open ? 1 : [4, 2.5, 1.6, 1][s], w = im.width / z, h = im.height / z;
+  if (gpCanto() || (gpSplash() && !open)) {  // a piece around the round's spot, as wide as the step says
+    const z = open ? 1 : (gpSplash() ? [9, 6, 3.5, 2] : [4, 2.5, 1.6, 1])[s], w = Math.min(im.width / z, im.height / z * W / H), h = w * H / W;
     const x = Math.min(im.width - w, Math.max(0, g.fx * im.width - w / 2)), y = Math.min(im.height - h, Math.max(0, g.fy * im.height - h / 2));
     return ctx.drawImage(im, x, y, w, h, 0, 0, W, H);
   }
   const k = Math.min(W / im.width, H / im.height), w = im.width * k, h = im.height * k, x = (W - w) / 2, y = (H - h) / 2;
+  if (gpAtlas() && !open) {  // the sheet with only some of its parts
+    for (const p of g.parts.slice(0, Math.ceil(g.parts.length * [0.15, 0.35, 0.6, 1][s]))) ctx.drawImage(im, p.x, p.y, p.w, p.h, x + p.x * k, y + p.y * k, p.w * k, p.h * k);
+    return;
+  }
   if (gpPix() && !open) {
     const n = [9, 15, 24, 40][s], sw = Math.max(1, Math.round(n * w / Math.max(w, h))), sh = Math.max(1, Math.round(n * h / Math.max(w, h)));
     const small = document.createElement("canvas");
@@ -188,31 +239,32 @@ function gpPaint() {
   }
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(im, x, y, w, h);
-  if (!open) cv.style.filter = ["brightness(0)", "brightness(.3) blur(7px)", "blur(5px)", "blur(2px)"][s];
+  if (!open && gp.page === "enemy") cv.style.filter = ["brightness(0)", "brightness(.3) blur(7px)", "blur(5px)", "blur(2px)"][s];
 }
 
 function gpDraw() {
   const g = gp.game, a = g.ans, d = g.done, used = Object.keys(g.hints).length, canto = gpCanto();
-  const hints = canto ? [] : gp.who === "id" ? (a.season ? [["season", "SEASON", a.season]] : []) : [["where", "WHERE", a.sub]];
+  const ofId = gpOfId(), wide = gp.page !== "enemy";
+  const hints = canto ? [] : ofId ? (a.season ? [["season", "SEASON", a.season]] : []) : [["where", "WHERE", a.sub]];
   const hint = ([k, label, val]) => g.hints[k] || d ? `<div class="gihint open"><small>${label}</small><b>${esc(val)}</b></div>`
     : `<button class="gihint" data-hint="${k}"><small>${label}</small><b>hidden</b><u>open · −${GP_HINT * (gp.hard ? 2 : 1)}</u></button>`;
   const cls = (key) => d ? (key === (canto ? String(a.canto) : a.key) ? "ok" : key === d.pick ? "bad" : "dim") : "";
   const opts = canto ? `<div class="gmopts gpcantos">${gp.data.cantos.map((n) => `<button class="gmopt ${cls(String(n))}" data-k="${n}" ${d ? "disabled" : ""}><b>Canto ${n}</b></button>`).join("")}</div>`
-    : `<div class="gmopts">${g.opts.map((o) => `<button class="gmopt ${cls(o.key)}" data-k="${o.key}" ${d ? "disabled" : ""}><b>${esc(o.title)}</b><i>${esc(gp.who === "id" || d ? o.sub : "")}</i></button>`).join("")}</div>`;
+    : `<div class="gmopts">${g.opts.map((o) => `<button class="gmopt ${cls(o.key)}" data-k="${o.key}" ${d ? "disabled" : ""}><b>${esc(o.title)}</b><i>${esc(ofId || d ? o.sub : "")}</i></button>`).join("")}</div>`;
   $("#main").innerHTML = `<h1>${gpTitle()}</h1>
     <div class="gmtop"><span class="gmscore">ROUND <b>${g.round + 1} / ${GP_ROUNDS}</b></span><span class="grow"></span>
       <span class="gmscore">SCORE <b>${g.score}</b> &nbsp; STREAK <i>×${g.streak}</i></span><button class="toggle" id="gpquit">Quit</button></div>
-    <div class="gmstage gistage gpstage ${canto ? "wide" : ""}"><div>
-      <div class="gppic ${canto ? "scene" : gpPix() ? "" : "sil"}"><canvas id="gpcv" width="${canto ? 420 : 300}" height="${canto ? 236 : 300}"></canvas></div>
+    <div class="gmstage gistage gpstage ${wide ? "wide" : ""}"><div>
+      <div class="gppic ${canto ? "scene" : gpPix() || gpSplash() ? "" : "sil"}"><canvas id="gpcv" width="${wide ? 420 : 300}" height="${wide ? 236 : 300}"></canvas></div>
       <div class="gmsteps">${GP_WORTH.map((w, i) => `<span class="${d ? (i <= g.step ? "done" : "") : i < g.step ? "done" : i === g.step ? "cur" : ""}">${w}</span>`).join("")}</div>
       ${!d && g.step < GP_WORTH.length - 1 ? `<button class="toggle gmmore" id="gpmore">Show more · −${(GP_WORTH[g.step] - GP_WORTH[g.step + 1]) * (gp.hard && !canto ? 2 : 1)}</button>` : ""}
       <div class="gihints">${hints.map(hint).join("")}</div></div>
     <div><div class="gmkick">${d ? (d.ok ? `+${d.points}${used ? ` · ${used} HINT USED` : ""}` : "MISSED") : `WORTH ${gpWorth()} NOW`}</div>
-      <div class="gmq">${d ? esc(a.name) : canto ? "Which Canto is this from?" : gp.who === "id" ? "Which Identity is this?" : "Who is this?"}</div>
-      ${gp.hard && !canto && !d ? `<input id="gptype" class="dbq" placeholder="${gp.who === "id" ? "Identity…" : "Enemy…"}" autocomplete="off"><div id="gpsugg" class="gmsugg"></div>
+      <div class="gmq">${d ? esc(a.name) : canto ? "Which Canto is this from?" : gpSplash() ? (gp.what === "ego" ? "Which E.G.O is this?" : "Whose art is this?") : ofId ? "Which Identity is this?" : "Who is this?"}</div>
+      ${gp.hard && !canto && !d ? `<input id="gptype" class="dbq" placeholder="${gpSplash() && gp.what === "ego" ? "E.G.O…" : ofId ? "Identity…" : "Enemy…"}" autocomplete="off"><div id="gpsugg" class="gmsugg"></div>
         <button class="toggle gmmore" id="gpskip">I don't know</button>`
       : gp.hard && !canto ? `<div class="gmopts"><div class="gmopt ${d.ok ? "ok" : "bad"}"><b>${esc(d.said || "—")}</b><i>your answer</i></div></div>` : opts}
-      ${d ? `<div class="gmafter">${canto ? "<span></span>" : gp.who === "id" ? `<a href="#/db/${a.id}">Open in the database →</a>` : `<a href="#/enemies/${a.id}">Open in the handbook →</a>`}
+      ${d ? `<div class="gmafter">${canto ? "<span></span>" : ofId ? `<a href="#/db/${a.id}">Open in the database →</a>` : `<a href="#/enemies/${a.id}">Open in the handbook →</a>`}
         <button class="gmbtn" id="gpnext">${g.round + 1 < GP_ROUNDS ? "Next" : "Result"}</button></div>` : ""}</div></div>`;
   gpPaint();
   $("#gpquit").onclick = () => { gp.game = null; gpDailyEnd(); gpDrawStart(); };

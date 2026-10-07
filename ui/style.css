@@ -1040,3 +1040,10 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .ggcell b { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 6px 5px; text-align: center; font: 14px/1.1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; color: #fff; background: linear-gradient(180deg, transparent, rgba(20,17,19,.95) 55%); }
 .ggcell.ok { border-color: var(--add); } .ggcell.ok i, .ggcell.miss i { position: absolute; top: 4px; right: 5px; padding: 1px 5px; background: rgba(20,17,19,.85); color: var(--gold); }
 .ggcell.miss img { opacity: .35; filter: grayscale(1); } .ggcell.miss i { color: var(--muted); }
+/* Games: Odd one out (games4.js) */
+.gobox { max-width: 900px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+.gobox .gctile.plain img { height: 170px; } .gobox .gctile img { height: 130px; }
+.gobox .gctile.ok { border-color: var(--add); outline: 2px solid var(--add); outline-offset: -2px; } .gobox .gctile.bad { border-color: var(--rem); outline: 2px solid var(--rem); outline-offset: -2px; }
+.gobox .gctile:disabled { cursor: default; } .gobox .gctile.plain b { margin-top: 7px; } .gobox .gctile.plain i { display: block; margin-bottom: 7px; }
+.goopts { margin-top: 14px; }
+.gologpic { width: 40px; height: 40px; object-fit: cover; object-position: top; margin-right: 4px; vertical-align: middle; opacity: .55; } .gologpic.odd { opacity: 1; outline: 1px solid var(--gold); }
