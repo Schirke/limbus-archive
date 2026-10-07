@@ -81,7 +81,7 @@ function glFront() {
     <div class="gmstart"><a class="gmbtn" href="#/live/new">Make a room</a><span class="muted">or a friend's code:</span><input id="glcode" class="dbq glin" placeholder="code or link" autocomplete="off"><button class="toggle" id="glgo">Join</button></div>`;
   const go = () => { const m = /([a-z0-9]{4,10})\s*$/i.exec($("#glcode").value.trim()); m ? (location.hash = "#/live/" + m[1].toLowerCase()) : toast("That is not a room's code."); };
   $("#glgo").onclick = go;
-  $("#glcode").onkeydown = (e) => e.key === "Enter" && go();
+  $("#glcode").onkeydown = (e) => { if (e.key === "Enter") go(); };  // (a handler that returns false would swallow the key)
 }
 
 function glLobby() {
@@ -94,7 +94,7 @@ function glLobby() {
       <div class="gmstart"><span class="muted">Your nickname:</span><input id="glnick" class="dbq glin" maxlength="20" value="${esc(gl.nick)}" placeholder="nickname" autocomplete="off"><button class="gmbtn" id="gljoin">Come in</button></div>`;
     const join = () => { const n = $("#glnick").value.trim().slice(0, 20); if (!n) return $("#glnick").focus(); gl.nick = n; glKeep(); glOpen(code); glLobby(); };
     $("#gljoin").onclick = join;
-    $("#glnick").onkeydown = (e) => e.key === "Enter" && join();
+    $("#glnick").onkeydown = (e) => { if (e.key === "Enter") join(); };
     $("#glnick").focus();
   } else if (!gl.room) {
     $("#main").innerHTML = `${head}<p class="muted">Coming into the room…</p>`;
