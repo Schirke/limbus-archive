@@ -548,10 +548,11 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 #mu-bar { height: 4px; margin-top: 8px; background: var(--line); cursor: pointer; } #mu-bar i { display: block; width: 0; height: 100%; background: var(--gold); }
 #player button { border-radius: 0; background: none; cursor: pointer; }
 #player .c { display: flex; gap: 5px; margin-top: 9px; align-items: center; }
-#player .c button { width: 32px; height: 28px; padding: 0; display: grid; place-items: center; color: #cfd3d8; font: 14px "Segoe UI Symbol", sans-serif; }
+#player .c button { width: 28px; height: 28px; padding: 0; display: grid; place-items: center; color: #cfd3d8; font: 14px "Segoe UI Symbol", sans-serif; }
 #player .c button.on { background: var(--gold); color: #111; border-color: var(--gold); }
 #mu-vol { flex: 1; min-width: 0; padding: 0; border: 0; background: none; accent-color: var(--gold); height: 14px; }
 #mu-clock { font: 12px Consolas, "Cascadia Mono", monospace; color: var(--muted); white-space: nowrap; }
+#mu-fav { position: absolute; top: 5px; right: 30px; border: 0; padding: 0 4px; color: var(--muted); font-size: 15px; } #mu-fav.on, #mu-fav:hover { color: var(--gold); }
 #mu-min { position: absolute; top: 4px; right: 6px; border: 0; padding: 0 6px; color: var(--muted); font-size: 16px; }
 #mu-pill { display: none; margin-left: auto; max-width: 340px; padding: 6px 12px; background: #161315 !important; border: 1px solid var(--line); border-top: 2px solid var(--gold);
   color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -559,13 +560,15 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 #mu-list { display: none; background: #161315; border: 1px solid var(--line); border-bottom: 0; box-shadow: 0 8px 30px #000a; }
 #player.open #mu-list { display: block; }
 #mu-list .mu-head { display: flex; gap: 6px; padding: 8px; } #mu-q { flex: 1; min-width: 0; border-radius: 0; }
-#mu-both { white-space: nowrap; border-color: var(--gold) !important; color: var(--gold); }
+#mu-both { white-space: nowrap; border-color: var(--gold) !important; color: var(--gold); } #mu-both.off { border-color: var(--line) !important; color: var(--muted); }
+#mu-favs { color: var(--muted); } #mu-favs.on { background: var(--gold); color: #111; border-color: var(--gold); }
 #mu-rows { height: min(420px, calc(100vh - 330px)); overflow-y: auto; }
-#mu-rows div { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 5px 10px; cursor: pointer; border-top: 1px solid #231e21; }
+#mu-rows div { display: grid; grid-template-columns: 1fr auto auto; gap: 0 8px; padding: 5px 10px; cursor: pointer; border-top: 1px solid #231e21; }
 #mu-rows div:hover { background: var(--panel2); } #mu-rows div.on b { color: var(--gold); }
 #mu-rows b { font-weight: normal; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #mu-rows i { grid-column: 1; font-style: normal; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #mu-rows u { grid-column: 2; grid-row: 1 / span 2; align-self: center; text-decoration: none; font: 12px Consolas, monospace; color: var(--muted); }
+#mu-rows em { grid-column: 3; grid-row: 1 / span 2; align-self: center; padding: 4px 2px 4px 6px; font-style: normal; font-size: 15px; color: #4a4246; } #mu-rows em:hover, #mu-rows em.on { color: var(--gold); }
 #mu-rows p { padding: 10px; margin: 0; }
 body.player-up .toast { bottom: 150px; }
 
