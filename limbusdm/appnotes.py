@@ -31,9 +31,33 @@ def _releases() -> list:
                                      headers={"User-Agent": UA["User-Agent"], "Accept": "application/vnd.github+json"})
         with urllib.request.urlopen(req, timeout=15) as r:
             _kept[:] = [time.time(), [x for x in json.load(r) if not x.get("draft")]]
-    except Exception:
-        return _kept[1]
+    except Exception:  # (the API's hourly limit is spent, as a rule: the releases' feed has none)
+        try:
+            _kept[:] = [time.time(), _feed()]
+        except Exception:
+            return _kept[1]
     return _kept[1]
+
+
+def _feed() -> list:
+    """The last ten releases from github.com/<repo>/releases.atom, shaped like the API's answer; the notes come as
+    HTML there and are turned back into the few marks the page reads ("## ", "- ", "**")."""
+    import html, re
+    import xml.etree.ElementTree as ET
+    req = urllib.request.Request(f"https://github.com/{REPO}/releases.atom", headers={"User-Agent": UA["User-Agent"]})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        root = ET.fromstring(r.read())
+    ns = {"a": "http://www.w3.org/2005/Atom"}
+    out = []
+    for e in root.findall("a:entry", ns):
+        t = e.findtext("a:content", "", ns)
+        t = re.sub(r"<h\d[^>]*>", "\n## ", t)
+        t = re.sub(r"<li[^>]*>\s*(?:<p>)?", "\n- ", t)
+        t = re.sub(r"</?(?:strong|b)>", "**", t)
+        t = re.sub(r"</(?:p|h\d|ul|ol|li)>|<br\s*/?>", "\n", t)
+        body = "\n".join(l.strip() for l in html.unescape(re.sub(r"<[^>]+>", "", t)).splitlines() if l.strip())
+        out.append({"tag_name": e.findtext("a:id", "", ns).rsplit("/", 1)[-1], "body": body, "published_at": e.findtext("a:updated", "", ns)})
+    return out
 
 
 def history(count: int = 20) -> dict:
