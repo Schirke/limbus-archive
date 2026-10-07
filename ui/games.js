@@ -8,7 +8,7 @@ const gm = { battle: true, hard: false, group: "", how: "", best: {},
   ...(() => { try { return JSON.parse(localStorage.getItem(GM_KEEP) || "{}"); } catch { return {}; } })(), game: null };
 const gmAudio = new Audio();
 const gmKeep = () => { try { localStorage.setItem(GM_KEEP, JSON.stringify({ battle: gm.battle, hard: gm.hard, group: gm.group, how: gm.how, best: gm.best, vol: gm.vol })); } catch {} };
-// how loud the game plays: its own slider under the disc (the corner player's volume until it is moved)
+// how loud the games by ear play (the track, the Identity, the character): a slider under the disc (the corner player's volume until it is moved)
 const gmVol = () => gm.vol != null ? +gm.vol : (typeof mu !== "undefined" && mu.vol) || 0.6;
 const gmGroup = (t) => /^Canto \d+$/.test(t.where) ? t.where : "Other";
 const gmPool = () => mu.tracks.map((t, n) => ({ t, n })).filter(({ t }) => t.ms > 40000 && (!gm.battle || t.battle) && (!gm.group || gmGroup(t) === gm.group));

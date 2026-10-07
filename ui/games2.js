@@ -136,7 +136,7 @@ function giRound() {
   Object.assign(g, { ans, line, opts: gmShuffle([ans, ...gmShuffle(near.slice()).slice(0, 3)]), hints: {}, done: null });
   if (giSkill()) return giDraw();
   giAudio.src = "/api/quiz_audio?s=" + encodeURIComponent(line.s);
-  giAudio.volume = (typeof mu !== "undefined" && mu.vol) || 0.6;
+  giAudio.volume = gmVol();
   giAudio.onerror = () => toast("This line could not be read from the game's files.");
   if (!gi.text) giAudio.play().catch(() => {});
   giDraw();
@@ -167,6 +167,7 @@ function giDraw() {
     <div class="gmtop"><span class="gmscore">ROUND <b>${g.round + 1} / ${GI_ROUNDS}</b></span><span class="grow"></span>
       <span class="gmscore">SCORE <b>${g.score}</b> &nbsp; STREAK <i>×${g.streak}</i></span><button class="toggle" id="giquit">Quit</button></div>
     <div class="gmstage gistage"><div>${giSkill() ? `<div class="giskill"><img id="giskpic" src="${g.line.pic}"></div>` : gi.text && !d && !g.hints.voice ? "" : `<button id="gidisc" class="gmdisc gidisc" title="Play it again"><div>▶</div></button>`}
+      ${giSkill() ? "" : `<label class="gmvol">Volume <input id="givol" type="range" min="0" max="1" step="0.01" value="${gmVol()}"></label>`}
       <div class="gihints">${giHints().map(hint).join("")}</div></div>
     <div><div class="gmkick">${d ? (d.ok ? `+${d.points}${used ? ` · ${used} HINT${used > 1 ? "S" : ""} USED` : ""}` : "MISSED") : `WORTH ${giWorth()} NOW`}</div>
       <div class="gmq">${d ? esc(a.name) : a.char ? "Who says this?" : a.boss ? "Who says this in a fight?" : giSkill() ? "Whose skill is this?" : "Whose line is this?"}</div>${quote}
@@ -179,6 +180,8 @@ function giDraw() {
   $("#giquit").onclick = () => { giStop(); gi.game = null; giDailyEnd(); giDrawStart(); };
   // a skill the game has no picture of: another one takes the round
   if ($("#giskpic")) $("#giskpic").onerror = () => { a.skills = a.skills.filter((s) => s !== g.line); if (!a.skills.length) g.pool = g.pool.filter((x) => x !== a); g.round--; giRound(); };
+  // the volume is the one of Guess the track: one slider for the games by ear
+  if ($("#givol")) { $("#givol").oninput = (e) => { giAudio.volume = gm.vol = +e.target.value; }; $("#givol").onchange = gmKeep; }
   if ($("#gidisc")) $("#gidisc").onclick = () => { giAudio.currentTime = 0; giAudio.play().catch(() => {}); };
   document.querySelectorAll("[data-hint]").forEach((b) => b.onclick = () => { g.hints[b.dataset.hint] = 1; if (b.dataset.hint === "voice") giAudio.play().catch(() => {}); giDraw(); });
   document.querySelectorAll(".gicards button").forEach((b) => b.onclick = () => giAnswer(b.dataset.k));
