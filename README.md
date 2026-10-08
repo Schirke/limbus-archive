@@ -158,6 +158,7 @@ points. Puzzles. And two toys.
 - **Jigsaw:** an Identity's art cut into tiles and shuffled — put it together against the clock.
 - **Mixed up:** a piece of a track cut into parts and shuffled — listen and put them back in order.
 - **Guess the buff:** the effect of a buff or a debuff plays — which one is it?
+- **Spot the difference:** an Identity's art twice, the second changed in a few spots.
 - **When was it:** an Identity or an E.G.O — put the mark on the game's timeline where it came out.
 - **Guess who** (for two, in a room or against the game): the same 24 Identities and a hidden one
   each; ask what the other's is, the game answers and darkens the cards it can't be — name it first.

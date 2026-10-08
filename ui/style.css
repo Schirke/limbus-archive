@@ -1079,17 +1079,22 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gjboard.whole .gjtile, .gjbox .gmafter ~ .gjboard .gjtile { cursor: default; filter: none; }
 /* the lunacy: the game's icon and its red (games.js GM_LUNIMG) */
 :root { --lun: #e8503a; }
-@media (max-width: 1560px) { #nav { gap: 2px; } #nav a { padding: 7px 9px; } }  /* (the top menu with Extraction in it, in the app's usual window) */
+@media (max-width: 1560px) { #nav { gap: 0; } #nav a { padding: 7px 7px; font-size: 13.5px; } }  /* (the top menu with Extraction in it, in the app's usual window) */
 .lunicon { height: 1.25em; width: auto; vertical-align: -0.25em; margin-right: 5px; }
 #navgacha { display: flex; align-items: center; gap: 9px; } #navlun { display: flex; align-items: center; } #navlun b { color: var(--lun); font-weight: normal; } #navlun .lunicon { height: 18px; margin-right: 4px; vertical-align: 0; }
 .gmwallet i.lun, .gmscore i.lun { color: var(--lun); }
+/* Games: Spot the difference (games9.js) */
+.gfbox { max-width: 1500px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+.gfpair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .gfpair canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); cursor: crosshair; } .gfpair.over canvas { cursor: default; }
+@media (max-width: 1100px) { .gfpair { grid-template-columns: 1fr; } }
 /* Games: When was it, Guess who (games8.js) */
 .gtbox { max-width: 1100px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
 .gthead { display: flex; gap: 22px; align-items: center; } .gthead img { width: 210px; height: 210px; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--panel2); } .gthead .gihints { max-width: 360px; }
-.gtline { position: relative; margin: 34px 8px 26px; padding-top: 22px; }
+.gtline { position: relative; margin: 30px 8px 26px; padding-top: 50px; }
 .gtline input { width: 100%; margin: 0; padding: 0; accent-color: var(--gold); cursor: pointer; }
-.gtyears span { position: absolute; top: 0; transform: translateX(-50%); font: 12px Consolas, monospace; color: var(--muted); } .gtyears span::after { content: ""; position: absolute; left: 50%; top: 16px; width: 1px; height: 8px; background: var(--line); }
-.gtmark { position: absolute; top: 18px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
+.gtyears span { position: absolute; top: 0; transform: translateX(-50%); font: 12px Consolas, monospace; color: var(--muted); } .gtyears span::after { content: ""; position: absolute; left: 50%; top: 16px; width: 1px; height: 30px; background: var(--muted); opacity: .6; }
+.gtseasons span { position: absolute; top: 21px; height: 20px; box-sizing: border-box; overflow: hidden; padding-left: 6px; border-left: 2px solid var(--c); background: color-mix(in srgb, var(--c) 22%, transparent); font: 12px/20px Consolas, monospace; color: #fff; white-space: nowrap; }
+.gtmark { position: absolute; top: 46px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 .gtmark i { width: 2px; height: 30px; background: var(--add); } .gtmark b { font: 12px Consolas, monospace; color: var(--add); font-weight: normal; margin-top: 2px; }
 .gqcols { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 22px; max-width: 1400px; align-items: start; }
 .gqgrid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }

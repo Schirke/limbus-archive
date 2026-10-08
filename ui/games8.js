@@ -26,7 +26,11 @@ routes.gamewhen = async (args = []) => {
     const all = [...of((u || {}).ids, false), ...of((u || {}).egos, true)];
     // (what the game came out with would all be one answer: not asked)
     const from = Math.min(...all.map((x) => x.day));
-    gt.data = { from, to: Math.max(gtDay(new Date().toISOString().slice(0, 10)), ...all.map((x) => x.day)), all: all.filter((x) => x.day > from) };
+    // the seasons on the timeline: each from its first Identity's day to the next one's
+    const first = {};
+    for (const x of (u || {}).ids || []) if (x.date && x.season >= 1 && x.season < 100) first[x.season] = Math.min(first[x.season] ?? 1e9, gtDay(x.date));
+    const seasons = Object.entries(first).map(([k, day]) => ({ n: +k, day, color: (((u || {}).seasons || {})[k] || {}).color || "#888" })).sort((a, b) => a.day - b.day);
+    gt.data = { from, to: Math.max(gtDay(new Date().toISOString().slice(0, 10)), ...all.map((x) => x.day)), all: all.filter((x) => x.day > from), seasons };
     if (!u) setTimeout(() => { gt.data = null; });
   }
   if (!location.hash.startsWith("#/gamewhen")) return;
@@ -85,6 +89,7 @@ function gtDraw() {
         <div class="muted">${d || !g.hard ? esc(a.sub) : ""}${d ? ` · came out on <b>${gtSay(a.day)}</b>` : ""}</div>
         <div class="gihints">${hint}</div></div></div>
       <div class="gtline"><div class="gtyears">${years.map((y) => `<span style="left:${pos(gtDay(y + "-01-01"))}%">${y}</span>`).join("")}</div>
+        <div class="gtseasons">${gt.data.seasons.map((s, i, all) => `<span style="left:${pos(s.day)}%;width:${pos(all[i + 1] ? all[i + 1].day : to) - pos(s.day)}%;--c:${s.color}" title="Season ${s.n}: from ${gtSay(s.day)}">S${s.n}</span>`).join("")}</div>
         <input id="gtat" type="range" min="${from}" max="${to}" step="1" value="${g.at}" ${d ? "disabled" : ""}>
         ${d ? `<div class="gtmark" style="left:${pos(a.day)}%"><i></i><b>${gtIso(a.day)}</b></div>` : ""}</div>
       <div class="gmafter"><span>Your mark: <b id="gtsay">${gtSay(g.at)}</b></span>

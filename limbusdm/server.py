@@ -941,6 +941,7 @@ CARD_PRESET = {
     "jig": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10310_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11208_normal.png",
             "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10609_normal.png"],
     "when": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10102_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10708_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11111_normal.png"],
+    "diff": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10905_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10307_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11003_normal.png"],
     "who": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10203_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10804_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11205_normal.png"],
 }
 

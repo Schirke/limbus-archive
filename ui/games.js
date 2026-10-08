@@ -281,12 +281,14 @@ const GM_GAMES = [
     gmIcon('<rect x="3" y="3" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/><rect x="14.5" y="2.2" width="7" height="7" transform="rotate(12 18 5.7)"/><rect x="3" y="13" width="8" height="8"/>')],
   ["when", "#/gamewhen", "When was it", "An Identity or an E.G.O — put the mark on the game's timeline where it came out. The closer, the more points.",
     gmIcon('<path d="M2.5 15h19M5 12.5v5M10 12.5v5M15 12.5v5M20 12.5v5"/><path d="M12.5 3.5a3 3 0 0 1 3 3c0 2.2-3 5-3 5s-3-2.8-3-5a3 3 0 0 1 3-3z"/>')],
+  ["diff", "#/gamediff", "Spot the difference", "An Identity's art twice, the second one changed in a few spots — find them all before the time is up.",
+    gmIcon('<rect x="2.5" y="5" width="8.5" height="14"/><rect x="13" y="5" width="8.5" height="14"/><circle cx="6.7" cy="10" r="1.6"/><path d="M4.500 16l2-2.500 2.500 2.500"/><path d="M15 16l2-2.500 2.500 2.500"/><path d="M16.200 8.800l2.600 2.600M18.800 8.800l-2.600 2.600"/>')],
   // (a game for two: no score, no Daily — the tile says what it is instead)
   ["who", "#/gamewho", "Guess who", "For two: the same 24 Identities and a hidden one each. Ask what the other's is, the game answers — name it first. Or play against the game.",
     gmIcon('<circle cx="8" cy="8" r="3.2"/><path d="M2.5 19c.6-3.2 2.8-5 5.5-5s4.900 1.800 5.500 5"/><path d="M16.2 8.2a2.3 2.3 0 1 1 3.4 2c-.8.4-1.2.9-1.2 1.800"/><path d="M18.4 14.6v.1"/>'), "FOR TWO"]];
 const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
 // the games' page: the columns its tiles stand in
-const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig", "when"]], ["Toys", ["dare", "who"]]];
+const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff", "diff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig", "when"]], ["Toys", ["dare", "who"]]];
 // Mode of the day: the game shown big on the games' page — another one after every daily reset, never a toy; each
 // comes once before any comes again (the order is drawn anew for every round of them)
 function gmOfDay() {
