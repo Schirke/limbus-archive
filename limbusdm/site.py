@@ -39,7 +39,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
             "project": "", "url": ""}
 # the pages the site is written for (each has its part in Exporter); any other page of the UI is opened on the site
 # only when the check finds it asking for nothing the site lacks (verify)
-BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs"]
+BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners"]
 # requests the check never fetches by itself: the app's own state and controls, renders, the game's raw files, and the
 # ones a part of Exporter makes its own way
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
@@ -725,7 +725,9 @@ class Exporter:
         have = old.get("urls", {}) if old.get("id") == sid else {}
         g = gacha.build(self.svc)
         keys = ["/api/gacha"] + [url_key("/api/gacha_ui", n=n) for n in gacha.UI_USED]
-        keys += [url_key("/api/asset_img", path=b[k]) for b in g["banners"] for k in ("tile", "typo", "illust") if b.get(k)]
+        # (the archive's banners too: Extraction → Banner archive shows their tiles, and "Pull" opens one of them)
+        keys += [url_key("/api/asset_img", path=b[k]) for b in g["banners"] + g.get("archive", []) for k in ("tile", "typo", "illust") if b.get(k)]
+        keys = list(dict.fromkeys(keys))
         sounds = [url_key("/api/quiz_audio", s=s) for s in sorted(set(g["snd"].values()))]
         voices = [url_key("/api/quiz_audio", s=v[0]) for v in g["lines"].values() if v[0]]
         got = self.fetch_all(keys + sounds + voices, {k: f for k, f in have.items() if k != "/api/gacha"}, "site: Games (Extraction)")
@@ -816,6 +818,39 @@ class Exporter:
             self.write_manifest("extra", extra)
         return m
 
+    def tools(self) -> dict:
+        """Tools → Mirror Dungeon planner (ui/mirror.js) and Patches → Change history (ui/history.js): their lists and
+        the pictures they name — the gifts and packs, the changed cards and skills. The lists are the app's own
+        work (not a snapshot's), so they are asked again every time; the pictures are kept while the game version
+        is the same."""
+        old = self.read_manifest("tools")
+        sid = self.svc.latest_snapshot_id()
+        lists = ["/api/mirror", "/api/history"]
+        have = {k: f for k, f in old.get("urls", {}).items() if k not in lists} if old.get("id") == sid else {}
+        got = {}
+        for k in lists:
+            try:
+                got[k] = json.loads(self._get(k)[0])
+            except Exception as e:
+                self.failed.append((k, str(e)))
+                got[k] = {}
+        thumb = lambda p: url_key("/api/asset_thumb", path=p)  # noqa: E731
+        md, hist = got["/api/mirror"], got["/api/history"]
+        planner = [thumb(x["pic"]) for x in list((md.get("gifts") or {}).values()) + (md.get("packs") or []) if x.get("pic")]
+        drawn = os.path.join(self.svc.data_dir, "enemy_thumbs")
+        cards = []
+        for c in (hist.get("cards") or {}).values():
+            if c.get("pic"):
+                cards.append(thumb(c["pic"]))
+            elif c.get("app") and os.path.exists(os.path.join(drawn, c["app"] + ".png")):
+                cards.append(url_key("/api/enemy_thumb", app=c["app"]))
+        cards += [thumb(r["icon"]) for p in hist.get("patches") or [] for c in p["cards"].values() for g in c["groups"] for r in g["rows"] if r.get("icon")]
+        files = self.fetch_all(lists + planner + cards, have, "site: Tools (planner, change history)")
+        urls, groups = _grouped(files, [(["/api/mirror"] + planner, PACK), (["/api/history"] + cards, PACK)])
+        m = {"kind": "tools", "id": sid, "urls": urls, "groups": groups}
+        self.write_manifest("tools", m)
+        return m
+
     def small(self) -> dict:
         """Pages that are one list each, asked again every time: News (the developers' notices from Steam, as they
         are when the site is sent)."""
@@ -836,6 +871,7 @@ class Exporter:
             self.gacha()
         self.units()
         self.small()
+        self.tools()
         self.buffs()
         if self.cfg["spine"]:  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
             from . import sitefx

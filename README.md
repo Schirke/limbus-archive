@@ -30,8 +30,9 @@ when the app runs (none of them is in this repository).
 ## Website
 
 **[limbus.shpep.workers.dev](https://limbus.shpep.workers.dev)** is a copy of the app that runs in a browser:
-patch reports and news, Identities & E.G.O, the enemy handbook, battle animations, the team builder,
-the music player, the games and the live streams. The rest (skill renders with effects, Versus,
+patch reports, news and the change history, Identities & E.G.O, the enemy handbook, battle animations, the team
+builder, the Mirror Dungeon planner, the music player, the games with Extraction and its banner archive, and the live
+streams. The rest (skill renders with effects, Versus,
 files) needs the game on your PC, so it is only in the app.
 
 ## Features

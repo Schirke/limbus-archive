@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-VERSION = 2
+VERSION = 3
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 NUMS = {"defaultValue": "Base Power", "skillLevelCorrection": "Offense Level", "targetNum": "Atk Weight", "mpUsage": "SP cost"}
 GROUPS = ("Skills", "Passives", "Statuses", "Stats")
@@ -142,7 +142,7 @@ def _patch(report: dict, own: _Owners, glossary: dict, icons: dict) -> dict:
     def row(key, group, rid, name, icon=None):
         r = cards.setdefault(key, {}).setdefault(group, {}).setdefault(str(rid), {"id": str(rid), "name": name, "nums": [], "texts": [], "tech": [], "new": False})
         if icon is not None:  # a skill's picture by its number, a status's by its path
-            r["icon"] = icon if isinstance(icon, str) else icons.get(str(icon)) or ""
+            r["icon"] = icon if isinstance(icon, str) and "/" in icon else icons.get(str(icon)) or ""
         return r
 
     def texts(r, c, base="Description"):
