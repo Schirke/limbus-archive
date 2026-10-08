@@ -57,7 +57,7 @@ RULES = {
     "close_first": 3,        # up close the first skill this much likelier
     "clash_span": 0.8, "clash_reach": 3.5,  # a skill's coin as a clash (series): its blows within this many seconds, landing this close (world units; see clashable)
     # timing (seconds)
-    "standoff_hold": (0.25, 0.45), "recover_hold": (0.4, 0.7), "clash_pause": (0.0, 0.03),
+    "standoff_hold": (0.1, 0.2), "recover_hold": (0.1, 0.2), "clash_pause": (0.0, 0.03),
     # a clash played a little slower (never faster) so it can be followed: this speed, and slower still for a quick one
     # (its blow less than clash_quick seconds in, down to clash_slowest)
     "clash_speed": 0.9, "clash_quick": 0.3, "clash_slowest": 0.75,

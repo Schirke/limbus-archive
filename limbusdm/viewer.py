@@ -1329,6 +1329,9 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     zs = [p[1] for s in fight["steps"] for p in s["x"]] + [p[1] for p in fight["home"]]
     job = dict(L, bundles=bundles, partners=partners, opponent={"prefab": R["prefab"], "defaultClip": R["defaultClip"]},
                cast=cast, teamFrame=[min(xs), max(xs), min(zs), max(zs)], bossPower=fight.get("bossPower", 1.0), teamBg=bg,
+               # (not duels: knockbacks along the line between the two, depth too, and part of the way back towards the
+               # middle line — versus_team.Battle.knock)
+               teamRadial=fight["flow"] != "duels", teamDepth=fight["depth"], rowPull=T.TEAM["row_pull"],
                teamIds=[[f["cid"] for i, f in enumerate(F) if side[i] == s] for s in (0, 1)],
                teamNames=[[T.short_names(F)[i] for i in range(len(F)) if side[i] == s] for s in (0, 1)])
     job["clashSpeed"] = clash_speed(spec)

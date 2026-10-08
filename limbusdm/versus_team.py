@@ -89,9 +89,11 @@ TEAM = {
     "fair": 0.5, "fair_seeds": 48,  # the boss's strength is set so that it wins about this share of fights (that many tried)
     "boss_shot": 0.6,        # (aggro) a shot on the boss: x this on top of shot_share (it shrugs off chip damage too)
     "back_after": 2,         # (aggro) a range one backs off to shoot again after this many clashes up close
-    # (aggro) one done with its target in a knot (crowd_n others or more within crowd_r bodies) steps out of it, about
-    # crowd_step away from the knot's middle, before it goes for the next one
-    "crowd_r": 1.5, "crowd_n": 2, "crowd_step": 1.8,
+    # (not duels) picking a target, one in another depth row counts as this much farther per body of depth between
+    # them; a run in keeps the runner's own depth (at most a clash gap in front of / behind its target: 45 degrees);
+    # a knockback throws away along the line between the two (depth too, up to 45 degrees), and every one takes the
+    # one thrown row_pull of the way back towards the stage's middle line
+    "row_pref": 0.8, "row_pull": 0.25,
     # ammo (range ones): shots before it is empty; empty, it goes in to fight up close until it backs off (and reloads
     # there); one with no skill to fight up close with shoots on weaker (empty_share) and reloads in reload_s instead
     "ammo": 4, "empty_share": 0.5, "reload_s": 2.5,
@@ -602,18 +604,13 @@ class Battle:
         j's depth (+ dz); the seconds it takes."""
         # (aggro: j may already be decided on into a later beat — where it stands now)
         pj = self.spots(j, self.at, self.at)[0] if self.aggro else self.pos[j]
-        if side is None:
-            side = -1.0 if self.pos[i][0] < pj[0] else 1.0
-            if self.aggro and self.boss not in (i, j):  # (someone already at it on that side: the other side of it, if that one is free)
-                def taken(sd):
-                    p = [pj[0] + sd * self.R["clash_gap"], pj[1] + dz]
-                    return sum(1 for o in range(self.n) if o not in (i, j) and self.alive(o)
-                               and math.hypot(self.pos[o][0] - p[0], self.pos[o][1] - p[1]) < 1.0)
-                if taken(side) and not taken(-side) and abs(pj[0] - side * self.R["clash_gap"]) < self.wall_z(pj[1]) - 0.5:
-                    side = -side
-        to = self.clamp([pj[0] + side * self.R["clash_gap"], pj[1] + dz])
+        side = side if side is not None else (-1.0 if self.pos[i][0] < pj[0] else 1.0)
+        g = self.R["clash_gap"]
+        # (not duels: at its own depth, at most a clash gap in front of / behind the other one — they meet at an angle)
+        z = pj[1] + dz if self.duels else max(pj[1] - g, min(pj[1] + g, self.pos[i][1] + dz))
+        to = self.clamp([pj[0] + side * g, z])
         if abs(to[0] - pj[0]) < self.R["clash_gap"] * 0.6:  # (pinned at a wall: the other side of it)
-            to = self.clamp([pj[0] - side * self.R["clash_gap"], pj[1] + dz])
+            to = self.clamp([pj[0] - side * g, z])
         to = self.aside(i, to, j)
         d = math.hypot(to[0] - self.pos[i][0], to[1] - self.pos[i][1])
         self.pos[i] = to
@@ -666,10 +663,18 @@ class Battle:
             room = self.wall_z(self.pos[i][1]) - self.pos[i][0] * away
             d *= max(0.25, min(1.0, (room - 0.5) / self.T["soft_wall"]))
         o = self.pos[j][0]
-        to = self.pos[i][0] + away * max(-self.R["kb_max"], min(self.R["kb_max"], d))
+        x0 = self.pos[i][0]
+        to = x0 + away * max(-self.R["kb_max"], min(self.R["kb_max"], d))
         if (to - o) * away < self.R["clash_gap"] * 0.4:
             to = o + away * self.R["clash_gap"] * 0.4
-        self.pos[i] = self.aside(i, self.clamp([to, self.pos[i][1]]), j)
+        z = self.pos[i][1]
+        if not self.duels:
+            # (along the line between the two, depth too — up to 45 degrees; then a part of the way back towards the
+            # middle line; as ViewerTeam.cs TeamKnockTo)
+            ax = x0 - o
+            slope = max(-1.0, min(1.0, (z - self.pos[j][1]) / abs(ax))) if abs(ax) > 0.01 else 0.0
+            z = (z + abs(to - x0) * slope) * (1 - self.T["row_pull"])
+        self.pos[i] = self.aside(i, self.clamp([to, z]), j)
 
     def room(self, i, j) -> float:  # between i and the wall behind it (facing j)
         return self.wall_z(self.pos[i][1]) + self.pos[i][0] * self.face(i, j)
@@ -763,8 +768,12 @@ class Battle:
         if not foes:
             return None
         if "mass" in self.role[i]:  # (one with mass attacks: where they stand closest together)
-            return min(foes, key=lambda j: (round(self.dist(i, j) - 1.2 * len(self.near(j)), 2), self.rnd.random()))
-        return min(foes, key=lambda j: (round(self.dist(i, j), 2), self.rnd.random()))
+            return min(foes, key=lambda j: (round(self.rowd(i, j) - 1.2 * len(self.near(j)), 2), self.rnd.random()))
+        return min(foes, key=lambda j: (round(self.rowd(i, j), 2), self.rnd.random()))
+
+    def rowd(self, i, j) -> float:
+        """How far j is for i picking a target: the distance, one in another depth row a little farther (row_pref)."""
+        return self.dist(i, j) + self.T["row_pref"] * abs(self.pos[i][1] - self.pos[j][1])
 
     def empty(self, i) -> bool:
         """i is a range one out of ammo."""
@@ -1199,7 +1208,7 @@ class Battle:
         # (the nearest, but one already fought by several is less tempting; a mass one goes where they stand together)
         load = {j: sum(1 for k in range(self.n) if self.alive(k) and self.tgt[k] == j and k != i) for j in foes}
         mass = 1.2 if "mass" in self.role[i] else 0.0
-        j = min(foes, key=lambda j: (round(self.dist(i, j) + 1.2 * load[j] - mass * len(self.near(j)), 2), self.rnd.random()))
+        j = min(foes, key=lambda j: (round(self.rowd(i, j) + 1.2 * load[j] - mass * len(self.near(j)), 2), self.rnd.random()))
         self.waited[i] = None
         self.aggro_set(i, j)
         return j
@@ -1245,8 +1254,6 @@ class Battle:
         if j is None or not self.alive(j) or t >= self.agg_end[i] - 1e-6 or self.uses[i] <= 0:
             self.aggro_drop(i)
             if self.back_off(i, t):  # (a range one fought up close: it backs off to shoot again first)
-                return
-            if self.crowd_out(i, t):  # (in a knot: it steps out of it first)
                 return
             j = self.aggro_pick(i)
             if j is None:  # (nobody to go for: a slow one waits in its zone, walking back to it)
@@ -1437,36 +1444,6 @@ class Battle:
         self.log("return", i, None, dur, 0, at=t, result="backs off to shoot again" + (", reloads" if self.ammo[i] < self.T["ammo"] else ""))
         self.reload(i)
         self.busy[i] = t + max(dur, 0.2)
-        self.partner[i] = None
-        return True
-
-    def crowd_out(self, i, t) -> bool:
-        """(aggro) one between targets standing in a knot (crowd_n others within crowd_r) steps out of it: away from
-        the knot's middle, across and in depth, to a free spot; whether it did. Not in a boss fight (they surround it)."""
-        T = self.T
-        if i == self.boss:
-            return False
-        near = [o for o in range(self.n) if o != i and self.alive(o) and self.dist(i, o) <= T["crowd_r"]]
-        if len(near) < T["crowd_n"] or self.boss >= 0:
-            return False
-        x, z = self.pos[i]
-        cx = sum(self.pos[o][0] for o in near) / len(near)
-        cz = sum(self.pos[o][1] for o in near) / len(near)
-        dx, dz = x - cx, z - cz
-        if math.hypot(dx, dz) < 0.2:  # (right in the middle: back towards its own side, a little in depth)
-            dx, dz = (-1.0 if self.side[i] == 0 else 1.0), self.rnd.choice((-0.5, 0.5))
-        d = math.hypot(dx, dz)
-        step = T["crowd_step"] + self.rnd.uniform(0, 0.4)
-        to = [x + dx / d * step, z + dz / d * step]
-        if abs(to[0]) > self.wall_z(z) - 0.8:  # (no room that way: the other way round across)
-            to[0] = x - dx / d * step
-        to = self.aside(i, self.clamp(to))
-        dur = math.hypot(to[0] - x, to[1] - z) / T["walk_speed"]
-        if dur < 0.15:
-            return False
-        self.pos[i] = to
-        self.log("return", i, None, dur, 0, at=t, result="steps out of the crowd")
-        self.busy[i] = t + dur
         self.partner[i] = None
         return True
 
