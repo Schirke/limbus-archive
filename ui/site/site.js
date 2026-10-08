@@ -106,17 +106,25 @@
       document.head.appendChild(el);
     }, 300);
   }
-  // The site's own count of its visitors (worker.js Stats): every page opened is told to it, and a page left open says
-  // "still here" every ten minutes (each one is a request and a row of the free plan's daily lot). Nothing is kept in the browser. The Site stats tab of Community shows the sums —
-  // to everybody, or (SITE.stats "key") to who opened it once as #/community/stats/<key>.
+  // The site's own count of its visitors (worker.js Stats): a page tells what was opened in it — at once when it is
+  // opened, then every ten minutes ("still here" too) and when it is put away: few requests however many pages a
+  // visitor goes through. 410 = the count is closed for the month (worker.js, the allowance). Nothing is kept in the
+  // browser. The Site stats tab of Community shows the sums — to everybody, or (SITE.stats "key") to who opened it
+  // once as #/community/stats/<key>.
   if (!checking.has("check")) {
-    const hit = (beat) => {
-      const [, name = "home", , id] = location.hash.split("/");
-      fetch("/stat/hit", { method: "POST", keepalive: true, body: JSON.stringify({ p: name, u: name === "db" && id ? id : "", beat: !!beat }) }).catch(() => {});
+    let opened = [], shut = false;
+    const here = () => { const [, name = "home", , id] = location.hash.split("/"); return [name, name === "db" && id ? id : ""]; };
+    const tell = (leaving) => {
+      if (shut) return;
+      const body = JSON.stringify({ p: here()[0], o: opened.splice(0) });
+      if (leaving) { try { navigator.sendBeacon("/stat/hit", body); } catch (e) { /* not counted */ } return; }
+      fetch("/stat/hit", { method: "POST", keepalive: true, body }).then((r) => { if (r.status === 410) shut = true; }).catch(() => {});
     };
-    window.addEventListener("hashchange", () => hit());
-    hit();
-    setInterval(() => { if (!document.hidden) hit(true); }, 600e3);
+    window.addEventListener("hashchange", () => { if (opened.length < 50) opened.push(here()); });
+    opened.push(here());
+    tell();
+    setInterval(() => { if (!document.hidden) tell(); }, 600e3);
+    document.addEventListener("visibilitychange", () => { if (document.hidden && opened.length) tell(true); });
   }
   const statKey = () => { try { return localStorage.getItem("statskey") || ""; } catch (e) { return ""; } };
   window.siteStatsTab = () => SITE.stats !== "key" || !!statKey();
@@ -140,6 +148,14 @@
     const country = (cc) => { try { return (cc !== "??" && region && region.of(cc)) || "Unknown"; } catch (e) { return "Unknown"; } };
     const unit = (id) => { const x = typeof unitById === "function" && unitById(+id); return x ? (x.title ? `${x.title} ${x.sinnerName || ""}`.trim() : x.name) : id; };
     const part = (set, pre, name, most) => Object.entries(set).filter(([k]) => k.startsWith(pre)).map(([k, n]) => [name(k.slice(pre.length)), n]).sort((a, b) => b[1] - a[1]).slice(0, most);
+    // what the plan's period has spent of what the site's settings allow it (worker.js: the count's own sums)
+    const spent = () => {
+      const u = d.spent, m = u && u.most;
+      if (!m) return "";
+      const one = (name, n, most) => most ? `${name} ${n.toLocaleString("en")} of ${most.toLocaleString("en")} (${Math.round(n / most * 100)}%)` : "";
+      return `<p class="muted small">Server allowance since ${esc(u.period)}: ${[one("requests", u.w, m.w), one("object requests", u.d, m.d), one("rows written", u.r, m.r)].filter(Boolean).join(" · ")}.${
+        u.off ? ` <b>Reached: the count and the live rooms are closed until ${new Date(u.until).toISOString().slice(0, 10)}.</b>` : ""}</p>`;
+    };
     const draw = () => {
       const s = d.sets[stv.range], y = (k) => (d.sets.prev[k] || 0) - (d.sets.day[k] || 0);
       const pages = part(s, "pg:", (k) => k, 999).filter(([k]) => routes[k]);  // (a name anybody could send is not a page)
@@ -167,7 +183,7 @@
           <div class="card"><h3>Most viewed in the database</h3><div class="muted small">Identities and E.G.O people opened most.</div>${stRows(part(s, "u:", unit, 6))}</div>
           <div class="card"><h3>Devices</h3><div class="muted small">What the site was opened on.</div>${stRows(part(s, "dv:", (k) => k, 3))}</div>
         </div>
-        <p class="muted small">A visitor is one browser per day. The site keeps only daily totals: no names, no addresses, no cookies. Countries come from Cloudflare. Counting started on 8 October 2026.</p>`;
+        <p class="muted small">A visitor is one browser per day. The site keeps only daily totals: no names, no addresses, no cookies. Countries come from Cloudflare. Counting started on 8 October 2026.</p>${spent()}`;
       main.querySelectorAll("#strange button").forEach((b) => { b.onclick = () => { stv.range = b.dataset.r; draw(); }; });
     };
     draw();

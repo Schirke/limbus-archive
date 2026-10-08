@@ -55,7 +55,10 @@ def out_dir(svc) -> str:
 
 def config(svc) -> dict:
     """data/site_config.json: {"contact": "Discord: name", "audio": true, "video": true, "full_images": true,
-    "project": the Cloudflare Worker the site is uploaded to (none: the site is only written to disk), "url": its address}."""
+    "project": the Cloudflare Worker the site is uploaded to (none: the site is only written to disk), "url": its address,
+    "stats_key": who may open Site stats, "budget": {"day": the day of the month the Cloudflare plan's period starts
+    on, "requests", "objects", "rows": what a period may spend of Worker requests, Durable Object requests and rows
+    written before the count and the live rooms are closed until the next one (ui/site/worker.js)}}."""
     c = dict(DEFAULTS)
     try:
         with open(os.path.join(svc.data_dir, "site_config.json"), encoding="utf-8") as f:
@@ -93,8 +96,11 @@ def worker_config(svc) -> str:
            "assets": {"directory": packed_dir(svc), "binding": "ASSETS"},
            "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "Room"}, {"name": "STATS", "class_name": "Stats"}]},
            "migrations": [{"tag": "v1", "new_sqlite_classes": ["Room"]}, {"tag": "v2", "new_sqlite_classes": ["Stats"]}]}
+    cfg["vars"] = {}
     if config(svc).get("stats_key"):  # the Site stats page answers only who has the key (else: everybody)
-        cfg["vars"] = {"STATS_KEY": config(svc)["stats_key"]}
+        cfg["vars"]["STATS_KEY"] = config(svc)["stats_key"]
+    if isinstance(config(svc).get("budget"), dict):  # what a period of the Cloudflare plan may spend (worker.js)
+        cfg["vars"]["BUDGET"] = json.dumps(config(svc)["budget"])
     path = os.path.join(folder, "wrangler.jsonc")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=1)
