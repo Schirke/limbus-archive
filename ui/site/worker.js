@@ -241,8 +241,12 @@ export default {
       if (env.STATS && u.pathname === "/stat/get" && req.method === "GET") {
         // (the page can be the owner's alone: a key in the site's settings, see limbusdm/site.py worker_config)
         if (env.STATS_KEY && u.searchParams.get("k") !== env.STATS_KEY) return new Response("no", { status: 403 });
-        if (!G.got || now - G.got.at > 30e3) G.got = { at: now, body: await (await env.STATS.get(env.STATS.idFromName("site")).fetch("https://stats/get")).text() };
-        return new Response(G.got.body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+        if (!G.got || now - G.got.at > 30e3) {
+          const all = await (await env.STATS.get(env.STATS.idFromName("site")).fetch("https://stats/get")).json();
+          G.got = { at: now, own: JSON.stringify(all), body: JSON.stringify({ ...all, spent: undefined }) };
+        }
+        // (what the period has spent is the owner's: env.OWNER_KEY, the same link as the page's key)
+        return new Response(env.OWNER_KEY && u.searchParams.get("k") === env.OWNER_KEY ? G.got.own : G.got.body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
       }
       return env.ASSETS ? await env.ASSETS.fetch(req) : new Response("not found", { status: 404 });
     } finally {
