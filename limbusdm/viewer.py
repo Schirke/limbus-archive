@@ -1278,7 +1278,7 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     opts = dict(rounds=max(1, min(MAX_ROUNDS, int(spec.get("rounds") or 20))), defend=spec.get("defend"), counter=spec.get("counter"),
                 kbscale=kb_scale(spec), winner=None if w == 2 else w, pace=True, flow=spec.get("flow") or "",
                 # (the same options as /api/versus_plan's, so the render plays the fight the engine view showed; engagements
-                # at once: lanes, or all of them with allAtOnce; a spotlight attack stops the rest)
+                # at once: lanes, or all of them with allAtOnce; a fatal blow stops the rest)
                 lanes=int(spec.get("lanes") or 1), allAtOnce=bool(spec.get("allAtOnce")), randskill=True)
     if spec.get("bossPower"):
         opts["bossPower"] = float(spec["bossPower"])
@@ -1301,6 +1301,8 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
         for p in g["parts"]:
             p["tl"] = keep(p["tl"])
             p["ptl"] = keep(p["ptl"]) if p.get("ptl") else -1
+        for x in g.get("extras") or []:  # (aggro: blows on the side of a background beat)
+            x["tl"] = keep(x["tl"])
     pair = None
     for e in entries:
         pair = e.get("pair") or pair  # (only a beat's first part has it: the rest play within the same pair)
@@ -1320,6 +1322,7 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     bundles = list(dict.fromkeys(b for f in F for b in f["job"]["bundles"]))
     cast = [{"prefab": f["job"]["prefab"], "defaultClip": f["job"]["defaultClip"], "side": side[i], "name": T.short_names(F)[i],
              "x": fight["home"][i][0], "z": fight["home"][i][1], "boss": i == fight["boss"],
+             "wall": fight["walls"][i],
              "cds": [v for c in fight["cds"][i] for v in c]} for i, f in enumerate(F)]
     # the stretch of stage the fight goes over (everyone alive, every beat), for the fixed wide shot
     xs = [p[0] for s in fight["steps"] for i, p in enumerate(s["x"]) if s["hp"][i] > 0] + [p[0] for p in fight["home"]]
@@ -1331,6 +1334,8 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     job["clashSpeed"] = clash_speed(spec)
     job.update({k: bool(spec.get(k)) for k in VS_EXTRAS if k not in ("dash", "music", "intro", "ego", "uisfx", "randskill", "deck", "notes") and not k.startswith(("buff", "debuff"))})
     job.update(pace=True, loop=False, directed=True, wall=fight["wall"], loserPush=E.RULES["loser_push"], kbScale=kb_scale(spec))
+    # (the wide shot follows everyone, led this much by the pair's own camera: 0 = one fixed shot; ViewerTeam.cs TeamShow)
+    job["camFollow"] = max(0.0, min(1.0, float(spec.get("camFollow", 0.5))))
     winner = fight["winner"]
     if spec.get("uisfx"):
         k = 0

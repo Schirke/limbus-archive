@@ -40,8 +40,11 @@ import threading
 from . import versus_engine as E
 
 TEAM = {
-    "wall": 8.0,             # across: how far from the stage's middle anyone gets (at least; wider for far slots)
+    "wall": 5.5,             # across: how far from the stage's middle anyone gets (the start slots are squeezed in)
     "depth": 1.6,            # depth: how far in front of / behind the middle line
+    # duels: each pair in its own depth row (rows duel_row apart at most, within depth), the two duel_gap from the middle
+    # line; nobody farther across than duel_wall (about half the game-scale wide shot: the whole fight stays in it)
+    "duel_row": 1.2, "duel_gap": 1.65, "duel_wall": 4.0,
     "world_body": 1.6,       # the game's world units per body height (team-position -> bodies)
     "depth_scale": 0.65,     # the game's depth squeezed by this (a flat camera shows little of it)
     "cooldown": {"nimble": (0.3, 0.6), "universal": (0.8, 1.2), "range": (1.0, 1.5), "slow": (1.8, 2.5), "boss": (0.2, 0.4)},
@@ -60,9 +63,10 @@ TEAM = {
     "range_reach": 4.0,      # world units: a coin landing at least this far in front of the other one is a shot from afar
     "mass_reach": 2.2,       # a mass skill also hits the others within this many bodies of its target
     "mass_share": 0.6,       # them: this share of its damage and knockback
-    "edge": 2.2,             # after an engagement, one this close to a wall walks back towards the middle
-    "edge_back": 3.0,        # to at least this far from it
-    "soft_wall": 2.5,        # knocked towards a wall closer than this: less far (down to a quarter right at it)
+    "edge": 1.1,             # after an engagement, one pinned this close to a wall (the boss too) steps out from it
+    "edge_back": 1.9,        # to about this far from it (a step, not back to where it started)
+    "soft_wall": 2.0,        # knocked towards a wall closer than this: less far (down to a quarter right at it)
+    "spot_hold": 3.0,        # (stepping aside) a spot counts as taken by one standing there now or this many seconds on
     "personal": 0.65,        # two that aren't fighting each other never stand closer than this (one steps aside in depth)
     "boss_cd_by": {"slow": 2.0, "nimble": 0.7},  # a boss's cooldown x this for its own tag
     # aggro (flow "aggro"): how long one keeps at its target by its role (seconds), how often it turns on one that
@@ -91,15 +95,14 @@ TEAM = {
     # engine clock (seconds; estimates for the queue — the player has its own timing)
     "run_speed": 9.0, "walk_speed": 3.0, "clash_s": 0.35, "hold_s": 0.35, "counter_s": 0.8,
     "max_clashes": 3,        # the fight ends after rounds x this many clashes at most (then the losing side falls)
-    # (several engagements at once) a long or showy attack — a fighter's last skill (S3), one this long or longer, the
-    # fight's last kill — stops everyone else on the spot while it plays (Battle.freeze)
-    "spot_s": 3.5,
-    "freeze": True,          # a spotlight attack stops the others (Battle.freeze)
+    # (several engagements at once) a fatal blow — the one taking a fighter's last HP — stops everyone else on the spot
+    # while it plays (Battle.freeze; the player's camera zooms in on it)
+    "freeze": True,
 }
 
 # what the page's team rules may change (limbusdm/server.py /api/versus_team_rules; spec "rules"): key -> (low, high), a
 # pair of numbers (exchange: both ends), or a table of pairs (cooldown: by role)
-RULE_LIMITS = {"spot_s": (1.0, 30.0), "boss_streak": (1, 9), "interrupt_p": (0.0, 1.0), "boss_hp": (0.1, 3.0), "wall": (4.0, 14.0),
+RULE_LIMITS = {"boss_streak": (1, 9), "interrupt_p": (0.0, 1.0), "boss_hp": (0.1, 3.0), "wall": (4.0, 14.0),
                "freeze": None, "exchange": (1, 9), "cooldown": (0.0, 8.0)}
 _RULES_LOCK = threading.RLock()
 
@@ -282,6 +285,9 @@ def slots(svc) -> dict:
     return t
 
 
+OPEN_FRAME, OPEN_FOV = 2.65, 39.88  # the opening wide shot's half height (bodies) and the battle camera's field of view
+
+
 def start_places(svc, nl: int, nr: int) -> list[list[float]]:
     """Where each one starts (body heights, [x, z]): the left side in the player's slots, the right side in the
     enemies' (a lone one opposite two or more: the boss slot), centred between the two front slots."""
@@ -297,16 +303,27 @@ def start_places(svc, nl: int, nr: int) -> list[list[float]]:
         right.append((right[-1][0] + 2.5, -right[-1][1]))
     mid = (max(x for x, _ in left) + min(x for x, _ in right)) / 2
     wb, ds = TEAM["world_body"], TEAM["depth_scale"]
-    return [[round((x - mid) / wb, 3), round(max(-TEAM["depth"], min(TEAM["depth"], y / wb * ds)), 3)] for x, y in left + right]
+    # (the slots across squeezed in so that the farthest is a little over a body from the wall)
+    far = max(abs(x - mid) for x, _ in left + right) / wb
+    k = min(1.0, (TEAM["wall"] - 1.3) / far) if far > 0 else 1.0
+    zs = [max(-TEAM["depth"], min(TEAM["depth"], y / wb * ds)) for _, y in left + right]
+    # (and squeezed further so that everyone is in the opening's wide shot at the game's scale — ViewerTeam.cs
+    # TeamCamera / TeamNeed: half the picture's height OPEN_FRAME bodies, 16:9, the battle camera's field of view, half a
+    # body and a little to spare at the edges; one farther from the camera may stand farther out)
+    t = math.tan(math.radians(OPEN_FOV / 2))
+
+    def over(q):
+        xs = [x for x in q]
+        cx = (min(xs) + max(xs)) / 2
+        return max(abs(x - cx) - ((OPEN_FRAME + z * t) * 16 / 9 - 0.6) for x, z in zip(q, zs))
+    xs = [(x - mid) / wb * k for x, _ in left + right]
+    f = 1.0
+    while f > 0.5 and over([x * f for x in xs]) > 0:
+        f -= 0.01
+    return [[round(x * f, 3), round(z, 3)] for x, z in zip(xs, zs)]
 
 
 # ------------------------------------------------------------------ the fight
-
-def spotlight(f: dict, sk: dict, final=False) -> bool:
-    """A long or showy attack (it stops everyone else while it plays): the fighter's last skill (S3), one of spot_s
-    seconds or more, or the fight's last kill."""
-    return bool(final) or bool(f["skills"]) and sk["group"] == f["skills"][-1]["group"] or sk.get("seconds", 0) >= TEAM["spot_s"]
-
 
 class Battle:
     """One team fight. F: the fighters (versus_engine.fighter's), side: 0 left / 1 right each, tags: tags_of's each.
@@ -369,8 +386,15 @@ class Battle:
         # (the fight ends after about rounds x max_clashes clashes: of every pair at once in duels)
         self.clash_cap = self.rounds * T["max_clashes"] * (max(1, len(self.mate) // 2) if self.duels else 1)
         self.pos = [list(p) for p in (places or start_places(None, counts[0], counts[1]))]
+        if self.duels and self.mate:
+            # (each pair one row deeper than the one before — the first one farthest back — around the middle across)
+            prs = sorted((a, b) for a, b in self.mate.items() if self.side[a] == 0)
+            span = min(2 * T["depth"], T["duel_row"] * (len(prs) - 1))
+            for r, (a, b) in enumerate(prs):
+                z = round(span / 2 - (r * span / (len(prs) - 1) if len(prs) > 1 else 0), 3)
+                self.pos[a], self.pos[b] = [-T["duel_gap"], z], [T["duel_gap"], z]
         self.home = [list(p) for p in self.pos]
-        self.wall = max(T["wall"], max(abs(p[0]) for p in self.pos) + 0.6)
+        self.wall = T["duel_wall"] if self.duels else max(T["wall"], max(abs(p[0]) for p in self.pos) + 0.6)
         self.t = 0.0
         self.ready = [round(self.rnd.uniform(0, 0.4) + 0.15 * T["priority"][self.main_role(i)], 3) for i in range(self.n)]
         self.busy = [0.0] * self.n  # busy until
@@ -381,10 +405,14 @@ class Battle:
         self.steps = []
         self.dead_order = []
         self.cds = [[] for _ in range(self.n)]  # each one's cooldowns: [from, ready again]
-        # (several engagements at once: a spotlight attack stops the others — see freeze) [from, to] of each stop
+        # (several engagements at once: a fatal blow stops the others — see freeze) [from, to, engagement] of each stop
         self.freezes = []
-        self.freezing = not self.aggro and self.lanes != 1 and bool(TEAM.get("freeze", True))
+        self.freezing = (self.aggro or self.lanes != 1) and bool(TEAM.get("freeze", True))
         self.eng_start = {}  # each engagement's start (engine time)
+        # where each one stands when (the beats it is in so far: see spots), those in the beat being decided and its
+        # engine time now (others' beats decided earlier may go on at the same time: aside looks at where they are then)
+        self.track = [[] for _ in range(self.n)]
+        self.cur, self.at = set(), 0.0
 
     # --- duels
     def duel_pairs(self) -> dict:
@@ -454,7 +482,7 @@ class Battle:
         if w == self.boss:  # (the boss sweeps everyone around itself too)
             near += [o for o in self.foes(w) if o != v and o not in near and self.dist(o, w) <= self.T["boss_sweep"]]
         for o in near:
-            x, _ = self.land(w, o, sk, coins, share=self.T["mass_share"], kb=self.T["mass_share"], keep=True)
+            x, _ = self.land(w, o, sk, coins, share=self.T["mass_share"], kb=self.T["mass_share"], keep=True, spare=self.elsewhere(o, self.at))
             out.append({"who": o, "dmg": x, "dmgShare": x / self.max[o]})
         return out
 
@@ -467,8 +495,9 @@ class Battle:
         filled in by run())."""
         at = self.t if at is None else at
         if self.freezes:
-            # (decided before a spotlight attack of another engagement was known: after it — or held through it)
-            at = self.thaw(at, eng)
+            # (decided before a fatal blow of another engagement was known: after it — or held through it; aggro decides
+            # each beat as it comes, after the stops it knows of: only held)
+            at = at if self.aggro else self.thaw(at, eng)
             for a, b, e in self.freezes:
                 if e != eng and self.eng_start.get(eng, 0.0) < a - 1e-6 and at < a - 1e-6 < at + dur - 2e-6:
                     dur += b - a
@@ -477,13 +506,21 @@ class Battle:
         s = dict(act=act, t=round(at, 3), dur=round(dur, 3), who=who, tgt=tgt, eng=eng,
                  p={i: [round(v, 2) for v in self.pos[i]] for i in part}, h={i: self.hp[i] for i in part}, **kw)
         self.steps.append(s)
-        if self.freezing and act in ("whole", "strong", "shot") and kw.get("sk") and spotlight(self.F[who], kw["sk"], kw.get("final")):
-            s["spot"] = True
-            self.freeze(s)
+        for i in part:
+            self.track[i].append(s)
+        if act in ("whole", "strong", "shot", "interrupt", "blow"):
+            # a fatal blow: who it takes the last HP of (the player's camera zooms in on it; freeze: the others stop)
+            kv = [x for x in [tgt] + [e["who"] for e in kw.get("side") or []] + [e["on"] for e in kw.get("extras") or [] if "on" in e]
+                  if x is not None and x >= 0 and self.hp[x] <= 0 and x not in self.dead_order]
+            if kv:
+                s["kill"], s["kv"] = True, sorted(set(kv), key=kv.index)
+                if self.freezing:
+                    s["spot"] = True
+                    self.freeze(s)
         return s
 
     def freeze(self, s):
-        """A spotlight attack (see spotlight) at s: everything else stops for its length — the other engagements' beats
+        """A fatal blow (see log) at s: everything else stops for its length — the other engagements' beats
         from then on come that much later (one going on then: held that long, "frozen"), the others' busy / ready
         times and cooldowns too; no new engagement starts meanwhile (run)."""
         T, D, E = s["t"], s["dur"], s["eng"]
@@ -512,12 +549,25 @@ class Battle:
                     c[0], c[1] = round(c[0] + D, 3), round(c[1] + D, 3)
                 elif c[1] > T:
                     c[1] = round(c[1] + D, 3)
+            if self.aggro:  # (its aim, its shot and its aggro go on after the stop)
+                for a in (self.aim, self.shooting):
+                    if a[i] > T:
+                        a[i] = round(a[i] + D, 3)
+                if self.aggs[i] and self.aggs[i][-1][1] > T:
+                    self.aggs[i][-1][1] = round(self.aggs[i][-1][1] + D, 3)
+                if self.agg_end[i] > T:
+                    self.agg_end[i] = round(self.agg_end[i] + D, 3)
+        for f in self.freezes:  # (another fight's stop decided earlier but coming later: later still)
+            if f[2] != E and f[0] >= T - 1e-6:
+                f[0], f[1] = round(f[0] + D, 3), round(f[1] + D, 3)
+            elif f[2] != E and f[1] > T + 1e-6:
+                f[1] = round(f[1] + D, 3)
         self.freezes.append([T, round(T + D, 3), E])
         self.freezes.sort()
 
     def thaw(self, t, eng) -> float:
-        """Engine time t of engagement eng (decided as if nothing stopped it) after the other engagements' spotlight
-        stops before it."""
+        """Engine time t of engagement eng (decided as if nothing stopped it) after the other engagements' stops (fatal
+        blows) before it."""
         start = self.eng_start.get(eng, 0.0)
         for a, b, e in self.freezes:
             if e != eng and start < a - 1e-6 and t >= a - 1e-6:  # (one started after it was decided knowing it)
@@ -525,8 +575,16 @@ class Battle:
         return round(t, 3)
 
     # --- moving
+    def wall_z(self, z) -> float:
+        """How far from the middle across one may get at depth z: the wall; in duels (the whole fight in the game-scale
+        wide shot) no farther than that shot sees at that depth — nearer the camera less (see start_places)."""
+        if not self.duels:
+            return self.wall
+        t = math.tan(math.radians(OPEN_FOV / 2))
+        return max(2.0, min(self.wall, (OPEN_FRAME + z * t) * 16 / 9 - 0.6))
+
     def clamp(self, p):
-        w, d = self.wall, self.T["depth"]
+        w, d = self.wall_z(p[1]), self.T["depth"]
         over = abs(p[0]) - w
         if over > 0:
             p[0] = (1 if p[0] > 0 else -1) * (w - min(over * self.R["wall_bounce"], self.R["wall_bounce_max"]))
@@ -539,28 +597,51 @@ class Battle:
     def run_to(self, i, j, side=None, dz=0.0) -> float:
         """i runs up to j, face to face across (on `side` of it: -1 left, 1 right; default the side it comes from) at
         j's depth (+ dz); the seconds it takes."""
-        side = side if side is not None else (-1.0 if self.pos[i][0] < self.pos[j][0] else 1.0)
-        to = self.clamp([self.pos[j][0] + side * self.R["clash_gap"], self.pos[j][1] + dz])
-        if abs(to[0] - self.pos[j][0]) < self.R["clash_gap"] * 0.6:  # (pinned at a wall: the other side of it)
-            to = self.clamp([self.pos[j][0] - side * self.R["clash_gap"], self.pos[j][1] + dz])
+        # (aggro: j may already be decided on into a later beat — where it stands now)
+        pj = self.spots(j, self.at, self.at)[0] if self.aggro else self.pos[j]
+        side = side if side is not None else (-1.0 if self.pos[i][0] < pj[0] else 1.0)
+        to = self.clamp([pj[0] + side * self.R["clash_gap"], pj[1] + dz])
+        if abs(to[0] - pj[0]) < self.R["clash_gap"] * 0.6:  # (pinned at a wall: the other side of it)
+            to = self.clamp([pj[0] - side * self.R["clash_gap"], pj[1] + dz])
         to = self.aside(i, to, j)
         d = math.hypot(to[0] - self.pos[i][0], to[1] - self.pos[i][1])
         self.pos[i] = to
         return max(0.2, d / self.T["run_speed"]) if d > 0.05 else 0.0
 
+    def spots(self, o, t0, t1) -> list:
+        """Where o stands between engine times t0 and t1 as far as the beats decided so far go: its place at t0 and
+        every place it gets to before t1."""
+        out, tr = [], self.track[o]
+        for k in range(len(tr) - 1, -1, -1):
+            s = tr[k]
+            if s["t"] > t1 + 1e-6:
+                continue
+            out.append(s["p"][o])
+            if s["t"] <= t0 + 1e-6:
+                break
+        return out or [self.home[o]]
+
     def aside(self, i, to, j=None):
-        """Where i stands instead of `to` if someone else (not j) already stands there: the nearest free spot a step or
-        two aside in depth (else a step back across too)."""
+        """Where i stands instead of `to` if someone else (not j) stands there now or soon (spot_hold; the beats of other
+        engagements going on at the same time included — see spots): the nearest free spot a step or two aside in
+        depth, else a step back across too."""
         P = self.T["personal"]
+        taken = []
+        for o in range(self.n):
+            if self.duels and abs(self.home[o][1] - self.home[i][1]) > 1e-3:
+                continue  # (duels: every pair keeps to its own depth row)
+            if o not in (i, j) and self.alive(o):
+                taken += [self.pos[o]] if o in self.cur else self.spots(o, self.at, self.at + self.T["spot_hold"])
+        if j is not None:  # (aggro: where the other one is already decided to go on to soon)
+            taken += [st["p"][j] for st in self.track[j] if self.at + 1e-6 < st["t"] <= self.at + self.T["spot_hold"]]
 
         def free(p):
-            return all(math.hypot(self.pos[o][0] - p[0], self.pos[o][1] - p[1]) >= P
-                       for o in range(self.n) if o not in (i, j) and self.alive(o))
+            return all(math.hypot(q[0] - p[0], q[1] - p[1]) >= P for q in taken)
         if free(to):
             return to
         back = 1.0 if j is None or self.pos[j][0] <= to[0] else -1.0
-        for dx in (0.0, 0.5 * back, 1.0 * back):
-            for dz in (P, -P, 2 * P, -2 * P, 3 * P, -3 * P):
+        for dx in (0.0, 0.5 * back, 1.0 * back, 1.5 * back, -0.5 * back, 2.0 * back):
+            for dz in ((0.0,) if self.duels else (P, -P, 2 * P, -2 * P, 3 * P, -3 * P, 0.0)):
                 p = self.clamp([to[0] + dx, to[1] + dz])
                 if free(p):
                     return p
@@ -571,7 +652,7 @@ class Battle:
         soft_wall, less far."""
         away = -self.face(i, j)
         if d > 0:
-            room = self.wall - self.pos[i][0] * away
+            room = self.wall_z(self.pos[i][1]) - self.pos[i][0] * away
             d *= max(0.25, min(1.0, (room - 0.5) / self.T["soft_wall"]))
         o = self.pos[j][0]
         to = self.pos[i][0] + away * max(-self.R["kb_max"], min(self.R["kb_max"], d))
@@ -580,7 +661,7 @@ class Battle:
         self.pos[i] = self.aside(i, self.clamp([to, self.pos[i][1]]), j)
 
     def room(self, i, j) -> float:  # between i and the wall behind it (facing j)
-        return self.wall + self.pos[i][0] * self.face(i, j)
+        return self.wall_z(self.pos[i][1]) + self.pos[i][0] * self.face(i, j)
 
     # --- the rules (versus_engine.Fight's, for any two)
     def flip(self) -> bool:
@@ -605,6 +686,15 @@ class Battle:
         m = self.cap(d, share)
         return min(m, self.hp[d] - 1) if len(self.foes(w)) == 1 else m
 
+    def elsewhere(self, d, t) -> bool:
+        """d plays a beat of another fight at t (not one of those in the beat being decided)."""
+        return t + 1e-6 < self.busy[d] < 1e8 and d not in self.cur
+
+    def chip(self, w, d, share=1.0) -> int:
+        """The most a side blow of w takes from d (a helper's, a free blow, a cut-in, guarded chip damage): as most, and
+        never d's last HP — a fighter falls only to a skill (log: a fatal blow, the camera's zoom)."""
+        return min(self.most(w, d, share), self.hp[d] - 1)
+
     def defense(self, d, shot=False) -> str | None:
         """How d meets a blow it doesn't clash: guards / evades (its own defense skill's kind, else 2 : 1), or (not a
         shot: it would have to run at the shooter) takes it and strikes back; or nothing."""
@@ -618,13 +708,16 @@ class Battle:
         g = self.F[d]["guard"]
         return g["kind"] if g else rnd.choices(["Guard", "Evade"], weights=self.R["guard_evade"])[0]
 
-    def land(self, w, d, sk, coins, defense=None, share=1.0, kb=1.0, keep=False) -> tuple[int, int]:
+    def land(self, w, d, sk, coins, defense=None, share=1.0, kb=1.0, keep=False, spare=False) -> tuple[int, int]:
         """w lands `coins` coins of sk on d (versus_engine.Fight.land's rules; damage and knockback x share / kb);
-        (damage, coins dodged). keep: never d's last HP when it is the last one (see most)."""
+        (damage, coins dodged). keep: never d's last HP when it is the last one (see most); spare: never its last HP
+        (it plays a beat of another fight then: a fatal blow would cut it short — see elsewhere)."""
         g = (self.F[d]["guard"] or self.R["plain_guard"]) if defense in ("Guard", "Evade") else None
         shield = self.roll(g, g["coins"]) if defense == "Guard" else 0
         total, missed, power, broken = 0, 0, sk["base"], False
         cap = self.most(w, d, share) if keep else self.cap(d, share)
+        if spare:
+            cap = min(cap, self.hp[d] - 1)
         for _ in range(coins):
             if self.flip():
                 power += sk["coin"]
@@ -735,6 +828,7 @@ class Battle:
             self.shot(a, d)
         elif self.lone(a):
             # the lone one (a boss) goes for d: d and the rest of its side surround it
+            self.cur, self.at = {a, d}, self.t
             dur = self.run_to(a, d) / (self.T["dash"] if dash else 1)
             if dur:
                 self.log("run-in", a, d, dur, self.eng, dash=dash, result="dashes at the shooter" if dash else "runs in")
@@ -753,9 +847,10 @@ class Battle:
     def finish(self, who: list[int], end: float):
         """Those in an engagement ending at `end`: busy until then, ready again after their cooldown (kept in cds for
         the cooldown bars). A slow one out of its zone walks back to it; one left near a wall walks back towards the
-        middle (nobody hangs about at the stage's ends)."""
-        at_end = end  # (as decided: log() puts it after other engagements' spotlight stops)
+        middle — a step, only when pinned there (edge)."""
+        at_end = end  # (as decided: log() puts it after other engagements' stops)
         end = self.thaw(end, self.eng) if self.freezes else end
+        self.cur, self.at = set(who), end
         for i in who:
             self.busy[i] = end
             self.ready[i] = round(end + self.cooldown(i), 3)
@@ -774,10 +869,10 @@ class Battle:
                     x = self.pos[o][0] - away * self.T["shoot_gap"]
                 to, why = [x, self.pos[i][1]], "backs off to shoot again" + (", reloads" if self.ammo[i] >= 0 and self.ammo[i] < self.T["ammo"] else "")
                 self.reload(i)
-            elif self.wall - abs(self.pos[i][0]) < self.T["edge"]:
+            elif self.wall_z(self.pos[i][1]) - abs(self.pos[i][0]) < self.T["edge"]:
                 x = self.pos[i][0]
-                to = [(1 if x > 0 else -1) * (self.wall - self.T["edge_back"] - self.rnd.uniform(0, 0.8)), self.pos[i][1]]
-                why = "walks back from the wall"
+                to = [(1 if x > 0 else -1) * (self.wall_z(self.pos[i][1]) - self.T["edge_back"] - self.rnd.uniform(0, 0.3)), self.pos[i][1]]
+                why = "steps out from the wall"
             if to is None:
                 continue
             to = self.aside(i, self.clamp(to))
@@ -794,6 +889,9 @@ class Battle:
         """d fell to w: a beat for it; whether the fight is over (one side all down)."""
         if self.alive(d):
             return False
+        # (a beat decided earlier may take it on past then — aggro, or another engagement's: it falls after that one)
+        if at < self.busy[d] < 1e8:
+            at = self.busy[d]
         self.dead_order.append(d)
         self.busy[d] = 1e9
         over = self.duel_open() == 0 if self.duels else not self.foes(w)
@@ -804,6 +902,7 @@ class Battle:
         """a shoots d from where it stands (a range skill, all its coins): d can't clash it — it guards, evades or
         takes it, and stays where it is."""
         t0 = self.t
+        self.cur, self.at = {a, d}, t0
         sk = self.rnd.choice(self.range_skills(a))
         how = self.defense(d, shot=True)
         # (never the fight's last kill: that one is the longest skill, run in and landed — see landing)
@@ -844,10 +943,12 @@ class Battle:
         shooters = [k for k in A if k in shooters or (self.range_skills(k) and not self.melee_skills(k))]
         fighters = [k for k in A if k not in shooters] or A[:1]
         shooters = [k for k in shooters if k not in fighters]
+        self.cur = set(A) | {d}
         # the run in: the first from its side, the next from the other side, then behind them a little deeper / nearer
         for n, k in enumerate(fighters):
             s0 = -1.0 if self.pos[fighters[0]][0] < self.pos[d][0] else 1.0
             side = s0 * (-1 if n % 2 else 1)
+            self.at = t
             dur = self.run_to(k, d, side=side, dz=(0.0 if n < 2 else 0.45 * (1 if n == 2 else -1)))
             if dur:
                 self.log("run-in", k, d, dur, eng, at=t, result="runs in" + (" (surrounding)" if n else ""))
@@ -862,6 +963,7 @@ class Battle:
         armor_d = d == self.boss
         for r in range(n):
             k = rnd.choice(fighters) if surround and len(fighters) > 1 else fighters[0]
+            self.at = t
             if k != last and self.gap(k, d) > R["close"] + 1e-6:
                 dur = self.run_to(k, d)
                 self.log("run-in", k, d, dur, eng, at=t, result="runs back in")
@@ -893,6 +995,7 @@ class Battle:
             wn = d if lo == k else k
             wins[k][0 if wn == k else 1] += 1
             self.clashes += 1
+            self.at = t
             self.knock(lo, wn, R["loser_push"])
             # the others' blows land on d meanwhile (one coin each; a shooter's a shot) — d flinches, isn't thrown
             extras = []
@@ -900,7 +1003,7 @@ class Battle:
                 if e == k or not self.alive(d):
                     continue
                 if e in shooters or (e in fighters and self.gap(e, d) <= R["close"] + 1e-6):
-                    m = self.most(e, d, 0.5)
+                    m = self.chip(e, d, 0.5)
                     dmg = self.hurt(d, self.roll(sks[e], 1) * T["extra_share"], sks[e]["atk"], m, e) if m > 0 else 0
                     extras.append({"who": e, "dmg": dmg, "dmgShare": dmg / self.max[d], "shot": e in shooters})
             s = self.log("clash", wn, d if wn == k else k, T["clash_s"], eng, at=t, att=k, def_=d, loser=lo, pow=p,
@@ -914,6 +1017,7 @@ class Battle:
                 self.t_end(A + [d], t, over)
                 return
             if r < n - 1 and not surround:
+                self.at = t
                 dur = self.run_to(wn, lo)
                 if dur:
                     self.log("run-in", wn, lo, dur, eng, at=t, result="runs at it")
@@ -943,6 +1047,7 @@ class Battle:
         elif wins[worst][1] > wins[worst][0]:
             t, over = self.landing(d, worst, dsk, t, others=[x for x in A if x != worst], helpers=[x for x in A if x != worst])
         else:
+            self.at = t
             for k in fighters:
                 if self.gap(k, d) <= R["close"] + 1e-6:
                     self.knock(k, d, R["near_gap"] - R["clash_gap"])
@@ -960,10 +1065,13 @@ class Battle:
         others around: armor on its later skills (they can't cut it short), else a blow may cut it to one coin."""
         R, T = self.R, self.T
         eng = self.eng
+        self.cur |= {w, v} | set(others) | set(helpers)
+        self.at = t
         dur = self.run_to(w, v)
         if dur:
             self.log("run-in", w, v, dur, eng, at=t, result="runs at it")
             t += dur
+            self.at = t
         how = self.defense(v)
         if (self.duel_open() == 1 if self.duels else len(self.foes(w)) == 1) and self.hp[v] <= self.cap(v):
             how = None  # (the fight's last blow lands clean)
@@ -979,11 +1087,11 @@ class Battle:
         side = self.mass(w, v, sk, coins)
         final = not self.alive(v) and (self.duel_open() == 0 if self.duels else not self.foes(w))
         shown = self.final_skill(w) if final else sk
-        # the others in the engagement don't wait through a skill that isn't a spotlight one: each lands a blow
-        # meanwhile (one coin at extra_share — on the boss boss_blow, armor_blow in its armor; a shooter its shot) on the
-        # other side's one of the two
+        # the others in the engagement don't wait through a skill that isn't a fatal blow: each lands a blow meanwhile
+        # (one coin at extra_share — on the boss boss_blow, armor_blow in its armor; a shooter its shot) on the other
+        # side's one of the two
         helps = []
-        if helpers and not final and not spotlight(self.F[w], shown):
+        if helpers and not final and self.alive(v) and all(self.alive(x["who"]) for x in side):
             for h in helpers:
                 tg = v if self.side[h] == self.side[w] else w
                 if not self.alive(h) or not self.alive(tg) or h in (w, v):
@@ -993,7 +1101,7 @@ class Battle:
                     continue
                 hs = self.rnd.choice(self.range_skills(h)) if shooter else self.decks[h].skill("close", self.long_max)
                 share = (T["armor_blow"] if armor and tg == w else T["boss_blow"]) if tg == self.boss else T["extra_share"]
-                m = self.most(h, tg, 0.5)
+                m = self.chip(h, tg, 0.5)
                 d2 = self.hurt(tg, self.roll(hs, 1) * share, hs["atk"], m, h) if m > 0 else 0
                 helps.append({"who": h, "on": tg, "dmg": d2, "dmgShare": d2 / self.max[tg], "shot": shooter})
         res = f"{dmg} damage" + (f", {missed} dodged" if how == "Evade" else "") + (", blocked" if how == "Guard" else "") \
@@ -1005,7 +1113,7 @@ class Battle:
         t += shown["seconds"] if coins == sk["coins"] else T["counter_s"]
         if cut is not None and self.alive(w):
             cs = self.decks[cut].skill("close", self.long_max)
-            d2 = self.hurt(w, self.roll(cs, 1), cs["atk"], self.most(cut, w, 0.5)) if self.most(cut, w, 0.5) > 0 else 0
+            d2 = self.hurt(w, self.roll(cs, 1), cs["atk"], self.chip(cut, w, 0.5)) if self.chip(cut, w, 0.5) > 0 else 0
             self.log("interrupt", cut, w, T["counter_s"], eng, at=t, dmg=d2, dmgShare=d2 / self.max[w], result=f"cuts in: {d2} damage")
             t += T["counter_s"]
             if self.kill_check(cut, w, t):
@@ -1034,6 +1142,8 @@ class Battle:
         weaker (strong_side of the damage and knockback)."""
         T = self.T
         eng = self.eng
+        self.cur |= {d, k} | set(others)
+        self.at = t
         sk = max([s for s in self.F[d]["skills"] if s["seconds"] <= self.long_max] or self.F[d]["skills"], key=lambda s: s["coins"])
         dmg, _ = self.land(d, k, sk, sk["coins"])
         if d == self.boss:
@@ -1042,7 +1152,7 @@ class Battle:
         reach = max(T["side_reach"], T["mass_reach"] if "mass" in self.stags(d, sk) else 0)
         for o in others:
             if self.alive(o) and self.dist(o, d) <= reach:
-                x, _ = self.land(d, o, sk, sk["coins"], share=T["strong_side"], kb=T["strong_side"])
+                x, _ = self.land(d, o, sk, sk["coins"], share=T["strong_side"], kb=T["strong_side"], spare=self.elsewhere(o, t))
                 side.append({"who": o, "dmg": x, "dmgShare": x / self.max[o]})
         final = (not self.alive(k) or any(not self.alive(x["who"]) for x in side)) and not self.foes(d)
         shown = self.final_skill(d) if final else sk
@@ -1109,6 +1219,7 @@ class Battle:
         R, T, rnd = self.R, self.T, self.rnd
         t = self.t
         j = self.tgt[i]
+        self.cur, self.at = {i} | ({j} if j is not None else set()), t
         spent = self.uses[i] <= 0 or (i == self.boss and self.won[i] >= T["boss_land_wins"])
         if j is not None and self.alive(j) and spent and self.won[i] > self.lost[i] and self.gap(i, j) <= R["close"] + 0.5 \
                 and self.busy[j] <= t + 1e-6:
@@ -1133,6 +1244,7 @@ class Battle:
                 self.partner[i] = None
                 return
         self.eng = self.aggro_eng(i, j)
+        self.cur = {i, j}
         if self.empty(i) and self.sk[i] in self.range_skills(i) and self.melee_skills(i):
             melee = [x for x in self.melee_skills(i) if x["seconds"] <= self.long_max] or self.melee_skills(i)
             self.sk[i] = self.rnd.choice(melee)  # (out of ammo: it goes in to fight up close)
@@ -1146,7 +1258,8 @@ class Battle:
             sk = self.sk[i]
             how = self.defense(j, shot=True)
             share = self.spend(i)
-            dmg, missed = self.land(i, j, sk, sk["coins"], defense=how, share=share * T["shot_share"] * (T["boss_shot"] if j == self.boss else 1), keep=True)
+            dmg, missed = self.land(i, j, sk, sk["coins"], defense=how, share=share * T["shot_share"] * (T["boss_shot"] if j == self.boss else 1), keep=True,
+                                   spare=self.busy[j] > t + 1e-6)
             side = self.mass(i, j, sk, sk["coins"])
             res = f"{dmg} damage" + (", blocked" if how == "Guard" else "") + (f", {missed} dodged" if how == "Evade" else "") \
                 + "".join(f"; #{x['who']} {x['dmg']} (mass)" for x in side)
@@ -1187,7 +1300,7 @@ class Battle:
             self.blown[(i, j)] = self.busy[j]
             armor = j == self.boss and self.armor_until > t + 1e-6
             share = T["armor_blow"] if armor else T["boss_blow"] if j == self.boss else T["extra_share"]
-            m = self.most(i, j, 0.5)
+            m = self.chip(i, j, 0.5)
             dmg = self.hurt(j, self.roll(self.sk[i], 1) * share, self.sk[i]["atk"], m, i) if m > 0 else 0
             self.log("blow", i, j, T["extra_s"], self.eng, dmg=dmg, dmgShare=dmg / self.max[j], armor=armor,
                      result=f"lands a blow while it is busy: {dmg}" + (" (it can't be interrupted)" if armor else ""))
@@ -1207,7 +1320,7 @@ class Battle:
             if how in ("Guard", "Evade"):
                 g = self.F[j]["guard"] or R["plain_guard"]
                 hit = max(0, self.roll(self.sk[i], 1) - self.roll(g, g["coins"])) if how == "Guard" else 0
-                m = self.most(i, j, 0.5)
+                m = self.chip(i, j, 0.5)
                 dmg = self.hurt(j, hit, self.sk[i]["atk"], m, i) if hit and m > 0 else 0
                 if how == "Guard":
                     self.knock(j, i, 0.15)
@@ -1319,9 +1432,9 @@ class Battle:
         to, why = None, ""
         if "slow" in self.role[i] and not self.in_zone(i, self.pos[i]):
             to, why = [self.home[i][0] + self.rnd.uniform(-0.3, 0.3), self.home[i][1]], "walks back to its zone"
-        elif self.wall - abs(self.pos[i][0]) < self.T["edge"]:
+        elif self.wall_z(self.pos[i][1]) - abs(self.pos[i][0]) < self.T["edge"]:
             x = self.pos[i][0]
-            to, why = [(1 if x > 0 else -1) * (self.wall - self.T["edge_back"]), self.pos[i][1]], "walks back from the wall"
+            to, why = [(1 if x > 0 else -1) * (self.wall_z(self.pos[i][1]) - self.T["edge_back"]), self.pos[i][1]], "steps out from the wall"
         if to is None:
             return
         to = self.aside(i, self.clamp(to))
@@ -1341,6 +1454,8 @@ class Battle:
         self.steps[-1]["p"] = {i: list(self.pos[i]) for i in range(self.n)}
         self.steps[-1]["h"] = {i: self.hp[i] for i in range(self.n)}
         for i in range(self.n):
+            self.track[i].append(self.steps[-1])
+        for i in range(self.n):
             self.busy[i] = self.ready[i]
         guard = 0
         while not self.over and all(any(self.alive(i) and self.side[i] == s for i in range(self.n)) for s in (0, 1)):
@@ -1351,10 +1466,15 @@ class Battle:
             alive = [i for i in range(self.n) if self.alive(i)]
             i = min(alive, key=lambda i: (self.busy[i], T["priority"][self.main_role(i)], self.rnd.random()))
             self.t = max(self.t, self.busy[i])
+            fz = next((b for a, b, _ in self.freezes if a - 1e-6 <= self.t < b - 1e-6), None)
+            if fz is not None:  # (a fatal blow plays: nothing new starts until it is over)
+                self.busy[i] = fz
+                continue
             self.aggro_act(i)
         for i in range(self.n):
             if self.aggs[i] and self.aggs[i][-1][1] > self.t:
                 self.aggs[i][-1][1] = round(self.t, 3)
+        self.last_kill_final()
         return self.result()
 
     # --- the whole fight
@@ -1366,6 +1486,8 @@ class Battle:
         self.log("start", -1, None, 0.0, 0, result="the fight starts")
         self.steps[-1]["p"] = {i: list(self.pos[i]) for i in range(self.n)}
         self.steps[-1]["h"] = {i: self.hp[i] for i in range(self.n)}
+        for i in range(self.n):
+            self.track[i].append(self.steps[-1])
         guard = 0
         while not self.over and all(any(self.alive(i) and self.side[i] == s for i in range(self.n)) for s in (0, 1)):
             guard += 1
@@ -1373,7 +1495,7 @@ class Battle:
                 self.finale()
                 break
             fz = next((b for a, b, _ in self.freezes if a - 1e-6 <= self.t < b - 1e-6), None)
-            if fz is not None:  # (a spotlight attack plays: nothing new starts until it is over)
+            if fz is not None:  # (a fatal blow plays: nothing new starts until it is over)
                 self.t = fz
                 continue
             running = sum(1 for i in range(self.n) if self.busy[i] > self.t + 1e-6 and self.alive(i) and self.busy[i] < 1e8)
@@ -1392,6 +1514,7 @@ class Battle:
             # nothing to start now: on to the next moment something frees up
             nxt = [b for b in self.busy if b > self.t + 1e-6 and b < 1e8] + [r for i, r in enumerate(self.ready) if r > self.t + 1e-6 and self.alive(i)]
             self.t = min(nxt) if nxt else self.t + 0.5
+        self.last_kill_final()
         return self.result()
 
     def finale(self):
@@ -1406,6 +1529,7 @@ class Battle:
             self.eng_start[self.eng] = t
             last = sum(1 for i in range(self.n) if self.side[i] == lose and self.alive(i)) == 1
             sk = self.final_skill(w) if last else self.decks[w].skill("close", self.long_max)
+            self.cur, self.at = {w, v}, t
             dur = self.run_to(w, v)
             if dur:
                 self.log("run-in", w, v, dur, self.eng, at=t, result="runs in")
@@ -1417,6 +1541,31 @@ class Battle:
             t += sk["seconds"]
             self.dead_order.append(v)
         self.t = t
+
+    def last_kill_final(self):
+        """The fight's last kill in time is its final (the longest skill): one decided before the final but landing after
+        it (another fight's, decided ahead — the final's stop pushed it later) becomes the final instead."""
+        kills = [s for s in self.steps if s.get("kill") and s["act"] in ("whole", "strong")]
+        fin = next((s for s in kills if s.get("final")), None)
+        if fin is None:
+            return
+        k = max(kills, key=lambda s: (s["t"] + s["dur"], s is fin))
+        if k is fin:
+            return
+        sk = self.final_skill(k["who"])
+        d = round(sk["seconds"] - k["dur"], 3)
+        fin["final"] = False
+        k.update(final=True, skill=sk["group"], sk=sk, coins=sk["coins"], dur=round(k["dur"] + d, 3))
+        if d > 0:
+            T = k["t"]
+            for st in self.steps:  # (what comes after it: later by as much)
+                if st is not k and st["t"] > T + 1e-6:
+                    st["t"] = round(st["t"] + d, 3)
+            for f in self.freezes:
+                if f[0] > T + 1e-6:
+                    f[0], f[1] = round(f[0] + d, 3), round(f[1] + d, 3)
+                elif f[2] == k["eng"] and abs(f[0] - T) < 1e-6:
+                    f[1] = round(f[1] + d, 3)
 
     def result(self) -> dict:
         """The steps in time order, each with everyone's positions / HP after it and when each one is ready again."""
@@ -1447,7 +1596,7 @@ class Battle:
             winner = 0 if (up[0], share[0]) >= (up[1], share[1]) else 1
         return {"team": True, "steps": steps, "winner": winner, "seed": self.seed, "hp": list(self.hp), "hpMax": self.max,
                 "side": self.side, "clashes": self.clashes, "boss": self.boss, "roles": [sorted(r) for r in self.role],
-                "home": self.home, "wall": self.wall, "depth": self.T["depth"], "cds": self.cds, "tags": self.tags, "aggs": self.aggs,
+                "home": self.home, "wall": self.wall, "walls": [round(self.wall_z(h[1]), 3) for h in self.home], "depth": self.T["depth"], "cds": self.cds, "tags": self.tags, "aggs": self.aggs,
                 "flow": "aggro" if self.aggro else "duels" if self.duels else "exchanges", "bossPower": float(self.o.get("bossPower") or 1), "freezes": self.freezes,
                 "time": round(max((s["t"] + s["dur"] for s in steps), default=0), 2)}
 
@@ -1526,17 +1675,18 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
     """The player's script of a team fight: (parts, background). Each beat with an acting pair (a clash, a landing, a
     shot, a strong counter, a counter, an interrupt) is played as versus_engine.script plays a one-on-one beat (its
     parts, the partner's timeline, the loser, a defense, the damage share). Engagements go on at the same time: the
-    beats of one chain that never overlap (always the spotlight attacks — see spotlight — and never one held through
-    one) are "featured": the player's main parts, with the two-fighter code; the others are background beats the player
+    beats of one chain that never overlap (always the fatal blows — see Battle.log — and never one going on when one
+    starts) are "featured": the player's main parts, with the two-fighter code; the others are background beats the player
     plays alongside them, lighter (bg_part).
 
     A featured beat's first part also has: pair: [cast index of the player's fighter 0, of fighter 1] (who / loser /
     runs as in one-on-one, within the pair); place "run" + runs: the one running in first, rz: its depth after it (body
-    heights); et: its engine time, lt: the same without the spotlight stops (the background's clock); hp: everyone's HP
+    heights); et: its engine time, lt: the same without the stops (the background's clock); hp: everyone's HP
     share when it starts; moves: the others moving meanwhile ({"i", "x", "z", "dur", "kind": run / dash / walk / back,
     "rel": x relative to that one's place (-1: absolute), "after": from the beat's end on}); extras: the others' blows
     on the surrounded one during a clash ({"i", "tl": the coin's timeline, "off", "dmg"}); dies: those falling after
-    it. Every part of a spotlight attack has spot; every part of a mass skill / strong counter side ({"i", "dmg", "kb"}).
+    it. Every part of a fatal blow has kill + kv (the cast index of those it kills: the camera zooms in on it) and, with the
+    freeze rule, spot (everyone else stops meanwhile); every part of a mass skill / strong counter side ({"i", "dmg", "kb"}).
 
     A background beat: {"pair", "lt", "runs", "rz", "parts": [bg_part ...], "moves", "after" (moves from its end on),
     "dies", "note"}."""
@@ -1548,7 +1698,7 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
     n = len(F)
     freezes = fight.get("freezes") or []
 
-    def lane_t(e):  # (engine time without the spotlight stops before it)
+    def lane_t(e):  # (engine time without the stops before it)
         return round(e - sum(max(0.0, min(e, f[1]) - f[0]) for f in freezes), 3)
 
     hp = list(hpmax)
@@ -1557,6 +1707,7 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
     runs_in: dict = {}   # engagement -> run-ins since its last beat
     pending: dict = {}   # engagement -> the others' moves for its next beat
     last_win: dict = {}  # engagement -> its last clash's winner
+    last_by: dict = {}   # fighter -> the last beat it is in (aggro: its walks / backing off after it)
 
     def share(i):
         return round(hp[i] / max(1, hpmax[i]), 4)
@@ -1577,6 +1728,8 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
             continue
         b = last_of.get(eng)
         if act == "return":
+            if b is None:  # (aggro: a walk of its own, after its last beat)
+                b = last_by.get(s["who"])
             if b is not None and not b["final"]:
                 b["after"].append({"i": s["who"], "rel": -1, "x": s["x"][s["who"]][0], "z": s["x"][s["who"]][1],
                                    "dur": round(max(0.2, s["dur"]), 3), "kind": "walk", "after": True})
@@ -1591,12 +1744,31 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
             continue
         if act == "falls":
             v = s["who"]
+            if v in last_by and (b is None or last_by[v]["t0"] >= b["t0"]):
+                b = last_by[v]  # (the last beat it was in: it falls after that one)
             if b is not None and not b["final"]:
                 b["dies"].append(v)
                 b["after"] = [m for m in b["after"] if m["i"] != v]
             hp = s["hp"]
             if any(all(s["hp"][i] <= 0 for i in range(n) if fight["side"][i] == sd) for sd in (0, 1)):
                 break  # (the fight is over)
+            continue
+        if act == "blow":
+            # (aggro) a free blow on one busy with someone else: a blow on the side of the beat it is in then
+            i, j = s["who"], s["tgt"]
+            host = next((h for h in reversed(beats) if j in h["pair"] and h["t0"] <= s["t"] + 1e-6 and not h["final"]), None)
+            tl = _coin(rnd, F[i])
+            if host is not None and tl is not None and i not in host["pair"]:
+                lead = host["parts"][0]["events"]
+                off = round(V._clash_blow(tl["events"]) - V._round_blow(lead, None) - max(0.0, s["t"] - host["ta"]), 4)
+                host.setdefault("extras", []).append({"i": i, "tl": tl, "off": off, "dmg": round(s.get("dmgShare", 0), 4),
+                                                      "v": host["pair"].index(j)})
+                # (its run up to it: with that beat)
+                mine = [r for r in runs_in.get(eng, []) if r["who"] == i]
+                host["moves"] += [run_move(r) for r in mine]
+                runs_in[eng] = [r for r in runs_in.get(eng, []) if r["who"] != i]
+                last_by[i] = host
+            hp = s["hp"]
             continue
         if act not in _ACTING:
             hp = s["hp"]
@@ -1642,8 +1814,8 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
                 t["land"] = beat_no * 100 + int(t["land"])
         mine = [r for r in runs_in.get(eng, []) if r["who"] in pair]
         t0 = min([s["t"]] + [r["t"] for r in runs_in.get(eng, [])])
-        beat = dict(eng=eng, pair=pair, act=act, t0=round(t0, 3), end=round(s["t"] + s["dur"], 3), spot=bool(s.get("spot")),
-                    final=bool(s.get("final")), parts=parts, hp=[share(i) for i in range(n)], after=[], dies=[], standoff=None,
+        beat = dict(eng=eng, pair=pair, act=act, t0=round(t0, 3), ta=s["t"], end=round(s["t"] + s["dur"], 3), spot=bool(s.get("spot")),
+                    kill=bool(s.get("kill")), kv=s.get("kv") or [], final=bool(s.get("final")), parts=parts, hp=[share(i) for i in range(n)], after=[], dies=[], standoff=None,
                     note=describe_step(s, short), runs=-1, rz=None)
         if act != "shot":
             lw = last_win.get(eng)
@@ -1677,6 +1849,8 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
                 off = round(V._clash_blow(tl["events"]) - V._round_blow(lead_ev, None), 4)
                 xs.append({"i": i, "tl": tl, "off": off, "dmg": round(x.get("dmgShare", 0), 4), "v": pair.index(on)})
             beat["extras"] = xs
+            for x in xs:
+                last_by[x["i"]] = beat
         # a mass skill's / strong counter's others: hit with each part's blows, weaker
         side = s.get("side") or []
         if side:
@@ -1688,21 +1862,24 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
                     t["side"] = [{"i": x["who"], "dmg": round(x.get("dmgShare", 0) * h / nh, 4), "kb": kb} for x in side]
         beats.append(beat)
         last_of[eng] = beat
+        for i in pair:
+            last_by[i] = beat
         hp = s["hp"]
 
-    # the featured chain: beats that never overlap, always the spotlight ones, never one held through a spotlight stop
-    stops = [f[0] for f in freezes]
-    beats.sort(key=lambda b: b["t0"])
+    # the featured chain: beats that never overlap, always the fatal blows (the camera zooms in on them; with freeze the
+    # others stop meanwhile), never one going on when a fatal blow starts
+    beats.sort(key=lambda b: (b["final"], b["t0"]))  # (the final last: its run in may have been held through a stop)
+    stops = sorted({f[0] for f in freezes} | {b["t0"] for b in beats if b["kill"]})
     feat_end, last_eng = -1e9, None
     for k, b in enumerate(beats):
-        through = not b["spot"] and any(b["t0"] < T - 1e-3 and b["end"] > T + 1e-3 for T in stops)
+        through = not b["kill"] and any(b["t0"] < T - 1e-3 and b["end"] > T + 1e-3 for T in stops)
         free = b["t0"] >= feat_end - 1e-3
         # (two starting together: the one of the engagement featured so far)
-        if free and not b["spot"] and b["eng"] != last_eng and last_eng is not None:
+        if free and not b["kill"] and b["eng"] != last_eng and last_eng is not None:
             alt = next((o for o in beats[k + 1:] if o["t0"] <= b["t0"] + 1e-3 and o["eng"] == last_eng), None)
             if alt is not None:
                 free = False
-        b["featured"] = b["spot"] or (free and not through)
+        b["featured"] = b["kill"] or b["spot"] or (free and not through)
         if b["featured"]:
             feat_end = max(feat_end, b["end"])
             last_eng = b["eng"]
@@ -1721,9 +1898,11 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
                 e["moves"] = b["moves"]
             if b.get("extras"):
                 e["extras"] = b["extras"]
-            if b["spot"]:
-                for t in parts:
+            for t in parts:
+                if b["spot"]:
                     t["spot"] = True
+                if b["kill"]:
+                    t["kill"], t["kv"] = True, b["kv"]
             last = parts[-1]
             st = b["standoff"]
             mv = list(b["after"])
@@ -1743,9 +1922,10 @@ def script(fight: dict, F: list, spec: dict) -> tuple[list[dict], list[dict]]:  
                 st = b["standoff"]
                 after += [{"i": i, "rel": -1, "x": st["x"][i][0], "z": st["x"][i][1], "dur": 0.25, "kind": "back", "after": True}
                           for i in set(st["who"]) | set(b["pair"])]
-            bg.append({"pair": b["pair"], "et": b["t0"], "lt": lane_t(b["t0"]), "runs": b["runs"],
-                       "rz": b["rz"] if b["rz"] is not None else -999, "parts": [bg_part(t, k == 0, V) for k, t in enumerate(parts)],
-                       "moves": b["moves"], "after": after, "dies": b["dies"], "note": b["note"]})
+            bg.append({"pair": b["pair"], "et": b["t0"], "lt": lane_t(b["t0"]), "dur": round(lane_t(b["end"]) - lane_t(b["t0"]), 3),
+                       "runs": b["runs"], "rz": b["rz"] if b["rz"] is not None else -999,
+                       "parts": [bg_part(t, k == 0, V) for k, t in enumerate(parts)],
+                       "moves": b["moves"], "after": after, "dies": b["dies"], "note": b["note"], "extras": b.get("extras") or []})
     # each background beat's anchor: the featured beat it starts after (the player times it from that one's start)
     firsts = [(k, e["lt"]) for k, e in enumerate(out) if "pair" in e]
     for g in bg:

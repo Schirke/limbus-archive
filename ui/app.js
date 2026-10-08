@@ -2175,7 +2175,7 @@ const VS_DEBUG = ["pace", "loop", "numbers", "dash", "notes"];  // (the Debug pa
 // the base of every clash fight (limbusdm/viewer.py CLASH_BASE): on without switches; the Debug row changes it for a
 // test — `vs.base` holds only what differs from it, and only that is sent (kept until "Reset to base")
 const VS_BASE = { defend: true, counter: true, bursts: true, burstMax: 5, lskills: true, rskills: true, kbscale: 2, uisfx: true,
-  bars: true, trim: true, clean: true, punch: true, flash: true, ramp: true, hitstop: true, slowmo: true, fade: false };
+  bars: true, trim: true, clean: true, punch: true, flash: true, ramp: true, hitstop: true, slowmo: true, fade: false, camFollow: 0.5 };
 const VS_HIT = ["punch", "flash", "ramp", "hitstop", "slowmo"];  // ("Hit effects": one switch for all five)
 const VS_BASE_ITEMS = [
   ["defend", "Guard & evade", "Some rounds one side guards or evades instead of clashing"],
@@ -2198,6 +2198,7 @@ function vsBaseDiff(from, skip = []) {
   if (vsB("bursts", from) && +vsB("burstMax", from) !== VS_BASE.burstMax) out.push(`whole skills ≤${vsB("burstMax", from)} s`);
   if (+vsB("kbscale", from) !== VS_BASE.kbscale) out.push(`knockback ${vsB("kbscale", from)}×`);
   if (vsB("fade", from)) out.push("leftovers fade");
+  if (+vsB("camFollow", from) !== VS_BASE.camFollow) out.push(`team camera follow ${vsB("camFollow", from)}`);
   return out;
 }
 // (switches only a clash has)
@@ -2629,7 +2630,7 @@ function vsDrawDuelStage(box) {
 }
 // ---- team rules (Debug): the engine's TEAM numbers the page may change; vs.rules keeps only what differs from the defaults
 const VS_RULE_FIELDS = [
-  ["Spotlight", [["freeze", "Others stop while a long attack plays", "bool"], ["spot_s", "A long attack: from (s)", "num", 0.5]]],
+  ["Kills", [["freeze", "Others stop while a fatal blow plays", "bool"]]],
   ["Exchanges", [["exchange:0", "Clashes in an engagement: at least", "num", 1], ["exchange:1", "at most", "num", 1]]],
   ["Boss", [["boss_streak", "Clashes it wins in a row, at most", "num", 1], ["interrupt_p", "Chance a blow cuts its landing short", "num", 0.05], ["boss_hp", "HP: a one-on-one fighter's × this × the number against it", "num", 0.05]]],
   ["Stage", [["wall", "Half width of the stage (body heights)", "num", 0.5]]],
@@ -3020,11 +3021,12 @@ function drawVsBase() {
   const box = $("#vsbase");
   if (!box) return;
   const mark = (k) => ` style="white-space:nowrap${(k === "hit" ? VS_HIT : [k]).some((x) => x in vs.base) ? ";color:var(--gold)" : ""}"`;
-  const sec = vsB("burstMax"), kb = vsB("kbscale");
+  const sec = vsB("burstMax"), kb = vsB("kbscale"), cf = vsB("camFollow");
   box.innerHTML = `<div class="vslbl" style="margin:12px 0 6px" title="The base of every clash fight (on without switches); changes here are kept until Reset to base">Clash base</div>
     <div class="vsbase">${VS_BASE_ITEMS.map(([k, label, tip]) => `<label class="small" title="${esc(tip)}"${mark(k)}><input type="checkbox" class="vsb" data-k="${k}" ${vsB(k) ? "checked" : ""}> ${label}</label>${k === "bursts"
       ? `<label class="small" title="The longest whole skill, in seconds"${mark("burstMax")}><input type="range" id="vsbmax" min="1" max="10" step="0.5" value="${sec}" ${vsB("bursts") ? "" : "disabled"} style="width:80px;vertical-align:middle;padding:0"> <span id="vsbmaxv">≤${sec} s</span></label>` : ""}`).join("")}
     <label class="small" title="The game's knockback distances times this"${mark("kbscale")}>Knockback <input type="range" id="vsbkb" min="0.5" max="3" step="0.25" value="${kb}" style="width:80px;vertical-align:middle;padding:0"> <span id="vsbkbv">${kb}×</span></label>
+    <label class="small" title="Team fights: how much the wide shot goes along with the pair's own camera (0 = one fixed shot). A fatal blow always gets the pair's own camera"${mark("camFollow")}>Camera follow <input type="range" id="vsbcf" min="0" max="1" step="0.1" value="${cf}" style="width:80px;vertical-align:middle;padding:0"> <span id="vsbcfv">${cf}</span></label>
     <span class="small"${mark("fade")} title="Effects left from the previous round: Cut = gone the moment the next round starts; Fade = they dissolve while the two stand apart (only Exchanges has stand-offs)">Leftovers
       <span class="seg"><button class="toggle ${vsB("fade") ? "" : "on"}" data-fade="0">Cut</button><button class="toggle ${vsB("fade") ? "on" : ""}" data-fade="1">Fade</button></span></span>
     <button id="vsbreset" ${Object.keys(vs.base).length ? "" : "disabled"}>Reset to base</button></div>`;
@@ -3033,6 +3035,8 @@ function drawVsBase() {
   $("#vsbmax").onchange = (e) => { vsBSet("burstMax", +e.target.value); drawVsBase(); };
   $("#vsbkb").oninput = (e) => { $("#vsbkbv").textContent = `${e.target.value}×`; };
   $("#vsbkb").onchange = (e) => { vsBSet("kbscale", +e.target.value); drawVsBase(); };
+  $("#vsbcf").oninput = (e) => { $("#vsbcfv").textContent = e.target.value; };
+  $("#vsbcf").onchange = (e) => { vsBSet("camFollow", +e.target.value); drawVsBase(); };
   box.querySelectorAll("[data-fade]").forEach((b) => b.onclick = () => { vsBSet("fade", b.dataset.fade === "1"); drawVsBase(); });
   $("#vsbreset").onclick = () => { vs.base = {}; drawVsBase(); };
 }
