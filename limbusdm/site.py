@@ -1015,6 +1015,9 @@ def deploy(svc, progress=None) -> str:
         if m:
             url = m.group(0)
     if p.wait() != 0:
+        if any("EBUSY" in t for t in tail):  # npx could not update wrangler: its files are held by one that is running
+            raise RuntimeError("upload failed: another wrangler is running on this computer (a local preview, "
+                               "`wrangler dev`?) and holds its files — close it and send again")
         raise RuntimeError("upload failed: " + " | ".join(tail[-4:]))
     return url
 
