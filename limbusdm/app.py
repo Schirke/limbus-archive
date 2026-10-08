@@ -57,29 +57,41 @@ def _already_running(link: str = "") -> bool:
         return False
 
 
+NET_CONFIG = """<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <runtime>
+    <loadFromRemoteSources enabled="true"/>
+  </runtime>
+</configuration>
+"""
+
+
 def _unblock(root: str = ""):
-    """Takes the "downloaded from the internet" mark off the app's own files. Windows puts it on everything unpacked
-    from a zip the browser saved, and .NET then refuses to load a marked DLL: the window never opened ("Failed to
-    resolve Python.Runtime.Loader.Initialize"). The exe's own mark goes last, so a sweep cut short runs again."""
+    """Lets .NET load the app's own DLLs although Windows marked them "downloaded from the internet" (it marks
+    everything unpacked from a zip the browser saved, and .NET refuses a marked DLL: the window never opened, "Failed
+    to resolve Python.Runtime.Loader.Initialize"). Two ways, either is enough: the mark is taken off every program
+    file (every start — the exe's own mark says nothing: Windows drops it when the user agrees to run the file), and
+    <exe>.config tells .NET to load them anyway."""
     if not root:
         if not getattr(sys, "frozen", False) or sys.platform != "win32":
             return
         root = os.path.dirname(sys.executable)
-    mark = ":Zone.Identifier"
-    exe = os.path.join(root, os.path.basename(sys.executable))
-    if not os.path.exists(exe + mark):
-        return
-    for d, _, files in os.walk(root):
-        for f in files:
-            if f.lower().endswith((".dll", ".exe", ".pyd")) and os.path.join(d, f) != exe:
-                try:
-                    os.remove(os.path.join(d, f) + mark)
-                except OSError:
-                    pass
+    cfg = os.path.join(root, os.path.basename(sys.executable)) + ".config"
     try:
-        os.remove(exe + mark)
+        if not os.path.exists(cfg):
+            with open(cfg, "w", encoding="utf-8") as f:
+                f.write(NET_CONFIG)
     except OSError:
         pass
+    for d, dirs, files in os.walk(root):
+        if d == root:
+            dirs[:] = [x for x in dirs if x.lower() != "data"]  # (the app's data may sit next to the exe: nothing to load there)
+        for f in files:
+            if f.lower().endswith((".dll", ".exe", ".pyd")):
+                try:
+                    os.remove(os.path.join(d, f) + ":Zone.Identifier")
+                except OSError:
+                    pass
 
 
 def main():
