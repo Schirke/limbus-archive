@@ -1675,7 +1675,7 @@ def _occurrences(entries: list[dict]) -> list[int]:
     return out
 
 
-def skill_cutins(entries: list[dict], kills: bool = False) -> list[dict]:
+def skill_cutins(entries: list[dict], kills: bool = False, zoomed: bool = False, team_kills: bool = False) -> list[dict]:
     """The whole skills of a Versus video that get a cut-in of their character: kills, only the fatal one (the `final`
     parts), whatever its length; else each landing of the fight engine (its parts share `land`) and the last skill,
     when their timelines run over CUTIN_MIN seconds together (a team fight).
@@ -1690,6 +1690,10 @@ def skill_cutins(entries: list[dict], kills: bool = False) -> list[dict]:
             cur = {"key": key, "who": int(e.get("who") or 0), "parts": [], "final": key == "final", "cid": e.get("cid"), "side": e.get("cside")}
             groups.append(cur)
         cur["parts"].append(i)
+    if team_kills:  # (a team fight: every fatal blow, the camera zooms in on those — `kill` on its parts, see versus_team)
+        return [g for g in groups if g["final"] or any(entries[i].get("kill") for i in g["parts"])]
+    if zoomed:  # (a 1v1 render: every skill our camera closes in on, tilted — `closeup`, see versus_engine — and the fatal one)
+        return [g for g in groups if g["final"] or any(entries[i].get("closeup") for i in g["parts"])]
     if kills:
         return [g for g in groups if g["final"]]
     return [g for g in groups if sum(part_length(entries[i]) for i in g["parts"]) > CUTIN_MIN]
@@ -2877,7 +2881,7 @@ class Renderer:
         except OSError:
             return None
 
-    def _cutin_frames(self, exe, cid, side: int, out: str) -> bool:
+    def _cutin_frames(self, exe, cid, side: int, out: str, seconds: float = CUTIN_SECONDS) -> bool:
         """A cut-in panel's frames of character `cid` into `out` (_cutin_card); art: an Identity's own, else its battle
         sprite, else an enemy's portrait. False when it has none."""
         ident = bool(re.fullmatch(r"1\d{4}", str(cid)))
@@ -2888,7 +2892,7 @@ class Renderer:
         if art is None:
             return False
         os.makedirs(out, exist_ok=True)
-        _cutin_card(art, sprite, side, out, label=f"P{side + 1}")
+        _cutin_card(art, sprite, side, out, seconds=seconds, label=f"P{side + 1}")
         return True
 
     def _versus_cutins(self, exe, ff, spec, group, video):
@@ -2898,7 +2902,7 @@ class Renderer:
         last skill's not right at its start when the winner's E.G.O cut-in is spliced in before it (_versus_ego, later)."""
         entries = group["parts"]
         kills = not spec.get("team")
-        cuts = skill_cutins(entries, kills)
+        cuts = skill_cutins(entries, kills, zoomed=kills, team_kills=not kills)
         base = os.path.splitext(video)[0]
         starts, when = played_clock(base + ".parts.txt", base + ".timemap.txt")
         if not cuts or not starts:
@@ -2920,31 +2924,38 @@ class Renderer:
             g1 = (at(nxt) if nxt < len(entries) else None) or end
             lo = max(free, g0 + cutin_after(g, group.get("ego")))
             s0 = None
-            for i, t in cutin_moments(entries, g["parts"]):
+            for i, t in ([] if kills and not g["final"] else cutin_moments(entries, g["parts"])):  # (a close-up: with the zoom, at the wind-up)
                 hit = at(i, t)
                 if hit is not None and lo <= min(max(lo, hit - CUTIN_LEAD), g1 - CUTIN_SECONDS):
                     s0 = min(max(lo, hit - CUTIN_LEAD), g1 - CUTIN_SECONDS)
                     break
-            if s0 is None and kills:  # (the fatal skill always has one: none of its moments shown — as it starts)
-                s0 = max(g0, min(lo, end - CUTIN_SECONDS))
+            if s0 is None:  # (none of its moments shown — as the skill starts, when there is room)
+                s0 = max(g0, lo)
+                if not g["final"] and s0 > g1 - 0.6:
+                    s0 = None
+                elif g["final"]:
+                    s0 = max(g0, min(lo, end - CUTIN_SECONDS))
             if s0 is None:
                 continue
+            secs = CUTIN_SECONDS
+            if kills and g["final"]:  # (the fatal skill: the panel stays open, away 1 s before the animation ends)
+                secs = max(CUTIN_SECONDS, end - 1.0 - s0)
             if g.get("cid") is not None:  # (a team fight: the fighter of the entry's pair)
-                plan.append((s0, g["cid"], g["side"]))
+                plan.append((s0, g["cid"], g["side"], secs))
             else:
-                plan.append((s0, spec["left"] if g["who"] == 0 else spec["right"], g["who"]))
-            free = s0 + CUTIN_SECONDS + 0.5
+                plan.append((s0, spec["left"] if g["who"] == 0 else spec["right"], g["who"], secs))
+            free = s0 + secs + 0.5
         if not plan:
             return
         work = video + ".cutins"
         os.makedirs(work, exist_ok=True)
         try:
             sets, items = {}, []
-            for s0, cid, side in plan:
-                key = (str(cid), side)
+            for s0, cid, side, secs in plan:
+                key = (str(cid), side, round(secs, 2))
                 if key not in sets:
                     d = os.path.join(work, str(len(sets)))
-                    sets[key] = d if self._cutin_frames(exe, cid, side, d) else None
+                    sets[key] = d if self._cutin_frames(exe, cid, side, d, secs) else None
                 if sets[key]:
                     items.append((s0, sets[key]))
             if not items:
@@ -2961,7 +2972,7 @@ class Renderer:
             subprocess.run(cmd, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             os.replace(tmp, video)
             with open(base + ".cutins.txt", "w", encoding="utf-8") as f:  # (where they are: for checking)
-                f.write("".join(f"{s0:.3f}\t{cid}\t{side}\n" for s0, cid, side in plan))
+                f.write("".join(f"{s0:.3f}\t{cid}\t{side}\t{secs:.2f}\n" for s0, cid, side, secs in plan))
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
@@ -2997,12 +3008,16 @@ class Renderer:
                 raise RuntimeError("LimbusViewer.exe is missing")
             spec = {k: x for k, x in spec.items() if k not in ("loop", "notes")}
             spec["mode"] = "clash"
-            for side, key in (("left", "skill"), ("right", "rskill")):  # (random picks come without their skills)
+            team = bool(spec.get("team"))  # (a team fight: Versus duels or the Auto Battler; the engine draws every skill)
+            for side, key in () if team else (("left", "skill"), ("right", "rskill")):  # (random picks come without their skills)
                 names = [g["name"] for g in job_groups(make_job(self.svc, spec[side])) if not is_clash(g["name"])
                          and not re.search(r"(^|_)(Parrying|Duel_?Win|Dead|Retreat)(_|$)", g["name"], re.I)]
                 if spec.get(key) not in names:
                     spec[key] = names[0] if names else ""
             job, groups = versus_job(self.svc, spec)
+            if team:  # (the intro card as a render's: the first of each side and how many more)
+                tl, tr = job["teamIds"]
+                spec = dict(spec, left=tl[0], right=tr[0], lmore=len(tl) - 1, rmore=len(tr) - 1)
             st.update(msg="Reading the sounds…", winner=job.get("winner", 0))
             work = tempfile.mkdtemp(prefix="limbus_live_")
             sidx = sound_index(self.svc)
@@ -3026,6 +3041,8 @@ class Renderer:
                 live = [{"t": s["t"], "clip": k, "voice": bool(s.get("voice"))} for s in t["events"]["sounds"] + t.get("psounds", [])  # (as _encode)
                         if (k := clip(s["name"])) >= 0]
                 parts.append(dict(t, group=g["name"], first=i == 0, last=i == len(g["parts"]) - 1, live=live))
+            for k, snd in (g.get("bgSounds") or {}).items():  # (a team fight's background timelines: played as their lanes play them)
+                job["partners"][int(k)]["live"] = [{"t": s["t"], "clip": c, "voice": False} for s in snd if (c := clip(s["name"])) >= 0]
             music = clip(g.get("music"))
             if g.get("music") and music < 0:
                 raise RuntimeError(f"the music track {g['music']} could not be read from the game's sound banks")
@@ -3046,10 +3063,12 @@ class Renderer:
             # first; the player times them as it plays
             cutins, cut_who = [], []
             if spec.get("cutins", True):
-                for c in skill_cutins(g["parts"], kills=True):
+                for c in skill_cutins(g["parts"], kills=not team, zoomed=not team, team_kills=team):  # (as a render's, _versus_cutins)
                     cid, side = (c["cid"], c["side"]) if c.get("cid") is not None else (spec["left"] if c["who"] == 0 else spec["right"], c["who"])
-                    moments = cutin_moments(g["parts"], c["parts"])
+                    held = not team and c["final"]  # (a 1v1's fatal skill: the panel stays open to 1 s before the end)
+                    moments = [] if not team and not c["final"] else cutin_moments(g["parts"], c["parts"])  # (a close-up: with the zoom)
                     cutins.append({"parts": c["parts"], "mparts": [i for i, _t in moments], "mtimes": [t for _i, t in moments],
+                                   "hold": 12 if held else 0, "outro": 9 if held else 0,
                                    "lead": CUTIN_LEAD, "after": cutin_after(c, ego_job), "n": int(round(CUTIN_SECONDS * 30)),
                                    "frames": self.out_dir(f"cutin-{_safe_name(str(cid))}-{side}")})
                     cut_who.append((cid, side))

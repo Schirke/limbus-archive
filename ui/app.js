@@ -2220,7 +2220,7 @@ async function vsPage(auto) {
   vs.auto = auto;  // (the Auto Battler tab: the team fight with roles, cooldowns and a boss; Versus: duels)
   vs.team = auto || !!vs.vteam;
   const main = $("#main");
-  main.innerHTML = `<h1>${auto ? "Auto Battler" : `Versus <label class="vsteamsw" title="Team fight: several a side (many vs many, or many vs one boss). Render makes its video; Live does not play teams yet."><input type="checkbox" id="vsteam" ${vs.team ? "checked" : ""}> Team</label><a class="toggle vsroomlink" href="#/vsroom" title="Pick and fight: two players each pick a fighter in secret, then the same fight plays on everybody's screen; the others watch and bet">Online room</a>`}</h1><div class="sub">${auto ? "Teams fight by the autobattler rules: roles, cooldowns, targets, a boss against several. Pick fighters for each side." : "Pit two characters against each other — Identities, E.G.O or enemies — in the game's own animations and effects."}</div>
+  main.innerHTML = `<h1>${auto ? "Auto Battler" : `Versus <label class="vsteamsw" title="Team fight: several a side (many vs many, or many vs one boss)."><input type="checkbox" id="vsteam" ${vs.team ? "checked" : ""}> Team</label><a class="toggle vsroomlink" href="#/vsroom" title="Pick and fight: two players each pick a fighter in secret, then the same fight plays on everybody's screen; the others watch and bet">Online room</a>`}</h1><div class="sub">${auto ? "Teams fight by the autobattler rules: roles, cooldowns, targets, a boss against several. Pick fighters for each side." : "Pit two characters against each other — Identities, E.G.O or enemies — in the game's own animations and effects."}</div>
     <div id="vsbody"><div class="muted">Loading…</div></div>`;
   if (!anim.data) anim.data = await api("/api/characters");
   if (!vs.maps) vs.maps = await api("/api/battle_maps").catch(() => []);
@@ -2514,7 +2514,7 @@ function vsDrawTeamStage(box) {
       <span class="vslbl">Clashes</span><span class="seg vsstep"><button class="toggle" data-rounds="-1" title="Fewer">−</button><input id="vsrounds" type="number" min="1" max="99" step="1" value="${vs.rounds}" title="Rounds of the fight (it ends after about this many clashes per fighter)"><button class="toggle" data-rounds="1" title="More">+</button></span>
       <span class="vslbl">Winner</span><span class="seg">${[[0, "Left"], [2, "Random"], [1, "Right"]].map(([v, l]) => `<button class="toggle ${vs.winner === v ? "on" : ""}" data-winner="${v}">${l}</button>`).join("")}</span>
       <button id="vsteamview" ${nl && nr ? "" : "disabled"} title="The engine's decisions as a schematic arena played in real time (no render)">Engine view</button>
-      <span class="small muted grow" style="min-width:220px">Click fighters in the list on the left to fill the team marked “Adding here”. Render makes the video; Live does not play teams yet.</span></div>`;
+      <span class="small muted grow" style="min-width:220px">Click fighters in the list on the left to fill the team marked “Adding here”. Render makes the video; Live plays it in a window of its own.</span></div>`;
   const redraw = () => { vsKeep(); vsDrawPicker(); vsDrawStage(); };
   box.querySelectorAll("[data-tpick]").forEach((b) => b.onclick = () => { vs.side = b.dataset.tpick; vsDrawPicker(); vsDrawStage(); });
   box.querySelectorAll("[data-tside]").forEach((el) => el.onclick = (ev) => { if (!ev.target.closest("button") && vs.side !== el.dataset.tside) { vs.side = el.dataset.tside; vsDrawPicker(); vsDrawStage(); } });
@@ -2606,7 +2606,7 @@ function vsDrawDuelStage(box) {
       <span class="vslbl">Clashes</span><span class="seg vsstep"><button class="toggle" data-rounds="-1" title="Fewer">−</button><input id="vsrounds" type="number" min="1" max="99" step="1" value="${vs.rounds}" title="How many clashes each duel has"><button class="toggle" data-rounds="1" title="More">+</button></span>
       <span class="vslbl">Winner</span><span class="seg">${[[0, "Left"], [2, "Random"], [1, "Right"]].map(([v, l]) => `<button class="toggle ${vs.winner === v ? "on" : ""}" data-winner="${v}">${l}</button>`).join("")}</span>
       <button id="vsteamview" ${even ? "" : "disabled"} title="The engine's decisions as a schematic arena played in real time (no render)">Engine view</button>
-      <span class="small muted grow" style="min-width:220px">Click fighters in the list on the left to fill the team marked “Adding here”. Render makes the video; Live does not play teams yet.</span></div>`;
+      <span class="small muted grow" style="min-width:220px">Click fighters in the list on the left to fill the team marked “Adding here”. Render makes the video; Live plays it in a window of its own.</span></div>`;
   const redraw = () => { vsKeep(); vsDrawPicker(); vsDrawStage(); };
   box.querySelectorAll("[data-tpick]").forEach((b) => b.onclick = () => { vs.side = b.dataset.tpick; vsDrawPicker(); vsDrawStage(); });
   box.querySelectorAll("[data-tside]").forEach((el) => el.onclick = (ev) => { if (!ev.target.closest("button") && vs.side !== el.dataset.tside) { vs.side = el.dataset.tside; vsDrawPicker(); vsDrawStage(); } });
@@ -2931,7 +2931,7 @@ function vsDrawRight() {
         return `<button class="toggle ${vs[k] ? "on" : ""}" data-x="${k}" title="${esc(tip)}">${vs[k] ? "✓" : "+"} ${label}</button>`;
       }).join("")}${vs.team ? "" : `<button id="vsview" title="Test: the fight engine's decisions for these two as a step-by-step schematic arena (no render)">Engine view</button>`}</div>
       <div id="vsbase"></div><div id="vsrules"></div>` : `<div class="small muted" style="margin-top:8px">Clash fights only.</div>`}</details>
-    <div class="vsgo"><button id="vslivego" class="vslive" ${clash && !vs.team ? "" : "disabled"} title="${vs.team ? "Live does not play team fights yet" : clash ? "The same fight played live in a window of its own, nothing saved" : "Live plays clash fights"}"><i></i>Live</button>
+    <div class="vsgo"><button id="vslivego" class="vslive" ${clash ? "" : "disabled"} title="${clash ? "The same fight played live in a window of its own, nothing saved" : "Live plays clash fights"}"><i></i>Live</button>
       <button id="vslivestop" hidden>■ Stop</button>
       <button id="vsgo" class="primary vsrender">▶ Render the fight</button></div>
     <div id="vsprog"></div><div id="vsnote" class="muted small"></div>`;
@@ -3219,7 +3219,8 @@ function versusAll() {
 // The Versus page's Live: the same fight as a render, but played in the Unity player's own window as it happens
 // (limbusdm/viewer.py Renderer.start_live) — with its sounds, music, intro card and WIN. Nothing is saved.
 async function liveStart() {
-  const spec = vsSpec("clash");
+  const spec = vs.team ? vsTeamSpec() : vsSpec("clash");
+  if (!spec) return;
   spec.live = true;
   try { await api("/api/versus", spec); } catch (e) { toast(esc(e.message)); return; }
   liveWatch();
@@ -3231,7 +3232,7 @@ async function liveWatch() {
   let st;
   try { st = await api("/api/versus_live"); } catch (e) { liveWatch.timer = setTimeout(liveWatch, 2000); return; }  // (asked again: a busy moment)
   const busy = ["preparing", "loading", "playing"].includes(st.state);
-  $("#vslivego").disabled = busy || vs.mode !== "clash" || !!vs.team;
+  $("#vslivego").disabled = busy || vs.mode !== "clash" && !vs.team;
   $("#vslivestop").hidden = st.state !== "loading" && st.state !== "playing";
   const names = st.names && st.names[0] ? `${esc(st.names[0])} vs ${esc(st.names[1])} — ` : "";
   if (busy) note.innerHTML = `${names}${esc(st.msg || "")}`;

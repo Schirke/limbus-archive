@@ -759,13 +759,11 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 spec.update({k: b[k] for k in ("map", "speed", "pause", "rspeed", "rpause", "lskills", "rskills", "defend", "counter",
                                         "bursts", "burstMax", "seed", "hitstop", "trim", "clean", "spread", "numbers",
                                         "slowmo", "dash", "music", "hp", "death", "intro", "ego", "lname", "rname",
-                                        "bars", "uisfx", "pace", "ramp", "throw", "punch", "fade", "loop", "flash", "randskill", "kbscale", "deck", "notes",
+                                        "bars", "uisfx", "pace", "ramp", "throw", "punch", "fade", "loop", "flash", "randskill", "kbscale", "camFollow", "deck", "notes",
                                         "buff", "buffboth", "buffmany", "buffown", "buffshort",
                                         "debuff", "debuffboth", "debuffmany", "debuffown", "debuffshort") if b.get(k) is not None})
                 spec["left"], spec["right"] = _fx_id(spec["left"]), _fx_id(spec["right"])
                 if b.get("team"):  # (a team fight: the line-ups as comma-joined ids; versus_job -> versus_team_job)
-                    if b.get("live"):
-                        return self._json({"error": "Versus Live does not play team fights yet"}, 400)
                     spec.update(team=True, **{k: b[k] for k in ("lefts", "rights", "flow", "lanes", "allAtOnce", "bossPower", "rules", "pairs", "lnames", "rnames") if b.get(k)})
                 if b.get("live"):  # (the Versus Live tab: played in the player's window, nothing saved)
                     return self._json(svc.fx.start_live(spec))
