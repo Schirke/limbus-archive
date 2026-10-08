@@ -1607,8 +1607,8 @@ def _ego_card(svc, ego: int, still: str | None, out: str, seconds: float = 1.2, 
     return n
 
 
-# a character cut-in over a long whole skill (see skill_cutins, _cutin_card, Renderer._versus_cutins)
-CUTIN_MIN = 4.0      # a whole skill whose timelines run longer than this together (part_length summed) gets one
+# a character cut-in over a skill (see skill_cutins, _cutin_card, Renderer._versus_cutins; Live: ViewerLive.cs)
+CUTIN_MIN = 4.0      # (a team fight) a whole skill whose timelines run longer than this together (part_length summed) gets one
 CUTIN_SECONDS = 1.1  # the panel on screen: slides in, holds, slides back out
 CUTIN_LEAD = 0.8     # it comes this long before the skill's strongest moment and slides away just after it
 
@@ -1622,10 +1622,11 @@ def _occurrences(entries: list[dict]) -> list[int]:
     return out
 
 
-def skill_cutins(entries: list[dict]) -> list[dict]:
-    """The whole skills of a Versus video that get a cut-in of their character: each landing of the fight engine (its
-    parts share `land`) and the last skill (the `final` parts), when their timelines run over CUTIN_MIN seconds
-    together. [{"who": 0 left / 1 right, "parts": [indices into entries], "final": bool}], in order."""
+def skill_cutins(entries: list[dict], kills: bool = False) -> list[dict]:
+    """The whole skills of a Versus video that get a cut-in of their character: kills, only the fatal one (the `final`
+    parts), whatever its length; else each landing of the fight engine (its parts share `land`) and the last skill,
+    when their timelines run over CUTIN_MIN seconds together (a team fight).
+    [{"who": 0 left / 1 right, "parts": [indices into entries], "final": bool}], in order."""
     groups, cur = [], None
     for i, e in enumerate(entries):
         key = "final" if e.get("final") else e.get("land")
@@ -1636,6 +1637,8 @@ def skill_cutins(entries: list[dict]) -> list[dict]:
             cur = {"key": key, "who": int(e.get("who") or 0), "parts": [], "final": key == "final", "cid": e.get("cid"), "side": e.get("cside")}
             groups.append(cur)
         cur["parts"].append(i)
+    if kills:
+        return [g for g in groups if g["final"]]
     return [g for g in groups if sum(part_length(entries[i]) for i in g["parts"]) > CUTIN_MIN]
 
 
@@ -1661,6 +1664,12 @@ def cutin_moments(entries: list[dict], parts: list[int]) -> list[tuple[int, floa
                 order += 1
     blows.sort(key=lambda b: (-round(b[0], 3), -b[1]))
     return [(i, t) for _s, _o, i, t in blows]
+
+
+def cutin_after(g: dict, ego) -> float:
+    """How long after its skill starts a cut-in may come at the earliest: the fatal skill's, when the winner's E.G.O
+    cut-in comes before it, 1 s (not right where that one ends)."""
+    return 1.0 if g["final"] and ego else 0.0
 
 
 def cutin_art(img, sprite: bool = False):
@@ -2813,13 +2822,28 @@ class Renderer:
         except OSError:
             return None
 
+    def _cutin_frames(self, exe, cid, side: int, out: str) -> bool:
+        """A cut-in panel's frames of character `cid` into `out` (_cutin_card); art: an Identity's own, else its battle
+        sprite, else an enemy's portrait. False when it has none."""
+        ident = bool(re.fullmatch(r"1\d{4}", str(cid)))
+        art = char_art(self.svc, cid) if ident else self._battle_sprite(exe, cid)
+        sprite = art is not None and not ident
+        if art is None:
+            art = char_art(self.svc, cid)  # (no sprite: an enemy's portrait)
+        if art is None:
+            return False
+        os.makedirs(out, exist_ok=True)
+        _cutin_card(art, sprite, side, out, label=f"P{side + 1}")
+        return True
+
     def _versus_cutins(self, exe, ff, spec, group, video):
-        """Over the fight's whole skills longer than CUTIN_MIN (skill_cutins): a cut-in of the one playing it, leading
-        into the skill's strongest moment (cutin_moments) where the player showed it (Versus.parts.txt / .timemap.txt),
-        inside the skill and apart from the others; the last skill's not right at its start when the winner's E.G.O
-        cut-in is spliced in before it (_versus_ego, later). Art: an Identity's own, else its battle sprite."""
+        """A cut-in of the one playing it over the fight's fatal skill (a 1v1: always, whatever its length; a team fight:
+        its whole skills longer than CUTIN_MIN, skill_cutins), leading into the skill's strongest moment (cutin_moments)
+        where the player showed it (Versus.parts.txt / .timemap.txt), inside the skill and apart from the others; the
+        last skill's not right at its start when the winner's E.G.O cut-in is spliced in before it (_versus_ego, later)."""
         entries = group["parts"]
-        cuts = skill_cutins(entries)
+        kills = not spec.get("team")
+        cuts = skill_cutins(entries, kills)
         base = os.path.splitext(video)[0]
         starts, when = played_clock(base + ".parts.txt", base + ".timemap.txt")
         if not cuts or not starts:
@@ -2839,17 +2863,22 @@ class Renderer:
                 continue
             nxt = g["parts"][-1] + 1
             g1 = (at(nxt) if nxt < len(entries) else None) or end
-            lo = max(free, g0 + (1.0 if g["final"] and group.get("ego") else 0.0))
+            lo = max(free, g0 + cutin_after(g, group.get("ego")))
+            s0 = None
             for i, t in cutin_moments(entries, g["parts"]):
                 hit = at(i, t)
                 if hit is not None and lo <= min(max(lo, hit - CUTIN_LEAD), g1 - CUTIN_SECONDS):
                     s0 = min(max(lo, hit - CUTIN_LEAD), g1 - CUTIN_SECONDS)
-                    if g.get("cid") is not None:  # (a team fight: the fighter of the entry's pair)
-                        plan.append((s0, g["cid"], g["side"]))
-                    else:
-                        plan.append((s0, spec["left"] if g["who"] == 0 else spec["right"], g["who"]))
-                    free = s0 + CUTIN_SECONDS + 0.5
                     break
+            if s0 is None and kills:  # (the fatal skill always has one: none of its moments shown — as it starts)
+                s0 = max(g0, min(lo, end - CUTIN_SECONDS))
+            if s0 is None:
+                continue
+            if g.get("cid") is not None:  # (a team fight: the fighter of the entry's pair)
+                plan.append((s0, g["cid"], g["side"]))
+            else:
+                plan.append((s0, spec["left"] if g["who"] == 0 else spec["right"], g["who"]))
+            free = s0 + CUTIN_SECONDS + 0.5
         if not plan:
             return
         work = video + ".cutins"
@@ -2859,16 +2888,8 @@ class Renderer:
             for s0, cid, side in plan:
                 key = (str(cid), side)
                 if key not in sets:
-                    ident = bool(re.fullmatch(r"1\d{4}", str(cid)))
-                    art = char_art(self.svc, cid) if ident else self._battle_sprite(exe, cid)
-                    sprite = art is not None and not ident
-                    if art is None:
-                        art = char_art(self.svc, cid)  # (no sprite: an enemy's portrait)
-                    sets[key] = None
-                    if art is not None:
-                        sets[key] = os.path.join(work, str(len(sets)))
-                        os.makedirs(sets[key])
-                        _cutin_card(art, sprite, side, sets[key], label=f"P{side + 1}")
+                    d = os.path.join(work, str(len(sets)))
+                    sets[key] = d if self._cutin_frames(exe, cid, side, d) else None
                 if sets[key]:
                     items.append((s0, sets[key]))
             if not items:
@@ -2965,9 +2986,21 @@ class Renderer:
                 ego_job = self._live_ego(exe, g, work, sidx, st, clip)
                 if ego_job is None:
                     job.update(egoStart=False)  # (it could not be made: the fight goes on without the lead-in too)
+            # the skill cut-ins (a render's _versus_cutins): each its panel's frames (kept per character and side; made
+            # while the fight plays when not yet, below) and the moments of its skill it may lead into, strongest
+            # first; the player times them as it plays
+            cutins, cut_who = [], []
+            if spec.get("cutins", True):
+                for c in skill_cutins(g["parts"], kills=True):
+                    cid, side = (c["cid"], c["side"]) if c.get("cid") is not None else (spec["left"] if c["who"] == 0 else spec["right"], c["who"])
+                    moments = cutin_moments(g["parts"], c["parts"])
+                    cutins.append({"parts": c["parts"], "mparts": [i for i, _t in moments], "mtimes": [t for _i, t in moments],
+                                   "lead": CUTIN_LEAD, "after": cutin_after(c, ego_job), "n": int(round(CUTIN_SECONDS * 30)),
+                                   "frames": self.out_dir(f"cutin-{_safe_name(str(cid))}-{side}")})
+                    cut_who.append((cid, side))
             job.update(timelines=parts, out=work, fps=30, width=WIDTH, height=HEIGHT, supersample=1, target=True,
                        live=True, liveClips=[os.path.join(work, f"s{k}.wav") for k in range(len(clips))],
-                       liveMusic=music, liveWin=win, liveIntro=intro, liveEgo=ego_job, livePrep=True)
+                       liveMusic=music, liveWin=win, liveIntro=intro, liveEgo=ego_job, liveCutins=cutins, livePrep=True)
             jp = os.path.join(work, "job.json")
             with open(jp, "w", encoding="utf-8") as f:
                 json.dump(job, f)
@@ -2993,7 +3026,18 @@ class Renderer:
                     p.kill()
                     return
                 open(os.path.join(work, "prep.done"), "w").close()
+
+            def make_cutins():  # (a few seconds each: the player picks them up as they are ready; one not made is left out)
+                for c, (cid, side) in zip(cutins, cut_who):
+                    if os.path.isfile(os.path.join(c["frames"], "ready")):
+                        continue
+                    try:
+                        self._live_cutin(exe, cid, side, c["frames"])
+                    except (OSError, ValueError, subprocess.SubprocessError):
+                        pass
             threading.Thread(target=write_sounds, daemon=True).start()
+            if cutins:
+                threading.Thread(target=make_cutins, daemon=True).start()
             while (rc := p.poll()) is None:
                 try:
                     with open(os.path.join(work, "live.txt"), encoding="utf-8") as f:
@@ -3054,6 +3098,37 @@ class Renderer:
             return None
         return {"clip": os.path.join(d, "clip"), "clipFrames": frames, "audio": audio,
                 "card": os.path.join(d, "card"), "cardFrames": n, "sound": clip(UI_SFX["ego"])}
+
+    def _live_cutin(self, exe, cid, side: int, out: str, size=(1280, 720)) -> bool:
+        """A skill cut-in's panel for the Live player (ViewerLive.cs): _cutin_card's frames at the window's picture
+        size, cut to what any of them draws, as raw RGBA bottom row first (out/000.raw…: the player reads them while it
+        plays, no decoding); out/rect.txt: where that is on the picture (x y w h, fractions), how many frames, their
+        width and height; out/ready last. False when it can't be made."""
+        from PIL import Image
+        full = out + ".full"
+        try:
+            if not self._cutin_frames(exe, cid, side, full):
+                return False
+            frames, box = [], None
+            for x in sorted(x for x in os.listdir(full) if x.endswith(".png")):
+                im = Image.open(os.path.join(full, x)).convert("RGBA").resize(size, Image.BILINEAR)
+                b = im.getchannel("A").getbbox()
+                if b:
+                    box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+                frames.append(im)
+            if box is None:
+                return False
+            os.makedirs(out, exist_ok=True)
+            for k, im in enumerate(frames):
+                with open(os.path.join(out, f"{k:03d}.raw"), "wb") as f:
+                    f.write(im.crop(box).transpose(Image.FLIP_TOP_BOTTOM).tobytes())
+            with open(os.path.join(out, "rect.txt"), "w", encoding="utf-8") as f:
+                f.write(f"{box[0] / size[0]:.5f} {box[1] / size[1]:.5f} {(box[2] - box[0]) / size[0]:.5f} "
+                        f"{(box[3] - box[1]) / size[1]:.5f} {len(frames)} {box[2] - box[0]} {box[3] - box[1]}")
+            open(os.path.join(out, "ready"), "w").close()
+            return True
+        finally:
+            shutil.rmtree(full, ignore_errors=True)
 
     def versus_list(self) -> list[dict]:
         """Versus videos made with the current snapshot, newest first."""
