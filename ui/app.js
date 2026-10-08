@@ -829,6 +829,8 @@ const animThumb = (id) => {
   const u = typeof unitById === "function" && unitById(id);
   return u && u.img && u.img.thumb ? `<img loading="lazy" src="${imgThumb(u.img.thumb)}" onerror="this.style.visibility='hidden'">` : `<span class="an-ph"></span>`;
 };
+// an enemy's picture: the one the Enemies handbook drew (data/enemy_thumbs); the grey square where there is none
+const animEnemyThumb = (app) => `<img loading="lazy" src="/api/enemy_thumb?app=${encodeURIComponent(app)}" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'an-ph' }))">`;
 const AN_FILTERS = [["all", "All"], ["ids", "Identities"], ["egos", "E.G.O"], ["enemies", "Enemies"], ["mine", "★ Mine"]];
 function drawAnimTree() {
   const q = anim.q.trim().toLowerCase();
@@ -841,7 +843,7 @@ function drawAnimTree() {
   let h = "";
   const recent = !q && f === "all" ? recentGet() : [];
   if (recent.length) {
-    h += `<div class="an-grp">Recent</div>` + recent.map((r, i) => `<div class="an-it ${sel(r.key)}" data-r="${i}">${r.enemy ? `<span class="an-ph"></span>` : animThumb(r.cid)}<div class="an-t">${esc(r.title)}<small>${esc(r.sub)}</small></div></div>`).join("");
+    h += `<div class="an-grp">Recent</div>` + recent.map((r, i) => `<div class="an-it ${sel(r.key)}" data-r="${i}">${r.enemy ? animEnemyThumb(r.enemy) : animThumb(r.cid)}<div class="an-t">${esc(r.title)}<small>${esc(r.sub)}</small></div></div>`).join("");
   }
   const chars = f === "all" || f === "ids" || f === "egos" || f === "mine";
   if (chars) {
@@ -871,7 +873,7 @@ function drawAnimTree() {
       kinds.forEach(([k, arr]) => {
         g2 += `<div class="an-sub">${esc(k)}</div>` + arr.map((x) => x.app
           // a battle prefab: its skills with the game's effects
-          ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects"><span class="an-ph"></span><div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
+          ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects">${animEnemyThumb(x.app)}<div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
           : `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-g="${gi}" data-k="${esc(k)}" data-a="${x.atlas}" data-b="${esc(x.bundle)}"><span class="an-ph"></span><div class="an-t">${x.name ? esc(x.name) : esc(x.base)}<small>${x.name ? esc(x.base) : "Spine"}</small></div></div>`).join("");
       });
     });
@@ -951,7 +953,7 @@ async function openAnimEntry(sel) {
     const tabs = [["fx", "Skills"], ["mod", "Edit mod"]];
     if (!tabs.some(([k]) => k === anim.tab)) anim.tab = "fx";
     recentAdd(sel, c.title, `${x.kind} · ${x.app}`);
-    if (!await animHead(v, sel, { title: c.title, sub: `${x.kind} · ${x.app}`, tabs, cid: x.app })) return;
+    if (!await animHead(v, sel, { title: c.title, sub: `${x.kind} · ${x.app}`, pic: animEnemyThumb(x.app), tabs, cid: x.app })) return;
     if (anim.tab === "mod") return openMod(c, $("#abody"), () => { anim.tab = "fx"; openAnimEntry(sel); });
     return openFx(c, $("#abody"));
   }
@@ -1436,7 +1438,7 @@ function fxPicker(done) {
   const V = "alpha_effects";
   const chars = [];
   for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos]) chars.push({ key: String(x.id), label: `${s.name} · ${x.title}`, pic: animThumb(x.id) });
-  for (const g of anim.data.groups) for (const arr of Object.values(g.kinds)) for (const x of arr) if (x.app) chars.push({ key: x.app, label: `${g.label} · ${x.name || x.app}`, pic: `<span class="an-ph"></span>` });
+  for (const g of anim.data.groups) for (const arr of Object.values(g.kinds)) for (const x of arr) if (x.app) chars.push({ key: x.app, label: `${g.label} · ${x.name || x.app}`, pic: animEnemyThumb(x.app) });
   const box = document.createElement("div");
   box.className = "an-modal";
   box.innerHTML = `<div class="an-mbox an-pick"><div class="row" style="gap:8px;margin-bottom:10px"><b class="grow" style="font-size:17px">Take an effect of another character</b><button data-x>Close</button></div>
@@ -3369,7 +3371,7 @@ async function drawSiteBox() {
       <span class="muted small">writes the pages and data out again, packs them and uploads what changed; the progress is in the status at the top</span></div>
     ${siteLog(s.log, when)}
     ${s.fx ? `<div class="row" style="gap:8px;margin-top:10px"><button id="sitefx" ${busy && !fxJob ? "disabled" : ""}>${fxJob ? "Stop rendering" : "Render skills for the site"}</button>
-      <span class="muted small">Animations → With effects on the site: <b>${s.fx.have}</b> of ${s.fx.total} Identities and E.G.O have their videos there (${s.fx.videos} videos; with the target, and with buffs where they have any).
+      <span class="muted small">Animations → With effects on the site: <b>${s.fx.have}</b> of ${s.fx.total} Identities and E.G.O have their videos there (${s.fx.videos} videos; with the target, and with buffs where they have any)${s.fx.old ? `; ${s.fx.old} of them are from before the last patch and will be rendered again` : ""}.
         Renders the rest one by one — hours the first time; it can be stopped and goes on from there. Then Send to site.</span></div>` : ""}
     ${s.command ? `<div class="hint" style="margin-top:10px">The upload alone, by hand (sends what was prepared last):</div>
       <div class="row" style="gap:8px"><code class="mono small grow" id="sitecmd" style="user-select:all;overflow-wrap:anywhere">${esc(s.command)}</code><button id="sitecopy">Copy</button></div>` : ""}`;

@@ -1131,8 +1131,8 @@ def pull(ex: Exporter, url: str) -> dict:
         if site.get("v") != VERSION or _game(site.get("id")) != _game(made):
             continue
         local = ex.read_manifest(name)
-        if local.get("id") != made:
-            local = {"kind": name, "id": made, "urls": {}}
+        if local.get("id") != made:  # (the skills' videos of the version before stay until rendered again: sitefx._read)
+            local = sitefx._read(ex) if name == "fx" else {"kind": name, "id": made, "urls": {}}
         got = p.files({k: w for k, w in (site.get("urls") or {}).items() if k.startswith(key) and k not in local["urls"]})
         if not got:
             continue

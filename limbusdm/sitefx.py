@@ -29,11 +29,16 @@ def _key(path: str, cid, v: str = "", **q) -> str:
 
 
 def _read(ex) -> dict:
-    m = ex.read_manifest("fx")
-    if m.get("id") != _made(ex.svc):
-        m = {}
-    return {"kind": "fx", "id": _made(ex.svc), "urls": m.get("urls") or {}, "src": m.get("src") or {}, "have": m.get("have") or {},
-            "none": m.get("none") or []}
+    """The site's videos as the manifest lists them. After a game patch (or a new renderer) they stay: "old" names the
+    sets — {character: [options]} — still to be rendered again, and each is replaced when its new render is taken
+    (the site used to lose every video at the first send after a patch)."""
+    m, made = ex.read_manifest("fx"), _made(ex.svc)
+    out = {"kind": "fx", "id": made, "urls": m.get("urls") or {}, "src": m.get("src") or {}, "have": m.get("have") or {},
+           "none": m.get("none") or [], "old": m.get("old") or {}}
+    if m.get("id") and m.get("id") != made:
+        out["old"] = {c: sorted(v for v, names in vs.items() if names) for c, vs in out["have"].items()}
+        out["none"] = []  # (what gave nothing may give something now)
+    return out
 
 
 def _take(ex, m: dict, cid: int, v: str) -> int:
@@ -60,7 +65,16 @@ def _take(ex, m: dict, cid: int, v: str) -> int:
             m["urls"][k], m["src"][k] = got[k], sig
     names = [n for n in names if _key("/api/fx_video", cid, v, name=n) in m["urls"]]
     if names:
+        for n in (m["have"].get(str(cid)) or {}).get(v) or []:  # (a video the new render has no more)
+            if n not in names:
+                m["urls"].pop(_key("/api/fx_video", cid, v, name=n), None)
+                m["src"].pop(_key("/api/fx_video", cid, v, name=n), None)
         m["have"].setdefault(str(cid), {})[v] = names
+        old = [x for x in m.get("old", {}).get(str(cid), []) if x != v]
+        if old:
+            m["old"][str(cid)] = old
+        else:
+            m.get("old", {}).pop(str(cid), None)
     return len(got)
 
 
@@ -112,7 +126,7 @@ def counts(svc) -> dict:
     from .site import Exporter
     try:
         m = _read(Exporter(svc, ""))
-        return {"have": len(m["have"]), "total": len(_ids(svc)), "videos": len(m["src"]), "running": False}
+        return {"have": len(m["have"]), "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False}
     except Exception:
         return {"have": 0, "total": 0, "videos": 0, "running": False}
 
@@ -141,7 +155,7 @@ def render_all(svc, base_url: str, progress=None) -> dict:
                         continue
                 except Exception:
                     continue
-            if not (m["have"].get(str(cid)) or {}).get(v) and f"{cid}:{v}" not in m["none"]:
+            if (not (m["have"].get(str(cid)) or {}).get(v) or v in m["old"].get(str(cid), [])) and f"{cid}:{v}" not in m["none"]:
                 todo.append((cid, v))
     made = failed = 0
     for i, (cid, v) in enumerate(todo):
@@ -158,7 +172,7 @@ def render_all(svc, base_url: str, progress=None) -> dict:
                 break
             progress("site: rendering skills", i, len(todo), f"{label} · {st.get('msg') or ''}")
             time.sleep(1.5)
-        if _take(ex, m, cid, v) or (m["have"].get(str(cid)) or {}).get(v):
+        if _take(ex, m, cid, v) or ((m["have"].get(str(cid)) or {}).get(v) and v not in m["old"].get(str(cid), [])):
             made += 1
         else:  # nothing came out (no skill timelines, or the player failed): not tried again for this game version
             failed += 1
