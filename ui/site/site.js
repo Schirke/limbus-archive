@@ -308,6 +308,7 @@
     <span><a href="${repo}/releases/latest" target="_blank" rel="noopener">Desktop app for Windows: the latest release on GitHub</a></span>
     ${SITE.build ? `<span title="pages ${esc(SITE.build.ui)}">Built from Limbus Archive <b>${esc(SITE.build.version)}</b> · ${new Date(SITE.build.stamp * 1000).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}${SITE.build.game ? ` · game ${esc(fmtVer(SITE.build.game))}` : ""}</span>` : ""}
     ${SITE.contact ? `<span>Contact: <b>${esc(SITE.contact)}</b></span>` : ""}
+    <span>Made with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></span>
     <span><a href="#" id="sitenotes">What's new</a> · <a href="#/support">Support · Credits</a></span>`;
   document.body.appendChild(foot);
   $("#sitenotes").onclick = (e) => { e.preventDefault(); showAppHistory(); };
