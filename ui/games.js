@@ -120,7 +120,9 @@ const gmW = { lunacy: 10 * GM_PULL, streak: 0, day: "", ach: {}, played: {}, pul
 // the lunacy as the game shows it: its own icon (cut from the game's files, /api/gacha_ui) and its red
 const GM_LUNIMG = `<img class="lunicon" src="/api/gacha_ui?n=icon_lunacy" alt="lunacy" onerror="this.remove()">`;
 // (the count next to Extraction in the top menu)
-const gmLunDraw = () => { const el = document.querySelector("#navlun"); if (el) el.innerHTML = `${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b>`; };
+// (the top menu has little room: 5,230 is shown as 5.2k, rounded down; the exact count is in the hint)
+const gmLunShort = (n) => n < 1000 ? String(n) : n < 1e6 ? (Math.floor(n / 100) / 10) + "k" : (Math.floor(n / 1e5) / 10) + "m";
+const gmLunDraw = () => { const el = document.querySelector("#navlun"); if (el) el.innerHTML = `${GM_LUNIMG}<b title="${gmW.lunacy.toLocaleString("en")} lunacy">${gmLunShort(gmW.lunacy)}</b>`; };
 const gmWKeep = () => { try { localStorage.setItem(GM_WALLET, JSON.stringify(gmW)); } catch {} gmLunDraw(); };
 gmLunDraw();
 // [key, name, what it takes, lunacy]

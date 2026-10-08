@@ -208,3 +208,7 @@ button.primary:disabled { filter: grayscale(.8); }
 #nav #navgacha { display: flex; min-width: 124px; }
 #nav #navgacha::before { transform: translateX(-26px); }
 #navlun { position: absolute; left: 50%; top: 15px; margin-left: -6px; white-space: nowrap; }
+#nav #navgacha { min-width: 104px; }
+#nav #navgacha::before { transform: translateX(-20px); }
+#navlun { margin-left: -1px; top: 14px; font: 15px "LC Bebas", sans-serif; letter-spacing: .06em; }
+#navlun .lunicon { height: 14px; margin-right: 2px; }
