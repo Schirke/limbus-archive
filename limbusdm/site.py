@@ -1059,6 +1059,17 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     ex = Exporter(svc, base_url, progress=progress)
     if report:
         ex.report(report)
+    # a report made since the newest one on the site goes up as well: Settings -> Website sends without naming one
+    # (an older one that is not there was taken off, and stays off)
+    def taken(r):
+        return r["new"].rsplit("_", 1)[-1]
+
+    def there(r):
+        return os.path.exists(ex._manifest_path("report-" + hashlib.sha1(r["id"].encode()).hexdigest()[:12]))
+    newest = max((taken(r) for r in svc.reports() if there(r)), default="")
+    for r in svc.reports():
+        if r["id"] != report and taken(r) > newest and not there(r):
+            ex.report(r["id"])
     ex.pages()
     ex.shell()
     progress("site: packing", 0, 0)
