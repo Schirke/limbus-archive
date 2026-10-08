@@ -2830,6 +2830,47 @@ function vsDrawStage() {
   }
 }
 // a list scrolled to its picked row (only the list: the page stays where it is)
+// The right column is one panel with tabs — Stage / Music / Options — and each tab says what is picked. vsDrawRight
+// draws the three sections as before (their ids and handlers stay); this puts them under the tabs.
+const VS_TABS = [["stage", "Stage"], ["music", "Music"], ["options", "Options"]];
+function vsTabs() {
+  const box = $("#vsright");
+  const secs = box ? [...box.querySelectorAll(":scope > section.vsside")] : [];
+  if (secs.length !== 3) return;
+  const wrap = document.createElement("div");
+  wrap.className = "vstabbox";
+  wrap.innerHTML = `<div class="vstabs">${VS_TABS.map(([k, name]) => `<button class="vstab" data-rtab="${k}"><b>${name}</b><small></small></button>`).join("")}</div>`;
+  box.insertBefore(wrap, secs[0]);
+  secs.forEach((sec, i) => {
+    sec.classList.remove("card");
+    sec.dataset.rtabof = VS_TABS[i][0];
+    wrap.appendChild(sec);
+    // the search and the random pick share a line
+    const q = sec.querySelector("input[type=search]"), dice = sec.querySelector("#vsmaprand, #vsmusicrand");
+    if (q && dice) {
+      const line = document.createElement("div");
+      line.className = "vsqline";
+      q.before(line);
+      line.append(q, dice);
+      dice.textContent = "🎲 Random";
+    }
+  });
+  secs[0].insertAdjacentHTML("afterbegin", `<div class="vsbig" id="vsbig"><b></b></div>`);
+  wrap.querySelectorAll("[data-rtab]").forEach((b) => b.onclick = () => { vs.rtab = b.dataset.rtab; vsKeep(); vsTabsDraw(); });
+  wrap.addEventListener("click", () => setTimeout(vsTabsDraw, 0));  // (a pick inside changes what the tabs say)
+  vsTabsDraw();
+}
+function vsTabsDraw() {
+  const wrap = document.querySelector(".vstabbox");
+  if (!wrap) return;
+  const tab = VS_TABS.some(([k]) => k === vs.rtab) ? vs.rtab : "stage";
+  const track = (vs.bgm || []).find((m) => m.name === vs.music);
+  const now = { stage: vs.map ? vsMapLabel(vs.map) : "Plain dark", music: track ? vsTrackLabel(track) : "None", options: `${VS_SHOW.filter((k) => vs[k]).length} on` };
+  wrap.querySelectorAll("[data-rtab]").forEach((b) => { b.classList.toggle("on", b.dataset.rtab === tab); b.querySelector("small").textContent = now[b.dataset.rtab]; });
+  wrap.querySelectorAll("[data-rtabof]").forEach((sec) => { sec.hidden = sec.dataset.rtabof !== tab; });
+  const big = $("#vsbig"), pic = vs.map && vsPicUrl(vs.map);
+  if (big) { big.style.backgroundImage = pic ? `url('${pic}')` : ""; big.querySelector("b").textContent = now.stage; }
+}
 // Render and Live stand between the fighters' cards and the fight's row on a duel's page (#vsgoslot); the right column
 // draws them, so they are moved there after either is drawn (and back to the column when the page has no such place)
 const VS_GO = [".vsgo", "#vsprog", "#vsnote"];
@@ -2853,6 +2894,7 @@ function vsGoPlace(kept) {
     const r = right.apply(this, arguments);
     document.querySelectorAll("#vsgoslot > *").forEach((el) => el.remove());
     vsGoPlace();
+    vsTabs();
     return r;
   };
 }

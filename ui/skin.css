@@ -276,3 +276,28 @@ button.primary:disabled { filter: grayscale(.8); }
 .gmdot::after { width: 24px; height: 23px; border: 0; border-radius: 0; background: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_26") center / contain no-repeat; }
 .gmdot.done::after { background-image: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_27"); }
 @media (max-width: 1250px) { .gmtop { grid-template-columns: 1fr; } }
+
+/* ---- Versus, the right column: one panel with tabs (Stage / Music / Options) ---- */
+.vstabs { display: flex; gap: 2px; border-bottom: 1px solid var(--cream); }
+.vstab { flex: 1; min-width: 0; padding: 6px 4px 5px; text-align: center; background: #140e0b; border: 1px solid var(--line); border-bottom: 0; color: var(--muted); clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
+.vstab b { display: block; font: 17px/1.1 "LC Bebas", sans-serif; letter-spacing: .1em; text-transform: uppercase; font-weight: 400; }
+.vstab small { display: block; font-size: 11px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px; }
+.vstab:hover { color: var(--text); border-color: #6b4a2c; }
+.vstab.on, .vstab.on:hover { background: var(--cream); color: #1a0f08; border-color: var(--cream); }
+.vstabbox > section.vsside { background: rgba(12, 8, 7, .92); border: 1px solid var(--line); border-top: 0; padding: 10px; }
+.vstabbox > section[hidden] { display: none; }
+.vstabbox > section > .row:first-of-type:has(.vsh), .vstabbox > section > .vsh { display: none; }
+.vsbig { position: relative; height: 160px; outline: 1px solid var(--cream); background: #0a0605 center / cover; overflow: hidden; }
+.vsbig::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 55%, rgba(0, 0, 0, .85)); }
+.vsbig b { position: absolute; left: 10px; right: 10px; bottom: 6px; z-index: 1; font: 24px/1.1 "LC Bebas", sans-serif; letter-spacing: .05em; text-transform: uppercase; font-weight: 400; text-shadow: 2px 2px 0 #000; }
+.vsqline { display: flex; gap: 6px; align-items: stretch; } .vsqline input { flex: 1; min-width: 0; }
+.vsqline button { white-space: nowrap; font: 15px "LC Bebas", "Segoe UI Emoji", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--cream); padding: 0 12px; }
+.vsqline button:hover { color: var(--gold); border-color: var(--gold); }
+.vstabbox .vsrows { max-height: 250px; } .vstabbox .vsmaprows { max-height: 230px; }
+.vstabbox .vsrow { border-radius: 0; font: 16px "LC Bebas", sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--text); }
+.vstabbox .vsrow.on { border-color: var(--gold); color: var(--gold); box-shadow: inset 0 0 12px rgba(255, 138, 0, .45); background: none; }
+.vstabbox .vsbuff { border-radius: 0; border-left: 3px solid var(--gold); background: #120d0b; }
+.vsw:has(.vsarena) .vsright > .vstabbox { grid-column: 1 / span 2; }
+.vsw:has(.vsarena) .vsright > details { grid-column: 3; }
+.vstabbox > section > .row:has(> .vsh) { display: none; }
+.vstabbox .vsbig { margin-bottom: 8px; }
