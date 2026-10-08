@@ -112,6 +112,9 @@ button.primary:disabled { filter: grayscale(.8); }
 
 /* ---- the corner player ---- */
 #player { border: 12px solid transparent; border-image: var(--k-frame) 44 fill / 12px stretch; background: none; }
+/* the frame takes 24px of the width: the volume and the clock go to a row of their own under the buttons */
+#player .c { flex-wrap: wrap; row-gap: 8px; }
+#mu-vol { flex: 1 0 150px; }
 
 /* the lunacy next to Extraction: right of the icon and the name, not over them */
 #nav #navgacha { display: grid; grid-template: "i l" auto "t l" auto / auto auto; column-gap: 7px; align-content: center; justify-items: center; }
