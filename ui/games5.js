@@ -41,7 +41,7 @@ window.addEventListener("resize", () => $("#gestage") && gaFit());
 function gaFit() {
   const box = $("#gebox");
   box.style.width = "";
-  const k = Math.max(0.45, Math.min(1, box.clientWidth / 1280, (window.innerHeight - box.getBoundingClientRect().top - 70) / 720));  // (the whole screen in sight)
+  const k = Math.max(Math.min(0.45, box.clientWidth / 1280), Math.min(1, box.clientWidth / 1280, (window.innerHeight - box.getBoundingClientRect().top - 70) / 720));  // (the whole screen in sight; never wider than the page — a phone)
   $("#gestage").style.transform = `scale(${k})`;
   box.style.width = 1280 * k + "px";
   box.style.height = 720 * k + "px";
