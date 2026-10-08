@@ -2463,7 +2463,7 @@ function vsDrawTeamStage(box) {
   };
   const panel = (k) => {
     const list = vs[k + "s"], on = vs.side === k;
-    return `<div class="card vsteamside ${on ? "on" : ""} ${k}" data-tside="${k}">
+    return `<div class="vsteamside ${on ? "on" : ""} ${k}" data-tside="${k}">
       <div class="row"><b class="vsh grow">${k === "left" ? "Left" : "Right"} team · ${list.length}${boss === k ? " · BOSS" : ""}</b>
         <button class="toggle ${on ? "on" : ""}" data-tpick="${k}" title="A click in the list on the left adds a fighter to this team">${on ? "Adding here" : "Add here"}</button>
         <button data-tbossfor="${k}" title="Make this side a lone boss: keeps its first fighter and shows the Bosses &amp; Abnormalities list">Boss</button>
@@ -2484,9 +2484,9 @@ function vsDrawTeamStage(box) {
     : boss ? `<span><b>★ Boss fight:</b> ${esc(vsChar(vs[boss + "s"][0])?.short || "")} alone against ${boss === "left" ? nr : nl}. Its strength is set to be fair against this team.</span>`
     : `<span class="muted">${nl} vs ${nr}: no boss. A boss is a lone fighter against two or more: press <b>Boss</b> on a side, pick the boss, then add two or more to the other side.</span>`;
   const sp = vs.map && vsPicUrl(vs.map);
-  box.innerHTML = `<div class="vsprev vsteamprev" ${sp ? `style="background-image:url('${sp}')"` : ""}><div class="vsvs">TEAM</div>
-      <div class="vstag">${esc(vs.map ? vsMapLabel(vs.map) : "Plain dark stage")}</div></div>
-    <div class="vsteams">${panel("left")}${panel("right")}</div>
+  box.innerHTML = `<div class="vsprev vsteamprev vsarena" ${sp ? `style="background-image:url('${sp}')"` : ""}><div class="vsvs">VS</div>
+      <div class="vstag">${esc(vs.map ? vsMapLabel(vs.map) : "Plain dark stage")}</div>
+      <div class="vsteams">${panel("left")}${panel("right")}</div></div>
     <div class="card vsfight"><span class="vslbl">Boss</span>${status}</div>
     ${e ? editor() : ""}
     <div class="card vsfight"><span class="vslbl">Mode</span><select id="vslanes"><option value="one">Exchanges · one at a time</option><option value="all" ${vs.teamFlow === "all" ? "selected" : ""}>Exchanges · all at once</option><option value="aggro" ${vs.teamFlow === "aggro" ? "selected" : ""}>Aggro · real time</option></select>
@@ -2843,7 +2843,7 @@ function vsDrawRight() {
       <div id="vsbase"></div><div id="vsrules"></div>` : `<div class="small muted" style="margin-top:8px">Clash fights only.</div>`}</details>
     <div class="vsgo"><button id="vslivego" class="vslive" ${clash && !vs.team ? "" : "disabled"} title="${vs.team ? "Live does not play team fights yet" : clash ? "The same fight played live in a window of its own, nothing saved" : "Live plays clash fights"}"><i></i>Live</button>
       <button id="vslivestop" hidden>■ Stop</button>
-      <button id="vsgo" class="primary vsrender">Render</button></div>
+      <button id="vsgo" class="primary vsrender">▶ Render the fight</button></div>
     <div id="vsprog"></div><div id="vsnote" class="muted small"></div>`;
   // stage
   const drawMaps = () => {

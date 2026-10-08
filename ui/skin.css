@@ -1,0 +1,166 @@
+/* The app's look, made of the game's own menu pieces (frames, plates, icons: /api/gacha_ui cuts them from the install,
+   limbusdm/gacha.py SKIN). Loaded after style.css: only the shared pieces are restyled here, the pages keep their own rules. */
+:root {
+  --bg: #0d0a09; --panel: #17110e; --panel2: #1f1612; --line: #3a2a20; --text: #f1e3cc; --muted: #9c8a76;
+  --gold: #f8b400; --cream: #e9c9a0; --hot: #ff8a00; --radius: 0px;
+  --k-frame: url("/api/gacha_ui?n=MainUI_common_Popup_01_23");
+  --k-plate: url("/api/gacha_ui?n=MainUI_common_Popup_01_btn_t1_normal");
+  --k-plate-on: url("/api/gacha_ui?n=MainUI_common_Popup_01_btn_t1_hover");
+  --k-btn: url("/api/gacha_ui?n=MainUI_UserInfo_2_3");
+  --k-btn-on: url("/api/gacha_ui?n=MainUI_UserInfo_2_6");
+  --k-glow: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_2");
+  --k-glow-line: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_19");
+  --k-slant: url("/api/gacha_ui?n=MainUI_common_Popup_01_27");
+  --cut: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+}
+* { scrollbar-width: thin; scrollbar-color: #6b4a2c #120d0b; }
+html { background: var(--bg); }
+body {
+  background:
+    radial-gradient(circle at 0 100%, rgba(179, 22, 15, .2), transparent 38%),
+    radial-gradient(circle at 100% 0, rgba(248, 180, 0, .06), transparent 34%),
+    linear-gradient(rgba(13, 10, 9, .88), rgba(13, 10, 9, .94)),
+    #0d0a09 url("/api/gacha_ui?n=MainUI_Settings_3_8") center top / cover;
+}
+body::after { /* the company's seal, bottom right */
+  content: ""; position: fixed; right: -70px; bottom: -90px; width: 503px; height: 564px; pointer-events: none; z-index: 0;
+  background: url("/api/gacha_ui?n=MainUI_Settings_3_10") no-repeat; opacity: .3;
+}
+#main { position: relative; z-index: 1; }
+
+/* ---- the top menu ---- */
+#top { height: 68px; padding: 0 22px; background: linear-gradient(#1b110d, #0c0807); border-bottom: 2px solid #000; box-shadow: 0 1px 0 #5d3f25; position: relative; z-index: 5; }
+#top::after { content: ""; position: absolute; left: 0; right: 0; bottom: -7px; height: 4px; pointer-events: none; opacity: .8;
+  background: repeating-linear-gradient(90deg, #b3160f 0 46px, transparent 46px 54px); }
+#top .brand { font-size: 25px; margin-right: 14px; }
+#top .logo { height: 36px; }
+#nav { gap: 0; height: 100%; }
+#nav a { position: relative; min-width: 88px; padding: 0 8px; border: 0; border-radius: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font: 15px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+#nav a::before { content: ""; width: 34px; height: 28px; background: center / contain no-repeat; opacity: .5; filter: sepia(1) saturate(1.6) hue-rotate(-12deg); }
+#nav a:hover::before { opacity: .85; }
+#nav a.active { color: var(--gold); background: none; }
+#nav a.active::before { opacity: 1; filter: sepia(1) saturate(6) hue-rotate(-8deg) drop-shadow(0 0 6px var(--hot)); }
+#nav a.active::after { content: ""; position: absolute; inset: 5px 2px; pointer-events: none; border: 10px solid transparent; border-image: var(--k-glow-line) 30 / 10px stretch; }
+#nav a[data-group=patches]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_11"); }
+#nav a[data-group=db]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_10"); }
+#nav a[data-group=versus]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_12"); }
+#nav a[data-group=games]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_13"); }
+#nav a[data-group=gacha]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_14"); }
+#nav a[data-group=tools]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_9"); }
+#nav a[data-group=community]::before { background-image: url("/api/gacha_ui?n=MainUI_Lobby_new_1_2"); filter: none; opacity: .75; width: 30px; }
+#nav a[data-group=community].active::before { background-image: url("/api/gacha_ui?n=MainUI_Lobby_new_1_3"); filter: drop-shadow(0 0 6px var(--hot)); opacity: 1; }
+#nav a[hidden] { display: none; }
+#navgacha { gap: 2px; }
+#navlun { position: absolute; right: -4px; top: 6px; font: 12px Consolas, monospace; letter-spacing: 0; background: #150d0a; border: 1px solid #5d2a1c; padding: 0 5px; z-index: 1; }
+#navlun:empty { display: none; }
+#navlun .lunicon { height: 13px; }
+@media (max-width: 1560px) { #nav a { min-width: 78px; padding: 0 5px; font-size: 14px; } }
+#statusbtn { border-radius: 0; border-color: transparent; font: 13px "LC Bebas", sans-serif; letter-spacing: .16em; text-transform: uppercase; }
+.status { top: 46px; border-color: var(--cream); }
+#timers { font: 13px/1.25 "LC Bebas", sans-serif; letter-spacing: .18em; text-transform: uppercase; padding-left: 32px;
+  background: url("/api/gacha_ui?n=MainUI_Inventory_1_21") left center / 24px auto no-repeat; }
+#timers b { font: 12px Consolas, monospace; letter-spacing: 0; color: var(--text); }
+#navsup, #navset { border-radius: 0; }
+#navsup { border: 9px solid transparent; border-image: var(--k-btn) 36 fill / 9px stretch; background: none; padding: 2px 6px; font: 15px "LC Bebas", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--cream); }
+#navsup:hover, #navsup.active { border-image-source: var(--k-btn-on); background: none; color: var(--gold); }
+#navset { width: 48px; height: 46px; padding: 0; border: 0; font-size: 0; background: url("/api/gacha_ui?n=MainUI_Lobby_new_1_9") center / contain no-repeat; }
+#navset:hover { filter: brightness(1.3); }
+#navset.active { background-color: transparent; background-image: url("/api/gacha_ui?n=MainUI_Lobby_new_1_10"); }
+
+/* ---- the pages of a section: tabs ---- */
+#subnav { background: linear-gradient(rgba(13, 10, 9, .97), rgba(13, 10, 9, .8)); padding: 12px 28px 0; position: relative; z-index: 4; }
+#subnav div:not(.gmcrumb) { gap: 2px; }
+#subnav div:not(.gmcrumb) a { padding: 6px 20px 5px; font: 16px "LC Bebas", sans-serif; letter-spacing: .1em; text-transform: uppercase; background: #140e0b;
+  border: 1px solid var(--line); border-bottom: 0; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
+#subnav div:not(.gmcrumb) a.active { background: var(--cream); color: #1a0f08; border-color: var(--cream); }
+#subnav div.gmcrumb { padding-bottom: 6px; }
+
+/* ---- headings ---- */
+h1 { font-size: 42px; line-height: 1; letter-spacing: .06em; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+h1::after { content: ""; flex: 1; min-width: 60px; max-width: 268px; height: 13px; background: var(--k-slant) left / 268px 100% no-repeat; opacity: .22; order: 99; }
+h2 { font: 22px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.sub { color: var(--muted); }
+
+/* ---- buttons, switches, fields ---- */
+button, select, input, textarea { border-radius: 0; background: #120d0b; border-color: var(--line); }
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--gold); }
+input[type=text], input[type=search], input:not([type]) { background: #0c0807; border-color: #4a3424; }
+button:not([class]), .toggle, .tabs button, button.danger {
+  font: 15px/1.2 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--cream);
+}
+button:not([class]), .toggle { clip-path: var(--cut); padding: 6px 12px 5px; }
+button:not([class]):hover, .toggle:hover { color: var(--text); border-color: #6b4a2c; }
+.toggle.on, .toggle.on:hover { background: linear-gradient(#6a4a1d, #3b2710); color: var(--gold); border-color: var(--gold); box-shadow: inset 0 0 10px rgba(255, 138, 0, .55); }
+a.toggle { text-decoration: none; display: inline-block; background: #120d0b; border: 1px solid var(--line); }
+.seg .toggle, .seg .toggle:first-child, .seg .toggle:last-child { border-radius: 0; }
+button.primary { border: 10px solid transparent; border-image: var(--k-glow) 30 fill / 10px stretch; background: none; padding: 3px 14px 2px;
+  font: 18px/1.2 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #fff3d0; text-shadow: 0 0 10px var(--hot); }
+button.primary:hover { filter: brightness(1.25); }
+button.primary:disabled { filter: grayscale(.8); }
+.tabs button { font-size: 17px; }
+.tabs button.active { color: var(--gold); }
+
+/* ---- frames ---- */
+.card { border: 9px solid transparent; border-image: var(--k-frame) 44 fill / 9px stretch; border-radius: 0; background: none; padding: 8px 10px; }
+.card.click:hover { filter: brightness(1.25); }
+.modal { background: rgba(5, 3, 2, .8); backdrop-filter: blur(3px); }
+.modal-box, .modal-box:has(.ud) { border: 12px solid transparent; border-image: var(--k-frame) 44 fill / 12px stretch; border-radius: 0; background: none; padding: 10px; }
+.modal-box .close { color: var(--cream); z-index: 2; }
+.chip { border-radius: 0; }
+.panel { border-radius: 0; }
+
+/* ---- the corner player ---- */
+#player { border: 12px solid transparent; border-image: var(--k-frame) 44 fill / 12px stretch; background: none; }
+
+/* the lunacy next to Extraction: right of the icon and the name, not over them */
+#nav #navgacha { display: grid; grid-template: "i l" auto "t l" auto / auto auto; column-gap: 7px; align-content: center; justify-items: center; }
+#nav #navgacha::before { grid-area: i; }
+#navlun { position: static; grid-area: l; align-self: center; }
+
+/* ---- Versus: Render and Live side by side ---- */
+.vsgo { grid-template-columns: 1fr auto; align-items: stretch; }
+.vsgo .vsrender { order: -1; height: 60px; font-size: 24px; letter-spacing: .1em; }
+.vsgo .vslive { height: 60px; padding: 0 20px; border: 10px solid transparent; border-image: var(--k-glow) 30 fill / 10px stretch; background: none; filter: hue-rotate(-38deg) saturate(1.7);
+  font: 22px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #fff3d0; text-shadow: 0 0 10px var(--hot); }
+.vsgo .vslive:hover { filter: hue-rotate(-38deg) saturate(1.7) brightness(1.25); }
+.vsgo .vslive:disabled { filter: grayscale(.9) brightness(.7); }
+.vsgo .vslive i { background: #fff3d0; box-shadow: 0 0 8px #fff; }
+.vsgo #vslivestop { grid-column: 1 / -1; }
+
+/* ---- Auto Battler: the teams stand on the stage, face to face ---- */
+.vsteamprev.vsarena { display: block; height: auto; min-height: 400px; max-height: none; aspect-ratio: auto; padding: 46px 16px 14px; border: 2px solid #000; outline: 1px solid var(--cream); border-radius: 0; background-color: #0a0605; }
+.vsarena::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(10, 6, 5, .9), rgba(10, 6, 5, .3) 42%, rgba(10, 6, 5, .3) 58%, rgba(60, 6, 4, .88)), linear-gradient(transparent 60%, #0a0605); }
+.vsarena .vsvs { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 104px; color: var(--gold); text-shadow: 0 0 30px rgba(255, 138, 0, .7), 4px 4px 0 #000; }
+.vsarena .vstag { clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); background: var(--cream); color: #1a0f08; border-radius: 0; padding: 3px 20px 2px 10px;
+  font: 16px "LC Bebas", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+.vsarena .vsteams { position: relative; z-index: 1; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 110px; margin: 0; }
+.vsarena .vsteamside, .vsarena .vsteamside.on, .vsarena .vsteamside.right.on { background: none; border: 0; padding: 0; }
+.vsarena .vsteamside .vsh { font: 28px/1 "LC Bebas", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #fff; }
+.vsarena .vsteamside.right .vsh { color: #ff6a55; }
+.vsarena .vsteamside.on .vsh { text-shadow: 0 0 14px var(--hot); }
+.vsarena .vsteamside.right > .row { flex-direction: row-reverse; } .vsarena .vsteamside.right .vsh { text-align: right; }
+.vsarena .vstmlist { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 8px; min-height: 290px; margin-top: 12px; }
+.vsarena .right .vstmlist { flex-direction: row-reverse; }
+.vsarena .vstm { position: relative; flex: 0 1 132px; min-width: 96px; flex-direction: column; align-items: stretch; gap: 0; padding: 0; border-radius: 0; background: rgba(8, 5, 4, .82); outline: 1px solid var(--cream); }
+.vsarena .vstm img { width: 100%; height: 150px; border-radius: 0; object-fit: cover; object-position: center 12%; }
+.vsarena .vstm.boss { flex-basis: 230px; outline-color: #ff3b24; background: rgba(30, 6, 4, .85); box-shadow: 0 0 22px rgba(255, 59, 36, .35); }
+.vsarena .vstm.boss img { height: 230px; }
+.vsarena .vstm.edit { outline: 2px solid var(--gold); box-shadow: none; }
+.vsarena .vstm .grow { padding: 5px 7px 3px; min-width: 0; }
+.vsarena .vstm b { font: 18px/1.05 "LC Bebas", sans-serif; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vsarena .vstm small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vsarena .vstbtn { display: flex; gap: 2px; padding: 3px 5px 5px; }
+.vsarena .vstbtn button { flex: 1; padding: 2px 0; font-size: 12px; clip-path: none; min-width: 0; }
+.vsarena .vstmlist > .muted { background: rgba(0, 0, 0, .6); align-self: center; }
+/* (the Auto Battler's page: the picker on the left, the stage wide, stage / music / switches under it) */
+.vsw:has(.vsarena) { grid-template-columns: minmax(330px, 420px) minmax(0, 1fr); grid-template-areas: "pick mid" "pick right"; }
+.vsw:has(.vsarena) .vsright { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+.vsw:has(.vsarena) .vsright > .vsgo { grid-column: 1 / -1; order: -1; grid-template-columns: minmax(0, 420px) auto; }
+.vsw:has(.vsarena) .vsright > #vsprog, .vsw:has(.vsarena) .vsright > #vsnote { grid-column: 1 / -1; order: -1; }
+.vsw:has(.vsarena) .vsright > details { grid-column: 1 / -1; }
+.vsarena .vsteamside > .row { flex-wrap: nowrap; } .vsarena .vsteamside .vsh { white-space: nowrap; }
+.vsw:has(.vsarena) .vsright > .vsgo { justify-content: start; }
+.vsarena .vsteamside button { white-space: nowrap; }
+.vsroomlink { display: none; }  /* (a tab of Versus now) */
