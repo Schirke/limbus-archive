@@ -194,3 +194,17 @@ button.primary:disabled { filter: grayscale(.8); }
 #vsgoslot #vsprog:not(:empty), #vsgoslot #vsnote:not(:empty) { margin-top: 8px; }
 .vsgo .vsrender { white-space: nowrap; overflow: hidden; padding-left: 6px; padding-right: 6px; }
 .vsright > .vsgo .vsrender { font-size: 19px; letter-spacing: .06em; }
+
+/* the menu, second pass: Community has a striped icon like the rest (the camera), Games the ticket; the lunacy sits by Extraction's icon */
+#nav a[data-group=community]::before, #nav a[data-group=community].active::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_13"); width: 34px; }
+#nav a[data-group=community]::before { opacity: .5; filter: sepia(1) saturate(1.6) hue-rotate(-12deg); }
+#nav a[data-group=community]:hover::before { opacity: .85; }
+#nav a[data-group=community].active::before { opacity: 1; filter: sepia(1) saturate(6) hue-rotate(-8deg) drop-shadow(0 0 6px var(--hot)); }
+#nav a[data-group=games]::before { background-image: url("/api/gacha_ui?n=MainUI_Settings_3_20"); }
+#nav #navgacha { grid-template: "i l" auto "t t" auto / auto auto; column-gap: 5px; row-gap: 2px; justify-content: center; }
+#nav #navgacha::before { justify-self: end; }
+#navlun { justify-self: start; background: none; border: 0; padding: 0; font: 13px Consolas, monospace; }
+#navlun .lunicon { height: 15px; margin-right: 3px; }
+#nav #navgacha { display: flex; min-width: 124px; }
+#nav #navgacha::before { transform: translateX(-26px); }
+#navlun { position: absolute; left: 50%; top: 15px; margin-left: -6px; white-space: nowrap; }

@@ -22,7 +22,7 @@ GACHA = "Assets/Resources_moved/Gacha/"
 # sprites and textures of the extraction's screens, by their names in the main build
 # the pieces of the game's own menus the app's look is made of (ui/skin.css): frames, plates, the menu's icons
 SKIN = (["MainUI_common_Popup_01_" + n for n in ("23", "26", "27", "37", "btn_t1_normal", "btn_t1_hover")] + ["MainUI_common_Popup_03_23", "MainUI_UserInfo_2_3", "MainUI_UserInfo_2_6",
-         "MainUI_Inventory_1_21", "MainUI_Settings_3_8", "MainUI_Settings_3_10"] + [f"New_MainUI_PersonalityList_2_{n}" for n in (2, 19, 26, 27)]
+         "MainUI_Inventory_1_21", "MainUI_Settings_3_8", "MainUI_Settings_3_10", "MainUI_Settings_3_20"] + [f"New_MainUI_PersonalityList_2_{n}" for n in (2, 19, 26, 27)]
         + [f"MainUI_BottomMenu_1_{n}" for n in (9, 10, 11, 12, 13, 14, 19, 21)] + [f"MainUI_Lobby_new_1_{n}" for n in (0, 1, 2, 3, 9, 10)])
 UI_RE = re.compile(r"^(MainUI_Gacha_\w+|MainUI_Logoicon_filter_\d+|gacharesult_\w+|FX_Tex_UI_Gacha_\w+|icon_lunacy|" + "|".join(SKIN) + r")$")
 # the ones the page draws (ui/games5.js, ui/style.css): what the web copy takes
@@ -101,7 +101,7 @@ def ui_png(name: str, game_data: str, cache_dir: str) -> tuple[bytes, str] | Non
         return None
     folder = os.path.join(cache_dir, "gacha")
     with _lock:
-        if not os.path.exists(os.path.join(folder, ".done3")):
+        if not os.path.exists(os.path.join(folder, ".done4")):
             _extract(game_data, folder)
     for ext, mime in ((".png", "image/png"), (".jpg", "image/jpeg")):
         fp = os.path.join(folder, name + ext)
@@ -139,5 +139,5 @@ def _extract(game_data: str, folder: str) -> None:
                     img.save(os.path.join(folder, n + ".png"), "PNG")
             except Exception:
                 continue
-    with open(os.path.join(folder, ".done3"), "w") as f:
+    with open(os.path.join(folder, ".done4"), "w") as f:
         f.write("1")
