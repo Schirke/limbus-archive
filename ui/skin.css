@@ -317,3 +317,4 @@ button.primary:disabled { filter: grayscale(.8); }
 #nav a.live .cmlive i { padding: 1px 5px 0; font: 13px "LC Bebas", sans-serif; letter-spacing: .06em; font-style: normal; color: #fff; background: #b3160f; clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 0 5px); }
 @keyframes cmpulse { 50% { box-shadow: 0 0 3px rgba(255, 59, 36, .5); } }
 #nav #navcommunity.live { min-width: 136px; } #nav #navcommunity.live::before { transform: translateX(-40px); } .cmlive { margin-left: -22px; }
+#nav #navcommunity.live { min-width: 144px; } .cmlive { margin-left: -17px; }  /* (a little air between the camera and the streamer's picture) */
