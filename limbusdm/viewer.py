@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import glob
 import json
+import math
 import os
 import re
 import shutil
@@ -1250,6 +1251,10 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
             e["events"] = dict(ev, sounds=list(ev["sounds"]) + add)
     job.update(win=bool(spec.get("intro")), seed=int(spec.get("seed") or 0), winner=winner,
                finalHits=sum(len(t["events"].get("hits") or []) for t in final))
+    job["hud"] = [fighter_hud(svc, c, n, f and f["hp"]) for c, n, f in
+                  ((left, spec.get("lname") or "", fa if pace else None), (right, spec.get("rname") or "", fb if pace else None))]
+    from . import battle_ui  # (the game's own HUD pieces for the player: ViewerHud.cs)
+    job["hudUi"] = battle_ui.folder(svc)
     m = next((x for x in battle_maps(svc) if x["name"] == spec.get("map")), None) if spec.get("map") else None
     if m:
         # the stage behind them, with the game's battle camera looking down at its floor
@@ -1356,6 +1361,11 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     final = [e for e in entries if e.get("final")]
     job.update(win=bool(spec.get("intro")), seed=int(spec.get("seed") or 0), winner=winner,
                finalHits=sum(len(t["events"].get("hits") or []) for t in final))
+    # (the boss's HP as the engine made it stronger: x sqrt(bossPower), see versus_team.Battle.boss_mult)
+    job["hud"] = [fighter_hud(svc, f["cid"], f["name"], f["hp"] * (math.sqrt(fight.get("bossPower") or 1) if i == fight["boss"] else 1),
+                              boss=i == fight["boss"]) for i, f in enumerate(F)]
+    from . import battle_ui
+    job["hudUi"] = battle_ui.folder(svc)
     m = next((x for x in battle_maps(svc) if x["name"] == spec.get("map")), None) if spec.get("map") else None
     if m:
         maps = [svc.object_file(lg) for lg in bundle_deps(svc, m["bundle"])]
@@ -1363,6 +1373,41 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
         job["map"] = {"prefab": m["prefab"]}
     music = spec.get("music") if spec.get("music") in bgm_tracks(svc) else None
     return job, [{"name": "Versus", "parts": entries, "music": music, "ego": None, "bgSounds": bg_sounds}]
+
+
+def abno_codes(svc) -> dict:
+    """Abnormality id -> its code name (EN_AbnormalityGuides: "O-01-73")."""
+    if getattr(svc, "_abno_codes", None) is None:
+        from . import units
+        loc = os.path.join(svc.game.data or "", "Assets", "Resources_moved", "Localize", "en")
+        svc._abno_codes = {k: r["codeName"] for k, r in units._load(loc, r"EN_AbnormalityGuides.*\.json$").items() if r.get("codeName")}
+    return svc._abno_codes
+
+
+def fighter_hud(svc, cid, name: str = "", hp=None, boss=None) -> dict:
+    """What the player's battle HUD shows for one fighter (Viewer.cs FighterHud): its name, an enemy's risk level (ZAYIN
+    … ALEPH, empty for the rest), boss (a team fight: its boss block under it — code, HP, risk level, name; a 1v1 fight
+    shows both in the top corners anyway: a team fight's boss, else a Boss / Abnormality enemy), its max HP (what the
+    numbers count) and code (an Abnormality's, as O-01-73; "??-??-??-??" for the rest, as the game shows them)."""
+    from . import versus_engine as E
+    kind, cls, code = "", "", ""
+    if isinstance(cid, int):
+        x = next((i for i in svc.unit_db()["ids"] if i["id"] == cid), None)
+        if x:
+            name = f"{x['title']} {x['sinnerName']}"  # (an Identity as the game names it, whatever the page called it)
+            hp = hp or (x.get("hp") or 70) + (x.get("hpLevel") or 2.5) * E.LEVEL
+    else:
+        es = [e for e in svc.enemy_db()["list"] if e.get("app") == cid]
+        e = max(es, key=lambda e: (e.get("kind") == "Boss", bool((e.get("variants") or [{}])[0].get("cls"))), default=None)
+        if e:
+            v = (e.get("variants") or [{}])[0]
+            name, kind = e.get("name") or name, e.get("kind") or ""
+            cls = {"ZYAIN": "ZAYIN"}.get(v.get("cls") or "", v.get("cls") or "")
+            codes = abno_codes(svc)
+            code = next((codes[i] for i in [e.get("id")] + list(v.get("ids") or []) if i in codes), "")
+            hp = hp or (v.get("hp") or 70) + (v.get("hpLevel") or 2.5) * E.LEVEL
+    return {"name": name or str(cid), "cls": cls, "boss": kind in ("Boss", "Abnormality") if boss is None else bool(boss),
+            "hpMax": max(1, round(hp or 300)), "code": code or "??-??-??-??"}
 
 
 def versus_ego_pick(svc, cid, rnd) -> dict | None:
@@ -2640,6 +2685,8 @@ class Renderer:
                 keep[k] = spec[k]
         if spec.get("kbscale") is not None:
             keep["kbscale"] = kb_scale(spec)
+        if spec.get("hp"):  # (the game's battle HUD, Viewer FighterHud: videos with the old HP bars are made again)
+            keep["hud"] = 1
         return "vs-" + hashlib.sha1(json.dumps(keep, sort_keys=True).encode()).hexdigest()[:12]
 
     def start_versus(self, spec: dict) -> str:
