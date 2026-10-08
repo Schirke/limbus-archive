@@ -164,3 +164,26 @@ button.primary:disabled { filter: grayscale(.8); }
 .vsw:has(.vsarena) .vsright > .vsgo { justify-content: start; }
 .vsarena .vsteamside button { white-space: nowrap; }
 .vsroomlink { display: none; }  /* (a tab of Versus now) */
+
+/* ---- the Identity / E.G.O / enemy card ---- */
+.ud .udtitle { font-size: 38px; letter-spacing: .05em; text-shadow: 3px 3px 0 #000; }
+.ud .udhead { border-bottom: 2px solid var(--cream); padding-bottom: 10px; position: relative; }
+.ud .udhead::after { content: ""; position: absolute; left: 0; bottom: -9px; width: 268px; height: 6px; background: var(--k-slant) left / 100% 100% no-repeat; opacity: .35; }
+.ud .udhead button { border: 9px solid transparent; border-image: var(--k-btn) 36 fill / 9px stretch; background: none; clip-path: none; padding: 3px 8px 2px; }
+.ud .udhead button:hover { border-image-source: var(--k-btn-on); color: var(--gold); }
+.ud .udart { border: 2px solid #000; outline: 1px solid var(--cream); clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px); }
+.ud .panel, .ud .lvpanel, .ud .passive { border: 9px solid transparent; border-image: var(--k-plate) 34 fill / 9px stretch; background: none; padding: 4px 6px 6px; }
+.ud .panel h4, .ud h3.group { display: inline-block; padding: 2px 34px 1px 10px; margin-bottom: 10px; color: #1a0f08; font-size: 16px; letter-spacing: .12em;
+  background: url("/api/gacha_ui?n=MainUI_common_Popup_01_37") right center / 100% 100% no-repeat; }
+.ud .panel { text-align: left; } .ud .panel .trio, .ud .panel .kwrow { justify-content: center; }
+.ud h3.group { background-image: var(--k-slant); }
+.ud .upbtn { background: #120d0b; clip-path: var(--cut); }
+.ud .upbtn.on { background: linear-gradient(#6a4a1d, #3b2710); border-color: var(--gold); box-shadow: inset 0 0 12px rgba(255, 138, 0, .6); }
+.ud .lvlabel { color: var(--cream); }
+.ud .sktabs { gap: 2px; border-bottom: 1px solid var(--cream); margin-top: 8px; }
+.ud .sktabs button { padding: 6px 20px 5px; font-size: 16px; letter-spacing: .1em; background: #140e0b; border: 1px solid var(--line); border-bottom: 0; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); }
+.ud .sktabs button.on { background: var(--cream); color: #1a0f08; border-color: var(--cream); }
+.ud .skpanel { background: rgba(12, 8, 7, .9); border: 1px solid var(--line); border-top: 0; }
+.ud .skvbase, .ud .skvoff { font-family: "LC Bebas", Impact, sans-serif; font-weight: 400; }
+.ud .skvbase { font-size: 52px; }
+.ud .trait { font: 15px "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--cream); background: #120d0b; padding: 3px 12px 2px; clip-path: var(--cut); }
