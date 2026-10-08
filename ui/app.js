@@ -2254,6 +2254,23 @@ async function vsPicsWatch() {
   if (vs.pics.have.size !== before || !vs.pics.busy) { vsDrawMaps && vsDrawMaps(); vsDrawStage(); }
   vsPicsNote();
 }
+// The stages in sight get their pictures by themselves (a few at a time, when the renderer is free): nobody has to
+// click a stage to see it. One that could not be drawn is not asked for again.
+function vsPicsNear() {
+  clearTimeout(vsPicsNear.timer);
+  vsPicsNear.timer = setTimeout(() => {
+    const box = $("#vsmaps");
+    if (!box || !vs.pics || vs.pics.busy) return;
+    const top = box.getBoundingClientRect().top, bottom = top + box.clientHeight;
+    const names = [...box.querySelectorAll("[data-map]")].filter((b) => {
+      const r = b.getBoundingClientRect();
+      return b.dataset.map && b.querySelector(".vsnopic") && r.bottom > top && r.top < bottom && !vs.pics.failed.has(b.dataset.map) && !vsPicsNear.asked.has(b.dataset.map);
+    }).map((b) => b.dataset.map).slice(0, 8);
+    names.forEach((n) => vsPicsNear.asked.add(n));  // (asked once a page: a request that fails must not come again and again)
+    if (names.length) vsPicsMake(names);
+  }, 700);
+}
+vsPicsNear.asked = new Set();
 function vsPicsNote() {
   const el = $("#vspicnote");
   if (!el || !vs.pics) return;
@@ -2885,6 +2902,8 @@ function vsDrawRight() {
       || `<div class="muted small">No stage.</div>`;
     $("#vsmaps").querySelectorAll("[data-map]").forEach((b) => b.onclick = () => { vs.map = b.dataset.map; vsKeep(); drawMaps(); vsDrawStage(); vsPicWant(); });
     vsScrollTo($("#vsmaps"));
+    $("#vsmaps").onscroll = vsPicsNear;
+    vsPicsNear();
   };
   vsDrawMaps = drawMaps;
   $("#vsmapq").oninput = drawMaps;
