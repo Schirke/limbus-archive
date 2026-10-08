@@ -5,12 +5,13 @@
 
 const MUSIC_KEEP = "music";
 const mu = { tracks: [], n: -1, open: false, q: "", history: [],
-  ...{ battle: true, shuffle: true, vol: 0.6, min: false, repeat: false, fav: false, favs: [] },
+  ...{ battle: true, shuffle: true, vol: 0.6, min: true, repeat: false, fav: false, favs: [] },
   ...(() => { try { return JSON.parse(localStorage.getItem(MUSIC_KEEP) || "{}"); } catch { return {}; } })() };
+if (mu.v !== 2) { mu.v = 2; mu.min = true; }  // (the new look starts with the player folded, once: a small square in the corner)
 const muAudio = new Audio();
 muAudio.preload = "none";
 
-const muKeep = () => { try { localStorage.setItem(MUSIC_KEEP, JSON.stringify({ battle: mu.battle, shuffle: mu.shuffle, vol: mu.vol, min: mu.min, repeat: mu.repeat, fav: mu.fav, favs: mu.favs, last: mu.tracks[mu.n]?.event })); } catch {} };
+const muKeep = () => { try { localStorage.setItem(MUSIC_KEEP, JSON.stringify({ battle: mu.battle, shuffle: mu.shuffle, vol: mu.vol, min: mu.min, v: mu.v, repeat: mu.repeat, fav: mu.fav, favs: mu.favs, last: mu.tracks[mu.n]?.event })); } catch {} };
 const muTime = (s) => isFinite(s) ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : "0:00";
 // a theme heard in a few fights only is somebody's own: "Canto 8 · Lei Heng"; the common ones name the chapter
 const muSub = (t) => [t.where, t.fights && t.fights <= 3 && t.who.length ? t.who.slice(0, 2).join(", ") : "", t.by].filter(Boolean).join(" · ");

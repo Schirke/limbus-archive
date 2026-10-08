@@ -203,11 +203,13 @@ function dbCard(x, newest) {
   const isId = !!x.title;
   const line = isId ? x.statuses.map((k) => `<span class="arch">${statusIcon(k, "s18")}${esc(statusName(k))}</span>`).join("")
     : (x.cost || []).map((c) => `<span class="arch">${sinIcon(c.sin, "s18")}${c.n}</span>`).join("");
-  return `<div class="ucard dcard" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">
-      ${x.date && x.date === newest ? `<span class="unew">NEW</span>` : ""}</div>
-    <div class="ucap"><div class="utitle">${esc(isId ? x.title : x.name)}</div>
-      <div class="uarch">${isId ? rankIcons(x.rank) : ico(`grade_${x.grade}`, "s18", x.grade, x.grade)}${line}</div>
-      <div class="ufoot"><span>${esc(x.sinnerName)}</span>${seasonTag(x.season)}</div></div></div>`;
+  // (the tile: the art with the Sinner's emblem, the rank and the season's plate on it; under it who, the title, the archetype)
+  const sid = Math.floor(x.id / 100) % 100;
+  return `<div class="ucard dcard d2" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">
+      ${x.date && x.date === newest ? `<span class="unew">NEW</span>` : ""}<span class="uem">${ico(`sinner_${sid}`, "s36", x.sinnerName, "")}</span>
+      <span class="urank">${isId ? rankIcons(x.rank) : ico(`grade_${x.grade}`, "s22", x.grade, x.grade)}</span>${seasonTag(x.season)}</div>
+    <div class="ucap"><div class="uwho">${esc(x.sinnerName)}</div><div class="utitle">${esc(isId ? x.title : x.name)}</div>
+      <div class="uarch">${line}</div></div></div>`;
 }
 function drawDbGrid() {
   const arr = dbFiltered();

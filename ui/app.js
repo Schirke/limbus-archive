@@ -272,7 +272,10 @@ routes.patches = async (args) => {
         <button onclick="location.hash='#/browse'">Browse files</button></div></div>`;
     }
     for (const r of s.reports) {
-      h += `<div class="card click" onclick="location.hash='#/patches/${encodeURIComponent(r.id)}'"><div class="row"><b>${esc(fmtSnap(r.new))}</b><span class="muted">compared with ${esc(fmtSnap(r.old))}</span></div>${summaryChips(r.summary)}</div>`;
+      // (a report's row: the build's day large, what changed as large counts)
+      const m = /^build (\d\d\.\d\d)\.(\d{4}) · taken (.+)$/.exec(fmtSnap(r.new));
+      h += `<div class="card click rep" onclick="location.hash='#/patches/${encodeURIComponent(r.id)}'"><div class="repd">${m ? `<b>${m[1]}</b><span>${m[2]} · taken ${esc(m[3])}</span>` : `<span>${esc(fmtSnap(r.new))}</span>`}</div>
+        <div class="repb">${summaryChips(r.summary)}<div class="muted small">compared with ${esc(fmtSnap(r.old))}</div></div><span class="repgo">Open report ›</span></div>`;
     }
     main.innerHTML = h;
   };
