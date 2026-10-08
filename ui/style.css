@@ -1243,3 +1243,20 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 .glsaid { min-height: 32px; margin-bottom: 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 /* (rounds in step: the room moves everybody on, not the player) */
 body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #gmquit, body.glfirst #giquit, body.glfirst #gpquit { display: none; }
+
+/* Sprite workshop (ui/sprites.js): a frames zip as one sheet; --sph = the tiles' height */
+.sph { margin: 16px 0 6px; } .sph button { margin-left: 8px; vertical-align: middle; }
+.spgrid { display: flex; flex-wrap: wrap; gap: 6px; }
+.spf { cursor: pointer; padding: 4px; border-radius: 6px; border: 2px solid transparent; background: var(--panel2); }
+.spf:hover { border-color: var(--line); } .spf.on { border-color: var(--add); } .spf.sel { border-color: var(--gold); }
+.spf img { display: block; height: var(--sph, 110px); min-width: 44px; max-width: calc(var(--sph, 110px) * 2.6); object-fit: contain; border-radius: 3px; }
+.spf .small { text-align: center; color: var(--muted); } .spf.on .small { color: var(--add); }
+.spview { display: flex; gap: 14px; align-items: flex-start; position: sticky; top: 0; z-index: 5; box-shadow: 0 8px 18px #0008; }
+.spstage { flex: 1; min-width: 0; height: 46vh; display: flex; align-items: center; justify-content: center; border-radius: 6px; overflow: hidden; }
+.spstage canvas { max-width: 100%; max-height: 100%; }
+.spstage.full { display: block; overflow: auto; } .spstage.full canvas { max-width: none; max-height: none; display: block; }
+.spside { flex: none; width: 250px; }
+.spbg-dark .spf img, .spbg-dark .spstage { background: #121012; }
+.spbg-light .spf img, .spbg-light .spstage { background: #d9d9d9; }
+.spbg-green .spf img, .spbg-green .spstage { background: #00b140; }
+.spbg-checker .spf img, .spbg-checker .spstage { background: repeating-conic-gradient(#3a3a3a 0 25%, #262626 0 50%) 0 0 / 16px 16px; }

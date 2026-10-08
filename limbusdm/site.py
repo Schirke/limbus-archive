@@ -43,7 +43,7 @@ BASE_OPEN = ["patches", "news", "db", "enemies", "anim", "teams", "games", "game
 # requests the check never fetches by itself: the app's own state and controls, renders, the game's raw files, and the
 # ones a part of Exporter makes its own way
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
-                     r"local_video|redraw|browse|tree|types|container|scan|bank|export|open|site_|object|blob|report|characters|"
+                     r"local_video|sprites|browse|tree|types|container|scan|bank|export|open|site_|object|blob|report|characters|"
                      r"music_audio|quiz_audio|community|buff)")  # (community: who is live right now — a copy would only go stale)
 CJK = re.compile("[぀-ヿ㐀-鿿가-힯]")
 PREVIEW = ("Texture2D", "Sprite", "AudioClip", "VideoClip", "TextAsset", "Mesh")  # ui: previewHtml asks for these as they are

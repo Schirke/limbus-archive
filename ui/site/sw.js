@@ -9,7 +9,7 @@ const ONLY_APP = "Only in the desktop app";
 let site = null, loading = null, loaded = 0, tr = null;
 // what each page asked for and the site has no file for (the app's check reads it: limbusdm/sitecheck.py)
 const misses = new Map();
-const NOT_NEWS = new Set(["/api/redraw"]);  // asked by every page on load, only the app answers
+const NOT_NEWS = new Set();  // asked by every page on load, only the app answers
 // …and what it asked for at all, with how many answers are still on their way: the check waits for a page to go quiet
 const asked = new Map();
 function work(id) {

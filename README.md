@@ -89,6 +89,10 @@ Filter by buff / debuff and by who has it.
   changed; any size, placed by the feet), take frames from another character, add freeze frames or
   slow-motion, recolour the effects, or replace whole sprite sheets, then render again. Applied only
   while rendering: the game's files stay as they are.
+- **Sprite workshop** (Tools): a frames zip laid out as one sheet, for editing by hand. Open its
+  folder, draw over the PNGs in any editor and save: the sheet follows the files, marks the frames
+  that changed, shows a frame next to the original (or the two in turn), with the frame before it
+  shown through, and the whole skill in motion; the changed frames load into a mod in one click.
 
 <p align="center"><a href="docs/animations.webp"><img src="docs/animations.webp" width="760" alt="Animations"></a></p>
 

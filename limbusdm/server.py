@@ -252,18 +252,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import patchnotes
                 rid = patchnotes.unseen(svc) if q.get("new") else q["id"]
                 return self._json(patchnotes.notes(svc, rid) if rid else {"id": None})
-            if p.startswith("/api/redraw"):  # AI redraw of frames (experimental, limbusdm/redraw.py)
-                from . import redraw
-                if p == "/api/redraw/thumb":
-                    return self._send(200, redraw.thumb(svc, q["zip"], q["frame"]), "image/png")
-                if p == "/api/redraw/search":
-                    return self._json(redraw.search(q.get("q", "")))
-                if p == "/api/redraw/char":
-                    return self._json(redraw.character(q["tag"]))
-                if p == "/api/redraw/img":
-                    data, ctype = redraw.booru_image(q["url"])
-                    return self._send(200, data, ctype, {"Cache-Control": "max-age=86400"})
-                return self._json(dict(redraw.state(), zips=redraw.zips(svc)))
+            if p.startswith("/api/sprites"):  # Sprite workshop: a frames zip as a sheet to edit by hand (limbusdm/sprites.py)
+                from . import sprites
+                if p == "/api/sprites/png":  # (the address carries the file's time: a frame saved again is another address)
+                    return self._send(200, sprites.png(svc, q["zip"], q["frame"], bool(q.get("orig")), int(q.get("size") or 0)),
+                                      "image/png", {"Cache-Control": "max-age=86400"})
+                return self._json(sprites.sheet(svc, q["zip"]) if q.get("zip") else {"zips": sprites.zips(svc)})
             if p == "/api/state":
                 st = svc.state()
                 st["disk"] = svc.disk_usage() if q.get("disk") else None
@@ -672,14 +666,23 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import patchnotes
                 patchnotes.mark_seen(svc, b["id"])
                 return self._json({"ok": True})
-            if p.startswith("/api/redraw"):
-                from . import redraw
-                if p == "/api/redraw/stop":
-                    return self._json(redraw.stop())
-                if p == "/api/redraw/load":
-                    cid, n = redraw.load(svc, b["zip"], b["mod"])
-                    return self._json({"id": cid, "count": n})
-                return self._json(redraw.start(svc, b))
+            if p.startswith("/api/sprites"):
+                from . import sprites
+                if p == "/api/sprites/add":
+                    return self._json({"name": sprites.add(svc, b["name"], b["data"])})
+                if p == "/api/sprites/put":
+                    sprites.put(svc, b["zip"], b["frame"], b["png"])
+                    return self._json({"ok": True})
+                if p == "/api/sprites/reset":
+                    return self._json({"count": sprites.reset(svc, b["zip"], b.get("frame") or "")})
+                if p == "/api/sprites/open":
+                    sprites.open_file(svc, b["zip"], b["frame"])
+                    return self._json({"ok": True})
+                if p == "/api/sprites/pack":
+                    return self._json(sprites.pack(svc, b["zip"]))
+                if p == "/api/sprites/load":
+                    return self._json({"count": sprites.load(svc, b["zip"], _fx_id(b["id"]), b["mod"])})
+                return self._json({"error": "not found"}, 404)
             if p == "/api/snapshot":
                 svc.start_snapshot(auto_report=b.get("report", True))
                 return self._json({"ok": True})
