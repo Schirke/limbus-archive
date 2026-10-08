@@ -92,8 +92,9 @@ TEAM = {
     # (not duels) picking a target, one in another depth row counts as this much farther per body of depth between
     # them; a run in keeps the runner's own depth (at most a clash gap in front of / behind its target: 45 degrees);
     # a knockback throws away along the line between the two (depth too, up to 45 degrees), and every one takes the
-    # one thrown row_pull of the way back towards the stage's middle line
-    "row_pref": 0.8, "row_pull": 0.25,
+    # one thrown row_pull of the way towards the other one's depth: two fighting at different depths come closer to one
+    # depth clash after clash (never quite there)
+    "row_pref": 0.8, "row_pull": 0.3,
     # ammo (range ones): shots before it is empty; empty, it goes in to fight up close until it backs off (and reloads
     # there); one with no skill to fight up close with shoots on weaker (empty_share) and reloads in reload_s instead
     "ammo": 4, "empty_share": 0.5, "reload_s": 2.5,
@@ -669,11 +670,12 @@ class Battle:
             to = o + away * self.R["clash_gap"] * 0.4
         z = self.pos[i][1]
         if not self.duels:
-            # (along the line between the two, depth too — up to 45 degrees; then a part of the way back towards the
-            # middle line; as ViewerTeam.cs TeamKnockTo)
-            ax = x0 - o
-            slope = max(-1.0, min(1.0, (z - self.pos[j][1]) / abs(ax))) if abs(ax) > 0.01 else 0.0
-            z = (z + abs(to - x0) * slope) * (1 - self.T["row_pull"])
+            # (along the line between the two, depth too — up to 45 degrees; then a part of the way towards the other
+            # one's depth; as ViewerTeam.cs TeamKnockZ)
+            ax, zj = x0 - o, self.pos[j][1]
+            slope = max(-1.0, min(1.0, (z - zj) / abs(ax))) if abs(ax) > 0.01 else 0.0
+            z = z + abs(to - x0) * slope
+            z += (zj - z) * self.T["row_pull"]
         self.pos[i] = self.aside(i, self.clamp([to, z]), j)
 
     def room(self, i, j) -> float:  # between i and the wall behind it (facing j)
