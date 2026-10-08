@@ -26,6 +26,72 @@
       document.head.appendChild(el);
     }, 300);
   }
+  // The site's own count of its visitors (worker.js Stats): every page opened is told to it, and a page left open says
+  // "still here" every two minutes. Nothing is kept in the browser. The Site stats tab of Community shows the sums —
+  // to everybody, or (SITE.stats "key") to who opened it once as #/community/stats/<key>.
+  if (!checking.has("check")) {
+    const hit = (beat) => {
+      const [, name = "patches", , id] = location.hash.split("/");
+      fetch("/stat/hit", { method: "POST", keepalive: true, body: JSON.stringify({ p: name, u: name === "db" && id ? id : "", beat: !!beat }) }).catch(() => {});
+    };
+    window.addEventListener("hashchange", () => hit());
+    hit();
+    setInterval(() => { if (!document.hidden) hit(true); }, 120e3);
+  }
+  const statKey = () => { try { return localStorage.getItem("statskey") || ""; } catch (e) { return ""; } };
+  window.siteStatsTab = () => SITE.stats !== "key" || !!statKey();
+  const stv = { range: "day" };
+  const stRows = (list) => {
+    const total = list.reduce((a, r) => a + r[1], 0), top = Math.max(1, ...list.map((r) => r[1]));
+    return !list.length ? `<div class="muted">Nothing yet.</div>` : `<div class="strows">${list.map(([n, c]) =>
+      `<div><span>${esc(n)}</span><i><u style="width:${(c / top * 100).toFixed(1)}%"></u></i><b>${c}</b><em>${Math.round(c / total * 100)}%</em></div>`).join("")}</div>`;
+  };
+  const stPage = (name) => { const a = document.querySelector(`#top a[href="#/${name}"], #subnav a[href="#/${name}"]`); return a ? a.textContent.trim() : name; };
+  window.siteStats = async (args) => {
+    if (args[1]) { try { localStorage.setItem("statskey", args[1]); } catch (e) { /* asked for each time then */ } location.replace("#/community/stats"); return; }
+    const main = $("#main"), head = `${cmHead("Who opens Limbus Archive, from where, and what they look at.")}${cmTabs("stats")}`;
+    main.innerHTML = `${head}<p class="muted">Reading the count…</p>`;
+    const r = await fetch("/stat/get?k=" + encodeURIComponent(statKey()), { cache: "no-store" }).catch(() => null);
+    const d = r && r.ok ? await r.json().catch(() => null) : null;
+    if (location.hash.split("/")[2] !== "stats") return;
+    if (!d) { main.innerHTML = `${head}<div class="empty">${r && r.status === 403 ? "This page is the owner's." : "The count didn't answer. Try again in a minute."}</div>`; return; }
+    try { await units(); } catch (e) { /* ids instead of names */ }
+    const region = (() => { try { return new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) { return null; } })();
+    const country = (cc) => { try { return (cc !== "??" && region && region.of(cc)) || "Unknown"; } catch (e) { return "Unknown"; } };
+    const unit = (id) => { const x = typeof unitById === "function" && unitById(+id); return x ? (x.title ? `${x.title} ${x.sinnerName || ""}`.trim() : x.name) : id; };
+    const part = (set, pre, name, most) => Object.entries(set).filter(([k]) => k.startsWith(pre)).map(([k, n]) => [name(k.slice(pre.length)), n]).sort((a, b) => b[1] - a[1]).slice(0, most);
+    const draw = () => {
+      const s = d.sets[stv.range], y = (k) => (d.sets.prev[k] || 0) - (d.sets.day[k] || 0);
+      const pages = part(s, "pg:", (k) => k, 999).filter(([k]) => routes[k]);  // (a name anybody could send is not a page)
+      const played = pages.filter(([k]) => /^(game(?!s$)|live)/.test(k));
+      const games = played.reduce((a, [, n]) => a + n, 0);
+      const diff = (s.v || 0) - y("v"), top = Math.max(10, Math.ceil(Math.max(...d.days.map((x) => x[1])) / 10) * 10);
+      const ticks = [0, 1, 2, 3, 4].map((i) => top / 4 * i);
+      const where = Object.entries(d.online.reduce((o, p) => { o[p] = (o[p] || 0) + 1; return o; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p, n]) => `${n} in ${esc(stPage(p))}`).join(", ");
+      main.innerHTML = `${head}
+        <div class="sthead"><div class="seg" id="strange">${[["day", "Today"], ["week", "7 days"], ["month", "30 days"]].map(([k, n]) => `<button data-r="${k}" class="toggle ${stv.range === k ? "on" : ""}">${n}</button>`).join("")}</div></div>
+        <div class="sttiles">
+          <div><small>Visitors</small><b>${s.v || 0}</b><span>${stv.range === "day" ? `${diff > 0 ? "+" : ""}${diff} vs yesterday` : "a browser counts once a day"}</span></div>
+          <div><small>Pages opened</small><b>${s.p || 0}</b><span>${s.v ? ((s.p || 0) / s.v).toFixed(1) + " per visitor" : "&nbsp;"}</span></div>
+          <div><small>Games opened</small><b>${games}</b><span>${played.length ? esc(stPage(played[0][0])) + " leads" : "&nbsp;"}</span></div>
+          <div><small>On the site now</small><b><i class="stlive"></i>${d.online.length}</b><span>${where || "&nbsp;"}</span></div>
+        </div>
+        <div class="stcols">
+          <div class="card wide"><h3>Visitors by day</h3><div class="muted small">Last 14 days (UTC). The lighter bar is today, still filling.</div>
+            <div class="stplot"><div class="styax">${ticks.map((t) => `<span style="bottom:${t / top * 100}%">${t}</span>`).join("")}</div>
+              <div class="starea">${ticks.slice(1).map((t) => `<i style="bottom:${t / top * 100}%"></i>`).join("")}
+                <div class="stbars">${d.days.map(([day, v], i) => `<div class="${i === d.days.length - 1 ? "last" : ""}" title="${day.slice(8)}.${day.slice(5, 7)} · ${v} visitors"><u style="height:${v / top * 100}%"></u></div>`).join("")}</div></div>
+              <div class="stxax">${d.days.map(([day], i) => `<span>${i % 2 ? "" : `${day.slice(8)}.${day.slice(5, 7)}`}</span>`).join("")}</div></div></div>
+          <div class="card"><h3>Where from</h3><div class="muted small">Country of each visitor.</div>${stRows(part(s, "cc:", country, 8))}</div>
+          <div class="card"><h3>Most opened pages</h3><div class="muted small">Share of the pages listed.</div>${stRows(pages.slice(0, 8).map(([k, n]) => [stPage(k), n]))}</div>
+          <div class="card"><h3>Most viewed in the database</h3><div class="muted small">Identities and E.G.O people opened most.</div>${stRows(part(s, "u:", unit, 6))}</div>
+          <div class="card"><h3>Devices</h3><div class="muted small">What the site was opened on.</div>${stRows(part(s, "dv:", (k) => k, 3))}</div>
+        </div>
+        <p class="muted small">A visitor is one browser per day. The site keeps only daily totals: no names, no addresses, no cookies. Countries come from Cloudflare. Counting started on 8 October 2026.</p>`;
+      main.querySelectorAll("#strange button").forEach((b) => { b.onclick = () => { stv.range = b.dataset.r; draw(); }; });
+    };
+    draw();
+  };
   // Animations: the site has the Spine skeletons and the battle animations — an Identity or E.G.O opens on its Spine
   // tab, or on the battle one when it has no skeleton (the tabs that need the game's files are hidden in site.css),
   // without asking for its videos and skill numbers

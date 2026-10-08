@@ -50,11 +50,12 @@ function cmRec(d) {
 }
 const cmHead = (sub, d) => `<div class="cmhead"><div><h1>Community</h1><div class="sub">${sub}</div></div>${cmRec(d)}</div>`;
 
-// The page's two tabs: the live streams, the videos on Bilibili.
-const cmTabs = (on) => `<div class="cmtabs">${[["", "Live streams"], ["bilibili", "Bilibili"]].map(([k, n]) => `<a class="${on === k ? "on" : ""}" href="#/community${k ? "/" + k : ""}">${n}</a>`).join("")}</div>`;
+// The page's tabs: the live streams, the videos on Bilibili, and — on the website — who visits it (ui/site/site.js).
+const cmTabs = (on) => `<div class="cmtabs">${[["", "Live streams"], ["bilibili", "Bilibili"], ...(window.siteStatsTab && siteStatsTab() ? [["stats", "Site stats"]] : [])].map(([k, n]) => `<a class="${on === k ? "on" : ""}" href="#/community${k ? "/" + k : ""}">${n}</a>`).join("")}</div>`;
 
 routes.community = async (args) => {
   if (args && args[0] === "bilibili") return cmBili();
+  if (args && args[0] === "stats" && window.siteStats) return siteStats(args);
   $("#main").innerHTML = `<h1>Community</h1><div class="sub">Who streams Limbus Company right now.</div><p class="muted">Reading the list…</p>`;
   let d = await api("/api/community").catch(() => ({}));
   cmTab(d);

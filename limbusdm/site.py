@@ -83,15 +83,18 @@ def build_info(svc) -> dict:
 
 def worker_config(svc) -> str:
     """The site's server as wrangler takes it: data/site_worker with the Worker's script (ui/site/worker.js: the files
-    as they are, and the rooms of the Games' live matches — a Durable Object) and its config, written anew each time.
+    as they are, the rooms of the Games' live matches and the count of the site's visitors — Durable Objects) and its
+    config, written anew each time.
     -> the config's path."""
     folder = os.path.join(svc.data_dir, "site_worker")
     os.makedirs(folder, exist_ok=True)
     shutil.copyfile(os.path.join(resource_dir(), "ui", "site", "worker.js"), os.path.join(folder, "worker.js"))
     cfg = {"name": config(svc)["project"], "main": "worker.js", "compatibility_date": "2025-09-01",
            "assets": {"directory": packed_dir(svc), "binding": "ASSETS"},
-           "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "Room"}]},
-           "migrations": [{"tag": "v1", "new_sqlite_classes": ["Room"]}]}
+           "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "Room"}, {"name": "STATS", "class_name": "Stats"}]},
+           "migrations": [{"tag": "v1", "new_sqlite_classes": ["Room"]}, {"tag": "v2", "new_sqlite_classes": ["Stats"]}]}
+    if config(svc).get("stats_key"):  # the Site stats page answers only who has the key (else: everybody)
+        cfg["vars"] = {"STATS_KEY": config(svc)["stats_key"]}
     path = os.path.join(folder, "wrangler.jsonc")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=1)
@@ -857,7 +860,7 @@ class Exporter:
         html = re.sub(r'<script src="[^"]+"></script>\s*', "", html)
         stamp = str(int(time.time()))
         boot = f"""<script>
-const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "scripts": [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]})};
+const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "scripts": [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]})};
 (async () => {{
   const fail = (m) => {{ document.getElementById("main").innerHTML = '<div class="empty">' + m + '</div>'; }};
   if (!("serviceWorker" in navigator)) return fail("This site needs service workers — open it in a normal (not private) window of a current browser.");
