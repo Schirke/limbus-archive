@@ -303,3 +303,6 @@ button.primary:disabled { filter: grayscale(.8); }
 .vstabbox .vsbig { margin-bottom: 8px; }
 .vsarena .vsteamside > .row { flex-wrap: wrap; gap: 5px; } .vsarena .vsteamside .vsh { flex: 1 0 100%; }
 .vsarena .vsteamside.right > .row { justify-content: flex-start; }
+
+/* the app's usual window is 1400 px: the picker gives the middle some room */
+@media (max-width: 1500px) { .vsw:not(:has(.vsarena)) { grid-template-columns: minmax(300px, 390px) minmax(0, 1fr) minmax(270px, 330px); gap: 12px; } .vsname b, .vsname .big { font-size: 34px; } }
