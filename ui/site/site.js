@@ -107,7 +107,7 @@
     }, 300);
   }
   // The site's own count of its visitors (worker.js Stats): every page opened is told to it, and a page left open says
-  // "still here" every two minutes. Nothing is kept in the browser. The Site stats tab of Community shows the sums —
+  // "still here" every ten minutes (each one is a request and a row of the free plan's daily lot). Nothing is kept in the browser. The Site stats tab of Community shows the sums —
   // to everybody, or (SITE.stats "key") to who opened it once as #/community/stats/<key>.
   if (!checking.has("check")) {
     const hit = (beat) => {
@@ -116,7 +116,7 @@
     };
     window.addEventListener("hashchange", () => hit());
     hit();
-    setInterval(() => { if (!document.hidden) hit(true); }, 120e3);
+    setInterval(() => { if (!document.hidden) hit(true); }, 600e3);
   }
   const statKey = () => { try { return localStorage.getItem("statskey") || ""; } catch (e) { return ""; } };
   window.siteStatsTab = () => SITE.stats !== "key" || !!statKey();

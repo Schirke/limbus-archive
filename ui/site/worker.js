@@ -83,7 +83,7 @@ export class Room extends DurableObject {
 // The count. c: a day's sums by key — "v" visitors, "p" pages opened, "pg:<page>", "cc:<country>", "dv:<device>",
 // "u:<Identity or E.G.O>"; s: who was here today (the day's hash, when last, on which page) — for "a visitor once a
 // day" and "on the site now".
-const DAY = 86400e3, NOW = 5 * 60e3;
+const DAY = 86400e3, NOW = 12 * 60e3;  // (a page says "still here" every ten minutes, site.js)
 const dayOf = (t) => new Date(t).toISOString().slice(0, 10);
 
 export class Stats extends DurableObject {
