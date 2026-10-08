@@ -57,11 +57,37 @@ def _already_running(link: str = "") -> bool:
         return False
 
 
+def _unblock(root: str = ""):
+    """Takes the "downloaded from the internet" mark off the app's own files. Windows puts it on everything unpacked
+    from a zip the browser saved, and .NET then refuses to load a marked DLL: the window never opened ("Failed to
+    resolve Python.Runtime.Loader.Initialize"). The exe's own mark goes last, so a sweep cut short runs again."""
+    if not root:
+        if not getattr(sys, "frozen", False) or sys.platform != "win32":
+            return
+        root = os.path.dirname(sys.executable)
+    mark = ":Zone.Identifier"
+    exe = os.path.join(root, os.path.basename(sys.executable))
+    if not os.path.exists(exe + mark):
+        return
+    for d, _, files in os.walk(root):
+        for f in files:
+            if f.lower().endswith((".dll", ".exe", ".pyd")) and os.path.join(d, f) != exe:
+                try:
+                    os.remove(os.path.join(d, f) + mark)
+                except OSError:
+                    pass
+    try:
+        os.remove(exe + mark)
+    except OSError:
+        pass
+
+
 def main():
     link = _link(sys.argv)
     if _already_running(link):  # (the window that is open goes to the link's page)
         return
     _register()
+    _unblock()
 
     import webview
 
