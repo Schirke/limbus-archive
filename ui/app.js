@@ -874,7 +874,7 @@ function drawAnimTree() {
         g2 += `<div class="an-sub">${esc(k)}</div>` + arr.map((x) => x.app
           // a battle prefab: its skills with the game's effects
           ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects">${animEnemyThumb(x.app)}<div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
-          : `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-g="${gi}" data-k="${esc(k)}" data-a="${x.atlas}" data-b="${esc(x.bundle)}"><span class="an-ph"></span><div class="an-t">${x.name ? esc(x.name) : esc(x.base)}<small>${x.name ? esc(x.base) : "Spine"}</small></div></div>`).join("");
+          : `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-g="${gi}" data-k="${esc(k)}" data-a="${x.atlas}" data-b="${esc(x.bundle)}">${x.of ? animEnemyThumb(x.of) : `<span class="an-ph"></span>`}<div class="an-t">${x.name ? esc(x.name) : esc(x.base)}<small>${x.name ? esc(x.base) : "Spine"}</small></div></div>`).join("");
       });
     });
     if (g2 || f !== "mine") h += `<div class="an-grp">Enemies, abnormalities &amp; others</div>` + (anim.data.pending ? `<div class="muted small" style="padding:0 8px 6px">Sorting enemies by chapter…</div>` : "") + g2;

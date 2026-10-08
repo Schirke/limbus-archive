@@ -309,8 +309,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 wav, fn = export_wav(path, int(q["i"]))
                 extra = {"Content-Disposition": f'attachment; filename="{fn}"'} if q.get("download") else {}
                 return self._send(200, wav, "audio/wav", extra)
-            if p == "/api/characters":
-                return self._json(svc.characters())
+            if p == "/api/characters":  # (+ "of": the enemy a Spine skeleton is drawn for — its picture in the list)
+                ch = svc.characters()
+                of = {(x["bundle"], str(x["atlas"])): app for app, xs in svc.enemy_spines().items() for x in xs}
+                if of:
+                    ch = {**ch, "groups": [{**g, "kinds": {k: [{**x, "of": of[(x["bundle"], str(x.get("atlas")))]}
+                                                               if not x.get("app") and (x["bundle"], str(x.get("atlas"))) in of else x
+                                                               for x in arr] for k, arr in g["kinds"].items()}}
+                                           for g in ch.get("groups", [])]}
+                return self._json(ch)
             if p == "/api/site_status":  # the web copy: the build the site shows next to this app's (Settings)
                 from . import site
                 return self._json(site.status(svc))
