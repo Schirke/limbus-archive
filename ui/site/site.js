@@ -94,6 +94,18 @@
     if (name && !OPEN.has(name)) a.classList.add("apponly");
   });
   document.body.classList.add("site");
+  // an invite opened here (a duel, a live room, a Versus room): who has the desktop app can go on there — the app
+  // makes limbusarchive: links its own (limbusdm/app.py)
+  const appBar = () => {
+    const h = location.hash, on = /^#\/(game\w+|games\/track)\/duel\/[\w.%-]+$|^#\/(live|vsroom)\/[a-z0-9]{4,10}$/i.test(h);
+    let el = $("#appbar");
+    if (!on) return el && el.remove();
+    if (!el) { el = document.createElement("a"); el.id = "appbar"; document.body.appendChild(el); }
+    el.href = "limbusarchive://open/" + h.slice(2);
+    el.innerHTML = `<b>Open in the desktop app</b><small>if Limbus Archive is installed, version 0.11.33 or newer</small>`;
+  };
+  window.addEventListener("hashchange", appBar);
+  appBar();
   const foot = document.createElement("footer");
   foot.id = "sitefoot";
   foot.innerHTML = `<span>Unofficial fan site, not affiliated with ProjectMoon. Limbus Company and everything from it belong to ProjectMoon.</span>

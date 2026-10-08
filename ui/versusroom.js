@@ -190,8 +190,8 @@ function vrDraw() {
   if (!vrOn() || !vr.code) return;
   const code = vr.code, chip = (on, attr, text, off) => `<button class="toggle ${on ? "on" : ""}" ${attr} ${off ? "disabled" : ""}>${text}</button>`;
   const head = `<h1>Versus · online room</h1><div class="glroom"><span class="gmscore">ROOM <b>${esc(code.toUpperCase())}</b></span>
-    <button class="toggle" id="vrcopy">${GM_SWORDS}Copy the invite</button><span class="muted small">Friends come in from their app: Versus → Online room → the code.</span></div>`;
-  const invite = () => { if ($("#vrcopy")) $("#vrcopy").onclick = () => gmCopy(`Limbus Archive · a Versus room — pick a fighter and fight me.\nIn the app: Versus → Online room → code ${code.toUpperCase()}`); };
+    <button class="toggle" id="vrcopy">${GM_SWORDS}Copy the invite</button><span class="muted small">The link opens the room in a friend's app (or: Versus → Online room → the code).</span></div>`;
+  const invite = () => { if ($("#vrcopy")) $("#vrcopy").onclick = () => gmCopy(`Limbus Archive · a Versus room — pick a fighter and fight me:\n${GM_SITE}/#/vsroom/${code}\n(the page has a button that opens the app; or in the app: Versus → Online room → code ${code.toUpperCase()})`); };
   if (!gl.nick || !vr.ws) {  // who are you: asked on the way in, kept for the next time (the Games' live matches' nickname)
     vr.sig = "";
     $("#main").innerHTML = `${head}${vr.error ? `<p class="glerr">${esc(vr.error)}</p>` : ""}

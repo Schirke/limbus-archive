@@ -14,3 +14,7 @@ body.site .fxapp { opacity: .4; cursor: default; }
 body.site #fxnote { flex-basis: 100%; }
 /* the music player sits above the footer, not over its links */
 body.site #player { bottom: 58px; }
+
+/* an invite's "Open in the desktop app" (site.js appBar) */
+#appbar { position: fixed; left: 28px; bottom: 22px; z-index: 44; display: flex; flex-direction: column; gap: 2px; padding: 10px 18px; background: var(--panel); border: 1px solid var(--gold); color: var(--gold); text-decoration: none; box-shadow: 0 6px 22px rgba(0,0,0,.5); }
+#appbar:hover { background: #2a2412; } #appbar b { font: 17px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; font-weight: normal; } #appbar small { color: var(--muted); font-size: 12px; }

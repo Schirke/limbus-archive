@@ -825,7 +825,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json({"ok": True})
             if p == "/api/show":
                 if on_show:
-                    on_show()
+                    on_show(str(b.get("open") or ""))
                 return self._json({"ok": True})
             return self._json({"error": "unknown"}, 404)
 

@@ -4,22 +4,52 @@ On start it checks whether the game has downloaded a new version and, if so, bui
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 import sys
 import threading
 import urllib.request
 
 PORT = int(os.environ.get("LIMBUS_DM_PORT", "47821"))  # override only for running a second dev copy
+SCHEME = "limbusarchive"  # limbusarchive://open/<page>: a link that opens the app on that page (an invite's button on the site)
 
 
-def _already_running() -> bool:
+def _link(argv: list[str]) -> str:
+    """The page the app was started for by a link (limbusarchive://open/gamechar/duel/abc123) as the window's
+    address "#/gamechar/duel/abc123"; "" without one. Only a page's address gets through: the link comes from a
+    web page."""
+    for a in argv[1:]:
+        m = re.fullmatch(rf"{SCHEME}:/*(?:open/+)?#?/*([\w.%~-]+(?:/[\w.%~-]+)*)/?", a.strip(), re.I)
+        if m and len(m.group(1)) <= 200:
+            return "#/" + m.group(1)
+    return ""
+
+
+def _register():
+    """Tells Windows that limbusarchive: links are this app's (the user's own part of the registry, every start: the
+    app may have been moved). Only the built exe on its usual port."""
+    if not getattr(sys, "frozen", False) or PORT != 47821 or sys.platform != "win32":
+        return
+    try:
+        import winreg
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{SCHEME}") as k:
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, "URL:Limbus Archive")
+            winreg.SetValueEx(k, "URL Protocol", 0, winreg.REG_SZ, "")
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{SCHEME}\shell\open\command") as k:
+            winreg.SetValueEx(k, "", 0, winreg.REG_SZ, f'"{sys.executable}" "%1"')
+    except Exception:
+        pass
+
+
+def _already_running(link: str = "") -> bool:
     import socket
     try:  # (nothing listens there on a usual start: Windows takes 2 s to say so to an HTTP request, a bare connect is told to give up sooner)
         socket.create_connection(("127.0.0.1", PORT), timeout=0.3).close()
     except OSError:
         return False
     try:
-        req = urllib.request.Request(f"http://127.0.0.1:{PORT}/api/show", data=b"{}", method="POST",
+        req = urllib.request.Request(f"http://127.0.0.1:{PORT}/api/show", data=json.dumps({"open": link}).encode(), method="POST",
                                      headers={"X-Limbus-Datamine": "1", "Content-Type": "application/json"})
         urllib.request.urlopen(req, timeout=2).read()
         return True
@@ -28,8 +58,10 @@ def _already_running() -> bool:
 
 
 def main():
-    if _already_running():
+    link = _link(sys.argv)
+    if _already_running(link):  # (the window that is open goes to the link's page)
         return
+    _register()
 
     import webview
 
@@ -43,11 +75,13 @@ def main():
     svc = Service(data_dir())
     state = {"window": None}
 
-    def show():
+    def show(page: str = ""):
         w = state["window"]
         if w:
             w.restore()
             w.show()
+            if page and re.fullmatch(r"#/[\w.%~/-]{1,200}", page):
+                w.evaluate_js(f"location.hash = {json.dumps(page)}")
 
     serve(svc, PORT, on_show=show)
 
@@ -92,7 +126,7 @@ def main():
                      daemon=True).start()
 
     from . import APP_TITLE
-    state["window"] = webview.create_window(APP_TITLE, f"http://127.0.0.1:{PORT}/", width=1400, height=900,
+    state["window"] = webview.create_window(APP_TITLE, f"http://127.0.0.1:{PORT}/{link}", width=1400, height=900,
                                             min_size=(900, 600), background_color="#121012")
     profile = "webview" if PORT == 47821 else f"webview_{PORT}"  # a running copy locks its WebView2 profile
     webview.start(private_mode=False, storage_path=os.path.join(data_dir(), profile))
