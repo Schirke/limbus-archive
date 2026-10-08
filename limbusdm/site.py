@@ -1248,12 +1248,24 @@ def pull(ex: Exporter, url: str) -> dict:
     svc = ex.svc
     p = Puller(ex, url)
     ex.progress(PULL_STAGE, 0, 0)
+    # only the newest app sends: an older one would put its older pages back on the site
+    from . import updater
+    from . import __version__
+    try:
+        up = updater.check()
+    except Exception:  # (GitHub not reached: the site's own build below still tells)
+        up = None
+    if up and up["newer"]:
+        raise RuntimeError(f"this app is {__version__} and {up['latest']} is out — update the app, then send")
     try:
         idx = p.json("index.json")
     except Exception as e:
         if getattr(e, "code", None) == 404:  # nothing sent yet
             return {}
         raise RuntimeError(f"couldn't read what the site has ({type(e).__name__}: {e}) — sending now could take things off it")
+    site_app = (idx.get("build") or {}).get("version") or ""
+    if updater._ver(site_app) > updater._ver(__version__):
+        raise RuntimeError(f"the site was made by the app {site_app} and this one is {__version__} — update the app, then send")
     site_game, mine = _game((idx.get("build") or {}).get("game", "")), build_info(svc)["game"]
     if site_game and site_game != mine and site_game[1:9] >= mine[1:9]:  # (s<date>_<build>)
         raise RuntimeError(f"the site has game data {site_game} and this app {mine or '(none)'} — start the app with the "
