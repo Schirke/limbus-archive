@@ -334,32 +334,92 @@ let MY = null;
 routes.teams = async () => {
   const main = $("#main");
   main.innerHTML = `<div class="muted">Loading…</div>`;
-  await units();
-  [MY] = await Promise.all([api("/api/myteam")]);
-  MY.slots = MY.slots || {};
-  MY.order = MY.order || [];
+  await Promise.all([units(), myTeam()]);
   drawTeams();
 };
 function saveMy() { api("/api/myteam", MY).catch(() => {}); }
+async function myTeam() {
+  if (!MY) MY = await api("/api/myteam");
+  MY.slots = MY.slots || {};
+  MY.order = MY.order || [];
+  MY.egos = MY.egos || {};
+  return MY;
+}
+
+// The game's team code (Sinner menu → the two-papers icon → Copy / Load team code): base64 of gzip of base64 of a bit
+// string, high bit first, Sinner 1 to 12, 46 bits each — the Identity (8 bits: the number after 1SS, 10114 → 14), the
+// deployment order (4, 0 = not deployed), E.G.O ZAYIN, TETH, HE, WAW (7 each: the number after 2SS, 0 = empty) and
+// ALEPH (6; none exist yet), then a zero byte. Worked out from a code the game made.
+const TC_EGO = [7, 7, 7, 7, 6];
+const tcBytes = (s) => Uint8Array.from(atob(s.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+const tcB64 = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""));
+async function teamCodeRead(code) {
+  let bytes;
+  try {
+    const text = await new Response(new Blob([tcBytes(code)]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+    bytes = tcBytes(text.trim());
+  } catch { throw new Error("That is not a team code — copy one in the game: Sinners → the two-papers icon → Copy team code."); }
+  if (bytes.length * 8 < 12 * 46) throw new Error("The team code is too short.");
+  let bit = 0;
+  const take = (n) => { let v = 0; for (let i = 0; i < n; i++, bit++) v = v * 2 + ((bytes[bit >> 3] >> (7 - (bit & 7))) & 1); return v; };
+  const team = { slots: {}, order: [], egos: {} }, at = {};
+  for (let s = 1; s <= 12; s++) {
+    const id = take(8), ord = take(4), eg = TC_EGO.map(take);
+    if (id) team.slots[s] = 10000 + s * 100 + id;
+    if (ord) at[s] = ord;
+    team.egos[s] = eg.map((n) => (n ? 20000 + s * 100 + n : 0));
+  }
+  team.order = Object.keys(at).map(Number).sort((a, b) => at[a] - at[b]);
+  return team;
+}
+async function teamCodeMake(team) {
+  const bits = [];
+  const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push((v >> i) & 1); };
+  for (let s = 1; s <= 12; s++) {
+    const eg = (team.egos || {})[s] || [];
+    put((team.slots[s] || 10001 + s * 100) % 100, 8);  // (the game wants an Identity for everyone: the LCB one)
+    put(team.order.indexOf(s) + 1, 4);
+    TC_EGO.forEach((n, i) => put(eg[i] ? eg[i] % 100 : i ? 0 : 1, n));  // ZAYIN can't be empty: the first one
+  }
+  const bytes = new Uint8Array(Math.ceil(bits.length / 8) + 1);
+  bits.forEach((b, i) => { if (b) bytes[i >> 3] |= 128 >> (i & 7); });
+  const gz = await new Response(new Blob([tcB64(bytes)]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
+  return tcB64(new Uint8Array(gz));
+}
+// a pasted code becomes the team (Identities, order, E.G.O); the number of Identities this game data lacks
+async function teamCodeLoad(code) {
+  const t = await teamCodeRead(code);
+  const lost = Object.values(t.slots).filter((id) => !unitById(id)).length;
+  Object.assign(MY, t);
+  saveMy();
+  return lost;
+}
+
 function drawTeams() {
   const main = $("#main");
   main.innerHTML = `<h1>Team builder</h1>
-    <div class="sub">Pick an Identity for every Sinner and the order they go in.</div>
+    <div class="sub">Pick an Identity for every Sinner and the order they go in — or paste a team code from the game.</div>
+    <div class="row tcrow"><input type="text" id="tccode" placeholder="Paste a team code from the game…"><button id="tcload">Load</button>
+      <span class="grow"></span><button id="tccopy" title="Load it in the game: Sinners → the two-papers icon → Load team code">Copy team code</button></div>
     <div id="builder"></div>`;
   drawBuilder();
+  const load = async () => {
+    const v = $("#tccode").value.trim();
+    if (!v) return;
+    try { const lost = await teamCodeLoad(v); $("#tccode").value = ""; drawBuilder(); toast(lost ? `Team loaded — ${lost} Identit${lost > 1 ? "ies are" : "y is"} newer than this game data.` : "Team loaded."); }
+    catch (e) { toast(esc(e.message), 6000); }
+  };
+  $("#tcload").onclick = load;
+  $("#tccode").onkeydown = (e) => { if (e.key === "Enter") load(); };
+  $("#tccopy").onclick = async () => {
+    const code = await teamCodeMake(MY);
+    try { await navigator.clipboard.writeText(code); toast("Team code copied — load it in the game: Sinners → the two-papers icon → Load team code."); }
+    catch { $("#tccode").value = code; $("#tccode").select(); toast("Copy the code from the box."); }
+  };
 }
 function teamIds() { return Object.values(MY.slots).map(unitById).filter(Boolean); }
-function drawBuilder() {
-  const el = $("#builder");
-  const pos = (sid) => MY.order.indexOf(sid) + 1;
-  const slots = UNITS.sinners.map((name, i) => {
-    const sid = i + 1, x = unitById(MY.slots[sid]), p = pos(sid);
-    return `<div class="slot ${x ? "" : "empty"}" data-slot="${sid}">
-      <button class="ord ${p ? (p <= ORDER_MAX ? "on" : "bk") : ""}" data-ord="${sid}" title="Deployment order: click to add / remove">${p || "+"}</button>
-      ${x ? `<img src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'"><div class="stitle">${esc(x.title)}</div>` : `<div class="semblem">${ico(`sinner_${sid}`, "s36", name, "")}</div><div class="stitle muted">Pick</div>`}
-      <div class="small muted">${esc(name)}</div></div>`;
-  }).join("");
-  // what the deployed part of the team brings
+// what the deployed part of the team brings: statuses, attack types and sins of the skills
+function teamStats() {
   const deployed = MY.order.slice(0, ORDER_MAX).map((sid) => unitById(MY.slots[sid])).filter(Boolean);
   const pool = deployed.length ? deployed : teamIds();
   const st = {}, sins = {}, atk = {};
@@ -367,6 +427,21 @@ function drawBuilder() {
     x.statuses.forEach((k) => st[k] = (st[k] || 0) + 1);
     x.skills.forEach((s) => { const u = topUp(s); sins[u.sin] = (sins[u.sin] || 0) + (s.copies || 1); if (u.atk) atk[u.atk] = (atk[u.atk] || 0) + (s.copies || 1); });
   });
+  return { deployed, pool, st, sins, atk };
+}
+function drawBuilder() {
+  const el = $("#builder");
+  const pos = (sid) => MY.order.indexOf(sid) + 1;
+  const slots = UNITS.sinners.map((name, i) => {
+    const sid = i + 1, x = unitById(MY.slots[sid]), p = pos(sid);
+    const egos = (MY.egos[sid] || []).map(unitById).filter(Boolean);
+    return `<div class="slot ${x ? "" : "empty"}" data-slot="${sid}">
+      <button class="ord ${p ? (p <= ORDER_MAX ? "on" : "bk") : ""}" data-ord="${sid}" title="Deployment order: click to add / remove">${p || "+"}</button>
+      ${x ? `<img src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'"><div class="stitle">${esc(x.title)}</div>` : `<div class="semblem">${ico(`sinner_${sid}`, "s36", name, "")}</div><div class="stitle muted">${MY.slots[sid] ? `Id ${MY.slots[sid]} — newer than this game data` : "Pick"}</div>`}
+      ${egos.length ? `<div class="slotegos">${egos.map((e) => `<img src="${imgThumb(e.img.thumb)}" title="${esc(e.grade)} · ${esc(e.name)}" onerror="this.style.visibility='hidden'">`).join("")}</div>` : ""}
+      <div class="small muted">${esc(name)}</div></div>`;
+  }).join("");
+  const { deployed, st, sins, atk } = teamStats();
   const total = Object.values(sins).reduce((a, b) => a + b, 0) || 1;
   el.innerHTML = `<div class="slots">${slots}</div>
     <div class="row" style="margin:8px 0;gap:8px;flex-wrap:wrap">
@@ -381,7 +456,7 @@ function drawBuilder() {
     if (i >= 0) MY.order.splice(i, 1); else if (MY.slots[sid]) MY.order.push(sid); else return pickFor(sid);
     saveMy(); drawBuilder();
   });
-  $("#clearteam").onclick = () => { MY.slots = {}; MY.order = []; saveMy(); drawBuilder(); };
+  $("#clearteam").onclick = () => { MY.slots = {}; MY.order = []; MY.egos = {}; saveMy(); drawBuilder(); };
 }
 function pickFor(sid) {
   const list = UNITS.ids.filter((x) => x.sinner === sid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));

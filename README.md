@@ -145,7 +145,8 @@ and export (PNG, JSON, WAV, MP4).
 ### Team builder
 
 Pick an Identity per Sinner and an order: the page counts the statuses, damage types and sins the
-team brings.
+team brings. A team code copied in the game (Sinners → the two-papers icon → Copy team code) loads here with its E.G.O,
+and the team goes back to the game the same way (Copy team code).
 
 <p align="center"><a href="docs/team-builder.webp"><img src="docs/team-builder.webp" width="760" alt="Team builder"></a></p>
 
