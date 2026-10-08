@@ -15,6 +15,11 @@
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blue">
 </p>
 
+<p align="center">
+  <a href="docs/promo.mp4"><img src="docs/promo.webp" width="760" alt="A half-minute tour of the website"></a><br>
+  <sub>a half-minute tour of the website — click for the video with sound</sub>
+</p>
+
 A Windows app for poking around Limbus Company's game files: patch datamining, an Identity / E.G.O
 database, an enemy handbook, battle animations and skills rendered with the game's own effects,
 Versus fights, every asset of the game, a team builder and the soundtrack.
