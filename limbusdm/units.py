@@ -15,7 +15,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 9  # bump when the database layout changes (cached per snapshot)
+VERSION = 10  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -166,6 +166,8 @@ def build(tables: dict, loc_dir: str) -> dict:
             for g in sorted(pp.get(key) or [], key=lambda g: g.get("level", 0)):
                 for p in g.get("passiveIDList") or []:
                     info = passive_info(p, passives, loc_passives, kind)
+                    if info["name"] == str(p) and not info["desc"]:
+                        continue  # one the game never names or describes is internal (as with skills)
                     info["uptie"] = g.get("level")
                     got[info["name"]] = info
             pas += got.values()

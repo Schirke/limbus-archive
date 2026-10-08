@@ -6,10 +6,12 @@ body.site #timers { margin-left: auto; }
 a.apponly { opacity: .55; }
 a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; margin-left: 5px; padding: 1px 4px;
   border: 1px solid currentColor; border-radius: 4px; opacity: .8; vertical-align: 1px; }
-#sitefoot { display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; margin-top: 40px; padding: 14px 24px;
+/* the last thing in the page's scroll (site.js keeps it there): seen at the bottom only; the negative margins = #main's padding, the room under it
+   is for the music player's button */
+#sitefoot { display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; margin: 40px -28px -60px; padding: 14px 24px 72px;
   border-top: 1px solid rgba(255, 255, 255, .08); font-size: 12px; opacity: .7; }
 /* a narrow screen: the short wording in a line or two, centred (the build and the long sentences are for wide screens) */
-@media (max-width: 900px) { #sitefoot { justify-content: center; text-align: center; gap: 2px 14px; margin-top: 24px; padding: 10px 12px; font-size: 11px; } #sitefoot .fwide { display: none; } }
+@media (max-width: 900px) { #sitefoot { justify-content: center; text-align: center; gap: 2px 14px; margin: 24px -12px -40px; padding: 10px 12px 66px; font-size: 11px; } #sitefoot .fwide { display: none; } }
 /* a phone: the header in two rows (the menu is a strip that scrolls sideways), nothing wider than the screen */
 @media (max-width: 900px) {
   body.site #top { height: auto; flex-wrap: wrap; padding: 6px 10px 0; gap: 0 6px; }
@@ -39,8 +41,6 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
 body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site #agif, body.site #enanim, body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
 body.site .fxapp { opacity: .4; cursor: default; }
 body.site #fxnote { flex-basis: 100%; }
-/* the music player sits above the footer, not over its links */
-body.site #player { bottom: 58px; }
 
 /* an invite's "Open in the desktop app" (site.js appBar) */
 #appbar { position: fixed; left: 28px; bottom: 22px; z-index: 44; display: flex; flex-direction: column; gap: 2px; padding: 10px 18px; background: var(--panel); border: 1px solid var(--gold); color: var(--gold); text-decoration: none; box-shadow: 0 6px 22px rgba(0,0,0,.5); }

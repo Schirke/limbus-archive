@@ -341,7 +341,10 @@
     ${SITE.contact ? `<span>Contact: <b>${esc(SITE.contact)}</b></span>` : ""}
     <span>Made with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></span>
     <span><a href="#" id="sitenotes">What's new</a> · <a href="#/support">Support · Credits</a></span>`;
-  document.body.appendChild(foot);
+  // at the end of the page's scroll, not on the screen all the time: a page that draws itself anew puts it back last
+  const main = $("#main"), last = () => { if (main.lastElementChild !== foot) main.appendChild(foot); };
+  new MutationObserver(last).observe(main, { childList: true });
+  last();
   $("#sitenotes").onclick = (e) => { e.preventDefault(); showAppHistory(); };
   route();
 })();
