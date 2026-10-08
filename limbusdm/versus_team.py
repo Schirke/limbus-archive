@@ -89,6 +89,9 @@ TEAM = {
     "fair": 0.5, "fair_seeds": 48,  # the boss's strength is set so that it wins about this share of fights (that many tried)
     "boss_shot": 0.6,        # (aggro) a shot on the boss: x this on top of shot_share (it shrugs off chip damage too)
     "back_after": 2,         # (aggro) a range one backs off to shoot again after this many clashes up close
+    # (aggro) one done with its target in a knot (crowd_n others or more within crowd_r bodies) steps out of it, about
+    # crowd_step away from the knot's middle, before it goes for the next one
+    "crowd_r": 1.5, "crowd_n": 2, "crowd_step": 1.8,
     # ammo (range ones): shots before it is empty; empty, it goes in to fight up close until it backs off (and reloads
     # there); one with no skill to fight up close with shoots on weaker (empty_share) and reloads in reload_s instead
     "ammo": 4, "empty_share": 0.5, "reload_s": 2.5,
@@ -599,7 +602,15 @@ class Battle:
         j's depth (+ dz); the seconds it takes."""
         # (aggro: j may already be decided on into a later beat — where it stands now)
         pj = self.spots(j, self.at, self.at)[0] if self.aggro else self.pos[j]
-        side = side if side is not None else (-1.0 if self.pos[i][0] < pj[0] else 1.0)
+        if side is None:
+            side = -1.0 if self.pos[i][0] < pj[0] else 1.0
+            if self.aggro and self.boss not in (i, j):  # (someone already at it on that side: the other side of it, if that one is free)
+                def taken(sd):
+                    p = [pj[0] + sd * self.R["clash_gap"], pj[1] + dz]
+                    return sum(1 for o in range(self.n) if o not in (i, j) and self.alive(o)
+                               and math.hypot(self.pos[o][0] - p[0], self.pos[o][1] - p[1]) < 1.0)
+                if taken(side) and not taken(-side) and abs(pj[0] - side * self.R["clash_gap"]) < self.wall_z(pj[1]) - 0.5:
+                    side = -side
         to = self.clamp([pj[0] + side * self.R["clash_gap"], pj[1] + dz])
         if abs(to[0] - pj[0]) < self.R["clash_gap"] * 0.6:  # (pinned at a wall: the other side of it)
             to = self.clamp([pj[0] - side * self.R["clash_gap"], pj[1] + dz])
@@ -1235,6 +1246,8 @@ class Battle:
             self.aggro_drop(i)
             if self.back_off(i, t):  # (a range one fought up close: it backs off to shoot again first)
                 return
+            if self.crowd_out(i, t):  # (in a knot: it steps out of it first)
+                return
             j = self.aggro_pick(i)
             if j is None:  # (nobody to go for: a slow one waits in its zone, walking back to it)
                 if "slow" in self.role[i] and self.waited[i] is None:
@@ -1424,6 +1437,36 @@ class Battle:
         self.log("return", i, None, dur, 0, at=t, result="backs off to shoot again" + (", reloads" if self.ammo[i] < self.T["ammo"] else ""))
         self.reload(i)
         self.busy[i] = t + max(dur, 0.2)
+        self.partner[i] = None
+        return True
+
+    def crowd_out(self, i, t) -> bool:
+        """(aggro) one between targets standing in a knot (crowd_n others within crowd_r) steps out of it: away from
+        the knot's middle, across and in depth, to a free spot; whether it did. Not in a boss fight (they surround it)."""
+        T = self.T
+        if i == self.boss:
+            return False
+        near = [o for o in range(self.n) if o != i and self.alive(o) and self.dist(i, o) <= T["crowd_r"]]
+        if len(near) < T["crowd_n"] or self.boss >= 0:
+            return False
+        x, z = self.pos[i]
+        cx = sum(self.pos[o][0] for o in near) / len(near)
+        cz = sum(self.pos[o][1] for o in near) / len(near)
+        dx, dz = x - cx, z - cz
+        if math.hypot(dx, dz) < 0.2:  # (right in the middle: back towards its own side, a little in depth)
+            dx, dz = (-1.0 if self.side[i] == 0 else 1.0), self.rnd.choice((-0.5, 0.5))
+        d = math.hypot(dx, dz)
+        step = T["crowd_step"] + self.rnd.uniform(0, 0.4)
+        to = [x + dx / d * step, z + dz / d * step]
+        if abs(to[0]) > self.wall_z(z) - 0.8:  # (no room that way: the other way round across)
+            to[0] = x - dx / d * step
+        to = self.aside(i, self.clamp(to))
+        dur = math.hypot(to[0] - x, to[1] - z) / T["walk_speed"]
+        if dur < 0.15:
+            return False
+        self.pos[i] = to
+        self.log("return", i, None, dur, 0, at=t, result="steps out of the crowd")
+        self.busy[i] = t + dur
         self.partner[i] = None
         return True
 
