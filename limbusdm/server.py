@@ -203,10 +203,23 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if not self._replied:  # nothing was answered: a kept connection would leave the page waiting
                 self.close_connection = True
 
+        def _ours(self) -> bool:
+            """The request names this server by its own address. A web page can point a name of its own at 127.0.0.1
+            and then talk to the app as if it were its page (DNS rebinding) — such a request carries that name."""
+            host = (self.headers.get("Host") or "").lower()
+            if host in (f"127.0.0.1:{self.server.server_address[1]}", f"localhost:{self.server.server_address[1]}"):
+                return True
+            self.close_connection = True
+            self._json({"error": "forbidden"}, 403)
+            return False
+
         def do_GET(self):
-            self._run(self._get_kept)
+            if self._ours():
+                self._run(self._get_kept)
 
         def do_POST(self):
+            if not self._ours():
+                return
             if self.headers.get(TOKEN_HEADER) != "1":  # blocks cross-site requests from web pages
                 self.close_connection = True  # (its body is left unread)
                 return self._json({"error": "forbidden"}, 403)
@@ -238,7 +251,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._file(os.path.join(ui_dir, "index.html"), "text/html; charset=utf-8")
             if p.startswith("/ui/"):
                 full = os.path.normpath(os.path.join(ui_dir, p[4:]))
-                if not full.startswith(os.path.normpath(ui_dir)):
+                if not full.startswith(os.path.normpath(ui_dir) + os.sep):
                     return self._send(403, b"", "text/plain")
                 return self._file(full)
             if p == "/api/appnotes":  # what's new in the app since the version seen last ({} when seen); all=1: the last releases
@@ -263,6 +276,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 st["disk"] = svc.disk_usage() if q.get("disk") else None
                 return self._json(st)
             if p == "/api/report":
+                if not re.fullmatch(r"[\w.-]+", q["id"]):
+                    return self._send(404, b"", "text/plain")
                 return self._gz_json_file(os.path.join(svc.data_dir, "reports", q["id"] + ".json.gz"))
             if p == "/api/scan":
                 if not q.get("id"):
