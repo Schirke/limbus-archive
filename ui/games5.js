@@ -113,7 +113,7 @@ function gaHome() {
     return (100 * b.groups.filter((x) => x.g === g || x.g === g + "_pickup").reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) / all).toFixed(1) + "%"; };
   const up = b.groups.filter((x) => String(x.g).endsWith("_pickup")).flatMap((x) => x.ids).map(gaU);
   // TEMPORARY (Vlad, 2026-10-08: "to test with, we'll take it out later"): the "+1300" button gives lunacy for nothing
-  $("#gehome").innerHTML = `<div class="gewallet">LUNACY <b>${gmW.lunacy.toLocaleString("en")}</b><button id="getest" title="For testing: lunacy for nothing. To be removed.">+ 1300 · test</button></div>
+  $("#gehome").innerHTML = `<div class="gewallet">${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b><button id="getest" title="For testing: lunacy for nothing. To be removed.">+ 1300 · test</button></div>
     <div class="getiles">${ga.data.banners.map((x) => `<img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">`).join("")}</div>
     <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.illust ? gaFull(b.illust) : ""}')"></div>${b.typo ? `<img class="getypo" src="${gaFull(b.typo)}">` : ""}
       <div class="geinfo">${b.end ? `<div class="geend">Until ${esc(b.end.slice(0, 10))}</div>` : ""}
@@ -121,7 +121,7 @@ function gaHome() {
         ${up.length ? `<div class="geup">${up.map((x) => `<img src="${x.thumb}" class="${x.ego ? "ego" : ""}" title="${esc(x.title + " — " + x.who)} · rate up">`).join("")}</div>` : ""}</div>
       <label class="geall"><input type="checkbox" id="geall" ${st.all ? "checked" : ""}> Show every 000 and E.G.O</label>
       ${f ? `<div class="gepity">IDEALITY <b>${pity}</b> / ${GA_PITY}${pity >= GA_PITY ? ` <button id="gex">Exchange for ${esc(f.title)}</button>` : ""}</div>` : ""}
-      <div class="gepull"><button id="ge1" ${gmW.lunacy < GA_COST ? "disabled" : ""}>Extract 1<small>◆ ${GA_COST}</small></button><button id="ge10" ${gmW.lunacy < 10 * GA_COST ? "disabled" : ""}>Extract 10<small>◆ ${10 * GA_COST}</small></button></div>
+      <div class="gepull"><button id="ge1" ${gmW.lunacy < GA_COST ? "disabled" : ""}>Extract 1<small>${GM_LUNIMG}${GA_COST}</small></button><button id="ge10" ${gmW.lunacy < 10 * GA_COST ? "disabled" : ""}>Extract 10<small>${GM_LUNIMG}${10 * GA_COST}</small></button></div>
       ${gmW.lunacy < GA_COST ? `<a class="gebroke" href="#/games">Out of lunacy — play a game: today's Dailies pay the most</a>` : ""}</div>`;
   document.querySelectorAll("#gehome [data-b]").forEach((el) => el.onclick = () => { ga.banner = ga.data.banners.find((x) => x.id === +el.dataset.b); st.banner = ga.banner.id; gaKeep(); gaSnd("gacha_whoosh", 0.4); gaHome(); });
   $("#getest").onclick = () => { gmW.lunacy += 10 * GA_COST; gmWKeep(); gaHome(); };
@@ -317,7 +317,7 @@ function gaResult(got) {
       ${g.fresh ? "<u>NEW!</u>" : ""}<span>${esc(u.title)}</span></div>`; };
   $("#geres .gegrid").innerHTML = got.map(card).join("");
   $("#geres .gegrid").classList.toggle("one", got.length === 1);
-  $("#geres .gebtns").innerHTML = `<button id="geback">Return</button><button id="geagain" ${gmW.lunacy < GA_COST * got.length ? "disabled" : ""}>Extract again<small>◆ ${GA_COST * got.length} · you have ${gmW.lunacy.toLocaleString("en")}</small></button>`;
+  $("#geres .gebtns").innerHTML = `<button id="geback">Return</button><button id="geagain" ${gmW.lunacy < GA_COST * got.length ? "disabled" : ""}>Extract again<small>${GM_LUNIMG}${GA_COST * got.length} · you have ${gmW.lunacy.toLocaleString("en")}</small></button>`;
   $("#geback").onclick = () => { ga.run++; gaHome(); };
   $("#geagain").onclick = () => gaPull(got.length === 10 ? 10 : 1);
   document.querySelectorAll(".gecard.r3, .gecard.ego").forEach((c) => c.onclick = async () => { const run = ++ga.run; document.body.classList.add("quiz"); await gaReveal(+c.dataset.id, () => run === ga.run);

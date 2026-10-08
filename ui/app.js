@@ -203,7 +203,7 @@ const routes = {};
 function route() {
   const [, name = "patches", ...rest] = location.hash.split("/");
   const sub = document.querySelector(`#subnav a[data-route="${name}"]`);
-  const group = sub ? sub.parentElement.dataset.group : ({ scan: "patches", vsroom: "versus" })[name] || name;
+  const group = sub ? sub.parentElement.dataset.group : ({ scan: "patches", vsroom: "versus", gamegacha: "gacha" })[name] || name;
   document.querySelectorAll("#top a[data-group]").forEach((a) => a.classList.toggle("active", a.dataset.group === group));
   document.querySelectorAll("#subnav div").forEach((d) => { d.hidden = d.dataset.group !== group; });
   document.querySelectorAll("#subnav a").forEach((a) => a.classList.toggle("active", a === sub));

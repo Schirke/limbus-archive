@@ -25,7 +25,7 @@ const glSay = (data) => glSend({ t: "msg", data });
 function glGame(k) {
   return k === "track" ? gm.game : ["id", "skill", "char"].includes(k) ? gi.game : ["enemy", "canto", "splash", "atlas"].includes(k) ? gp.game
     : k === "wordle" ? gw.game : k === "conn" ? gc.game : k === "grid" ? gg.game : k === "odd" ? go.game
-    : k === "chain" ? gn.game : k === "buff" ? gb.game : k === "mix" ? gy.game : k === "jig" ? gj.game : null;
+    : k === "chain" ? gn.game : k === "buff" ? gb.game : k === "mix" ? gy.game : k === "jig" ? gj.game : k === "when" ? gt.game : null;
 }
 function glStand(k, g) {
   if (k === "wordle") return [g.tries.length, GW_TRIES, g.over && g.tries.includes(g.ans) ? "solved" : ""];

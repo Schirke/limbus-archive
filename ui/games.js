@@ -117,7 +117,12 @@ function gmDailyOver(game, g, score) { if (g.duel) g.duel.mine = score; else gmD
 const GM_PULL = 130, GM_WALLET = "games_wallet";
 const gmW = { lunacy: 10 * GM_PULL, streak: 0, day: "", ach: {}, played: {}, pulls: 0, r3: 0, ego: 0, feat: 0,
   ...(() => { try { return JSON.parse(localStorage.getItem(GM_WALLET) || "{}"); } catch { return {}; } })() };
-const gmWKeep = () => { try { localStorage.setItem(GM_WALLET, JSON.stringify(gmW)); } catch {} };
+// the lunacy as the game shows it: its own icon (cut from the game's files, /api/gacha_ui) and its red
+const GM_LUNIMG = `<img class="lunicon" src="/api/gacha_ui?n=icon_lunacy" alt="lunacy" onerror="this.remove()">`;
+// (the count next to Extraction in the top menu)
+const gmLunDraw = () => { const el = document.querySelector("#navlun"); if (el) el.innerHTML = `${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b>`; };
+const gmWKeep = () => { try { localStorage.setItem(GM_WALLET, JSON.stringify(gmW)); } catch {} gmLunDraw(); };
+gmLunDraw();
 // [key, name, what it takes, lunacy]
 const GM_ACH = [["first", "First steps", "Finish any game", 130], ["daily", "Daily bread", "Finish a Daily challenge", 260],
   ["allday", "Clocked in", "Finish every Daily of one day", 1300], ["streak3", "Three in a row", "A Daily three days running", 390],
@@ -273,10 +278,15 @@ const GM_GAMES = [
   ["chain", "#/gamechain", "Chain", "From one Identity to another, each step sharing the Sinner or a faction with the one before — in the fewest links.",
     gmIcon('<rect x="2.5" y="8.5" width="9" height="7" rx="3.5"/><rect x="12.5" y="8.5" width="9" height="7" rx="3.5"/><path d="M9 12h6"/>')],
   ["jig", "#/gamejig", "Jigsaw", "An Identity's art cut into tiles and shuffled — put it together against the clock.",
-    gmIcon('<rect x="3" y="3" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/><rect x="14.5" y="2.2" width="7" height="7" transform="rotate(12 18 5.7)"/><rect x="3" y="13" width="8" height="8"/>')]];
+    gmIcon('<rect x="3" y="3" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/><rect x="14.5" y="2.2" width="7" height="7" transform="rotate(12 18 5.7)"/><rect x="3" y="13" width="8" height="8"/>')],
+  ["when", "#/gamewhen", "When was it", "An Identity or an E.G.O — put the mark on the game's timeline where it came out. The closer, the more points.",
+    gmIcon('<path d="M2.5 15h19M5 12.5v5M10 12.5v5M15 12.5v5M20 12.5v5"/><path d="M12.5 3.5a3 3 0 0 1 3 3c0 2.2-3 5-3 5s-3-2.8-3-5a3 3 0 0 1 3-3z"/>')],
+  // (a game for two: no score, no Daily — the tile says what it is instead)
+  ["who", "#/gamewho", "Guess who", "For two: the same 24 Identities and a hidden one each. Ask what the other's is, the game answers — name it first. Or play against the game.",
+    gmIcon('<circle cx="8" cy="8" r="3.2"/><path d="M2.5 19c.6-3.2 2.8-5 5.5-5s4.900 1.800 5.500 5"/><path d="M16.2 8.2a2.3 2.3 0 1 1 3.4 2c-.8.4-1.2.9-1.2 1.800"/><path d="M18.4 14.6v.1"/>'), "FOR TWO"]];
 const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
 // the games' page: the columns its tiles stand in
-const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig"]], ["Toys", ["gacha", "dare"]]];
+const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig", "when"]], ["Toys", ["dare", "who"]]];
 // Mode of the day: the game shown big on the games' page — another one after every daily reset, never a toy; each
 // comes once before any comes again (the order is drawn anew for every round of them)
 function gmOfDay() {
@@ -308,20 +318,20 @@ function gmHub() {
   document.querySelector('#subnav [data-group="games"]').hidden = true;  // the tiles are the menu here
   const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_SCORED.filter(([k]) => gmDailyDone(k) != null).length;
   const mode = gmOfDay(), today = gmDailyDone(mode[0]), yesterday = new Date(new Date(gmDay() + "T12:00:00Z") - 864e5).toISOString().slice(0, 10);
-  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="A duel link or a live room's code — paste, Enter" autocomplete="off"><a class="gmscore gmwallet" href="#/gamegacha" title="Games pay lunacy — spend it in Extraction">LUNACY <i>${gmW.lunacy.toLocaleString("en")}</i>${gmW.streak > 1 && [gmDay(), yesterday].includes(gmW.day) ? ` · <i>${gmW.streak}</i> DAYS IN A ROW` : ""}</a><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_SCORED.length}</i></span></div>
+  $("#main").innerHTML = `<div class="gmhubhead"><h1>Games</h1><input id="gmduel" class="dbq" placeholder="A duel link or a live room's code — paste, Enter" autocomplete="off"><a class="gmscore gmwallet" href="#/gamegacha" title="Games pay lunacy — spend it in Extraction">${GM_LUNIMG}<i class="lun">${gmW.lunacy.toLocaleString("en")}</i>${gmW.streak > 1 && [gmDay(), yesterday].includes(gmW.day) ? ` · <i>${gmW.streak}</i> DAYS IN A ROW` : ""}</a><span class="gmscore" title="The same ten rounds for everybody, new every day at the game's daily reset">DAILY CHALLENGE · NEW IN <i>${Math.floor(left / 60)} H ${left % 60} M</i> · TODAY <i>${done} / ${GM_SCORED.length}</i></span></div>
     <div class="gmday"><a class="gmart" data-game="${mode[0]}" href="${mode[1]}">${mode[4]}</a><div class="gmdaybody">
       <div class="gmkick">MODE OF THE DAY</div><a class="gmname" href="${mode[1]}">${mode[2]}</a><p>${mode[3]}</p>
       <div class="gmscore">BEST ${gmBest(mode[0]) ? `<i>${gmBest(mode[0])}</i>` : "—"} &nbsp;·&nbsp; DAILY ${today == null ? "—" : `<i>${today}</i>`}</div>
       <div class="gmplay"><a class="gmbtn" href="${mode[1]}">Play</a>${today == null ? `<a class="toggle" href="${mode[1]}/daily" title="The same ten rounds for everybody today, on fixed settings">Daily</a>` : `<span class="toggle done">Daily ✓</span>`}${gmDuelBtns(mode[0])}</div></div></div>
     <div class="gmcols">${GM_GROUPS.map(([group, keys]) => `<div><div class="gmgrp">${group}</div>${keys.map((key) => { const [k, href, name, , pic, toy] = GM_GAMES.find((g) => g[0] === key), best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
-      return `<div class="gmtile ${k === mode[0] ? "on" : ""}"><a class="gmtmain" href="${href}"><span class="gmtpic" data-game="${k}">${pic}</span><span><b>${name}</b><small>${toy ? "A TOY" : `BEST ${best ? `<i>${best}</i>` : "—"}`}</small></span></a>
+      return `<div class="gmtile ${k === mode[0] ? "on" : ""}"><a class="gmtmain" href="${href}"><span class="gmtpic" data-game="${k}">${pic}</span><span><b>${name}</b><small>${toy ? (toy === true ? "A TOY" : toy) : `BEST ${best ? `<i>${best}</i>` : "—"}`}</small></span></a>
         ${toy ? "" : day == null ? `<a class="gmdot" href="${href}/daily" title="Today's Daily: not played yet — start it"></a>` : `<span class="gmdot done" title="Today's Daily: ${day}"></span>`}</div>`; }).join("")}</div>`).join("")}</div>
     <div class="gmgrp gmachhead">Achievements <small>${GM_ACH.filter(([k]) => gmW.ach[k]).length} / ${GM_ACH.length} · each pays lunacy once</small></div>
     <div class="gmach">${GM_ACH.map(([k, name, what, n]) => `<span class="${gmW.ach[k] ? "done" : ""}" title="${esc(what)}"><b>${esc(name)}</b><small>${esc(what)}</small><i>${gmW.ach[k] ? "✓" : "+" + n}</i></span>`).join("")}</div>`;
   // a duel link from a friend opens its game here too (the link itself leads to the website)
   $("#gmduel").onkeydown = (e) => {
     if (e.key !== "Enter") return;
-    const v = e.target.value.trim(), m = /#\/[a-z/]+\/duel\/[\w.%-]+/.exec(v) || /#\/live\/[a-z0-9]{4,10}/i.exec(v), room = /^[a-z0-9]{4,10}$/i.test(v);
+    const v = e.target.value.trim(), m = /#\/[a-z/]+\/duel\/[\w.%-]+/.exec(v) || /#\/(live|gamewho|vsroom)\/[a-z0-9]{4,10}/i.exec(v), room = /^[a-z0-9]{4,10}$/i.test(v);
     m ? (location.hash = m[0]) : room ? (location.hash = "#/live/" + v.toLowerCase()) : toast("That is neither a duel link nor a room's code.");
   };
   gmHubPics();

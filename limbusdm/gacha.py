@@ -20,9 +20,9 @@ import threading
 VERSION = 1
 GACHA = "Assets/Resources_moved/Gacha/"
 # sprites and textures of the extraction's screens, by their names in the main build
-UI_RE = re.compile(r"^(MainUI_Gacha_\w+|MainUI_Logoicon_filter_\d+|gacharesult_\w+|FX_Tex_UI_Gacha_\w+)$")
+UI_RE = re.compile(r"^(MainUI_Gacha_\w+|MainUI_Logoicon_filter_\d+|gacharesult_\w+|FX_Tex_UI_Gacha_\w+|icon_lunacy)$")
 # the ones the page draws (ui/games5.js, ui/style.css): what the web copy takes
-UI_USED = (["MainUI_Gacha_5", "MainUI_Gacha_3_4", "MainUI_Gacha_4_Illust_Skip", "MainUI_Gacha_4_Card_EgoRing", "FX_Tex_UI_Gacha_BGSpace_Normal", "FX_Tex_UI_Gacha_Chain2",
+UI_USED = (["icon_lunacy", "MainUI_Gacha_5", "MainUI_Gacha_3_4", "MainUI_Gacha_4_Illust_Skip", "MainUI_Gacha_4_Card_EgoRing", "FX_Tex_UI_Gacha_BGSpace_Normal", "FX_Tex_UI_Gacha_Chain2",
             "FX_Tex_UI_Gacha_Chain_Long1", "FX_Tex_UI_Gacha_Crack1_Main", "FX_Tex_UI_Gacha_Crack1_Space"]
            + [f"MainUI_Gacha_4_Card_Foreground_{n}" for n in (1, 2, 3)] + [f"MainUI_Gacha_3_Rank{n}" for n in (1, 2, 3)] + [f"MainUI_Gacha_4_Illust_Rank_{n}" for n in (1, 2, 3)]
            + [f"MainUI_Gacha_4_Illust_E{i + 1}_{g}" for i, g in enumerate(["ZAYIN", "TETH", "HE", "WAW", "ALEPH"])] + [f"MainUI_Logoicon_filter_{n}" for n in range(12)])
@@ -97,7 +97,7 @@ def ui_png(name: str, game_data: str, cache_dir: str) -> tuple[bytes, str] | Non
         return None
     folder = os.path.join(cache_dir, "gacha")
     with _lock:
-        if not os.path.exists(os.path.join(folder, ".done")):
+        if not os.path.exists(os.path.join(folder, ".done2")):
             _extract(game_data, folder)
     for ext, mime in ((".png", "image/png"), (".jpg", "image/jpeg")):
         fp = os.path.join(folder, name + ext)
@@ -135,5 +135,5 @@ def _extract(game_data: str, folder: str) -> None:
                     img.save(os.path.join(folder, n + ".png"), "PNG")
             except Exception:
                 continue
-    with open(os.path.join(folder, ".done"), "w") as f:
+    with open(os.path.join(folder, ".done2"), "w") as f:
         f.write("1")

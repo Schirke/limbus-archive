@@ -158,7 +158,10 @@ points. Puzzles. And two toys.
 - **Jigsaw:** an Identity's art cut into tiles and shuffled — put it together against the clock.
 - **Mixed up:** a piece of a track cut into parts and shuffled — listen and put them back in order.
 - **Guess the buff:** the effect of a buff or a debuff plays — which one is it?
-- **Extraction** (a toy): the game's own extraction — its banners with their real pools and chances,
+- **When was it:** an Identity or an E.G.O — put the mark on the game's timeline where it came out.
+- **Guess who** (for two, in a room or against the game): the same 24 Identities and a hidden one
+  each; ask what the other's is, the game answers and darkens the cards it can't be — name it first.
+- **Extraction** (its own tab, with your lunacy next to it): the game's own extraction — its banners with their real pools and chances,
   the orb in chains, every 000 and E.G.O shown with its line and voice, the ten cards. All of it with
   the game's pictures and sounds.
 - **Challenge roulette** (a toy): a random team and a rule to play it by.
