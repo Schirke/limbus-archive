@@ -46,6 +46,10 @@ class Service:
                 pass
         self.marks_path = os.path.join(data_dir, "marks.json")
         self.marks = self._load_json(self.marks_path, {})
+        try:  # (the team guide an older version kept: recommendations are gone)
+            os.remove(os.path.join(data_dir, "teams", "guide.json"))
+        except OSError:
+            pass
         self.translator = Translator(os.path.join(data_dir, "translations.json"))
         self.job: dict | None = None
         self._job_lock = threading.Lock()
@@ -812,7 +816,7 @@ class Service:
             out[s["id"] - cid * 100] = {"slot": "Defense" + (f" {i}" if len(ds) > 1 else ""), "name": name(s)}
         return out
 
-    # ------------------------------------------------------------ Identity / E.G.O database, team guide
+    # ------------------------------------------------------------ Identity / E.G.O database, the user's team
     def unit_db(self) -> dict:
         """Identities and E.G.O of the latest snapshot, from the game's tables (rebuilt after every patch)."""
         from . import units
@@ -1060,44 +1064,6 @@ class Service:
                 name, title = f"Season {sid}", loc.get(f"season_title_{sid}") or ""
             out[sid] = {"name": name, "title": title, "color": color}
         return out
-
-    TEAMS_EVERY = 7 * 86400  # the guide is re-read once a week
-
-    def team_guide(self, refresh: bool = False) -> dict:
-        """The MDE teams guide, matched to the current Identities. Re-read in the background when a week old."""
-        from . import teams
-        path = os.path.join(self.data_dir, "teams", "guide.json")
-        data = self._load_json(path, None)
-        stale = not data or time.time() - data.get("fetched", 0) > self.TEAMS_EVERY
-        if (refresh or stale) and not getattr(self, "_teams_busy", False):
-            self._teams_busy = True
-            threading.Thread(target=self._fetch_teams, args=(path, data), daemon=True).start()
-        db = self.unit_db()
-        out = teams.rematch(data, db["ids"], db["egos"]) if data else {"teams": []}
-        out["busy"] = bool(getattr(self, "_teams_busy", False))
-        out["error"] = getattr(self, "_teams_error", None)
-        return out
-
-    def _fetch_teams(self, path: str, old: dict | None):
-        from . import teams
-        try:
-            db = self.unit_db()
-            new = teams.fetch_all(db["ids"], db["egos"], log=lambda *a: None)
-            # remember when each team's lineups last changed, to badge it in the app
-            before = {t["name"]: t for t in (old or {}).get("teams", [])}
-            sig = lambda t: [[m["name"] for m in lu["members"]] for lu in t["lineups"]]  # noqa: E731
-            for t in new["teams"]:
-                o = before.get(t["name"])
-                t["changed"] = (o.get("changed") if o and sig(o) == sig(t) else
-                                (new["fetched"] if old else None))
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(new, f, ensure_ascii=False)
-            self._teams_error = None
-        except Exception as e:
-            self._teams_error = f"{type(e).__name__}: {e}"
-        finally:
-            self._teams_busy = False
 
     def my_team(self, data: dict | None = None) -> dict:
         path = os.path.join(self.data_dir, "teams", "my.json")

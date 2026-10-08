@@ -619,8 +619,6 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json({"spine": svc.enemy_spines().get(e["app"]) or [],
                                    "skills": {s: db["skills"].get(s) or db["skills"].get(str(s)) for s in sk},
                                    "passives": {x: db["passives"].get(x) or db["passives"].get(str(x)) for x in pa}})
-            if p == "/api/teams":
-                return self._json(svc.team_guide(refresh=q.get("refresh") == "1"))
             if p == "/api/myteam":
                 return self._json(svc.my_team())
             if p == "/api/asset_img":
@@ -821,13 +819,6 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     mods.save(svc, cid, b["name"], {})
                 mods.put_texture(svc, cid, b["name"], b["tex"], png, size)
                 return self._json({"mods": mods.list_mods(svc, cid)})
-            if p == "/api/open_url":
-                url = str(b.get("url", ""))
-                if not url.startswith("https://docs.google.com/spreadsheets/"):  # only the team guide
-                    return self._json({"error": "not allowed"}, 403)
-                import webbrowser
-                webbrowser.open(url)
-                return self._json({"ok": True})
             if p == "/api/show":
                 if on_show:
                     on_show(str(b.get("open") or ""))

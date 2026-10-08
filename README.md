@@ -144,9 +144,8 @@ and export (PNG, JSON, WAV, MP4).
 
 ### Team builder
 
-Pick an Identity per Sinner and an order. Teams from the
-[MDOT Mirror Dungeon guide](https://docs.google.com/spreadsheets/d/1PGbgzl4Z2plWIJD5_2ZdVyfkpPvCUYPK_AJq2q6Ij5c)
-show up as a recommended tier list; the app re-reads the guide once a week.
+Pick an Identity per Sinner and an order: the page counts the statuses, damage types and sins the
+team brings.
 
 <p align="center"><a href="docs/team-builder.webp"><img src="docs/team-builder.webp" width="760" alt="Team builder"></a></p>
 
@@ -241,8 +240,8 @@ Also: reset timers (daily, weekly, maintenance) at the top and a list of your sn
 - A graphics card for the skill renders (they run in Unity).
 - [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (already there on
   Windows 11 and an updated Windows 10).
-- Internet for some parts: Spine animations (the player loads from a CDN), translations of
-  Korean / Japanese lines and the team guide.
+- Internet for some parts: Spine animations (the player loads from a CDN) and translations of
+  Korean / Japanese lines.
 
 Nothing else to install: Python, FFmpeg and the Unity player are inside the zip.
 
@@ -272,7 +271,7 @@ and put it next to the built exe to have them.
 [UnityPy](https://github.com/K0lb3/UnityPy), [fmod_toolkit](https://github.com/K0lb3/fmod_toolkit),
 [pywebview](https://pywebview.flowrl.com/), [FFmpeg](https://ffmpeg.org/),
 [Unity](https://unity.com/), [Spine](https://esotericsoftware.com/) (its web player is loaded
-from a CDN). Team recommendations by MDOT.
+from a CDN).
 
 ## License
 

@@ -1,4 +1,4 @@
-// Identity / E.G.O database and the Mirror Dungeon team builder.
+// Identity / E.G.O database and the team builder.
 // Everything comes from the game's own tables (/api/units), so it follows every patch by itself.
 
 const SIN_COLORS = { Wrath: "#d94a3a", Lust: "#e8862f", Sloth: "#e3c43a", Gluttony: "#8fc34a", Gloom: "#43b4d6", Pride: "#3e62d6", Envy: "#9b5bd0", None: "#888" };
@@ -339,19 +339,13 @@ routes.teams = async () => {
   MY.slots = MY.slots || {};
   MY.order = MY.order || [];
   drawTeams();
-  loadGuide();
 };
 function saveMy() { api("/api/myteam", MY).catch(() => {}); }
 function drawTeams() {
   const main = $("#main");
   main.innerHTML = `<h1>Team builder</h1>
-    <div class="sub">Pick an Identity for every Sinner and the order they go in. Recommendations come from the
-      community <a href="#" id="guidelink">Mirror Dungeon Extreme Teams Guide</a> (by MDOT), re-read once a week.</div>
-    <div id="builder"></div>
-    <h2>Recommended teams <span class="muted small" id="guideinfo"></span></h2>
-    <div id="recs" class="recs"><div class="muted">Loading the guide…</div></div>
-    <h2>All teams from the guide</h2><div id="guide"></div>`;
-  $("#guidelink").onclick = (e) => { e.preventDefault(); api("/api/open_url", { url: "https://docs.google.com/spreadsheets/d/1PGbgzl4Z2plWIJD5_2ZdVyfkpPvCUYPK_AJq2q6Ij5c" }).catch(() => {}); };
+    <div class="sub">Pick an Identity for every Sinner and the order they go in.</div>
+    <div id="builder"></div>`;
   drawBuilder();
 }
 function teamIds() { return Object.values(MY.slots).map(unitById).filter(Boolean); }
@@ -385,9 +379,9 @@ function drawBuilder() {
   el.querySelectorAll("[data-ord]").forEach((b) => b.onclick = () => {
     const sid = +b.dataset.ord, i = MY.order.indexOf(sid);
     if (i >= 0) MY.order.splice(i, 1); else if (MY.slots[sid]) MY.order.push(sid); else return pickFor(sid);
-    saveMy(); drawBuilder(); drawRecs();
+    saveMy(); drawBuilder();
   });
-  $("#clearteam").onclick = () => { MY.slots = {}; MY.order = []; saveMy(); drawBuilder(); drawRecs(); };
+  $("#clearteam").onclick = () => { MY.slots = {}; MY.order = []; saveMy(); drawBuilder(); };
 }
 function pickFor(sid) {
   const list = UNITS.ids.filter((x) => x.sinner === sid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -403,114 +397,10 @@ function pickFor(sid) {
     body.querySelectorAll("[data-u]").forEach((c) => c.onclick = () => {
       MY.slots[sid] = +c.dataset.u;
       if (!MY.order.includes(sid) && MY.order.length < ORDER_MAX) MY.order.push(sid);
-      saveMy(); $("#modal").classList.add("hidden"); drawBuilder(); drawRecs();
+      saveMy(); $("#modal").classList.add("hidden"); drawBuilder();
     });
     const none = body.querySelector("[data-none]");
-    if (none) none.onclick = () => { delete MY.slots[sid]; MY.order = MY.order.filter((s) => s !== sid); saveMy(); $("#modal").classList.add("hidden"); drawBuilder(); drawRecs(); };
+    if (none) none.onclick = () => { delete MY.slots[sid]; MY.order = MY.order.filter((s) => s !== sid); saveMy(); $("#modal").classList.add("hidden"); drawBuilder(); };
   };
   draw();
-}
-
-// ---------- the guide
-let GUIDE = null;
-async function loadGuide(refresh) {
-  GUIDE = await api(`/api/teams${refresh ? "?refresh=1" : ""}`).catch((e) => ({ teams: [], error: e.message }));
-  drawGuideInfo();
-  drawRecs();
-  drawGuide();
-  if (GUIDE.busy) setTimeout(() => $("#guide") && loadGuide(), 4000);
-}
-function drawGuideInfo() {
-  const el = $("#guideinfo");
-  if (!el) return;
-  const when = GUIDE.fetched ? new Date(GUIDE.fetched * 1000).toLocaleDateString() : "never";
-  el.innerHTML = `· read ${esc(when)}${GUIDE.busy ? " · updating…" : ""}${GUIDE.error ? ` · <span class="bad">${esc(GUIDE.error)}</span>` : ""} · <a href="#" id="guidere">check now</a>`;
-  $("#guidere").onclick = (e) => { e.preventDefault(); loadGuide(true); };
-}
-const mainLineup = (t) => t.lineups.find((l) => /prefer|main/i.test(l.label) && l.kind !== "ego") || t.lineups.find((l) => l.kind !== "ego");
-const isNew = (t) => t.changed && Date.now() / 1000 - t.changed < 14 * 86400;
-// "28th of August 2026" / "15.8.2026" → sortable number
-const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
-function guideDate(s) {
-  s = String(s || "").toLowerCase();
-  let m = /(\d{1,2})(?:st|nd|rd|th)?\s+of\s+([a-z]+)\s+(\d{4})/.exec(s);
-  if (m) return +m[3] * 10000 + (MONTHS.indexOf(m[2].slice(0, 3)) + 1) * 100 + +m[1];
-  m = /(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(s);
-  return m ? +m[3] * 10000 + +m[2] * 100 + +m[1] : 0;
-}
-// "Bleed+Burn+Poise [R]" → status icons + the name; the guide's words → the game's keyword ids
-const TEAM_WORDS = { rupture: "Burst", bleed: "Laceration", burn: "Combustion", tremor: "Vibration", sinking: "Sinking", poise: "Breath", charge: "Charge" };
-const teamStatuses = (t) => t.name.toLowerCase().split(/[^a-z]+/).map((w) => TEAM_WORDS[w]).filter(Boolean);
-const teamTitle = (t, cls = "s20") => `<span class="tname">${teamStatuses(t).map((k) => statusIcon(k, cls)).join("")}<b>${esc(t.name)}</b></span>`;
-const TIERS = ["Easy", "Medium", "Hard"];
-const recv = { statuses: new Set(), sort: "date" };
-function memberCard(m) {
-  const x = m.id ? unitById(m.id) : m.ego ? unitById(m.ego) : null;
-  const alt = m.alt ? unitById(m.alt) : null;
-  const tip = [m.tag, m.note.replace(/^[•\ufffd]\s*/, "")].filter(Boolean).join(" — ");
-  const pic = (u) => `<img loading="lazy" src="${imgThumb(u.img.thumb)}" onerror="this.style.visibility='hidden'">`;
-  return `<div class="mcard ${x ? "" : "unk"} ${alt ? "duo" : ""}" ${x && !alt ? `data-u="${x.id}"` : ""} title="${esc(tip)}">
-    ${x ? (alt ? `<div class="halves"><span data-u="${x.id}">${pic(x)}</span><span data-u="${alt.id}">${pic(alt)}</span></div>` : pic(x)) : `<div class="noimg">?</div>`}
-    <div class="mname">${esc(x ? (x.title || x.name) : m.name)}${alt ? ` <span class="muted">or</span> ${esc(alt.title)}` : ""}</div>
-    <div class="muted small">${esc(x ? x.sinnerName : "not found in the game")}</div>
-    ${m.tag ? `<div class="mtag">${esc(m.tag)}</div>` : ""}</div>`;
-}
-function drawRecs() {
-  const el = $("#recs");
-  if (!el || !GUIDE) return;
-  if (!GUIDE.teams.length) { el.innerHTML = `<div class="muted">${GUIDE.busy ? "Reading the guide…" : "No teams yet."}</div>`; return; }
-  const mine = new Set(Object.values(MY.slots));
-  const hitOf = (t) => { const lu = mainLineup(t); return lu ? lu.members.filter((m) => m.id && mine.has(m.id)).length : 0; };
-  const teams = GUIDE.teams.filter((t) => [...recv.statuses].every((k) => teamStatuses(t).includes(k)));
-  const order = (a, b) => recv.sort === "match" ? hitOf(b) - hitOf(a) || guideDate(b.updated) - guideDate(a.updated)
-    : recv.sort === "name" ? a.name.localeCompare(b.name) : guideDate(b.updated) - guideDate(a.updated);
-  const tiers = [...TIERS, ...new Set(teams.map((t) => t.difficulty).filter((d) => !TIERS.includes(d)))];
-  const card = (t) => { const lu = mainLineup(t), hit = hitOf(t);
-    return `<div class="rec">
-      <div class="row">${teamTitle(t)}<span class="grow"></span>${isNew(t) ? `<span class="badge added">updated</span>` : ""}</div>
-      <div class="muted small">${mine.size ? `<b class="${hit ? "gold" : ""}">${hit}</b> of yours · ` : ""}${esc(t.updated || "")}</div>
-      <div class="rthumbs">${(lu ? lu.members : []).map((m) => { const x = m.id && unitById(m.id); return x ? `<img src="${imgThumb(x.img.thumb)}" title="${esc(x.title + " " + x.sinnerName)}">` : `<span class="noimg" title="${esc(m.name)}">?</span>`; }).join("")}</div>
-      <div class="row" style="margin-top:6px"><button data-use="${esc(t.name)}">Use this team</button><button data-show="${esc(t.name)}">Details</button></div></div>`; };
-  el.innerHTML = `<div class="row recbar">
-      ${UNITS.statuses.map((k) => `<button class="toggle ${recv.statuses.has(k) ? "on" : ""}" data-rst="${k}">${statusIcon(k, "s18")}${esc(statusName(k))}</button>`).join("")}
-      <span class="grow"></span><select id="recsort"><option value="date">Newest update</option><option value="match">Most of my team</option><option value="name">Name</option></select></div>
-    ${tiers.map((d) => { const list = teams.filter((t) => (t.difficulty || "?") === d).sort(order);
-      return list.length ? `<div class="tier"><div class="tierlabel t-${esc(d.toLowerCase())}"><span>${esc(d)}</span></div><div class="tierrow">${list.map(card).join("")}</div></div>` : ""; }).join("")
-      || `<div class="muted">No team uses all of these statuses.</div>`}`;
-  $("#recsort").value = recv.sort;
-  $("#recsort").onchange = (e) => { recv.sort = e.target.value; drawRecs(); };
-  el.querySelectorAll("[data-rst]").forEach((b) => b.onclick = () => { const k = b.dataset.rst; recv.statuses.has(k) ? recv.statuses.delete(k) : recv.statuses.add(k); drawRecs(); });
-  el.querySelectorAll("[data-use]").forEach((b) => b.onclick = () => useTeam(GUIDE.teams.find((t) => t.name === b.dataset.use)));
-  el.querySelectorAll("[data-show]").forEach((b) => b.onclick = () => { const d = document.querySelector(`[data-team="${CSS.escape(b.dataset.show)}"]`); if (d) { d.classList.add("open"); d.scrollIntoView({ behavior: "smooth" }); } });
-}
-function useTeam(t) {
-  const lu = mainLineup(t);
-  if (!lu) return;
-  MY.slots = {}; MY.order = [];
-  for (const m of lu.members) {
-    const x = m.id && unitById(m.id);
-    if (x && !MY.slots[x.sinner]) { MY.slots[x.sinner] = x.id; MY.order.push(x.sinner); }
-  }
-  saveMy(); drawBuilder(); drawRecs();
-  toast(`Loaded “${esc(t.name)}” — ${MY.order.length} Identities. Fill the other Sinners yourself (the guide keeps them as backup / sacrifices).`, 7000);
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-function drawGuide() {
-  const el = $("#guide");
-  if (!el || !GUIDE) return;
-  el.innerHTML = GUIDE.teams.map((t) => `<div class="item gteam" data-team="${esc(t.name)}">
-      <div class="head">${teamTitle(t)}<span class="grow"></span>${isNew(t) ? `<span class="badge added">updated</span>` : ""}
-        <span class="chip">${esc(t.difficulty || "?")}</span><span class="muted small">${esc(t.updated || "")}</span></div>
-      <div class="body">
-        ${t.changelog ? `<div class="small" style="margin-bottom:6px"><b>Last change:</b> ${esc(t.changelog.split("\n")[0])}</div>` : ""}
-        ${t.about ? `<div class="small muted" style="margin-bottom:8px">${esc(t.about)}</div>` : ""}
-        ${t.codes.length ? `<div class="row" style="margin-bottom:8px"><button data-code="${esc(t.codes[0])}">Copy team code</button><span class="muted small">paste it in the game's formation screen</span></div>` : ""}
-        ${t.lineups.map((lu) => `<h3 class="group">${esc(lu.label)}</h3>${lu.note ? `<div class="small muted">${esc(lu.note)}</div>` : ""}
-          <div class="mrow">${lu.members.map(memberCard).join("")}</div>`).join("")}
-        <div class="row" style="margin-top:10px"><button data-use="${esc(t.name)}">Use this team</button></div>
-      </div></div>`).join("") || `<div class="muted">${GUIDE.busy ? "Reading the guide…" : "No teams."}</div>`;
-  el.querySelectorAll(".gteam > .head").forEach((h) => h.onclick = () => h.parentElement.classList.toggle("open"));
-  el.querySelectorAll("[data-use]").forEach((b) => b.onclick = () => useTeam(GUIDE.teams.find((t) => t.name === b.dataset.use)));
-  el.querySelectorAll("[data-code]").forEach((b) => b.onclick = async () => { try { await navigator.clipboard.writeText(b.dataset.code); toast("Team code copied."); } catch (e) { toast("Couldn't copy: " + esc(e.message)); } });
-  el.querySelectorAll("[data-u]").forEach((c) => c.onclick = () => openUnit(+c.dataset.u));
 }

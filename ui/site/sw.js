@@ -73,12 +73,6 @@ async function answer(req, u, e) {
       (await caches.open("own")).put("/api/myteam", new Response(body, { headers: { "Content-Type": TYPES.json } }));
       return new Response(body, { headers: { "Content-Type": TYPES.json } });
     }
-    if (u.pathname === "/api/open_url") {
-      const { url = "" } = await req.json().catch(() => ({}));
-      const c = url.startsWith("https://") && e.clientId && await self.clients.get(e.clientId);
-      if (c) c.postMessage({ open: url });
-      return json({ ok: !!c });
-    }
     if (/^\/api\/(mark|patchnotes_seen|appnotes_seen)$/.test(u.pathname)) return json({ ok: true });
     return json({ error: ONLY_APP }, 400);
   }

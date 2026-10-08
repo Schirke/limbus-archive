@@ -214,7 +214,7 @@ def report_urls(rep: dict, cfg: dict) -> list[str]:
 def unit_urls(units: dict) -> list[str]:
     """Requests of the Identities & E.G.O page (ui/db.js)."""
     from .uiicons import FONTS, ICONS
-    urls = [url_key("/api/units"), url_key("/api/teams")]  # (+ the Team builder)
+    urls = [url_key("/api/units")]
     urls += [url_key("/api/ui_icon", k=k) for k in ICONS] + [url_key("/api/ui_icon", k=f"sinner_{n}") for n in range(1, 13)]
     urls += [url_key("/api/font", name=n) for n in FONTS]
     thumbs, full = set(), set()
@@ -473,7 +473,7 @@ class Exporter:
         have = old.get("urls", {}) if old.get("id") == sid else {}  # another game version: every picture is asked again
         units = self.svc.unit_db()
         # (the lists are the app's own making: a newer app writes them anew for the same game version)
-        got = self.fetch_all(unit_urls(units), {k: f for k, f in have.items() if k not in ("/api/units", "/api/teams")}, "site: Identities & E.G.O")
+        got = self.fetch_all(unit_urls(units), {k: f for k, f in have.items() if k != "/api/units"}, "site: Identities & E.G.O")
         # the Games draw these at random: every round shows four Identities' faces (all of them in a pack or two of
         # their own: fetched once, then every round is there) and Guess the skill one skill's picture (small packs)
         thumb = lambda p: url_key("/api/asset_thumb", path=p)  # noqa: E731

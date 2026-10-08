@@ -139,7 +139,7 @@ def main():
 
     def watcher():
         """While the window is open: the game's catalog every 2 min (a local file, no network) and the app's own
-        releases hourly (update_check caches for an hour); the team guide when a week old."""
+        releases hourly (update_check caches for an hour)."""
         import time
         n = 0
         while True:
@@ -149,8 +149,6 @@ def main():
                 if svc.settings.get("auto_on_start", True) and not (svc.job and svc.job.get("running")):
                     svc.check_version(start=True)
                 svc.update_check()
-                if n % 30 == 1:  # hourly: re-read the team guide when it is a week old
-                    svc.team_guide()
                 if n % 5 == 0:  # every 10 min: drop renders unwatched for an hour
                     svc.fx.prune()
             except Exception as e:

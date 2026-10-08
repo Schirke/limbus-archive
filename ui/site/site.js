@@ -219,8 +219,6 @@
   }
   // mods are made and kept in the app: no list of them is asked for here
   if (typeof animMods === "function") window.animMods = async () => ({ mods: [] });
-  // a link the app opens in the system browser (/api/open_url): the worker hands it back to be opened here
-  navigator.serviceWorker.addEventListener("message", (e) => { if (e.data && e.data.open) window.open(e.data.open, "_blank", "noopener"); });
   // the app takes pictures of the enemies' idle poses for the grid and keeps them; the site has the ones it was given
   if (typeof enThumbs === "function") window.enThumbs = async () => {};
   const stub = () => {
