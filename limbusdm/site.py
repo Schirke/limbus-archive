@@ -803,7 +803,8 @@ class Exporter:
         st = {"list": fx.db()["list"], **fx.status()}
         names = list(dict.fromkeys(n for b in st["list"] for n in b.get("fx") or []))
         ready = set(st["have"])
-        keys = [url_key("/api/buff_video", name=n) for n in names if _safe_name(n) in ready]
+        # (and the ones the site keeps already: made on another computer, taken from the site by pull)
+        keys = [url_key("/api/buff_video", name=n) for n in names if _safe_name(n) in ready or url_key("/api/buff_video", name=n) in have]
         urls = self.fetch_all(keys, have, "site: Buff effects")
         on_site = {n for n in names if url_key("/api/buff_video", name=n) in urls}
         st.update(have=sorted({_safe_name(n) for n in on_site}), failed=[n for n in names if n not in on_site],
@@ -931,7 +932,8 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         ms = {n: self.read_manifest(n) for n in names}
         reports = sorted((m["meta"] for m in ms.values() if m.get("kind") == "report" and m.get("meta")),
                          key=lambda r: r["id"], reverse=True)
-        snaps = {s["id"]: s for s in self.svc.snapshots()}
+        # (with the ones a report taken from the site is between: pull)
+        snaps = {**_read_json(os.path.join(self.out, "d", "snapshots.json")), **{s["id"]: s for s in self.svc.snapshots()}}
         used = [snaps[i] for i in sorted({r[k] for r in reports for k in ("old", "new")} & set(snaps))]
         state = {"game": {"ok": True, "dir": "", "catalog": ""}, "snapshots": used, "reports": reports, "job": None,
                  "watch": {"state": "", "last_check": ""}, "settings": {}, "data_dir": "", "update": None,
@@ -977,6 +979,184 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
                     os.remove(os.path.join(d, fn))
                     n += 1
         return n
+
+
+PULL_STAGE = "site: taking from the site"
+
+
+def _game(made: str) -> str:
+    """A snapshot's (or a renders folder's) name without the time it was read on this computer: the same game version
+    on two computers."""
+    return re.sub(r"_\d{8}-\d{6}", "", made or "")
+
+
+class Puller:
+    """What the site has and this computer's site files lack, taken back from the site: the reports and the rendered
+    videos sent from another computer, so a "Send to site" from here keeps them. The files come back as they were
+    written (named by their content), out of the packs and parts pack() made of them."""
+
+    def __init__(self, ex: Exporter, url: str):
+        self.ex, self.url = ex, url.rstrip("/")
+        self.packs: dict[str, bytes] = {}
+        self.lock = threading.Lock()
+        self.taken = 0
+
+    def get(self, path: str) -> bytes:
+        from urllib.request import Request
+        with urlopen(Request(f"{self.url}/d/{path}", headers={"User-Agent": "LimbusArchive"}), timeout=300) as r:
+            return r.read()
+
+    def json(self, path: str):
+        data = self.get(path)
+        return json.loads(gzip.decompress(data) if data[:2] == b"\x1f\x8b" else data)
+
+    def _put(self, rel: str, data: bytes):
+        full = os.path.join(self.ex.out, "d", rel)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        tmp = f"{full}.{threading.get_ident()}.tmp"
+        with open(tmp, "wb") as f:
+            f.write(data)
+        os.replace(tmp, full)
+        with self.lock:
+            self.taken += 1
+
+    def file(self, where) -> str:
+        """One file of a manifest as the site has it → its name in the site's files (written here when missing)."""
+        if isinstance(where, str):  # on its own
+            if not os.path.exists(os.path.join(self.ex.out, "d", where)):
+                self._put(where, self.get(where))
+            return where
+        if isinstance(where, dict):  # in parts ("<file>.<size>k.<n>")
+            rel = re.sub(r"\.\d+k\.\d+$", "", where["parts"][0])
+            if not os.path.exists(os.path.join(self.ex.out, "d", rel)):
+                self._put(rel, b"".join(self.get(p) for p in where["parts"]))
+            return rel
+        pack, off, size, ext = where  # in a pack: named again by its content, as _store named it
+        with self.lock:
+            data = self.packs.get(pack)
+        if data is None:
+            data = self.get("p/" + pack)
+            with self.lock:
+                self.packs[pack] = data
+        data = data[off:off + size]
+        h = hashlib.sha1(data).hexdigest()
+        rel = f"f/{h[:2]}/{h}.{ext}"
+        if not os.path.exists(os.path.join(self.ex.out, "d", rel)):
+            self._put(rel, data)
+        return rel
+
+    def files(self, urls: dict) -> dict:
+        """{request: where on the site} → {request: file}; a pack is fetched once for all it holds."""
+        by_pack: dict = {}
+        for k, w in urls.items():
+            by_pack.setdefault(w[0] if isinstance(w, list) else None, []).append(k)
+        jobs = [ks for p, ks in by_pack.items() if p is not None] + [[k] for k in by_pack.get(None, [])]
+        out, done = {}, [0]
+
+        def one(ks):
+            for k in ks:
+                try:
+                    out[k] = self.file(urls[k])
+                except Exception as e:
+                    self.ex.failed.append((k, f"from the site: {e}"))
+            with self.lock:
+                if isinstance(urls[ks[0]], list):
+                    self.packs.pop(urls[ks[0]][0], None)
+                done[0] += len(ks)
+                self.ex.progress(PULL_STAGE, done[0], len(urls))
+        with ThreadPoolExecutor(6) as pool:
+            list(pool.map(one, jobs))
+        return {k: out[k] for k in urls if k in out}  # (in the manifest's order: pack() packs them in it)
+
+    def manifest(self, name: str) -> dict:
+        m = self.json(f"m/{name}.json.gz")
+        if m.get("v") != VERSION:
+            return {}
+        m["urls"] = self.files(m.get("urls") or {})
+        return m
+
+
+def pull(ex: Exporter, url: str) -> dict:
+    """Before a "Send to site": the upload replaces the whole site with this computer's files, so what was sent from
+    another computer is taken from the site first — the reports this computer has no files of, and the rendered
+    videos (Animations → With effects, Buff effects) of this game version it lacks. A report taken off the site after
+    this computer sent it is taken off here too. Refuses when the site shows a newer game version than this app has
+    read: the upload would put the older data back.
+    → {"reports": taken, "removed": taken off here, "videos": taken, "files": files written}"""
+    svc = ex.svc
+    p = Puller(ex, url)
+    ex.progress(PULL_STAGE, 0, 0)
+    try:
+        idx = p.json("index.json")
+    except Exception as e:
+        if getattr(e, "code", None) == 404:  # nothing sent yet
+            return {}
+        raise RuntimeError(f"couldn't read what the site has ({type(e).__name__}: {e}) — sending now could take things off it")
+    site_game, mine = _game((idx.get("build") or {}).get("game", "")), build_info(svc)["game"]
+    if site_game and site_game != mine and site_game[1:9] >= mine[1:9]:  # (s<date>_<build>)
+        raise RuntimeError(f"the site has game data {site_game} and this app {mine or '(none)'} — start the app with the "
+                           "game updated so it reads the new version, then send")
+    names = set(idx.get("manifests") or [])
+    out = {"reports": 0, "removed": 0, "videos": 0}
+    for name in sorted(n for n in names if n.startswith("report-") and not os.path.exists(ex._manifest_path(n))):
+        m = p.manifest(name)
+        if not m:
+            continue
+        if name in (idx.get("tr") or []):
+            try:
+                os.makedirs(os.path.join(ex.out, "d", "tr"), exist_ok=True)
+                data = p.get(f"tr/{name}.json.gz")
+                with open(os.path.join(ex.out, "d", "tr", name + ".json.gz"), "wb") as f:
+                    f.write(data)
+            except Exception as e:
+                ex.failed.append((name, f"translations from the site: {e}"))
+        ex.write_manifest(name, m)
+        out["reports"] += 1
+    # a report this computer sent that the site has no more was taken off from another computer
+    sent = _read_json(os.path.join(svc.data_dir, "site_sent.json")).get("files") or {}
+    for fn in os.listdir(os.path.join(ex.out, "d", "m")):
+        name = fn[:-8]
+        if fn.endswith(".json.gz") and name.startswith("report-") and name not in names and f"d/m/{fn}" in sent:
+            for path in (ex._manifest_path(name), os.path.join(ex.out, "d", "tr", name + ".json.gz")):
+                if os.path.exists(path):
+                    os.remove(path)
+            out["removed"] += 1
+    # rendered videos of the game version and the renderer this app has
+    from . import sitefx
+    for name, made, key in (("fx", sitefx._made(svc), "/api/fx_video"),
+                            ("buffs", os.path.basename(svc.buff_fx.folder()), "/api/buff_video")):
+        if name not in names:
+            continue
+        site = p.json(f"m/{name}.json.gz")
+        if site.get("v") != VERSION or _game(site.get("id")) != _game(made):
+            continue
+        local = ex.read_manifest(name)
+        if local.get("id") != made:
+            local = {"kind": name, "id": made, "urls": {}}
+        got = p.files({k: w for k, w in (site.get("urls") or {}).items() if k.startswith(key) and k not in local["urls"]})
+        if not got:
+            continue
+        local["urls"].update(got)
+        out["videos"] += len(got)
+        if name == "fx":  # (the lists the tab asks for are made again from these: sitefx._lists)
+            local.setdefault("src", {}).update({k: v for k, v in (site.get("src") or {}).items() if k in got})
+            have = local.setdefault("have", {})
+            for cid, vs in (site.get("have") or {}).items():
+                for v, videos in vs.items():
+                    ok = [n for n in videos if sitefx._key(key, int(cid), v, name=n) in local["urls"]]
+                    have.setdefault(cid, {})[v] = list(dict.fromkeys(have[cid].get(v, []) + ok))
+            local["none"] = list(dict.fromkeys((local.get("none") or []) + (site.get("none") or [])))
+        ex.write_manifest(name, local)
+    # the game versions the taken reports are between: the site's state lists them, this app may not have them
+    snaps = {s["id"]: s for s in ((idx.get("inline") or {}).get("/api/state") or {}).get("snapshots") or []}
+    if snaps:
+        path = os.path.join(ex.out, "d", "snapshots.json")
+        merged = {**_read_json(path), **snaps}
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(merged, f, ensure_ascii=False)
+    out["files"] = p.taken
+    ex.fresh["taken from the site"] = out["reports"] + out["videos"]
+    return out
 
 
 def export(svc, base_url: str, reports: list[str] | None = None, units=True, progress=None) -> dict:
@@ -1106,6 +1286,9 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     """This report (with the ones sent before) and the Identities & E.G.O database written out, packed and
     uploaded."""
     ex = Exporter(svc, base_url, progress=progress)
+    cfg = config(svc)
+    if cfg["project"] and cfg["url"]:  # what was sent from another computer stays (pull)
+        pull(ex, cfg["url"])
     if report:
         ex.report(report)
     # a report made since the newest one on the site goes up as well: Settings -> Website sends without naming one
@@ -1125,7 +1308,6 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     size = pack(ex.out, packed_dir(svc))
     chk = verify(ex, progress)
     size = size_of(packed_dir(svc))
-    cfg = config(svc)
     if not cfg["project"]:
         return {"site": "", "dir": packed_dir(svc), "check": chk, **size}
     # what this upload changes on the site: the packed folder's files next to the ones sent the last time
