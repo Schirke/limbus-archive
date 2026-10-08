@@ -187,3 +187,10 @@ button.primary:disabled { filter: grayscale(.8); }
 .ud .skvbase, .ud .skvoff { font-family: "LC Bebas", Impact, sans-serif; font-weight: 400; }
 .ud .skvbase { font-size: 52px; }
 .ud .trait { font: 15px "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--cream); background: #120d0b; padding: 3px 12px 2px; clip-path: var(--cut); }
+
+/* Render / Live between the fighters' cards and the fight's row (a duel) */
+#vsgoslot { margin-top: 10px; } #vsgoslot:empty { display: none; }
+#vsgoslot .vsgo { grid-template-columns: minmax(0, 1fr) auto; }
+#vsgoslot #vsprog:not(:empty), #vsgoslot #vsnote:not(:empty) { margin-top: 8px; }
+.vsgo .vsrender { white-space: nowrap; overflow: hidden; padding-left: 6px; padding-right: 6px; }
+.vsright > .vsgo .vsrender { font-size: 19px; letter-spacing: .06em; }

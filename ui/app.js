@@ -2767,6 +2767,7 @@ function vsDrawStage() {
       <div class="vstag">${esc(vs.map ? vsMapLabel(vs.map) : "Plain dark stage")}${track ? ` · ♪ ${esc(vsTrackLabel(track))}` : ""}</div>
       <button id="vsswap" title="Left and right change places (with their skills)">⇄ Swap</button></div>
     <div class="vscards">${card("left")}${card("right")}</div>
+    <div id="vsgoslot"></div>
     <div class="card vsfight"><span class="seg"><button class="toggle ${clash ? "on" : ""}" data-mode="clash">Clash fight</button><button class="toggle ${clash ? "" : "on"}" data-mode="target">Right takes the hits</button></span>
       ${clash ? `<span class="vslbl">Clashes</span><span class="seg vsstep"><button class="toggle" data-rounds="-1" title="Fewer">−</button><input id="vsrounds" type="number" min="1" max="99" step="1" value="${vs.rounds}" title="How many clashes the fight has (with Exchanges: about how long the fight lasts — HP is scaled to it)"><button class="toggle" data-rounds="1" title="More">+</button></span>
         <span class="vslbl">Winner</span><span class="seg">${[[0, "Left"], [2, "Random"], [1, "Right"]].map(([v, l]) => `<button class="toggle ${vs.winner === v ? "on" : ""}" data-winner="${v}">${l}</button>`).join("")}</span>` : ""}
@@ -2809,6 +2810,32 @@ function vsDrawStage() {
   }
 }
 // a list scrolled to its picked row (only the list: the page stays where it is)
+// Render and Live stand between the fighters' cards and the fight's row on a duel's page (#vsgoslot); the right column
+// draws them, so they are moved there after either is drawn (and back to the column when the page has no such place)
+const VS_GO = [".vsgo", "#vsprog", "#vsnote"];
+function vsGoPlace(kept) {
+  const slot = $("#vsgoslot"), right = document.querySelector(".vsright");
+  VS_GO.forEach((sel, i) => {
+    const el = (right && right.querySelector(`:scope > ${sel}`)) || (kept && kept[i]);
+    if (el && (slot || right)) (slot || right).appendChild(el);
+  });
+}
+{
+  const stage = vsDrawStage, right = vsDrawRight;
+  vsDrawStage = function () {
+    const kept = VS_GO.map((sel) => document.querySelector(`#vsgoslot > ${sel}`));
+    kept.forEach((el) => el && el.remove());
+    const r = stage.apply(this, arguments);
+    vsGoPlace(kept);
+    return r;
+  };
+  vsDrawRight = function () {
+    const r = right.apply(this, arguments);
+    document.querySelectorAll("#vsgoslot > *").forEach((el) => el.remove());
+    vsGoPlace();
+    return r;
+  };
+}
 function vsScrollTo(list) {
   const on = list && list.querySelector(".on");
   if (on) list.scrollTop = on.offsetTop - list.offsetTop - list.clientHeight / 2 + on.offsetHeight / 2;
