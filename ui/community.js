@@ -28,7 +28,7 @@ function cmTab(d) {
   const s = big[0];
   a.classList.toggle("live", !!s);
   a.title = s ? `${big.length > 1 ? `${big.length} big streams are live — the biggest: ` : "Live now: "}${s.name} · ${s.title}` : "";
-  a.innerHTML = !s ? "Community" : `<span class="cmav" data-i="${esc([...s.name.replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("").toUpperCase())}">${s.avatar ? `<img src="${esc(s.avatar)}" onerror="this.remove()">` : ""}</span>${esc(s.name)}<i>${cmK(s.viewers)}${big.length > 1 ? ` · +${big.length - 1}` : ""}</i>`;
+  a.innerHTML = !s ? "Community" : `Community<span class="cmlive"><span class="cmav" data-i="${esc([...s.name.replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("").toUpperCase())}">${s.avatar ? `<img src="${esc(s.avatar)}" onerror="this.remove()">` : ""}</span><i>${cmK(s.viewers)}${big.length > 1 ? ` · +${big.length - 1}` : ""}</i></span>`;  // (the word stays: the page is more than streams; the mark stands by the icon)
 }
 // When the list was made: a plate that keeps counting while the page is open.
 function cmStamp(iso) {

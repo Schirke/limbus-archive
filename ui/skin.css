@@ -307,16 +307,13 @@ button.primary:disabled { filter: grayscale(.8); }
 /* the app's usual window is 1400 px: the picker gives the middle some room */
 @media (max-width: 1500px) { .vsw:not(:has(.vsarena)) { grid-template-columns: minmax(300px, 390px) minmax(0, 1fr) minmax(270px, 330px); gap: 12px; } .vsname b, .vsname .big { font-size: 34px; } }
 
-/* Community while a big stream is live: the streamer's picture stands in for the icon (red ring), the name for the
-   word, the viewers are a red plate by the picture */
-#nav #navcommunity.live::before { display: none; }
-#nav #navcommunity.live { color: #ff8a75; min-width: 104px; max-width: 132px; overflow: hidden; white-space: nowrap; font-size: 14px; letter-spacing: .08em; }
-#nav #navcommunity.live.active { color: var(--gold); }
-#navcommunity.live .cmav { width: 30px; height: 30px; border: 2px solid #ff3b24; box-shadow: 0 0 10px rgba(255, 59, 36, .8); transform: translateX(-18px); animation: cmpulse 1.6s ease-in-out infinite; }
-#navcommunity.live i { position: absolute; left: 50%; top: 13px; margin-left: 2px; padding: 1px 6px 0; font: 13px "LC Bebas", sans-serif; letter-spacing: .06em; font-style: normal; color: #fff; background: #b3160f;
-  clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 0 5px); }
+/* a big stream is live: Community keeps its icon and name; the streamer's picture in a red ring and the viewers
+   stand by the icon, as the lunacy does by Extraction's (who it is: in the hint) */
+#nav #navcommunity.live { display: flex; padding: 0 8px; gap: 2px; border: 0; background: none; color: var(--muted); min-width: 116px; }
+#nav #navcommunity.live:hover { color: var(--text); } #nav #navcommunity.live.active { color: var(--gold); }
+#nav #navcommunity.live::before { transform: translateX(-30px); }
+.cmlive { position: absolute; left: 50%; top: 12px; margin-left: -12px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.cmlive .cmav { width: 24px; height: 24px; border: 2px solid #ff3b24; box-shadow: 0 0 8px rgba(255, 59, 36, .8); animation: cmpulse 1.6s ease-in-out infinite; }
+#nav a.live .cmlive i { padding: 1px 5px 0; font: 13px "LC Bebas", sans-serif; letter-spacing: .06em; font-style: normal; color: #fff; background: #b3160f; clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 0 5px); }
 @keyframes cmpulse { 50% { box-shadow: 0 0 3px rgba(255, 59, 36, .5); } }
-#nav #navcommunity.live { min-width: 128px; max-width: 150px; background: none; overflow: visible; }
-#navcommunity.live .cmav { transform: translateX(-32px); }
-#navcommunity.live i { margin-left: -12px; white-space: nowrap; }
-#navcommunity.live .cmav { width: 28px; height: 28px; }
+#nav #navcommunity.live { min-width: 136px; } #nav #navcommunity.live::before { transform: translateX(-40px); } .cmlive { margin-left: -22px; }
