@@ -52,3 +52,68 @@ body.site #player { bottom: 58px; }
 .strows u { display: block; height: 100%; background: var(--gold); border-radius: 3px; }
 .strows b { text-align: right; font-weight: normal; } .strows em { text-align: right; font-style: normal; color: var(--muted); font-size: 12.5px; }
 @media (max-width: 520px) { .strows > div { grid-template-columns: minmax(80px, 110px) 1fr 38px; } .strows em { display: none; } }
+/* ---- the front page (site.js routes.home) ---- */
+.home { --hcut: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.home a { color: inherit; text-decoration: none; }
+.hhero { position: relative; margin: -22px -28px 0; min-height: 560px; display: flex; align-items: center; gap: 40px; padding: 40px 56px 56px; background: #0b0807; overflow: hidden; }
+.hart { position: absolute; inset: 0; background: 72% 24% / cover no-repeat; opacity: 0; transition: opacity 1.2s; }
+.hart.on { opacity: 1; }
+.hhero::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: linear-gradient(90deg, rgba(13, 10, 9, .97) 0, rgba(13, 10, 9, .86) 30%, rgba(13, 10, 9, .15) 62%, rgba(13, 10, 9, .5) 100%), linear-gradient(transparent 70%, var(--bg)); }
+.hsay, .hlast, .hwho { position: relative; z-index: 2; }
+.hsay { max-width: 640px; }
+.hkick { display: block; font: 14px "LC Bebas", sans-serif; letter-spacing: .24em; text-transform: uppercase; color: #ff4a3a; }
+.hkick.dim { color: var(--muted); }
+.hname { font: 112px/.86 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--text); margin: 10px 0 18px; }
+.hname b { color: var(--gold); font-weight: normal; }
+.hsay p { font-size: 18px; line-height: 1.45; color: #d8c7ad; max-width: 560px; margin: 0; }
+.hgo { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; align-items: center; }
+.hbtn, .hbig { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; font-family: "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.hbtn { min-height: 44px; padding: 0 14px; border: 12px solid transparent; border-image: var(--k-btn) 36 fill / 12px stretch; font-size: 19px; color: var(--cream) !important; }
+.hbtn:hover { border-image-source: var(--k-btn-on); color: var(--gold) !important; }
+.hbig { min-height: 62px; padding: 0 34px; border: 16px solid transparent; border-image: var(--k-glow) 30 fill / 16px stretch; font-size: 28px; color: #fff3d0 !important; text-shadow: 0 0 12px var(--hot); }
+.hbig:hover { filter: brightness(1.2); }
+.hlast { width: 400px; flex: none; margin-left: auto; border: 22px solid transparent; border-image: var(--k-frame) 44 fill / 22px stretch; }
+.hlast a { display: block; }
+.hlast a:hover .hday { color: var(--gold); }
+.hday { display: block; font: 54px/1 "LC Bebas", sans-serif; letter-spacing: .04em; font-weight: normal; color: var(--text); margin: 4px 0 2px; }
+.hday small { font-size: 26px; color: var(--muted); }
+.hlast .chips { margin-top: 8px; }
+.hprev { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.hwho { position: absolute; right: 56px; bottom: 26px; display: flex; align-items: flex-end; gap: 16px; text-align: right; }
+#hwho { cursor: pointer; text-shadow: 0 1px 6px #000, 0 0 2px #000; }
+#hwho small { display: block; font: 12px "LC Bebas", sans-serif; letter-spacing: .24em; text-transform: uppercase; color: var(--gold); }
+#hwho b { display: block; font: 22px/1.1 "LC Bebas", sans-serif; letter-spacing: .06em; text-transform: uppercase; font-weight: normal; }
+#hwho span { font-size: 13px; color: var(--cream); }
+#hwho:hover b { color: var(--gold); }
+.hdots { display: flex; gap: 6px; padding-bottom: 5px; }
+.hdots button { width: 22px; height: 6px; padding: 0; min-height: 0; border: 0; border-image: none; border-radius: 0; background: rgba(241, 227, 204, .35); cursor: pointer; }
+.hdots button.on { background: var(--gold); }
+.hsect { display: flex; align-items: center; gap: 16px; margin: 38px 0 16px; }
+.hsect h2 { margin: 0; font-size: 30px; line-height: 1; }
+.hsect::after { content: ""; flex: 1; height: 12px; background: var(--k-slant) left / 268px 100% no-repeat; opacity: .22; }
+.hsect a { order: 2; font: 15px "LC Bebas", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+.htiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.htile { display: block; background: #120d0b; border: 1px solid var(--line); clip-path: var(--hcut); transition: border-color .15s, transform .15s; }
+.htile:hover { border-color: var(--gold); transform: translateY(-3px); }
+.hpic { display: block; aspect-ratio: 640 / 358; background: top left / cover no-repeat; border-bottom: 1px solid var(--line); filter: saturate(.9); }
+.htile:hover .hpic { filter: none; }
+.htx { display: block; padding: 12px 16px 16px; }
+.htx b { display: flex; align-items: center; gap: 10px; font: 24px "LC Bebas", sans-serif; letter-spacing: .06em; text-transform: uppercase; font-weight: normal; color: var(--text); }
+.htx b i { width: 28px; height: 24px; flex: none; background: center / contain no-repeat; filter: sepia(1) saturate(6) hue-rotate(-8deg); }
+.htx span { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); }
+.hids { display: grid; grid-template-columns: repeat(8, 1fr); gap: 16px; }
+@media (max-width: 1500px) { .hids { grid-template-columns: repeat(4, 1fr); } .hname { font-size: 92px; } }
+@media (max-width: 1100px) {
+  .hhero { flex-direction: column; align-items: stretch; gap: 26px; padding: 30px 28px 84px; }
+  .hhero::before { background: linear-gradient(rgba(13, 10, 9, .8), rgba(13, 10, 9, .9)); }
+  .hlast { width: auto; margin: 0; }
+  .hwho { right: 28px; }
+  .htiles { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .hhero { margin: -22px -28px 0; padding: 22px 18px 84px; }
+  .hname { font-size: 64px; } .hsay p { font-size: 16px; }
+  .hbig { min-height: 50px; font-size: 22px; padding: 0 20px; }
+  .htiles { grid-template-columns: 1fr; } .hids { grid-template-columns: repeat(2, 1fr); }
+}

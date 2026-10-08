@@ -7,6 +7,86 @@
   const OPEN = new Set(SITE.open || ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "community", "support"]);
   // "?check": the app looking at its own site (limbusdm/sitecheck.py) — every page runs for real and, once it has
   // settled, leaves what it asked for in vain where the app reads it
+  // The front page, here only (the app opens on Patches: who has it knows where they are): what the site is in a
+  // line, the art of the newest Identities taking turns behind it, the latest patch, the sections and the newest
+  // Identities. Somebody sent the bare link lands here.
+  OPEN.add("home");
+  if (location.hash.length < 3) history.replaceState(null, "", "#/home");
+  document.querySelector("#top .brand").setAttribute("href", "#/home");
+  const HOME_TILES = [
+    ["patches", "patches", "Patches", "What every update changed: new units, highlights, texts, pictures, sounds.", "BottomMenu_1_11"],
+    ["db", "db", "Identities & E.G.O", "Skills, coins, passives and the full art of every unit.", "BottomMenu_1_10"],
+    ["enemies", "enemies", "Enemies", "Enemies and Abnormalities with their skills and their battle look.", "BottomMenu_1_12"],
+    ["anim", "anim", "Animations", "Spine models and skills played with the game's own effects.", "BottomMenu_1_9"],
+    ["stages", "stages", "Story map", "Every Canto's stages: who stands there and what waits.", "BottomMenu_1_11"],
+    ["games", "games", "Games", "Guessers and live matches with friends. Lunacy for the Extraction.", "Settings_3_20"],
+    ["teams", "teams", "Team builder", "Put a team together and share it as a link.", "BottomMenu_1_14"],
+    ["community", "community", "Community", "Who streams Limbus right now, channels worth a look.", "BottomMenu_1_13"],
+  ];
+  let homeTimer = 0;
+  // (a report's counts as its row has them, without the kinds that say little to a visitor: code, new paths, other)
+  const homeChips = (sum) => `<div class="chips">${SUMMARY_LABELS.filter(([k]) => sum && sum[k] && !/^(code|catalog_added|other)$/.test(k)).map(([k, l]) =>
+    `<span class="chip ${k === "leaks" || k === "foreign_only" ? "leak" : ""}"><b>${sum[k]}</b> ${l}</span>`).join("") || `<span class="chip">no content changes</span>`}</div>`;
+  routes.home = async () => {
+    const main = $("#main"), here = () => !!main.querySelector(".home");
+    clearInterval(homeTimer);
+    main.innerHTML = `<div class="home"><div class="hhero"></div></div>`;
+    try { await units(); } catch (e) { /* the page without the Identities then */ }
+    if (!here()) return;
+    const ids = typeof UNITS !== "undefined" && UNITS && UNITS.ids || [];
+    const byDate = [...ids].sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.id - a.id);
+    const newest = byDate.length ? byDate[0].date || "" : "";
+    // the banner: the Identities of the latest date (one banner brings several: they take turns)
+    const slides = byDate.filter((x) => x.date === newest && x.img && x.img.art).slice(0, 6);
+    const games = document.querySelectorAll("#subnav a[data-game]").length;
+    const day = (r) => { const m = /^build (\d\d\.\d\d)\.(\d{4}) · taken (.+)$/.exec(fmtSnap(r.new)); return m ? { d: m[1], y: m[2], taken: m[3] } : { d: fmtSnap(r.new), y: "", taken: "" }; };
+    const draw = () => {
+      if (!here()) return;
+      const reps = STATE && STATE.reports || [], last = reps[0], prev = reps[1];
+      const a = last && day(last), b = prev && day(prev);
+      main.querySelector(".home").innerHTML = `<div class="hhero"><i class="hart"></i><i class="hart"></i>
+          <div class="hsay"><span class="hkick">Unofficial Limbus Company fan archive</span>
+            <div class="hname">Limbus<br><b>Archive</b></div>
+            <p>Everything a patch brings, the day it lands: new Identities and E.G.O, enemies, battle animations, story stages and music${games ? ` — plus ${games} mini-games to play with friends` : ""}.</p>
+            <div class="hgo">${last ? `<a class="hbig" href="#/patches/${encodeURIComponent(last.id)}">Latest patch</a>` : ""}<a class="hbtn" href="#/db">Browse Identities</a><a class="hbtn" href="${repo}/releases/latest" target="_blank" rel="noopener">Get the app</a></div>
+          </div>
+          ${last ? `<div class="hlast"><a href="#/patches/${encodeURIComponent(last.id)}"><span class="hkick">Latest patch</span><b class="hday">${esc(a.d)}${a.y ? `<small>.${esc(a.y)}</small>` : ""}</b>${homeChips(last.summary)}</a>
+            ${prev ? `<a class="hprev" href="#/patches/${encodeURIComponent(prev.id)}"><span class="hkick dim">Before that · ${esc(b.d)}</span>${homeChips(prev.summary)}</a>` : ""}</div>` : ""}
+          ${slides.length ? `<div class="hwho"><a id="hwho"></a>${slides.length > 1 ? `<span class="hdots">${slides.map((x, i) => `<button data-i="${i}" title="${esc(x.title)}"></button>`).join("")}</span>` : ""}</div>` : ""}
+        </div>
+        <div class="hsect"><h2>What is inside</h2></div>
+        <div class="htiles">${HOME_TILES.filter(([name]) => OPEN.has(name)).map(([name, pic, title, text, icon]) => `<a class="htile" href="#/${name}">
+          <i class="hpic" style="background-image:url(/ui/site/home/${pic}.webp)"></i><span class="htx"><b><i style="background-image:url(/api/gacha_ui?n=MainUI_${icon})"></i>${esc(title)}</b><span>${esc(text)}</span></span></a>`).join("")}</div>
+        ${byDate.length ? `<div class="hsect"><h2>Newest Identities</h2><a href="#/db">All Identities ›</a></div>
+        <div class="hids">${byDate.slice(0, 8).map((x) => dbCard(x, newest)).join("")}</div>` : ""}`;
+      main.querySelectorAll(".hids [data-u]").forEach((c) => { c.onclick = () => openUnit(+c.dataset.u); });
+      if (!slides.length) return;
+      // two layers, one fading into the other: a picture is shown when it has arrived
+      const layers = main.querySelectorAll(".hart"), who = $("#hwho");
+      let at = -1, top = 0;
+      const show = (i) => {
+        const x = slides[i], url = imgFull(x.img.art), im = new Image();
+        im.onload = () => {
+          if (!who.isConnected) return;
+          top ^= 1; at = i;
+          layers[top].style.backgroundImage = `url("${url}")`;
+          layers[top].classList.add("on"); layers[top ^ 1].classList.remove("on");
+          who.innerHTML = `<small>New Identity</small><b>${esc(x.title)}</b><span>${esc(x.sinnerName)}</span>`;
+          who.onclick = () => openUnit(x.id);
+          main.querySelectorAll(".hdots button").forEach((d, n) => d.classList.toggle("on", n === i));
+        };
+        im.src = url;
+      };
+      const turn = () => {
+        clearInterval(homeTimer);
+        if (slides.length > 1) homeTimer = setInterval(() => { if (!who.isConnected) return clearInterval(homeTimer); if (!document.hidden) show((at + 1) % slides.length); }, 7000);
+      };
+      main.querySelectorAll(".hdots button").forEach((d) => { d.onclick = () => { show(+d.dataset.i); turn(); }; });
+      show(0); turn();
+    };
+    // (the reports come with the app's state: drawn once it is here)
+    if (typeof STATE !== "undefined" && STATE) draw(); else refresh.hook = () => { refresh.hook = null; draw(); };
+  };
   const checking = new URLSearchParams(location.search);
   if (checking.has("check")) {
     const all = Object.keys(routes);
@@ -31,7 +111,7 @@
   // to everybody, or (SITE.stats "key") to who opened it once as #/community/stats/<key>.
   if (!checking.has("check")) {
     const hit = (beat) => {
-      const [, name = "patches", , id] = location.hash.split("/");
+      const [, name = "home", , id] = location.hash.split("/");
       fetch("/stat/hit", { method: "POST", keepalive: true, body: JSON.stringify({ p: name, u: name === "db" && id ? id : "", beat: !!beat }) }).catch(() => {});
     };
     window.addEventListener("hashchange", () => hit());
@@ -46,7 +126,7 @@
     return !list.length ? `<div class="muted">Nothing yet.</div>` : `<div class="strows">${list.map(([n, c]) =>
       `<div><span>${esc(n)}</span><i><u style="width:${(c / top * 100).toFixed(1)}%"></u></i><b>${c}</b><em>${Math.round(c / total * 100)}%</em></div>`).join("")}</div>`;
   };
-  const stPage = (name) => { const a = document.querySelector(`#top a[href="#/${name}"], #subnav a[href="#/${name}"]`); return a ? a.textContent.trim() : name; };
+  const stPage = (name) => { if (name === "home") return "Home"; const a = document.querySelector(`#top a[href="#/${name}"], #subnav a[href="#/${name}"]`); return a ? a.textContent.trim() : name; };
   window.siteStats = async (args) => {
     if (args[1]) { try { localStorage.setItem("statskey", args[1]); } catch (e) { /* asked for each time then */ } location.replace("#/community/stats"); return; }
     const main = $("#main"), head = `${cmHead("Who opens Limbus Archive, from where, and what they look at.")}${cmTabs("stats")}`;
