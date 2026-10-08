@@ -172,13 +172,66 @@
   };
   window.addEventListener("hashchange", appBar);
   appBar();
+  // A copy of the site left open learns that a newer one was sent (the app's "Send to site"): the site's index is
+  // looked at every two minutes and a plate offers the notes and a reload — nothing reloads by itself, a game may be
+  // on. The notes are the app's own (the releases', limbusdm/site.py index); after the reload, or on the next visit,
+  // the ones since the version seen last pop up once, as in the app.
+  const mine = SITE.build || {};
+  const ver = (v) => String(v || "").split(".").map((x) => parseInt(x, 10) || 0);
+  const newer = (a, b) => { const x = ver(a), y = ver(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+  const kept = (store, k, v) => { try { return v === undefined ? store.getItem(k) || "" : store.setItem(k, v); } catch (e) { return ""; } };
+  const index = () => fetch("/d/index.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const reports = (idx) => (((idx.inline || {})["/api/state"] || {}).reports || []).length;
+  // the notes of the versions after `from` up to `to`
+  const notes = (idx, from, to) => {
+    const a = (idx.inline || {})["/api/appnotes?all=1"] || {};
+    return { version: to, page: a.page || `${repo}/releases`, notes: (a.notes || []).filter((n) => newer(n.tag, from) && !newer(n.tag, to)) };
+  };
+  let had = null;  // how many reports the site had when this page was opened
+  const fresh = async () => {
+    if (document.hidden || $("#sitenew")) return;
+    const idx = await index(), b = idx && idx.build;
+    if (!b) return;
+    if (had === null) had = reports(idx);
+    const app = newer(b.version, mine.version), patch = b.game !== mine.game || reports(idx) > had;
+    if (!app && !patch && b.ui === mine.ui || kept(sessionStorage, "site_new_off") === String(idx.stamp) || $("#sitenew")) return;
+    const a = notes(idx, mine.version, b.version);
+    const el = document.createElement("div");
+    el.id = "sitenew";
+    el.innerHTML = `<div><b>${app ? `Limbus Archive ${esc(b.version)} is out` : patch ? "A new patch is on the site" : "The site was updated"}</b><small>Reload the page to see it${app && patch ? ", and the new patch with it" : ""}.</small></div>
+      ${a.notes.length ? `<button class="toggle" data-a="notes">What's new</button>` : ""}<button class="primary" data-a="reload">Reload</button><button class="toggle" data-a="off" title="Later">✕</button>`;
+    el.onclick = (e) => {
+      const act = (e.target.closest("button") || {}).dataset;
+      if (!act) return;
+      if (act.a === "notes") { kept(localStorage, "site_seen", b.version); showAppNotes(a); }
+      if (act.a === "off") { kept(sessionStorage, "site_new_off", String(idx.stamp)); el.remove(); }
+      if (act.a === "reload") { if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage("reload"); location.reload(); }
+    };
+    document.body.appendChild(el);
+  };
+  if (!checking.has("check") && mine.version) {
+    index().then((idx) => {
+      if (!idx) return;
+      had = reports(idx);
+      const last = kept(localStorage, "site_seen");
+      // (not over an invite's page, and not before somebody's first visit)
+      if (last && newer(mine.version, last) && !$("#appbar") && $("#modal").classList.contains("hidden")) {
+        const a = notes(idx, last, mine.version);
+        if (a.notes.length) showAppNotes(a);
+      }
+      if (!$("#appbar") || !last) kept(localStorage, "site_seen", mine.version);
+    });
+    setInterval(fresh, 120e3);
+    document.addEventListener("visibilitychange", fresh);
+  }
   const foot = document.createElement("footer");
   foot.id = "sitefoot";
   foot.innerHTML = `<span>Unofficial fan site, not affiliated with ProjectMoon. Limbus Company and everything from it belong to ProjectMoon.</span>
     <span><a href="${repo}/releases/latest" target="_blank" rel="noopener">Desktop app for Windows: the latest release on GitHub</a></span>
     ${SITE.build ? `<span title="pages ${esc(SITE.build.ui)}">Built from Limbus Archive <b>${esc(SITE.build.version)}</b> · ${new Date(SITE.build.stamp * 1000).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}${SITE.build.game ? ` · game ${esc(fmtVer(SITE.build.game))}` : ""}</span>` : ""}
     ${SITE.contact ? `<span>Contact: <b>${esc(SITE.contact)}</b></span>` : ""}
-    <span><a href="#/support">Support · Credits</a></span>`;
+    <span><a href="#" id="sitenotes">What's new</a> · <a href="#/support">Support · Credits</a></span>`;
   document.body.appendChild(foot);
+  $("#sitenotes").onclick = (e) => { e.preventDefault(); showAppHistory(); };
   route();
 })();

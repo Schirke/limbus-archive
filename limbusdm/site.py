@@ -900,15 +900,22 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         state = {"game": {"ok": True, "dir": "", "catalog": ""}, "snapshots": used, "reports": reports, "job": None,
                  "watch": {"state": "", "last_check": ""}, "settings": {}, "data_dir": "", "update": None,
                  "version": __import__("limbusdm").__version__, "site": True}
+        # the app's own "what's new" (the releases' notes from GitHub), as they read now: the site shows them to who
+        # has an older copy open (ui/site/site.js). Not read this time -> the ones sent before stay
+        path = os.path.join(self.out, "d", "index.json")
+        from . import appnotes
+        notes = appnotes.history()
+        if not notes["notes"]:
+            notes = (_read_json(path).get("inline") or {}).get("/api/appnotes?all=1") or notes
         idx = {"v": VERSION, "stamp": int(time.time()), "build": build_info(self.svc), "manifests": [n for n in names if ms[n]],
                "tr": sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "tr")) if fn.endswith(".json.gz"))
                if os.path.isdir(os.path.join(self.out, "d", "tr")) else [],
                # answered from the net by the visitor's browser itself: the list of live streams, made on GitHub
                # and Bilibili's videos (scripts/bilibili.py writes them there: a browser can't ask Bilibili)
                "live": {"/api/community": __import__("limbusdm.community", fromlist=["URL"]).URL, **_bilibili_live()},
-               "inline": {"/api/state": state, "/api/marks": {}, "/api/appnotes": {}, "/api/mods_owned": [], "/api/patchnotes?new=1": {"id": None},
-                          "/api/game_cards": (ms.get("cards") or {}).get("cards") or {}}}
-        with open(os.path.join(self.out, "d", "index.json"), "w", encoding="utf-8") as f:
+               "inline": {"/api/state": state, "/api/marks": {}, "/api/appnotes": {}, "/api/appnotes?all=1": notes, "/api/mods_owned": [],
+                          "/api/patchnotes?new=1": {"id": None}, "/api/game_cards": (ms.get("cards") or {}).get("cards") or {}}}
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(idx, f, ensure_ascii=False)
 
     def remove_report(self, rid: str):
