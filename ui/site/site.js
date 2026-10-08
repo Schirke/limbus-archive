@@ -304,9 +304,9 @@
   }
   const foot = document.createElement("footer");
   foot.id = "sitefoot";
-  foot.innerHTML = `<span>Unofficial fan site, not affiliated with ProjectMoon. Limbus Company and everything from it belong to ProjectMoon.</span>
-    <span><a href="${repo}/releases/latest" target="_blank" rel="noopener">Desktop app for Windows: the latest release on GitHub</a></span>
-    ${SITE.build ? `<span title="pages ${esc(SITE.build.ui)}">Built from Limbus Archive <b>${esc(SITE.build.version)}</b> · ${new Date(SITE.build.stamp * 1000).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}${SITE.build.game ? ` · game ${esc(fmtVer(SITE.build.game))}` : ""}</span>` : ""}
+  foot.innerHTML = `<span>Unofficial fan site, not affiliated with ProjectMoon.<span class="fwide"> Limbus Company and everything from it belong to ProjectMoon.</span></span>
+    <span><a href="${repo}/releases/latest" target="_blank" rel="noopener">Desktop app<span class="fwide"> for Windows: the latest release on GitHub</span></a></span>
+    ${SITE.build ? `<span class="fwide" title="pages ${esc(SITE.build.ui)}">Built from Limbus Archive <b>${esc(SITE.build.version)}</b> · ${new Date(SITE.build.stamp * 1000).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}${SITE.build.game ? ` · game ${esc(fmtVer(SITE.build.game))}` : ""}</span>` : ""}
     ${SITE.contact ? `<span>Contact: <b>${esc(SITE.contact)}</b></span>` : ""}
     <span>Made with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></span>
     <span><a href="#" id="sitenotes">What's new</a> · <a href="#/support">Support · Credits</a></span>`;

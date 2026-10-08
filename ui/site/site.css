@@ -8,6 +8,8 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   border: 1px solid currentColor; border-radius: 4px; opacity: .8; vertical-align: 1px; }
 #sitefoot { display: flex; flex-wrap: wrap; gap: 6px 24px; justify-content: space-between; margin-top: 40px; padding: 14px 24px;
   border-top: 1px solid rgba(255, 255, 255, .08); font-size: 12px; opacity: .7; }
+/* a narrow screen: the short wording in a line or two, centred (the build and the long sentences are for wide screens) */
+@media (max-width: 900px) { #sitefoot { justify-content: center; text-align: center; gap: 2px 14px; margin-top: 24px; padding: 10px 12px; font-size: 11px; } #sitefoot .fwide { display: none; } }
 /* Animations on the site: Spine and battle animations — no tabs, links and exports that need the game's files */
 body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site #agif, body.site #enanim, body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
 body.site .fxapp { opacity: .4; cursor: default; }
