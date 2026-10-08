@@ -90,9 +90,24 @@ def build(svc) -> dict:
             m = re.fullmatch(r"battle_awaken_(\d+)_1", str(r.get("id") or ""))
             if m and r.get("dlg"):
                 lines.setdefault(m.group(1), [r["id"] if r["id"].lower() in idx else "", r["dlg"]])
-    out = {"banners": open_, "pan": pan, "lines": lines, "snd": snd, "v": VERSION}
+    out = {"banners": open_, "archive": _archive(svc, banners, now), "pan": pan, "lines": lines, "snd": snd, "v": VERSION}
     svc._gacha = (sid, out)
     return out
+
+
+def _archive(svc, banners: list[dict], now: str) -> list[dict]:
+    """The timed banners of this snapshot added to the ones kept from earlier snapshots (data/gacha/archive.json.gz:
+    the game's files describe only the banners of the day), newest first, each with "open"."""
+    rel = "gacha/archive.json.gz"
+    kept = svc.store.read_json(rel) or {}
+    old = json.dumps(kept, sort_keys=True)
+    for b in banners:
+        if b["pick"] and b["kind"] != "DEFAULT":
+            # (a banner's pictures leave the game with it: the paths of the time it was seen are the ones to keep)
+            kept[str(b["id"])] = {**b, **{k: v for k, v in (kept.get(str(b["id"])) or {}).items() if k in ("tile", "typo", "illust") and v and not b[k]}}
+    if json.dumps(kept, sort_keys=True) != old:
+        svc.store.write_json(rel, kept)
+    return [{**b, "open": bool(b["end"]) and b["end"] > now} for b in sorted(kept.values(), key=lambda b: -b["id"])]
 
 
 def ui_png(name: str, game_data: str, cache_dir: str) -> tuple[bytes, str] | None:

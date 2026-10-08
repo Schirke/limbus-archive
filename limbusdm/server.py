@@ -20,7 +20,7 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 # (304) while the snapshot and the app are the same ones (the ETag), so nothing is cut out of the bundles twice.
 KEEP = "max-age=3600"
 # Lists that only a new snapshot changes and that take a while to put together: answered from memory after the first time.
-PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha"}
+PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror"}
 
 
 def _etag(svc) -> str:
@@ -553,6 +553,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if not hit:
                     return self._json({"error": "no such line"}, 404)
                 return self._send(200, export_wav(*hit)[0], "audio/wav", {"Cache-Control": "max-age=86400"})
+            if p == "/api/mirror":  # Tools → Mirror Dungeon planner: theme packs, their gifts, fusions
+                return self._json(svc.mirror_db())
+            if p == "/api/history":  # Patches → Change history: what the kept reports changed in each card
+                return self._json({k: v for k, v in svc.history_db().items() if k != "stamp"})
             if p == "/api/gacha":  # Games → Extraction: the game's banners, pools, lines and sounds
                 from . import gacha
                 return self._json(gacha.build(svc))

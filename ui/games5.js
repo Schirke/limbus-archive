@@ -47,7 +47,7 @@ function gaFit() {
   box.style.height = 720 * k + "px";
 }
 
-routes.gamegacha = async () => {
+routes.gamegacha = async (args = []) => {
   gaStop();
   gmCrumb("gacha");
   $("#main").innerHTML = `<h1>Extraction</h1><div class="sub">Reading the game's files…</div>`;
@@ -63,11 +63,17 @@ routes.gamegacha = async () => {
       tint: ((u.seasons || {})[e.season == null ? "8000" : e.season > 9100 && e.season < 9200 ? "9100" : String(e.season)] || {}).color || "",
       thumb: giThumb(e.img.thumb), art: gaFull(e.img.art), line: ((g || {}).lines || {})[e.id] || ["", ""], pan: [] });
     // (a banner names units by number: the ones this snapshot has no picture of are left out of its groups)
-    const banners = ((g || {}).banners || []).map((b) => ({ ...b, pick: b.pick.filter((i) => units.has(i)), groups: b.groups.map((gr) => ({ ...gr, ids: gr.ids.filter((i) => units.has(i)) })).filter((gr) => gr.ids.length) }))
-      .filter((b) => b.groups.length);
-    ga.data = { banners, units, snd: (g || {}).snd || {} };
+    const fit = (b) => ({ ...b, pick: b.pick.filter((i) => units.has(i)), groups: b.groups.map((gr) => ({ ...gr, ids: gr.ids.filter((i) => units.has(i)) })).filter((gr) => gr.ids.length) });
+    const banners = ((g || {}).banners || []).map(fit).filter((b) => b.groups.length);
+    ga.data = { banners, archive: ((g || {}).archive || []).map(fit).filter((b) => b.groups.length), units, snd: (g || {}).snd || {} };
   }
   if (!location.hash.startsWith("#/gamegacha")) return;
+  // "#/gamegacha/<banner>" (Banner archive → Pull): an ended banner joins the tiles, and stays the picked one afterwards
+  for (const id of [+args[0], ga.st.banner]) {
+    const b = id && !ga.data.banners.some((x) => x.id === id) && ga.data.archive.find((x) => x.id === id);
+    if (b) ga.data.banners.unshift(b);
+  }
+  if (+args[0] && ga.data.banners.some((x) => x.id === +args[0])) { ga.st.banner = +args[0]; gaKeep(); }
   ga.banner = ga.data.banners.find((b) => b.id === ga.st.banner) || ga.data.banners[0];
   if (!ga.banner) { $("#main").innerHTML = `<h1>Extraction</h1><p class="muted">Nothing to pull yet: the game's files or a snapshot are missing.</p>`; return; }
   $("#main").innerHTML = `<h1>Extraction</h1>

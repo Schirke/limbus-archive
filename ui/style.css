@@ -1260,3 +1260,119 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .spbg-light .spf img, .spbg-light .spstage { background: #d9d9d9; }
 .spbg-green .spf img, .spbg-green .spstage { background: #00b140; }
 .spbg-checker .spf img, .spbg-checker .spstage { background: repeating-conic-gradient(#3a3a3a 0 25%, #262626 0 50%) 0 0 / 16px 16px; }
+
+/* ---- Tools → Mirror Dungeon planner (ui/mirror.js) ---- */
+.mpcols { display: grid; grid-template-columns: 360px 400px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1500px) { .mpcols { grid-template-columns: 300px 340px minmax(0, 1fr); } }
+.mpcard { margin: 0; }
+.mpcard #mpq { width: 100%; }
+.mpcap { font: 15px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--cream, #e9c9a0); }
+.mpcap small { font: 12.5px "Segoe UI", sans-serif; letter-spacing: 0; text-transform: none; color: var(--muted); margin-left: 6px; }
+.mpbar { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; margin: 2px 0 16px; }
+.mpbar .seg .toggle { margin-left: -1px; }
+.mpbar label { color: var(--muted); font-size: 12.5px; margin-right: 6px; }
+.mpchips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
+.mpchips .toggle { font-size: 13.5px; padding: 4px 9px 3px; }
+.mpchips .fz.on { color: #d6b8ff; border-color: #a77be0; background: linear-gradient(#4a2f73, #2a1a44); box-shadow: inset 0 0 10px rgba(167, 123, 224, .5); }
+.mpgifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; max-height: calc(100vh - 470px); min-height: 240px; overflow: auto; margin-top: 10px; padding-right: 4px; }
+.mpgift { position: relative; aspect-ratio: 1; background: #0c0807; border: 1px solid var(--line); cursor: pointer; }
+.mpgift img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.mpgift.ex { border-color: #8a6a2c; }
+.mpgift.on { border-color: var(--gold); background: linear-gradient(#6a4a1d, #3b2710); box-shadow: inset 0 0 10px rgba(255, 138, 0, .55); }
+.mpgift u { position: absolute; left: 4px; top: 1px; font-size: 11px; text-decoration: none; color: var(--gold); text-shadow: 0 0 3px #000; }
+.mpgift s { position: absolute; right: 2px; bottom: 2px; font: 11px "LC Bebas", sans-serif; text-decoration: none; background: #6b3fa0; color: #fff; padding: 0 4px; letter-spacing: .06em; }
+.mpgi { width: 34px; height: 34px; background: #0c0807; border: 1px solid var(--line); object-fit: contain; flex: none; display: inline-block; }
+.mpgi.only { border-color: var(--gold); }
+.mpgi.dim { opacity: .38; }
+.mpgi.luck { border-color: #ff8a00; opacity: .8; }
+.mpmini { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.mpck { display: grid; grid-template-columns: 34px 1fr; gap: 3px 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: center; }
+.mpck:last-child { border-bottom: 0; }
+.mpck b { display: block; line-height: 1.2; }
+.mpck small { color: var(--muted); }
+.mpck small.ok { color: #7cc66a; } .mpck small.gold { color: var(--gold); } .mpck small.bad { color: #ff6a55; } .mpck small.luck { color: #ff8a00; } .mpck small.fz { color: #c9a8f5; }
+.mpck .parts { grid-column: 2; display: grid; gap: 4px; margin-top: 4px; padding-left: 10px; border-left: 2px solid #6b3fa0; }
+.mpck .parts div { display: flex; gap: 8px; align-items: center; }
+.mpck .parts .mpgi { width: 26px; height: 26px; }
+.mprow { display: grid; grid-template-columns: 40px 50px minmax(230px, 1fr) minmax(0, auto) 18px; gap: 11px; align-items: center; padding: 6px 10px 6px 6px; margin-bottom: 4px; background: var(--panel); border: 1px solid var(--line); cursor: pointer; }
+.mprow:hover { border-color: #6b4a2c; }
+.mprow.hit { border-color: var(--gold); }
+.mprow.any { grid-template-columns: 40px 1fr 18px; opacity: .6; }
+.mprow.free { grid-template-columns: 40px 1fr; opacity: .6; cursor: default; }
+.mprow.free:hover { border-color: var(--line); }
+.mprow .n { height: 38px; display: grid; place-items: center; font: 22px "LC Bebas", sans-serif; color: var(--muted); background: var(--panel2); }
+.mprow .n.wide { font-size: 14px; letter-spacing: .04em; }
+.mprow.hit .n { background: linear-gradient(#6a4a1d, #3b2710); color: var(--gold); }
+.mprow .pk { width: 50px; height: 46px; object-fit: cover; object-position: 50% 62%; background: #0c0807; display: block; }
+.mprow .nm { font-weight: 600; }
+.mprow small { color: var(--muted); display: block; font-size: 11.5px; }
+.mprow small.lk { color: #ff8a00; }
+.mprow small.lk b { display: inline-grid; place-items: center; width: 15px; height: 15px; background: #ff8a00; color: #1a0f08; font-size: 12px; margin-right: 3px; }
+.mprow .pin { color: var(--gold); font: 11px "LC Bebas", sans-serif; letter-spacing: .1em; margin-left: 8px; }
+.mprow .arr { color: var(--muted); }
+.mplane { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0 10px 51px; }
+.mpbc { flex: none; width: 128px; background: var(--panel); border: 1px solid var(--line); padding: 6px; cursor: pointer; position: relative; opacity: .7; }
+.mpbc:hover { opacity: 1; border-color: #6b4a2c; }
+.mpbc.sel { opacity: 1; border-color: var(--gold); background: #2b2014; }
+.mpbc .pk { width: 100%; aspect-ratio: 16/10; object-fit: cover; object-position: 50% 62%; display: block; background: #0c0807; }
+.mpbc .pn { font-size: 12.5px; font-weight: 600; line-height: 1.2; margin: 5px 0 4px; height: 30px; overflow: hidden; }
+.mpbc .mpgi { width: 24px; height: 24px; }
+.mpbc .mpmini { justify-content: flex-start; }
+.mpbc .cnt { position: absolute; right: 6px; top: 6px; background: rgba(0, 0, 0, .7); padding: 0 5px; font-size: 11.5px; color: var(--gold); }
+.mpzone { display: flex; align-items: center; gap: 10px; margin: 16px 0 8px; }
+.mpzone:first-child { margin-top: 0; }
+.mpzone::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.mpwarn { color: #ff6a55; margin-top: 8px; }
+#mptip { position: fixed; z-index: 200; max-width: 340px; background: #0c0807; border: 1px solid var(--gold); padding: 9px 11px; pointer-events: none; display: none; font-size: 13px; }
+#mptip > b { color: var(--gold); display: block; }
+#mptip .fz { color: #c9a8f5; margin-top: 4px; } #mptip .gold { color: var(--gold); margin-top: 4px; }
+
+/* ---- Patches → Change history (ui/history.js) ---- */
+.hvcols { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+.hvlist { margin: 0; max-height: calc(100vh - 250px); overflow: auto; }
+.hvlist #hvq { width: 100%; margin-top: 8px; }
+.hvpatches { display: flex; flex-wrap: wrap; gap: 4px; }
+.hvcap { font: 15px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--cream, #e9c9a0); margin: 14px 0 6px; }
+.hvlist a { display: flex; gap: 10px; align-items: center; padding: 6px; cursor: pointer; border: 1px solid transparent; color: var(--text); text-decoration: none; }
+.hvlist a:hover { border-color: var(--line); }
+.hvlist a.on { background: var(--panel2); border-color: var(--gold); }
+.hvlist a img, .hvlist a i, .hvhead > img, .hvhead > i { width: 48px; height: 48px; object-fit: contain; background: #0c0807; flex: none; }
+.hvlist small { color: var(--muted); display: block; }
+.hvhead { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.hvhead > img, .hvhead > i { width: 84px; height: 84px; }
+.hvhead h2 { margin: 0; }
+.hvhead .row { margin-left: auto; }
+.hvtl { border-left: 2px solid var(--line); margin-left: 8px; padding-left: 22px; }
+.hvtl > section { position: relative; margin-bottom: 22px; }
+.hvtl > section::before { content: ""; position: absolute; left: -29px; top: 5px; width: 12px; height: 12px; background: var(--gold); transform: rotate(45deg); }
+.hvtl > section.old::before { background: var(--line); }
+.hvtl h3 { margin: 0 0 2px; font: 20px "LC Bebas", sans-serif; letter-spacing: .08em; }
+.hvtl h3 small { font: 13px "Segoe UI", sans-serif; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
+.hvrow { display: grid; grid-template-columns: 44px 1fr; gap: 12px; padding: 10px; background: var(--panel); border: 1px solid var(--line); margin-bottom: 8px; }
+.hvrow.bare { grid-template-columns: 1fr; }
+.hvrow > img, .hvrow > i { width: 44px; height: 44px; object-fit: contain; background: #0c0807; }
+.hvrow > div > b { font-size: 15px; }
+.hvtag { font-size: 11px; padding: 1px 7px; margin-left: 8px; border: 1px solid var(--line); color: var(--muted); }
+.hvtag.new { color: #7cc66a; border-color: #7cc66a; }
+.hvnums { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.hvnums span { background: var(--panel2); padding: 2px 9px; }
+.hvnums .dn { color: #ff6a55; } .hvnums .up { color: #7cc66a; }
+.hvtxt { margin-top: 7px; line-height: 1.55; }
+.hvtxt em { font-style: normal; color: var(--muted); font-size: 12px; display: block; }
+.hvtxt del { background: #5a1f1a; color: #ffb9ae; margin-right: 2px; }
+.hvtxt ins { background: #22451f; color: #c5f0b8; text-decoration: none; }
+.hvba { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hvba > div { background: #0c0807; padding: 7px 9px; }
+.hvtech { margin-top: 7px; font: 12px/1.5 Consolas, monospace; color: var(--muted); overflow-wrap: anywhere; }
+.hvtech span { color: var(--text); }
+
+/* ---- Extraction → Banner archive (ui/banners.js) ---- */
+.bngrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.bncard { margin: 0; display: flex; flex-direction: column; padding: 0; }
+.bncard > img, .bncard > i { width: 100%; display: block; aspect-ratio: 697/314; object-fit: cover; background: #0c0807; }
+.bncard .bd { padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.bncard small { color: var(--muted); }
+.bncard .ft { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; }
+.bncard .ft small { margin-right: auto; }
+.bnlive { color: #7cc66a; font-size: 11px; border: 1px solid #7cc66a; padding: 0 6px; letter-spacing: .08em; }
+.bnended { color: var(--muted); font-size: 11px; border: 1px solid var(--line); padding: 0 6px; letter-spacing: .08em; }

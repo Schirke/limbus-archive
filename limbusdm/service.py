@@ -946,6 +946,60 @@ class Service:
         self._stages = (sid, db)
         return db
 
+    def mirror_db(self) -> dict:
+        """The Mirror Dungeon planner's lists of the latest snapshot (see mirror.build): packs, gifts, fusions."""
+        from . import mirror
+        sid = self.latest_snapshot_id()
+        if not sid:
+            return {"packs": [], "gifts": {}, "fus": {}, "modes": {}}
+        cached = getattr(self, "_mirror", None)
+        if cached and cached[0] == sid:
+            return cached[1]
+        rel = f"mirror_db/{sid}.json.gz"
+        db = self.store.read_json(rel)
+        if db is None or db.get("v") != mirror.VERSION:
+            gifts, cards = {}, {}
+            con = sqlite3.connect(self.ensure_browse())
+            try:
+                for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Sprite/EgoGiftIcon/%'"):
+                    gifts.setdefault(name, c)
+                for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Everydungeon/card_pack/%'"):
+                    cards.setdefault(name, c)
+            finally:
+                con.close()
+            loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
+            db = mirror.build(self.static_tables(["mirrordungeon-theme-floor", "mirror-dungeon-common-data", "ego-gift", "ego-gift-mirrordungeon",
+                                                  "mirrordungeon"]), loc, gifts, cards)
+            db["v"] = mirror.VERSION
+            self.store.write_json(rel, db)
+        self._mirror = (sid, db)
+        return db
+
+    def history_db(self) -> dict:
+        """What each kept report changed in the cards (see history.build). Made anew when a report comes or goes."""
+        from . import history
+        reports = self.reports()
+        stamp = [history.VERSION, self.latest_snapshot_id(), [r["id"] for r in reports]]
+        cached = getattr(self, "_history", None)
+        if cached and cached[0] == stamp:
+            return cached[1]
+        rel = "history/changes.json.gz"
+        db = self.store.read_json(rel)
+        if db is None or db.get("stamp") != stamp:
+            icons = {}
+            if self.ensure_browse():
+                con = sqlite3.connect(self.ensure_browse())
+                try:  # (newer skills' pictures sit in subfolders: SkillIcon/Ep10_3/151701.png)
+                    for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Sprite/SkillIcon/%'"):
+                        icons.setdefault(name, c)
+                finally:
+                    con.close()
+            db = history.build(reports, lambda rid: history.load_report(self.data_dir, rid), self.unit_db(), self.enemy_db(), icons)
+            db["stamp"] = stamp
+            self.store.write_json(rel, db)
+        self._history = (stamp, db)
+        return db
+
     def enemy_db(self) -> dict:
         """The enemy handbook of the latest snapshot (see enemies.build), with each entry's portrait path and
         whether the skill renderer has its battle prefab."""

@@ -46,6 +46,11 @@ update notices from Steam, each next to its patch in your archive.
 
 <p align="center"><a href="docs/patches.webp"><img src="docs/patches.webp" width="760" alt="Patch reports"></a></p>
 
+**Change history** turns the same reports around: pick an Identity, an E.G.O, an enemy or a status and see what each
+patch changed in it — numbers, and the wording with the old text struck out and the new one marked.
+
+<p align="center"><a href="docs/changes.webp"><img src="docs/changes.webp" width="760" alt="Change history"></a></p>
+
 ### Identities & E.G.O
 
 A database with skills, passives and stats for every uptie, filters by sin, damage type, status, season
@@ -144,6 +149,15 @@ show up as a recommended tier list; the app re-reads the guide once a week.
 
 <p align="center"><a href="docs/team-builder.webp"><img src="docs/team-builder.webp" width="760" alt="Team builder"></a></p>
 
+### Mirror Dungeon planner
+
+Pick the E.G.O gifts you want and get a route: which theme packs to take and on which floors. Some gifts drop only in
+certain packs and some packs appear only on certain floors — the planner seats the packs so that as much of the build
+as possible is reachable, adds the ingredients of fusions by itself and warns about what needs luck. Normal and Hard,
+5, 10 or 15 floors; click a floor to see the other packs worth taking there and pin one.
+
+<p align="center"><a href="docs/mirror.webp"><img src="docs/mirror.webp" width="760" alt="Mirror Dungeon planner"></a></p>
+
 ### Music player
 
 A small player in the corner (folded into a square with a note until you click it) with the game's own soundtrack, read from its sound files: battle themes first,
@@ -199,6 +213,13 @@ a room for two to eight under nicknames, everybody at once: a **race** (each at 
 achievements — and Extraction spends it.
 
 <p align="center"><a href="docs/games.webp"><img src="docs/games.webp" width="760" alt="Games"></a></p>
+
+### Banner archive
+
+The banners the app has seen, with the game's own pools and chances. The game describes only the banners of the day, so
+the app keeps each new one and the list grows patch by patch. **Pull** opens any of them in Extraction, ended ones too.
+
+<p align="center"><a href="docs/banners.webp"><img src="docs/banners.webp" width="760" alt="Banner archive"></a></p>
 
 ### Community
 
