@@ -301,3 +301,5 @@ button.primary:disabled { filter: grayscale(.8); }
 .vsw:has(.vsarena) .vsright > details { grid-column: 3; }
 .vstabbox > section > .row:has(> .vsh) { display: none; }
 .vstabbox .vsbig { margin-bottom: 8px; }
+.vsarena .vsteamside > .row { flex-wrap: wrap; gap: 5px; } .vsarena .vsteamside .vsh { flex: 1 0 100%; }
+.vsarena .vsteamside.right > .row { justify-content: flex-start; }

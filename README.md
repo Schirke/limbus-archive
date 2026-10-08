@@ -19,6 +19,9 @@ A Windows app for poking around Limbus Company's game files: patch datamining, a
 database, an enemy handbook, battle animations and skills rendered with the game's own effects,
 Versus fights, every asset of the game, a team builder and the soundtrack.
 
+The app wears the game's own look: its frames, plates, menu icons and fonts are read from your install
+when the app runs (none of them is in this repository).
+
 ## Website
 
 **[limbus.shpep.workers.dev](https://limbus.shpep.workers.dev)** is a copy of the app that runs in a browser:
@@ -101,7 +104,15 @@ Filter by buff / debuff and by who has it.
 Any Identity, E.G.O or enemy against any other on one stage: one takes the other's skill with its
 own idle and hit poses, or both clash first (their clash animations at once, as many rounds as you
 like) and the winner's skill follows. Optional HP and damage numbers, a death finale, an intro card
-and WIN, an E.G.O cut-in and battle music.
+and WIN, an E.G.O cut-in, buffs and debuffs with their effects, and battle music. Stage, music and
+options are one panel with tabs; a stage's picture is drawn by itself as you scroll the list.
+**Render the fight** makes the video, **Live** next to it plays the fight at once.
+
+**Auto Battler** (a tab of Versus): teams of up to six stand on the stage face to face and fight by
+autobattler rules: roles, cooldowns, targets. One fighter against two or more is a boss, and its
+strength is set to be fair against the team.
+
+<p align="center"><a href="docs/autobattler.webp"><img src="docs/autobattler.webp" width="760" alt="Auto Battler"></a></p>
 
 **Versus Live** plays such a fight as it happens, in the renderer's own window: press START for two random
 fighters on a random stage (or the Versus page's picks), with the fight's sounds, music, intro card and WIN.
@@ -130,7 +141,7 @@ show up as a recommended tier list; the app re-reads the guide once a week.
 
 ### Music player
 
-A small player in the corner with the game's own soundtrack, read from its sound files: battle themes first,
+A small player in the corner (folded into a square with a note until you click it) with the game's own soundtrack, read from its sound files: battle themes first,
 under their official names, with the Canto and the boss a theme belongs to. Search by track, Canto or enemy.
 
 <p align="center"><a href="docs/music.webp"><img src="docs/music.webp" width="420" alt="Music player"></a></p>
