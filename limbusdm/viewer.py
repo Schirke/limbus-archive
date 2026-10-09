@@ -1181,15 +1181,22 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     scripted = None
     if pace:
         from . import versus_engine as E
-        fa = E.fighter(svc, left, spec.get("lname") or "", bool(spec.get("lskills")))
-        fb = E.fighter(svc, right, spec.get("rname") or "", bool(spec.get("rskills")))
-        if not fa["anims"] and not fb["anims"]:
-            raise ValueError("neither of them has clash animations")
-        fight = E.simulate(fa, fb, int(spec.get("seed") or 0),
-                           dict(rounds=max(1, min(MAX_ROUNDS, int(spec.get("rounds") or 1))), defend=spec.get("defend"),
-                                counter=spec.get("counter"), bursts=spec.get("bursts"), burstMax=burst_max(spec), kbscale=kb_scale(spec),
-                                winner=None if w == 2 else w, flow="" if spec.get("pace") or loop else "series",
-                                randskill=spec.get("randskill"), finals=(spec.get("skill"), spec.get("rskill"))))
+        if spec.get("mirror"):
+            # (Versus → Mirror: the run's boss fight — real HP carried over, the build's gifts, statuses; the same
+            # fight the page's "Result now" gets, see versus_mirror.fight_of)
+            from . import versus_mirror as M
+            fight = M.fight_of(svc, spec["mirror"])
+            fa, fb = fight["fighters"]
+        else:
+            fa = E.fighter(svc, left, spec.get("lname") or "", bool(spec.get("lskills")))
+            fb = E.fighter(svc, right, spec.get("rname") or "", bool(spec.get("rskills")))
+            if not fa["anims"] and not fb["anims"]:
+                raise ValueError("neither of them has clash animations")
+            fight = E.simulate(fa, fb, int(spec.get("seed") or 0),
+                               dict(rounds=max(1, min(MAX_ROUNDS, int(spec.get("rounds") or 1))), defend=spec.get("defend"),
+                                    counter=spec.get("counter"), bursts=spec.get("bursts"), burstMax=burst_max(spec), kbscale=kb_scale(spec),
+                                    winner=None if w == 2 else w, flow="" if spec.get("pace") or loop else "series",
+                                    randskill=spec.get("randskill"), finals=(spec.get("skill"), spec.get("rskill"))))
         scripted = E.script(fight, fa, fb, spec)
         winner = fight["winner"]
         if loop:
@@ -1251,8 +1258,25 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
             e["events"] = dict(ev, sounds=list(ev["sounds"]) + add)
     job.update(win=bool(spec.get("intro")), seed=int(spec.get("seed") or 0), winner=winner,
                finalHits=sum(len(t["events"].get("hits") or []) for t in final))
+    if any("fw" in t for t in final):  # (Mirror: the killing skill drains the HP by its coins' damage, see versus_engine.script)
+        job["finalWeighted"] = True
     job["hud"] = [fighter_hud(svc, c, n, f and f["hp"]) for c, n, f in
                   ((left, spec.get("lname") or "", fa if pace else None), (right, spec.get("rname") or "", fb if pace else None))]
+    if spec.get("mirror"):
+        # (Mirror) real HP: the bars count the fight's own numbers, the player starts with what the last boss left;
+        # the statuses' icons (each part's `st` names them by their number here)
+        from . import versus_mirror as M
+        from .uiicons import icon_png
+        for h, m in zip(job["hud"], fight["hpMax"]):
+            h["hpMax"] = m
+        hp0 = spec["mirror"].get("hp")
+        job["hpStart"] = [1.0 if hp0 is None else max(0.01, min(1.0, hp0 / fight["hpMax"][0])), 1.0]
+        icons = []
+        for s_ in M.ST_NAME:  # (in versus_engine.script's ST order)
+            icon_png(f"st_{M.ST_KW[s_]}", svc.game.data, svc.ui_cache_dir())
+            p_ = os.path.join(svc.ui_cache_dir(), f"st_{M.ST_KW[s_]}.png")
+            icons.append(p_ if os.path.isfile(p_) else "")
+        job["stIcons"] = icons
     from . import battle_ui  # (the game's own HUD pieces for the player: ViewerHud.cs)
     job["hudUi"] = battle_ui.folder(svc)
     m = next((x for x in battle_maps(svc) if x["name"] == spec.get("map")), None) if spec.get("map") else None

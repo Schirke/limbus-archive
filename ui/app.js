@@ -194,8 +194,9 @@ setInterval(refresh, 2000);
 // were read from the one before, or from nothing on the first run, so they are read again.
 function newSnapshot() {
   anim.data = null; UNITS = null; ENEMIES = null; STAGES = null; MIRROR = null; HISTORY = null; ga.data = null; gi.data = null; vs.maps = vs.bgm = null;
+  if (typeof vm !== "undefined") vm.cat = null;
   if (!$("#player")) muStart();
-  if (["anim", "db", "enemies", "stages", "teams", "versus", "autobattler", "mirror", "changes", "banners"].includes(location.hash.split("/")[1])) route();
+  if (["anim", "db", "enemies", "stages", "teams", "versus", "autobattler", "mirror", "vsmirror", "changes", "banners"].includes(location.hash.split("/")[1])) route();
 }
 
 // ------------------------------------------------------------------ router
@@ -2894,8 +2895,9 @@ function vsGoPlace(kept) {
     return r;
   };
   vsDrawRight = function () {
-    const r = right.apply(this, arguments);
+    // (the old Render / Live go first: else the new ones' handlers are bound to these, found first by id)
     document.querySelectorAll("#vsgoslot > *").forEach((el) => el.remove());
+    const r = right.apply(this, arguments);
     vsGoPlace();
     vsTabs();
     return r;

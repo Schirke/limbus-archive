@@ -577,6 +577,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._send(200, export_wav(*hit)[0], "audio/wav", {"Cache-Control": "max-age=86400"})
             if p == "/api/mirror":  # Tools → Mirror Dungeon planner: theme packs, their gifts, fusions
                 return self._json(svc.mirror_db())
+            if p == "/api/mirror/catalog":  # Versus → Mirror (limbusdm/versus_mirror.py): gifts with our effects, packs, rules
+                from . import versus_mirror as M
+                return self._json(M.page_catalog(svc))
             if p == "/api/history":  # Patches → Change history: what the kept reports changed in each card
                 return self._json({k: v for k, v in svc.history_db().items() if k != "stamp"})
             if p == "/api/gacha":  # Games → Extraction: the game's banners, pools, lines and sounds
@@ -778,6 +781,14 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     return self._json({"mods": mods.list_mods(svc, cid)})
                 mods.save(svc, cid, b["name"], b)
                 return self._json({"mods": mods.list_mods(svc, cid)})
+            if p == "/api/mirror/act":  # Versus → Mirror: one action on the page's run ({"run", "act", "arg"}) -> {"run", "fight"?}
+                from . import versus_mirror as M
+                try:
+                    return self._json(M.act(svc, b.get("run"), b["act"], b.get("arg")))
+                except KeyError as e:  # (something in the page's run the catalog doesn't have)
+                    return self._json({"error": f"this run has something the game data doesn't know ({e}) — start a new run"}, 400)
+                except (ValueError, StopIteration) as e:
+                    return self._json({"error": str(e) or "that can't be done now"}, 400)
             if p == "/api/versus":
                 spec = {k: b.get(k) for k in ("left", "right", "skill", "mode", "rounds", "winner", "rskill")}
                 spec.update({k: b[k] for k in ("map", "speed", "pause", "rspeed", "rpause", "lskills", "rskills", "defend", "counter",
@@ -786,6 +797,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                                         "bars", "uisfx", "pace", "ramp", "throw", "punch", "fade", "loop", "flash", "randskill", "kbscale", "camFollow", "deck", "notes",
                                         "buff", "buffboth", "buffmany", "buffown", "buffshort",
                                         "debuff", "debuffboth", "debuffmany", "debuffown", "debuffshort") if b.get(k) is not None})
+                if b.get("mirror"):  # (Versus → Mirror: the run's boss fight, the engine's MirrorFight; see versus_job)
+                    spec.update(mirror=b["mirror"], left=b["mirror"]["id"], right=b["mirror"]["boss"])
                 spec["left"], spec["right"] = _fx_id(spec["left"]), _fx_id(spec["right"])
                 if b.get("team"):  # (a team fight: the line-ups as comma-joined ids; versus_job -> versus_team_job)
                     spec.update(team=True, **{k: b[k] for k in ("lefts", "rights", "flow", "lanes", "allAtOnce", "bossPower", "rules", "pairs", "lnames", "rnames") if b.get(k)})

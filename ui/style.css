@@ -1357,3 +1357,89 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .bncard .ft small { margin-right: auto; }
 .bnlive { color: #7cc66a; font-size: 11px; border: 1px solid #7cc66a; padding: 0 6px; letter-spacing: .08em; }
 .bnended { color: var(--muted); font-size: 11px; border: 1px solid var(--line); padding: 0 6px; letter-spacing: .08em; }
+
+/* ---- Versus → Mirror (vsmirror.js): a short PvE run, the mockup's screens in the app's skin ---- */
+.vm { max-width: 1300px; display: flex; flex-direction: column; gap: 16px; }
+.vm h1 { margin: 0; }
+.vmkick { font: 14px "LC Bebas", sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #ff4b3a; }
+.vmkick.good { color: #8fd18a; }
+.vmsteps { display: flex; flex-wrap: wrap; gap: 4px; }
+.vmsteps span { padding: 2px 10px; font: 13px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); background: #140e0b; border: 1px solid var(--line); }
+.vmsteps .done { color: var(--cream); }
+.vmsteps .on { color: #1a0f08; background: var(--cream); border-color: var(--cream); }
+.vmrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.vmcenter { text-align: center; justify-content: center; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.vmrow.vmcenter { flex-direction: row; }
+.vmhelp > div { margin: 4px 0; }
+.vmgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.vmcard { display: flex; flex-direction: column; gap: 10px; }
+.vmcard > button { min-height: 44px; }
+.vmstage { position: relative; height: 230px; display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+  background: radial-gradient(circle at 50% 70%, rgba(179, 22, 15, .3), transparent 62%), #0a0605; border: 1px solid var(--line); }
+.vmstage img { max-height: 100%; max-width: 100%; object-fit: contain; }
+.vmstage.small { height: 150px; }
+.vmstage .idp { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.vmfighter img.idp { object-fit: cover; object-position: 50% 30%; }
+.vmstage .fig { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
+.vmfighter img.fig { object-fit: contain; object-position: 50% 100%; }
+.vmfought img.fig { object-fit: contain; }
+.vmbosses { position: absolute; inset: 0; display: flex; justify-content: center; align-items: flex-end; gap: 2px; pointer-events: none; }
+.vmstage .vmbosses .fig { flex: 0 1 auto; min-width: 0; width: auto; max-width: 60%; height: 100%; }
+.vmbosses img { width: 74px; height: 74px; object-fit: contain; object-position: 50% 100%; filter: drop-shadow(0 0 6px #000); }
+.vmsteps em { margin-left: 10px; align-self: center; font: 13px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; font-style: normal; color: var(--muted); }
+.vmstats .gold b, .vmstats .gold span { color: var(--gold); }
+.vmstats .gold b { display: inline-flex; align-items: center; gap: 6px; }
+.vmcost { margin-left: 4px; font-weight: bold; }
+.vm .seg { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
+.vmstage.vmpack { align-items: center; }
+.vmtag { position: absolute; left: 0; top: 10px; padding: 3px 22px 2px 10px; background: var(--cream); color: #1a0f08; font: 15px "LC Bebas", sans-serif; letter-spacing: .1em;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+.vmsmall { font: 13px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.vmname { font: 24px/1.05 "LC Bebas", sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+.vmlbl { font: 14px "LC Bebas", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.vmkws { display: flex; flex-wrap: wrap; gap: 6px; }
+.vmkw { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px 1px 3px; font: 15px "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase;
+  background: #1f1612; border: 1px solid #5d3f25; color: var(--cream); }
+.vmeff { font-size: 13px; line-height: 1.4; }
+.vmcost { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); }
+.vmgi { position: relative; width: 72px; height: 72px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle, rgba(248, 180, 0, .12), transparent 70%), #0a0605; border: 1px solid #5d3f25; }
+.vmgi img { max-width: 88%; max-height: 88%; }
+.vmgi b { position: absolute; left: 4px; top: 0; font: 16px "LC Bebas", sans-serif; color: var(--gold); }
+.vmgi i { position: absolute; right: 4px; top: 0; font: bold 14px sans-serif; font-style: normal; color: #8fd18a; }
+.vmgi span { position: absolute; right: 2px; bottom: 0; }
+.vmstats { display: flex; flex-wrap: wrap; gap: 8px 32px; align-items: center; }
+.vmstats > div { display: flex; flex-direction: column; }
+.vmstats b { font: 30px/1 "LC Bebas", sans-serif; color: var(--text); }
+.vmstats b small { font-size: 18px; color: var(--muted); }
+.vmstats span { font: 12px "LC Bebas", sans-serif; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.vmshop { display: grid; grid-template-columns: 250px minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.vmshop2 { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+.vmside { display: flex; flex-direction: column; gap: 8px; }
+.vmmid, .vmright { display: flex; flex-direction: column; gap: 12px; }
+.vmright .card { display: flex; flex-direction: column; gap: 8px; }
+.vmbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vmbar .grow { flex: 1; }
+.vmstock { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.vmitem { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.vmitem .vmeff { min-height: 54px; }
+.vmgname { font: 17px/1.1 "LC Bebas", sans-serif; letter-spacing: .04em; }
+.vmowned { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.vmown { padding: 0; border: 2px solid transparent; background: none; cursor: pointer; }
+.vmown.on { border-color: var(--gold); }
+.vmseldesc { flex-basis: 100%; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.vmfought { display: flex; gap: 10px; align-items: center; }
+.vmfought img { width: 44px; height: 44px; object-fit: cover; background: #0a0605; border: 1px solid var(--line); }
+.vminfo { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; padding: 8px; background: #0a0605; border: 1px solid var(--line); font-size: 13px; }
+.vminfo span { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.vmvs { display: flex; align-items: center; justify-content: center; gap: 24px; flex-wrap: wrap; }
+.vmfighter { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.vmfighter img { width: 200px; height: 200px; object-fit: contain; background: radial-gradient(circle at 50% 70%, rgba(179, 22, 15, .3), transparent 62%), #0a0605; border: 1px solid var(--line); }
+.vmversus { font: 54px "LC Bebas", sans-serif; color: var(--gold); text-shadow: 0 0 14px var(--hot); }
+.vmhp b { font: 22px "LC Bebas", sans-serif; color: #ff5a46; }
+.vmside2 { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 16px; align-items: start; }
+.vmfight { display: flex; flex-direction: column; gap: 8px; }
+.vmtable { display: grid; grid-template-columns: auto auto auto; gap: 4px 24px; justify-content: start; font-size: 14px; }
+.vmrew { align-items: center; text-align: center; }
+.vmrew > button { align-self: stretch; }
+@media (max-width: 1000px) { .vmshop, .vmshop2, .vmside2 { grid-template-columns: 1fr; } }

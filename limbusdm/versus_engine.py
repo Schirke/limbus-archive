@@ -655,6 +655,8 @@ class Fight:
             if how == "Counter":
                 self.counter(1 - w, w)  # (it took the blow and strikes back)
                 runs = 1 - w
+                if self.hp[w] <= 0:
+                    break  # (a counter that kills: only a Mirror fight's, versus_mirror.MirrorFight.counter)
         # the finale: if nobody fell, whoever is lower (by HP share) falls to the other one's skill
         if self.hp[0] > 0 and self.hp[1] > 0:
             w = 0 if self.hp[0] / self.max[0] >= self.hp[1] / self.max[1] else 1
@@ -713,7 +715,66 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
             e.update(place=place, runs=runs)
             place = None
         return e
+    ST = ("bleed", "burn", "rupture", "poise", "tremor")
+    carry, start = None, 0
+
+    def flush():
+        # (a Mirror fight, versus_mirror.MirrorFight: what the step did besides its hits — HP healed / lost to statuses,
+        # as shares of each one's max HP, and both sides' statuses after it — on the last part played so far; its
+        # Rupture procs on its own parts, the k-th on its k-th part (its coins), the rest on its last)
+        if carry is None or not out:
+            return
+        e, mx = out[-1], fight["hpMax"]
+        if carry.get("sfx") and out[start:]:
+            # (a step's own sounds, e.g. a Mirror fight's Tremor Burst: at its first part's first hit)
+            t0 = out[start]
+            ev = t0["events"]
+            at = min((h["t"] for h in ev.get("hits") or []), default=0.0)
+            t0["events"] = dict(ev, sounds=list(ev.get("sounds") or []) + [{"t": round(at, 4), "name": n} for n in carry["sfx"]])
+        if carry.get("coinDmg") and out[start:]:
+            # (a Mirror landing: each coin's damage on its own animation(s) — the k-th of P parts with hits belongs to
+            # coin k*C/P — split among them by their hits; a one-hit coin keeps its whole blow, a many-hit one is split
+            # up, not the skill's damage spread evenly over every hit. The killing skill: each part's share of what is
+            # left (`fw`), the player drains the HP by it)
+            own = out[start:]
+            cd, mx = carry["coinDmg"], fight["hpMax"][1 - carry["who"]] if carry["who"] in (0, 1) else 1
+            hp_parts = [t for t in own if t["events"].get("hits")]
+            P, C = len(hp_parts), len(cd)
+            nh = {id(t): len(t["events"]["hits"]) for t in hp_parts}
+            got = {id(t): 0.0 for t in hp_parts}
+            if P >= C:  # (as many animations as coins or more: each animation belongs to one coin, split by hits)
+                coin_of = {id(t): p * C // P for p, t in enumerate(hp_parts)}
+                hits_of = [sum(nh[id(t)] for t in hp_parts if coin_of[id(t)] == c) for c in range(C)]
+                for t in hp_parts:
+                    c = coin_of[id(t)]
+                    got[id(t)] = cd[c] * nh[id(t)] / hits_of[c] if hits_of[c] else 0.0
+            else:  # (fewer animations than coins: each coin on one animation, k-th coin on the k*P/C-th)
+                for c, n in enumerate(cd):
+                    if P:
+                        got[id(hp_parts[c * P // C])] += n
+            tot = sum(got.values())
+            for t in own:
+                part = got.get(id(t), 0.0)
+                if t.get("final"):
+                    if tot > 0:
+                        t["fw"] = round(part / tot, 4)
+                else:
+                    t["dmg"] = round(part / mx, 4)
+        if carry.get("rup"):
+            own = out[start:] or [e]
+            hit = 1 - carry["who"] if carry["who"] in (0, 1) else 1
+            for k, n in enumerate(carry["rup"]):
+                t = own[min(k, len(own) - 1)]
+                t["rup"] = t.get("rup", []) + [round(n / mx[hit], 4)]
+        for k in ("heal", "tick"):
+            if carry.get(k):
+                old = e.get(k) or [0.0, 0.0]
+                e[k] = [round(old[i] + carry[k][i] / mx[i], 4) for i in (0, 1)]
+        e.update(hasSt=True, stL=[x for n in ST if n in carry["st"][0] for x in [ST.index(n)] + carry["st"][0][n]],
+                 stR=[x for n in ST if n in carry["st"][1] for x in [ST.index(n)] + carry["st"][1][n]])
     for s in fight["steps"]:
+        flush()
+        carry, start = s if "st" in s else None, len(out)
         act = s["act"]
         if act == "run-in":
             place, runs = "run", s["who"]
@@ -801,6 +862,7 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
         parts[0]["note"] = note(s)
         out.append(placed(parts[0]))
         out += parts[1:]
+    flush()
     return out
 
 
