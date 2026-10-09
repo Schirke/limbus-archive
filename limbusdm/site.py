@@ -56,7 +56,7 @@ def out_dir(svc) -> str:
 def config(svc) -> dict:
     """data/site_config.json: {"contact": "Discord: name", "audio": true, "video": true, "full_images": true,
     "project": the Cloudflare Worker the site is uploaded to (none: the site is only written to disk), "url": its address,
-    "stats_key": who may open Site stats, "owner_key": who sees the allowance there (the page is opened once as
+    "index": true = search engines may list the site (kept out otherwise), "stats_key": who may open Site stats, "owner_key": who sees the allowance there (the page is opened once as
     #/community/stats/<key>), "budget": {"day": the day of the month the Cloudflare plan's period starts
     on, "requests", "objects", "rows": what a period may spend of Worker requests, Durable Object requests and rows
     written before the count and the live rooms are closed until the next one (ui/site/worker.js)}}."""
@@ -927,13 +927,15 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 }})();
 </script>
 """
-        html = html.replace("</head>", '<meta name="robots" content="noindex, nofollow">\n'
-                            f'<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n</head>')
+        # search engines are kept out unless the site's settings say "index": true
+        found = ('<meta name="description" content="Limbus Company: patch highlights, Identity and E.G.O database, '
+                 'animations, music and mini-games.">' if self.cfg.get("index") else '<meta name="robots" content="noindex, nofollow">')
+        html = html.replace("</head>", f'{found}\n<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n</head>')
         html = html.replace("</body>", boot + "</body>")
         with open(os.path.join(self.out, "index.html"), "w", encoding="utf-8") as f:
             f.write(html)
         with open(os.path.join(self.out, "robots.txt"), "w") as f:
-            f.write("User-agent: *\nDisallow: /\n")
+            f.write("User-agent: *\nAllow: /\n" if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
         self.index()
 
     def index(self):
