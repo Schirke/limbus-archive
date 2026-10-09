@@ -83,6 +83,17 @@ function bfProgress() {
   btn.textContent = BUFFS.busy ? `Making videos… ${left} left` : `Make all videos (${left} left)`;
 }
 
+// a made video's Save (WebM with a transparent background) and GIF (under 10 MB, for Discord); app only (the site hides them)
+const bfFile = (b, n) => `${bfName(b)} - ${n}`;
+function bfFig(b, n) {
+  const btns = bfHas(n) ? `<span class="grow"></span><button data-bsave="${esc(n)}">Save</button><button data-bgif="${esc(n)}" title="a looping GIF under 10 MB, to post in Discord">GIF</button>` : "";
+  return `${bfVideo(n)}<figcaption class="row bfcap"><span class="mono">${esc(n)}</span>${btns}</figcaption>`;
+}
+function bfSaveBtn(b) {
+  const made = b.fx.filter(bfHas);
+  return made.length > 1 ? `<button data-bsaveall>Save all (${made.length})</button>` : "";
+}
+
 function bfVideo(n) {
   if (bfHas(n)) return `<video src="/api/buff_video?name=${encodeURIComponent(n)}" autoplay loop muted playsinline></video>`;
   if (bfFailed(n)) return `<div class="bfnone">This effect could not be drawn outside the game.</div>`;
@@ -104,12 +115,19 @@ function drawBuff() {
       `<a href="${link(w)}" title="${esc(w.name)}">${pic(w)}<span>${esc(w.name)}</span></a>`).join("")}</div>` : "";
   };
   box.innerHTML = `<div class="bfhead">${b.icon ? `<img src="${imgThumb(b.icon)}" onerror="this.remove()">` : ""}
-      <div><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div></div>
-    <div class="bfvids">${b.fx.map((n) => `<figure data-fx="${esc(n)}">${bfVideo(n)}<figcaption class="mono">${esc(n)}</figcaption></figure>`).join("")}</div>
+      <div class="grow"><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div><span id="bfsaveall">${bfSaveBtn(b)}</span></div>
+    <div class="bfvids">${b.fx.map((n) => `<figure data-fx="${esc(n)}">${bfFig(b, n)}</figure>`).join("")}</div>
     ${b.desc ? `<div class="panel"><div class="kwdesc">${fmtDesc(b.desc)}</div>${b.flavor ? `<div class="kwflavor">${esc(b.flavor)}</div>` : ""}</div>` : ""}
     ${b.who.length ? `<div class="panel">${group("id", "Identities")}${group("ego", "E.G.O")}${group("enemy", "Enemies")}</div>`
       : `<div class="muted small">No Identity or handbook enemy names this buff in its skills.</div>`}
     ${same.length ? `<div class="panel"><h4>Same effect</h4><div class="kwrow">${same.map((x) => `<a class="kw ${x.type} big" href="#/buffs/${encodeURIComponent(x.id)}">${esc(bfName(x))}</a>`).join("")}</div></div>` : ""}`;
+  box.onclick = (e) => {
+    const t = e.target.closest("[data-bsaveall], [data-bsave], [data-bgif]");
+    if (!t) return;
+    const items = "bsaveall" in t.dataset ? b.fx.filter(bfHas) : [t.dataset.bsave || t.dataset.bgif];
+    if (t.dataset.bgif) toast("Making the GIF…");
+    exportObj({ buffvideo: { items: items.map((n) => [n, bfFile(b, n)]), folder: bfName(b), discord: !!t.dataset.bgif } });
+  };
   // the picked buff's videos are made first
   const todo = b.fx.filter((n) => !bfHas(n) && !bfFailed(n) && !BUFFS.current.includes(n));
   if (todo.length && BUFFS.available && bfv.asked !== b.id) {
@@ -127,10 +145,12 @@ function bfPoll() {
     try { Object.assign(BUFFS, await api("/api/buffs?status=1")); } catch (e) { return; }
     bfProgress();
     bfMark();
-    document.querySelectorAll("#bfcard figure[data-fx]").forEach((f) => {
+    const b = BUFFS.list.find((x) => x.id === bfv.sel);
+    if (b) document.querySelectorAll("#bfcard figure[data-fx]").forEach((f) => {
       if (f.querySelector("video")) return;
-      f.innerHTML = `${bfVideo(f.dataset.fx)}<figcaption class="mono">${esc(f.dataset.fx)}</figcaption>`;
+      f.innerHTML = bfFig(b, f.dataset.fx);
     });
+    if (b && $("#bfsaveall")) $("#bfsaveall").innerHTML = bfSaveBtn(b);
     bfPoll();
   }, 2000);
 }

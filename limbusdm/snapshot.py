@@ -6,15 +6,17 @@ size+mtime, so after the first (slow) snapshot only what changed is scanned agai
 from __future__ import annotations
 
 import fnmatch
+import gc
 import hashlib
 import os
 import re
 import time
-from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, ThreadPoolExecutor, as_completed, wait
+from concurrent.futures.process import BrokenProcessPool
 from datetime import datetime
 
 from .banks import list_sounds
-from .bundles import index_bundle
+from .bundles import index_bundle, lean_loading
 from .catalog import Catalog
 from .paths import GamePaths
 from .store import Store
@@ -60,6 +62,20 @@ def code_names(path: str) -> bytes:
     return b"\n".join(sorted(out))
 
 
+def _worker_start():
+    """Pool worker start: UnityPy in half the memory, and below-normal CPU priority, so the PC stays usable
+    while a snapshot runs on every core."""
+    lean_loading()
+    try:
+        import ctypes
+        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)
+    except Exception:
+        try:
+            os.nice(5)
+        except Exception:
+            pass
+
+
 def _index_job(args):
     path, store_root, thumbs = args
     t = time.time()
@@ -67,6 +83,9 @@ def _index_job(args):
         res = index_bundle(path, Store(store_root), thumbs)
     except Exception as e:
         res = {"objects": [], "errors": [f"bundle unreadable: {type(e).__name__}: {e}"]}
+    # a read bundle is a web of reference cycles: without this the worker keeps it (GBs for a big one) until
+    # Python happens to collect, so the memory budget below is wrong and the PC runs out of memory
+    gc.collect()
     res["secs"] = round(time.time() - t, 2)
     return res
 
@@ -91,20 +110,26 @@ def free_memory() -> int:
 
 
 def job_memory(path: str) -> int:
-    """What indexing a bundle costs: UnityPy keeps ~2.2× the decompressed size, plus decoded textures."""
+    """What indexing a bundle costs: (with lean_loading) the decompressed size once, plus decoded textures."""
     from .cabs import unpacked_size
-    return int(unpacked_size(path) * 2.5) + (300 << 20)
+    return int(unpacked_size(path) * 1.6) + (300 << 20)
+
+
+def job_time(mem: int) -> float:
+    """How long a bundle takes, in shares (from job_memory): ~1 + decompressed MB / 20, fitted on a whole game."""
+    return 1 + max(0, mem - (300 << 20)) / 1.6 / (20 << 20)
 
 
 class Snapshotter:
     def __init__(self, store: Store, game: GamePaths, ignore: list[str] | None = None,
-                 workers: int | None = None, thumbs: bool = True, progress=None):
+                 workers: int | None = None, thumbs: bool = True, progress=None, light: bool = False):
         self.store = store
         self.game = game
         self.ignore = ignore if ignore is not None else DEFAULT_IGNORE
-        self.workers = workers or max(1, min(12, (os.cpu_count() or 4) - 1))
+        # light (Settings): 2 bundles at a time — slower, but needs little memory beside the biggest bundle (~3 GB)
+        self.workers = workers or (2 if light else max(1, min(12, (os.cpu_count() or 4) - 1)))
         self.thumbs = thumbs
-        self.progress = progress or (lambda stage, done, total, msg="": None)
+        self.progress = progress or (lambda stage, done, total, msg="", **_: None)
         self.cancelled = False
 
     # ---------- files ----------
@@ -124,12 +149,8 @@ class Snapshotter:
                     rel = label + "/" + os.path.relpath(full, root).replace("\\", "/")
                     if not self._ignored(rel):
                         todo.append((rel, full))
-        files = {}
-        for i, (rel, full) in enumerate(todo):
-            if self.cancelled:
-                raise InterruptedError
-            if i % 200 == 0:
-                self.progress("files", i, len(todo), rel)
+        files, work = {}, []
+        for rel, full in todo:
             try:
                 st = os.stat(full)
             except OSError:
@@ -143,7 +164,11 @@ class Snapshotter:
                     and (prev.get("blob") or not want_blob) and ("sounds" in prev or not want_sounds)
                     and ("names" in prev or not want_names)):
                 files[rel] = prev
-                continue
+            else:
+                work.append((rel, full, st, want_blob, want_sounds, want_names))
+
+        def read(job):
+            rel, full, st, want_blob, want_sounds, want_names = job
             rec = {"size": st.st_size, "mtime": int(st.st_mtime)}
             try:
                 if want_blob:
@@ -163,9 +188,22 @@ class Snapshotter:
             except OSError as e:
                 rec["h"] = "unreadable"
                 rec["error"] = str(e)
-            files[rel] = rec
-        self.progress("files", len(todo), len(todo))
-        return files
+            return rel, rec
+
+        # the first snapshot reads the whole install (~11 GB): hashing in a few threads is ~2x quicker on an SSD
+        with ThreadPoolExecutor(4) as pool:
+            futs = [pool.submit(read, job) for job in work]
+            for i, fut in enumerate(as_completed(futs)):
+                if self.cancelled:
+                    for f in futs:
+                        f.cancel()
+                    raise InterruptedError
+                rel, rec = fut.result()
+                files[rel] = rec
+                if i % 200 == 0:
+                    self.progress("files", i, len(work), rel)
+        self.progress("files", len(work), len(work))
+        return {rel: files[rel] for rel, _full in todo if rel in files}  # same order as before
 
     # ---------- main ----------
     def take(self, prev_snapshot: dict | None = None) -> dict:
@@ -216,18 +254,22 @@ class Snapshotter:
             jobs.append((logical, path, rel, os.path.getsize(path), job_memory(path)))
         jobs.sort(key=lambda j: -j[4])  # biggest first for better load balancing
         total_bytes = sum(j[3] for j in jobs) or 1
-        done_bytes = 0
-        errors = {}
+        total_time = sum(job_time(j[4]) for j in jobs) or 1
+        done_bytes = done_time = 0
+        errors, failed, retried = {}, [], set()
+        sizes_of = {j[0]: j[4] for j in jobs}
+        started = time.time()
         self.progress("bundles", 0, len(jobs), f"{len(jobs)} bundles to index")
         if jobs:
-            # Memory budget: a bundle is decompressed whole while it is read (one Canto bundle takes ~6 GB), so a
+            # Memory budget: a bundle is decompressed whole while it is read (one Canto bundle takes ~3 GB), so a
             # new one starts only while the running ones fit in half of the free memory; the biggest runs alone.
-            # Python keeps much of that memory after the job, so heavy bundles get a fresh process each time.
+            # Heavy bundles have their own small pool, so only a few of them run at once.
             budget = max(1 << 30, free_memory() // 2)
             heavy_at, reserve = 600 << 20, 1536 << 20
             pending, running, used, i = list(jobs), {}, 0, 0
-            with ProcessPoolExecutor(max(1, min(4, self.workers // 2)), max_tasks_per_child=1) as heavy, \
-                    ProcessPoolExecutor(self.workers, max_tasks_per_child=8) as light:
+            sizes = {"heavy": max(1, min(4, self.workers // 2)), "light": self.workers}
+            pools = {k: ProcessPoolExecutor(n, max_tasks_per_child=8, initializer=_worker_start) for k, n in sizes.items()}
+            try:
                 while pending or running:
                     while pending and len(running) < self.workers:
                         free = free_memory()  # what the system really has left, incl. memory workers kept
@@ -236,26 +278,52 @@ class Snapshotter:
                             if running:
                                 break
                             k = 0
-                        logical, path, rel, size, mem = pending.pop(k)
-                        pool = heavy if mem >= heavy_at else light
-                        running[pool.submit(_index_job, (path, self.store.root, self.thumbs))] = (logical, rel, size, mem)
-                        used += mem
+                        job = pending.pop(k)
+                        kind = "heavy" if job[4] >= heavy_at else "light"
+                        running[pools[kind].submit(_index_job, (job[1], self.store.root, self.thumbs))] = \
+                            (job, kind, pools[kind])
+                        used += job[4]
                     done, _ = wait(running, return_when=FIRST_COMPLETED)
                     for fut in done:
-                        logical, rel, size, mem = running.pop(fut)
+                        job, kind, pool = running.pop(fut)
+                        logical, path, rel, size, mem = job
                         used -= mem
                         if self.cancelled:
                             for f in running:
                                 f.cancel()
                             raise InterruptedError
-                        res = fut.result()
-                        if res["errors"]:
-                            errors[logical] = res["errors"][:20]
-                        self.store.write_json(rel, res)
+                        try:
+                            res = fut.result()
+                        except BrokenProcessPool:
+                            # a worker died (out of memory, most likely): a new pool, and the bundles it had go again
+                            # once, alone (they never fit next to others now); a second time → left for the next snapshot
+                            if pools[kind] is pool:
+                                pool.shutdown(wait=False, cancel_futures=True)
+                                pools[kind] = ProcessPoolExecutor(sizes[kind], max_tasks_per_child=8,
+                                                                  initializer=_worker_start)
+                            if logical not in retried:
+                                retried.add(logical)
+                                pending.insert(0, (logical, path, rel, size, budget + 1))
+                                continue
+                            errors[logical] = ["not read: the reading process stopped (out of memory?)"]
+                            failed.append(logical)
+                            res = None
+                        if res is not None:
+                            if res["errors"]:
+                                errors[logical] = res["errors"][:20]
+                            self.store.write_json(rel, res)
                         done_bytes += size
+                        done_time += job_time(sizes_of[logical])
                         i += 1
-                        self.progress("bundles", i, len(jobs), f"{logical} ({done_bytes * 100 // total_bytes}% of data)")
-        for logical in missing:
+                        part = done_time / total_time  # time left, from the share done so far
+                        spent = time.time() - started
+                        eta = round(spent * (1 - part) / part) if part >= 0.05 and spent >= 20 else None
+                        self.progress("bundles", i, len(jobs), f"{logical} ({done_bytes * 100 // total_bytes}% of data)",
+                                      eta=eta)
+            finally:
+                for p in pools.values():
+                    p.shutdown(wait=True, cancel_futures=True)
+        for logical in missing + failed:
             bundles[logical].pop("index", None)
 
         # ---------- files ----------

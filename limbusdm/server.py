@@ -554,7 +554,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import bilibili
                 return self._json(bilibili.videos(q.get("period", "week"), q.get("sort", "views"), svc.translator))
             if p == "/api/quiz":  # voice lines for Games -> Guess the Identity
-                return self._json(svc.quiz())
+                return self._json(_quiz_twins(svc, svc.quiz()))
             if p == "/api/game_pics":  # pictures of the Games: the jukebox covers (the track's card), the story's
                 # backgrounds by Canto (Guess the Canto; folders Ep<N> / Ep<N>_<part>, named from the folder on so that
                 # the web copy doesn't take a few hundred full-size pictures for paths to fetch)
@@ -626,9 +626,13 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 # until then); the sprite-drawn ones keep the portrait
                 done = {fn[:-4] for fn in os.listdir(_thumb_dir(svc))} if os.path.isdir(_thumb_dir(svc)) else set()
                 spines = svc.enemy_spines()
+                # twins: looks whose picture repeats an earlier one's in the handbook (Guess the enemy asks it once)
+                from .twins import repeats
+                looks = [a for a in dict.fromkeys(e["app"] for e in db["list"]) if a in done]
+                twins = [looks[i] for i in repeats([os.path.join(_thumb_dir(svc), a + ".png") for a in looks])]
                 return self._json({**{k: v for k, v in db.items() if k not in ("skills", "passives", "list")},
                                    "list": [{**e, "spine": bool(spines.get(e["app"]))} for e in db["list"]],
-                                   "thumbs": sorted({e["app"] for e in db["list"]} & done), "nothumb": _no_thumbs(svc)})
+                                   "thumbs": sorted({e["app"] for e in db["list"]} & done), "twins": twins, "nothumb": _no_thumbs(svc)})
             if p == "/api/enemy_thumb":
                 path = os.path.join(_thumb_dir(svc), _safe(q.get("app", "")) + ".png")
                 return self._file_live(path, "image/png") if os.path.exists(path) else self._send(404, b"", "text/plain")
@@ -1032,6 +1036,42 @@ def _thumb_dir(svc) -> str:
     return os.path.join(svc.data_dir, "enemy_thumbs")
 
 
+def _quiz_twins(svc, q: dict) -> dict:
+    """The story's characters (Guess the character) with "twin" (the kept one's place) on those whose picture repeats
+    another's: one portrait for two speakers keeps the speaker it is named after (StoryLog_Sanson: Sansón, not Narrator),
+    else the one with more lines, and gets the other's lines."""
+    import unicodedata
+    from .twins import repeats
+    chars = q.get("chars") or []
+    if not chars:
+        return q
+    flat = lambda s: "".join(ch for ch in unicodedata.normalize("NFKD", s.lower()) if ch.isalnum())
+
+    def thumb(path):
+        r = next((r for r in svc.lookup_container(path) if r["type"] == "Texture2D" and r.get("h")), None)
+        return r and svc.store.thumb_path(r["h"])
+    enemies = {e["id"]: e for e in svc.enemy_db()["list"]}
+    files, drawn_all = [], set(os.listdir(_thumb_dir(svc))) if os.path.isdir(_thumb_dir(svc)) else set()
+    memo = getattr(svc, "_quiz_pics", None)
+    if memo and memo[0] is q and memo[1] == len(drawn_all):
+        files = memo[2]
+    for c in chars if not files else ():  # the picture the page shows (games2.js giOpen): the story log's, else the handbook's
+        e = enemies.get(c.get("boss")) if not c.get("pic") else None
+        drawn = e and e["app"] + ".png" in drawn_all and os.path.join(_thumb_dir(svc), e["app"] + ".png")
+        files.append(thumb(c["pic"]) if c.get("pic") else drawn if drawn and (svc.enemy_spines().get(e["app"]) or not e.get("pic"))
+                     else thumb(e["pic"]) if e and e.get("pic") else None)
+    svc._quiz_pics = (q, len(drawn_all), files)
+    order = sorted(range(len(chars)), key=lambda i: (not (chars[i].get("pic") and flat(chars[i]["name"]) in flat(os.path.basename(chars[i]["pic"]))),
+                                                     -len(chars[i].get("lines") or []), i))
+    twins = {order[k]: order[j] for k, j in repeats([files[i] for i in order]).items()}
+    # the twin's lines go to the one kept (Narrator's to Sansón); it stays in the list, empty, so the others keep their places
+    out = [{**c, "lines": list(c.get("lines") or [])} for c in chars]
+    for i, j in twins.items():
+        out[j]["lines"] += out[i]["lines"]
+        out[i] = {**out[i], "lines": [], "twin": j}
+    return {**q, "chars": out}
+
+
 def _no_thumbs(svc, add: str | None = None) -> list[str]:
     """The enemies the page found no idle pose to take a picture of (ui/enemies.js enThumbs), kept for the game
     version they were found in: a new one may bring the missing skeleton."""
@@ -1126,6 +1166,24 @@ def export_object(svc: Service, b: dict) -> dict:
         if not saved:
             raise FileNotFoundError("not rendered")
         return {"path": saved if len(items) == 1 else dest}
+    elif b.get("buffvideo"):  # Buff effects: one effect's video (WebM with alpha), or all of a buff's into a folder
+        g = b["buffvideo"]
+        items = [(svc.buff_fx.video(n), fname) for n, fname in g["items"]]  # [[effect name, file name], …]
+        items = [(src, fname) for src, fname in items if src]
+        if not items:
+            raise FileNotFoundError("not made yet")
+        dest = os.path.join(out_dir, _safe(g["folder"])) if len(items) > 1 else out_dir
+        os.makedirs(dest, exist_ok=True)
+        import shutil
+        ext = ".gif" if g.get("discord") else ".webm"
+        for src, fname in items:
+            target = os.path.join(dest, _safe(fname, max(40, min(200, 250 - len(dest) - len(ext)))) + ext)
+            if g.get("discord"):  # a GIF under Discord's 10 MB
+                from .viewer import discord_gif
+                discord_gif(src, target)
+            else:
+                shutil.copyfile(src, target)
+        return {"path": target if len(items) == 1 else dest}
     elif b.get("blob"):
         data, fn = svc.store.get_blob(b["blob"]), b.get("name") or b["blob"] + ".txt"
     elif b.get("framezip"):  # one skill's frames, to draw over

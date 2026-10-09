@@ -218,7 +218,11 @@ window.addEventListener("hashchange", route);
 function jobBlock() {
   const j = STATE && STATE.job;
   if (!j) return "";
-  if (j.running) return `<div class="card"><b>${esc(j.kind)}</b> — ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}<div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div><div class="small muted mono">${esc(j.msg || "")}</div><button class="danger" onclick="api('/api/cancel',{})">Cancel</button></div>`;
+  if (j.running) {
+    const snap = j.kind === "snapshot";
+    const left = j.eta == null ? (snap && j.stage === "bundles" ? " · working out the time left…" : "") : j.eta < 60 ? " · less than a minute left" : ` · about ${Math.round(j.eta / 60)} min left`;
+    return `<div class="card"><b>${esc(j.kind)}</b> — ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}${left}<div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div><div class="small muted mono">${esc(j.msg || "")}</div>${snap ? `<div class="small muted">You can cancel and take the snapshot later: what is already read is kept, it goes on from there.</div>` : ""}<button class="danger" onclick="api('/api/cancel',{})">Cancel</button></div>`;
+  }
   if (j.error) return `<div class="card"><span class="badge removed">failed</span> ${esc(j.kind)}: ${esc(j.error)}</div>`;
   return "";
 }
@@ -262,7 +266,7 @@ routes.patches = async (args) => {
     let h = `<h1>Patches</h1><div class="sub">What changed between game versions. A new report is built automatically after each patch.</div>`;
     h += jobBlock();
     if (!s.snapshots.length) {
-      h += `<div class="empty"><p>No snapshot yet. Take the first one now — it is the baseline the next patch will be compared with.<br>The first snapshot reads the whole game cache (about 10 min), later ones only what changed.</p><button class="primary" onclick="takeSnapshot()" ${s.job && s.job.running ? "disabled" : ""}>Take first snapshot</button></div>`;
+      h += `<div class="empty"><p>No snapshot yet. Take the first one now — it is the baseline the next patch will be compared with.<br>The first snapshot reads the whole game cache (5–20 min, it depends on the PC), later ones only what changed.<br>It can be cancelled and taken again later: it goes on from where it stopped. A weak PC or 8 GB of memory: turn on Light mode in Settings first.</p><button class="primary" onclick="takeSnapshot()" ${s.job && s.job.running ? "disabled" : ""}>Take first snapshot</button></div>`;
     } else if (!s.reports.length) {
       h += `<div class="empty"><p>Baseline ready: <b>${esc(fmtSnap(s.snapshots[s.snapshots.length - 1].id))}</b>. There is nothing to compare it with yet, so there are no reports.</p>
         <p><b>After the next patch:</b> open the game and let it download everything. The app notices the new version by itself (on start, or within 2 minutes if it is already open) and builds the report.</p>
@@ -3312,6 +3316,8 @@ routes.settings = async () => {
       <div class="hint">The app reads only what the game itself downloaded: after a patch, open the game first, then this app.</div>
       <label>Image previews</label><div><input type="checkbox" id="thumbs" ${s.thumbs ? "checked" : ""}> keep small copies of every texture</div>
       <div class="hint">Needed for "before" pictures — the game deletes old files when it updates.</div>
+      <label>Light mode</label><div><input type="checkbox" id="light" ${s.light ? "checked" : ""}> snapshots read 2 files at a time instead of all at once</div>
+      <div class="hint">Slower, but needs much less memory and leaves the PC free — for weak PCs or 8 GB of memory.</div>
       <label>Ignored files</label><textarea id="ignore" class="mono">${esc(s.ignore.join("\n"))}</textarea>
       <div class="hint">Patterns of files that change on every launch (logs etc.), one per line.</div>
       <div></div><div><button class="primary" id="save">Save</button> <button id="open-data">Open data folder</button>
@@ -3319,7 +3325,7 @@ routes.settings = async () => {
       <div class="hint">Videos folder: your own recordings of skills, shown in Animations under the matching Identity / E.G.O (the file name has to contain its title and Sinner name).</div>
     </div>`;
   const collect = () => ({
-    game_dir: $("#game_dir").value.trim(), auto_on_start: $("#auto_on_start").checked, thumbs: $("#thumbs").checked,
+    game_dir: $("#game_dir").value.trim(), auto_on_start: $("#auto_on_start").checked, thumbs: $("#thumbs").checked, light: $("#light").checked,
     ignore: $("#ignore").value.split("\n").map((x) => x.trim()).filter(Boolean),
   });
   $("#save").onclick = async () => { await api("/api/settings", collect()); toast("Saved"); refresh(); };

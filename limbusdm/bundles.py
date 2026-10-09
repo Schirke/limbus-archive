@@ -9,6 +9,7 @@ import hashlib
 import warnings
 
 import UnityPy
+from UnityPy.export.Texture2DConverter import parse_image_data
 
 from .store import Store
 
@@ -19,14 +20,74 @@ TEXT_TYPES = {"TextAsset"}
 IMAGE_TYPES = {"Texture2D"}
 
 
+def lean_loading() -> None:
+    """Make UnityPy read a bundle in about half the memory (snapshot workers only; one Canto bundle peaked at
+    ~5 GB). UnityPy keeps every decompressed block in a list, joins them into one copy and then copies each file
+    out of that again; here the blocks go straight into one buffer and the files are views into it."""
+    import importlib
+    import struct
+
+    BF = importlib.import_module("UnityPy.files.BundleFile")  # the modules (the package exports the classes)
+    F = importlib.import_module("UnityPy.files.File")
+    from UnityPy.helpers import ImportHelper
+    from UnityPy.streams import EndianBinaryReader
+    from UnityPy.streams.EndianBinaryReader import EndianBinaryReader_Memoryview
+
+    cls = BF.BundleFile
+    if getattr(cls, "_lean", False):
+        return
+    plain_read_fs = cls.read_fs
+
+    def read_fs(self, reader):
+        start, st = reader.Position, {"buf": None, "pos": 0}
+        decompress = self.decompress_data
+
+        def into_buffer(data, usize, flags, index=0):
+            out = decompress(data, usize, flags, index)
+            if st["buf"] is None:  # the first call is the blocks-and-directory info: block sizes → the buffer
+                n = struct.unpack_from(">i", out, 16)[0]
+                st["buf"] = bytearray(sum(struct.unpack_from(">I", out, 20 + i * 10)[0] for i in range(n)))
+                return out
+            st["buf"][st["pos"]:st["pos"] + len(out)] = out
+            st["pos"] += len(out)
+            return b""
+
+        self.decompress_data = into_buffer
+        try:
+            dirs, blocks = plain_read_fs(self, reader)
+        except Exception:
+            dirs = None
+        finally:
+            del self.decompress_data
+        if dirs is None or st["buf"] is None or st["pos"] != len(st["buf"]) or blocks.Length:
+            reader.Position = start  # not the layout expected: UnityPy's own way
+            return plain_read_fs(self, reader)
+        return dirs, EndianBinaryReader(memoryview(st["buf"]), offset=blocks.BaseOffset)
+
+    def read_files(self, reader, files):
+        if not isinstance(reader, EndianBinaryReader_Memoryview):
+            return F.File.read_files(self, reader, files)
+        for node in files:  # File.read_files, with a view instead of a copy of each file
+            name = node.path
+            node_reader = EndianBinaryReader(reader.view[node.offset:node.offset + node.size],
+                                             offset=reader.BaseOffset + node.offset)
+            f = ImportHelper.parse_file(node_reader, self, name, is_dependency=self.is_dependency)
+            if isinstance(f, (EndianBinaryReader, F.SerializedFile.SerializedFile)) and self.environment:
+                self.environment.register_cab(name, f)
+            f.flags = getattr(node, "flags", 0)
+            self.files[name] = f
+
+    cls.read_fs, cls.read_files, cls._lean = read_fs, read_files, True
+
+
 def _h(data) -> str:
     return hashlib.sha1(data).hexdigest()
 
 
 def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
     """Return {"objects": [...], "errors": [...]} for the bundle at `path`. Read-only on `path`."""
-    with open(path, "rb") as f:
-        env = UnityPy.load(f.read())
+    with open(path, "rb") as f:  # read from the file as needed: the compressed bundle isn't kept in memory too
+        env = UnityPy.load(f)
     containers: dict[int, str] = {}
     # path → object straight from the AssetBundle's m_Container. (env.container would also walk the preload
     # table and look up every reference into other bundles across the whole cache folder: 315 of 333 s on a
@@ -75,8 +136,10 @@ def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
                 rec["w"], rec["hgt"] = tex.m_Width, tex.m_Height
                 textures[obj.path_id] = rec["h"]
                 if thumbs and img_bytes and not store.has_thumb(rec["h"]):
-                    try:
-                        store.put_thumb(rec["h"], tex.image)
+                    try:  # decoded from the bytes already read, upside down: put_thumb flips the small copy
+                        img = parse_image_data(img_bytes, tex.m_Width, tex.m_Height, tex.m_TextureFormat,
+                                               obj.version, obj.platform, getattr(tex, "m_PlatformBlob", None), flip=False)
+                        store.put_thumb(rec["h"], img, flip=True)
                     except Exception as e:  # unsupported texture format etc.
                         errors.append(f"thumb {name}: {type(e).__name__}: {e}")
             elif t == "Sprite":

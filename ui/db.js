@@ -154,8 +154,30 @@ const MAX_LEVEL = 65;  // the current level cap: HP = base + per level × level,
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 const SPEED_SVG = `<svg class="ico s28" viewBox="0 0 32 32"><path fill="#b4774a" stroke="#3a2418" stroke-width="1.5" d="M10 3h9l-1 12 9 5c3 2 3 6 0 7H6c-2 0-3-2-2-4l3-6z"/><path fill="#3a2418" d="M6 26h22v2H6z"/></svg>`;
 
-// skill / passive text like the game: [Keyword] → icon + name coloured by buff / debuff, clickable for a tooltip
-function fmtDesc(text) {
+// many enemies' texts name a status in plain words ("Inflict 2 Bleed"): the enemy handbook marks those too.
+// A name several keywords share goes to the one the Identities' texts use most (Bleed → Laceration, not Bleeding)
+let kwPlain = null;
+function kwPlainOf() {
+  if (kwPlain) return kwPlain;
+  const uses = {};
+  const count = (t) => String(t || "").replace(/<link="([^"]+)">|\[([A-Za-z0-9_]+)\]/g, (m, a, b) => { uses[a || b] = (uses[a || b] || 0) + 1; return m; });
+  for (const x of [...UNITS.ids, ...UNITS.egos]) {
+    for (const sk of [...(x.skills || []), ...(x.defense || [])]) for (const u of Object.values(sk.up)) { count(u.desc); u.coindescs.forEach((c) => c.forEach(count)); }
+    (x.passives || []).forEach((p) => count(p.desc));
+  }
+  const key = {};
+  for (const [k, g] of Object.entries(UNITS.glossary)) {
+    const n = g.name || "", o = key[n];
+    if (n.length < 4 || !/^[A-Z]/.test(n) || /[\[\]]/.test(n)) continue;
+    if (!o || (uses[k] || 0) > (uses[o] || 0) || ((uses[k] || 0) === (uses[o] || 0) && k.length < o.length)) key[n] = k;
+  }
+  const names = Object.keys(key).sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  kwPlain = { key, rx: names.length ? new RegExp(`(?<![\\w\\[])(${names.join("|")})(?![\\w\\]])`, "g") : null };
+  return kwPlain;
+}
+// skill / passive text like the game: [Keyword] → icon + name coloured by buff / debuff, clickable for a tooltip;
+// plain: also status names written as plain words (not in quotes: those name skills)
+function fmtDesc(text, plain = false) {
   if (!text) return "";
   const marks = [];
   const mark = (html) => { marks.push(html); return `\u0001${marks.length - 1}\u0002`; };
@@ -169,6 +191,9 @@ function fmtDesc(text) {
     .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t.replace(/<[^>]+>/g, "")))
     .replace(/<style="highlight">/g, "\u0006").replace(/<\/style>/g, "\u0007")
     .replace(/<[^>]+>/g, "");
+  const pk = plain && kwPlainOf();
+  if (pk && pk.rx) s = s.split(/("[^"\n]*"|“[^”\n]*”|(?<![A-Za-z])'[^'\n]*'(?![A-Za-z]))/)
+    .map((part, i) => i % 2 ? part : part.replace(pk.rx, (n) => kwSpan(pk.key[n], n))).join("");
   s = esc(s).replace(/\[([A-Za-z0-9_]+)\]/g, (m, k) => UNITS.tags[k] ? mark(`<span class="tg">${esc(UNITS.tags[k])}</span>`) : kwSpan(k));
   return s.replace(/\u0001(\d+)\u0002/g, (_, i) => marks[i]).replace(/\u0006/g, `<span class="hl">`).replace(/\u0007/g, "</span>").replace(/\n/g, "<br>");
 }
@@ -227,10 +252,10 @@ function drawDbGrid() {
 const RESIST = (v) => v >= 2 ? ["Fatal", "rfatal"] : v > 1 ? ["Weak", "rweak"] : v === 1 ? ["Normal", "rnorm"] : v >= 0.75 ? ["Endure", "rend"] : ["Ineff.", "rineff"];
 // the battle UI's own coins (plain / Unbreakable / purple / green); a drawn coin if the icon can't be cut
 const coinIcon = (kind) => `<img class="ico coin" src="/api/ui_icon?k=coin${kind ? `_${kind}` : ""}" title="${kind === "super" ? "Unbreakable Coin" : "Coin"}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'), { className: 'coinico' }))">`;
-function skillView(s, up, level, label, fallbackImg) {
+function skillView(s, up, level, label, fallbackImg, plain = false) {
   const u = s.up[up] || topUp(s);
   const color = SIN_COLORS[u.sin] || "#777";
-  const iconPath = `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = imgThumb(iconPath);
+  const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = imgThumb(iconPath);
   const key = frameKey(u.sin, s.tier, label === "Defense");
   const coin = u.coin == null ? "" : `${u.op === "SUB" ? "−" : "+"}${u.coin}`;
   const off = level + (u.level || 0);
@@ -245,18 +270,18 @@ function skillView(s, up, level, label, fallbackImg) {
           <span class="skvw">Atk Weight ${"<i class=\"wsq\"></i>".repeat(Math.max(1, u.targets || 1))}</span>
           ${label ? `<span class="sklabel">${esc(label)}</span>` : ""}${u.sanity ? `<span class="muted small">${u.sanity} SP</span>` : ""}</div>
       </div></div>
-    ${u.desc ? `<div class="skdesc">${fmtDesc(u.desc)}</div>` : ""}
-    ${u.coindescs.map((c, i) => c.length ? `<div class="coinrow"><span class="coinbadge">${ROMAN[i] || i + 1}</span><div>${c.map(fmtDesc).join("<br>")}</div></div>` : "").join("")}</div>`;
+    ${u.desc ? `<div class="skdesc">${fmtDesc(u.desc, plain)}</div>` : ""}
+    ${u.coindescs.map((c, i) => c.length ? `<div class="coinrow"><span class="coinbadge">${ROMAN[i] || i + 1}</span><div>${c.map((t) => fmtDesc(t, plain)).join("<br>")}</div></div>` : "").join("")}</div>`;
 }
 // [2, 0] → " · Threadspin II+", [2, 4] → " · Threadspin II–IV"
 const threadspinText = (t) => !t || !t.length ? ""
   : ` · Threadspin ${ROMAN[t[0] - 1] || t[0]}${t[1] ? (t[1] === t[0] ? "" : `–${ROMAN[t[1] - 1] || t[1]}`) : "+"}`;
-function passiveHtml(p) {
+function passiveHtml(p, plain = false) {
   const cost = p.cost.map((c) => `${sinIcon(c.sin, "s18")}<b>×${c.n}</b>`).join(" ");
   return `<div class="passive"><div class="row"><b class="grow">${esc(p.name)}</b>
       ${cost ? `<span class="pcost"><span class="muted small">${p.mode === "res" ? "Resonance" : "Owned"}</span> ${cost}</span>` : ""}</div>
     <div class="muted small">${p.kind === "support" ? "Support passive" : p.kind === "ego" ? `E.G.O passive${threadspinText(p.threadspin)}` : "Battle passive"}</div>
-    <div class="skdesc">${fmtDesc(p.desc)}</div></div>`;
+    <div class="skdesc">${fmtDesc(p.desc, plain)}</div></div>`;
 }
 function openUnit(id) {
   const x = unitById(id);

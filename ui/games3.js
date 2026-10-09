@@ -99,8 +99,10 @@ async function gpOpen(page, daily) {
   if (!gp.data) {
     const [units, en, pics] = await Promise.all([api("/api/units"), api("/api/enemies"), api("/api/game_pics")].map((p) => p.catch(() => null)));
     // enemies by the handbook's picture of their battle look (it has no background, so it makes a silhouette); one per name
-    const thumbs = new Set((en || {}).thumbs || []), seen = new Set();
-    const enemies = ((en || {}).list || []).filter((e) => thumbs.has(e.app) && !/^\?+$/.test(e.name) && !seen.has(e.name) && seen.add(e.name))
+    // and one per picture (the same look under another name, or one drawn just like an earlier one: the server's twins)
+    const thumbs = new Set((en || {}).thumbs || []), twins = new Set((en || {}).twins || []), seen = new Set();
+    const enemies = ((en || {}).list || []).filter((e) => thumbs.has(e.app) && !twins.has(e.app) && !/^\?+$/.test(e.name)
+      && !seen.has(e.name) && !seen.has(e.app) && seen.add(e.name).add(e.app))
       .map((e) => ({ key: "e" + e.id, id: e.id, name: e.name, title: e.name, sub: e.group, pic: `/api/enemy_thumb?app=${encodeURIComponent(e.app)}` }));
     const ids = ((units || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title,
       sub: x.sinnerName, sinner: x.sinner, season: giSeason(units, x.season), pic: giThumb(x.img.thumb), art: x.img.art }));
@@ -180,20 +182,15 @@ function gpRound() {
   // (the spot a Canto's picture is zoomed into is drawn here, so a daily game shows the same piece to everybody)
   Object.assign(g, { ans, opts: gmShuffle([ans, ...gmShuffle(near).slice(0, 3)]), step: 0, hints: {}, done: null, img: null, fx: 0.2 + gmRnd() * 0.6, fy: 0.2 + gmRnd() * 0.6 });
   const im = new Image();
-  // a picture the game's files don't give, or a scene that is all but black: another one takes the round
+  // a picture the game's files don't give, or a scene that is all but black or mostly one flat colour: another one takes the round
   const drop = () => { if (gp.game !== g || g.ans !== ans) return; g.pool = g.pool.filter((x) => x !== ans); g.round--;
     g.pool.length < 8 ? (gp.game = null, gpDailyEnd(), gpDrawStart(), toast("The pictures could not be read from the game's files.")) : gpRound(); };
   im.onload = () => {
     if (gp.game !== g || g.ans !== ans) return;
     if (gpCanto()) {
-      const c = document.createElement("canvas"), x = c.getContext("2d");
-      c.width = 32;
-      c.height = 18;
-      x.drawImage(im, 0, 0, 32, 18);
-      const px = x.getImageData(0, 0, 32, 18).data;
-      let sum = 0;
-      for (let i = 0; i < px.length; i += 4) sum += px[i] + px[i + 1] + px[i + 2];
-      if (sum / (px.length / 4 * 3) < 28) return drop();
+      const at = gpSceneSpot(im, g.fx, g.fy);
+      if (!at) return drop();
+      [g.fx, g.fy] = at;
     }
     g.img = im;
     gpPaint();
@@ -208,6 +205,34 @@ function gpRound() {
     }).catch(drop);
   } else im.src = ans.pic;
   gpDraw();
+}
+
+// Guess the Canto: where the round's first piece of a scene goes — null for a scene that is all but black, or whose
+// first pieces (gpPaint's widest zoom, at 7 × 7 spots) are mostly one flat colour (a white glow, an empty room);
+// a flat spot moves to the nearest one with something in it
+function gpSceneSpot(im, fx, fy) {
+  const SW = 128, SH = 72, c = document.createElement("canvas"), x = c.getContext("2d");
+  c.width = SW;
+  c.height = SH;
+  x.drawImage(im, 0, 0, SW, SH);
+  const px = x.getImageData(0, 0, SW, SH).data;
+  let sum = 0;
+  for (let i = 0; i < px.length; i += 4) sum += px[i] + px[i + 1] + px[i + 2];
+  if (sum / (px.length / 4 * 3) < 28) return null;
+  const r = Math.min(0.75, im.height / im.width), w = Math.min(im.width / 4, im.height / 4 / r), pw = SW * w / im.width, ph = SH * w * r / im.height;
+  const flat = (fx, fy) => {
+    const x0 = Math.round(Math.min(SW - pw, Math.max(0, fx * SW - pw / 2))), y0 = Math.round(Math.min(SH - ph, Math.max(0, fy * SH - ph / 2)));
+    const s = [0, 0, 0], q = [0, 0, 0];
+    let n = 0;
+    for (let y = y0; y < Math.min(SH, y0 + Math.round(ph)); y++) for (let xx = x0; xx < Math.min(SW, x0 + Math.round(pw)); xx++, n++)
+      for (let k = 0; k < 3; k++) { const v = px[(y * SW + xx) * 4 + k]; s[k] += v; q[k] += v * v; }
+    return s.every((t, k) => q[k] / n - (t / n) ** 2 < 64);  // no colour varies by more than a few steps
+  };
+  const spots = [];
+  for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) spots.push([0.2 + i * 0.1, 0.2 + j * 0.1]);
+  const live = spots.filter(([a, b]) => !flat(a, b));
+  if (live.length < spots.length * 0.7) return null;
+  return flat(fx, fy) ? live.reduce((m, p) => Math.hypot(p[0] - fx, p[1] - fy) < Math.hypot(m[0] - fx, m[1] - fy) ? p : m) : [fx, fy];
 }
 
 function gpPaint() {

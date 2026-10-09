@@ -171,12 +171,12 @@ async function drawEnemy() {
       : `<div class="enh">Damage type · Sin</div>${enResists(v) || `<div class="muted">No resistances listed.</div>`}`;
     if (v.sanity) body += `<div class="enh">Sanity</div><div class="enstage"><b>${v.sanity.name ? esc(v.sanity.name) : "Sanity"}</b>
         <span>starts at ${v.sanity.start}${v.sanity.low != null ? ` · low morale at ${v.sanity.low}` : ""}${v.sanity.panic != null ? ` · panic at ${v.sanity.panic}` : ""}</span></div>
-      ${v.sanity.lowDesc ? `<div class="skdesc enpanic"><span class="muted">Low morale:</span> ${fmtDesc(v.sanity.lowDesc)}</div>` : ""}
-      ${v.sanity.panicDesc ? `<div class="skdesc enpanic"><span class="muted">Panic:</span> ${fmtDesc(v.sanity.panicDesc)}</div>` : ""}`;
+      ${v.sanity.lowDesc ? `<div class="skdesc enpanic"><span class="muted">Low morale:</span> ${fmtDesc(v.sanity.lowDesc, true)}</div>` : ""}
+      ${v.sanity.panicDesc ? `<div class="skdesc enpanic"><span class="muted">Panic:</span> ${fmtDesc(v.sanity.panicDesc, true)}</div>` : ""}`;
   } else if (env.tab === "skills") {
-    body = skills.map(([s, label]) => skillView(s, 1, level, label, e.pic)).join(`<div class="sksep"></div>`) || `<div class="muted">No skills with a name in the game's files.</div>`;
+    body = skills.map(([s, label]) => skillView(s, 1, level, label, e.pic, true)).join(`<div class="sksep"></div>`) || `<div class="muted">No skills with a name in the game's files.</div>`;
   } else if (env.tab === "passives") {
-    body = passives.map(([p, label]) => passiveHtml(p).replace("Battle passive", label ? esc(label) : "Passive")).join("") || `<div class="muted">No passives.</div>`;
+    body = passives.map(([p, label]) => passiveHtml(p, true).replace("Battle passive", label ? esc(label) : "Passive")).join("") || `<div class="muted">No passives.</div>`;
   } else {
     body = v.stages.map((s) => `<div class="enstage"><b>${esc(s.label)}</b><span>${s.n} stage${s.n > 1 ? "s" : ""} · Lv ${s.lv[0]}${s.lv[1] !== s.lv[0] ? `–${s.lv[1]}` : ""}</span></div>
         ${s.stages.map((x) => `<div class="enstage sub"><span>${/^1\d{4}$/.test(x.id) ? `${+String(x.id).slice(1, 3)}-${+String(x.id).slice(3)}` : x.id}</span><b>${esc(x.title || "")}</b><span>${esc(x.place || "")}</span><span class="r">Lv ${x.lv}</span></div>`).join("")}`).join("")

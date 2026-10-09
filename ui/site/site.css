@@ -38,7 +38,7 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   .cmtext { grid-template-columns: minmax(0, 1fr); }
 }
 /* Animations on the site: Spine and battle animations — no tabs, links and exports that need the game's files */
-body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site #agif, body.site #enanim, body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
+body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #bfsaveall, body.site .bfcap button, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site #agif, body.site #enanim, body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
 body.site .fxapp { opacity: .4; cursor: default; }
 body.site #fxnote { flex-basis: 100%; }
 

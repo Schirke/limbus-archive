@@ -214,6 +214,7 @@
   if (typeof openAnimEntry === "function") {
     const open = openAnimEntry;
     window.openAnimEntry = async (sel) => {
+      anim.sel = sel;  // (before the wait: the list on the left is drawn right after the click, with this one marked)
       await fxList;
       const mine = sel && sel.cid != null && !sel.enemy && !sel.spine;
       if (mine) {

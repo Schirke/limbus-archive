@@ -57,17 +57,24 @@ class Store:
     def has_thumb(self, key: str) -> bool:
         return os.path.exists(self.path("thumbs", key, ".webp"))
 
-    def put_thumb(self, key: str, img) -> None:
+    def put_thumb(self, key: str, img, flip: bool = False) -> None:
+        """`img` may be changed. `flip`: turn it upside down (done on the small copy: cheaper)."""
         p = self.path("thumbs", key, ".webp")
         if os.path.exists(p):
             return
-        # snapshots make thousands of these: shrink by whole factors first (reducing_gap), then encode with the
-        # fastest WebP method — 2-3x quicker than method 4 for the same picture, files a bit larger
+        from PIL import Image
+        # snapshots make tens of thousands of these: average whole pixel blocks first (one cheap pass), then a
+        # bilinear step to the size, then the fastest WebP method — ~2x quicker than thumbnail() on the full picture
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGBA")
-        else:
-            img = img.copy()
-        img.thumbnail((THUMB_MAX, THUMB_MAX), reducing_gap=2.0)
+        k = max(img.size) // THUMB_MAX
+        if k > 1:
+            img = img.reduce(k)
+        img.thumbnail((THUMB_MAX, THUMB_MAX), Image.Resampling.BILINEAR)
+        if flip:
+            img = img.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+        if img.mode == "RGBA" and img.getextrema()[3][0] == 255:  # no transparency: no alpha plane to encode
+            img = img.convert("RGB")
         buf = io.BytesIO()
         img.save(buf, "WEBP", quality=75, method=0)
         self._atomic_write(p, buf.getvalue())

@@ -737,7 +737,7 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
             # up, not the skill's damage spread evenly over every hit. The killing skill: each part's share of what is
             # left (`fw`), the player drains the HP by it)
             own = out[start:]
-            cd, mx = carry["coinDmg"], fight["hpMax"][1 - carry["who"]] if carry["who"] in (0, 1) else 1
+            cd, top = carry["coinDmg"], fight["hpMax"][1 - carry["who"]] if carry["who"] in (0, 1) else 1
             hp_parts = [t for t in own if t["events"].get("hits")]
             P, C = len(hp_parts), len(cd)
             nh = {id(t): len(t["events"]["hits"]) for t in hp_parts}
@@ -759,7 +759,7 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
                     if tot > 0:
                         t["fw"] = round(part / tot, 4)
                 else:
-                    t["dmg"] = round(part / mx, 4)
+                    t["dmg"] = round(part / top, 4)
         if carry.get("rup"):
             own = out[start:] or [e]
             hit = 1 - carry["who"] if carry["who"] in (0, 1) else 1

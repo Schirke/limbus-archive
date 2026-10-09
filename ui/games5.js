@@ -129,7 +129,9 @@ function gaHome() {
       ${f ? `<div class="gepity">IDEALITY <b>${pity}</b> / ${GA_PITY}${pity >= GA_PITY ? ` <button id="gex">Exchange for ${esc(f.title)}</button>` : ""}</div>` : ""}
       <div class="gepull"><button id="ge1" ${gmW.lunacy < GA_COST ? "disabled" : ""}>Extract 1<small>${GM_LUNIMG}${GA_COST}</small></button><button id="ge10" ${gmW.lunacy < 10 * GA_COST ? "disabled" : ""}>Extract 10<small>${GM_LUNIMG}${10 * GA_COST}</small></button></div>
       ${gmW.lunacy < GA_COST ? `<a class="gebroke" href="#/games">Out of lunacy — play a game: today's Dailies pay the most</a>` : ""}</div>`;
-  document.querySelectorAll("#gehome [data-b]").forEach((el) => el.onclick = () => { ga.banner = ga.data.banners.find((x) => x.id === +el.dataset.b); st.banner = ga.banner.id; gaKeep(); gaSnd("gacha_whoosh", 0.4); gaHome(); });
+  document.querySelectorAll("#gehome [data-b]").forEach((el) => el.onclick = () => { ga.banner = ga.data.banners.find((x) => x.id === +el.dataset.b); st.banner = ga.banner.id; gaKeep();
+    const w = gaSnd("gacha_whoosh", 0.4); if (w) setTimeout(() => w.pause(), 1200);  // (the sample is the whoosh three times over: the first only)
+    gaHome(); });
   $("#getest").onclick = () => { gmW.lunacy += 10 * GA_COST; gmWKeep(); gaHome(); };
   $("#ge1").onclick = () => gaPull(1);
   $("#ge10").onclick = () => gaPull(10);

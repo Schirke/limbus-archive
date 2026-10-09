@@ -68,6 +68,8 @@ SECTIONS = {
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
                      r"local_video|sprites|browse|tree|types|container|scan|bank|export|open|site_|object|blob|report|characters|"
                      r"music_audio|quiz_audio|community|buff)")  # (community: who is live right now — a copy would only go stale)
+JOURNAL = "fetched.txt"  # (Exporter._journal_add)
+NO_JOURNAL = re.compile(r"^/api/(fx_video|buff_video|enemy_thumb)\b")
 CJK = re.compile("[぀-ヿ㐀-鿿가-힯]")
 PREVIEW = ("Texture2D", "Sprite", "AudioClip", "VideoClip", "TextAsset", "Mesh")  # ui: previewHtml asks for these as they are
 
@@ -331,7 +333,10 @@ class Exporter:
         self.progress = progress or (lambda stage, done, total, msg="": None)
         self.failed: list[tuple[str, str]] = []
         self.fresh: dict[str, int] = {}  # what was asked from the app this time (not kept from before), by part of the site
+        self._same: dict[str, object] = {}  # unchanged() by the game version a manifest was made from
         os.makedirs(os.path.join(self.out, "d", "m"), exist_ok=True)
+        self._jlock = threading.Lock()
+        self.journal = self._journal_read()
 
     # -- one request → one file
     def _get(self, key: str) -> tuple[bytes, str]:
@@ -371,11 +376,14 @@ class Exporter:
     def fetch_all(self, keys: list[str], have: dict, stage: str, sources: dict | None = None) -> dict:
         """keys → {key: file}; `have` = the manifest written last time, whose files are kept.
         sources: {key: the request that really gives its content} where the page's own request isn't the one to make."""
-        out, todo, sources = {}, [], sources or {}
+        out, todo, resumed, sources = {}, [], 0, sources or {}
         for k in keys:
             f = have.get(k)
             if f and os.path.exists(os.path.join(self.out, "d", f)):
                 out[k] = f
+            elif k in self.journal:  # fetched by a send that was cancelled or broke off
+                out[k] = self.journal[k]
+                resumed += 1
             else:
                 todo.append(k)
         done = [0]
@@ -387,18 +395,99 @@ class Exporter:
             with lock:
                 if f:
                     out[k] = f
+                    self._journal_add(k, f)
                 done[0] += 1
                 self.progress(stage, done[0], len(todo), k)
         # sounds are decoded one at a time by the app (FMOD), pictures come from the bundles a few at once
         with ThreadPoolExecutor(4) as pool:
             list(pool.map(one, todo))
-        self.fresh[stage.replace("site: ", "")] = sum(1 for k in todo if k in out)  # (the rest: the app has nothing there)
+        self.fresh[stage.replace("site: ", "")] = resumed + sum(1 for k in todo if k in out)  # (the rest: the app has nothing there)
         return out
+
+    # -- a send that stops halfway: what it fetched is written down as it comes (d/fetched.txt, not uploaded), so the
+    # next send goes on from there (the manifests are written only at the end of each part). A list asked again every
+    # time (a request without parameters) and the rendered videos (kept by their own rules) are not written down.
+    def _journal_path(self) -> str:
+        return os.path.join(self.out, "d", JOURNAL)
+
+    def _journal_head(self) -> str:
+        # (another game version or another app: the answers may differ)
+        return json.dumps({"game": _game(self.svc.latest_snapshot_id()), "app": __import__("limbusdm").__version__})
+
+    def _journal_read(self) -> dict:
+        out = {}
+        try:
+            with open(self._journal_path(), encoding="utf-8") as f:
+                lines = f.read().split("\n")
+        except OSError:
+            return out
+        if lines[0] == self._journal_head():
+            for ln in lines[1:]:
+                k, tab, rel = ln.partition("\t")
+                if tab and rel and os.path.exists(os.path.join(self.out, "d", rel)):  # (a line cut short by a crash: no file)
+                    out[k] = rel
+        self._journal_write(out)
+        return out
+
+    def _journal_write(self, entries: dict):
+        tmp = self._journal_path() + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(self._journal_head() + "\n" + "".join(f"{k}\t{v}\n" for k, v in entries.items()))
+        os.replace(tmp, self._journal_path())
+
+    def _journal_add(self, key: str, rel: str):
+        if not ("?" in key or key.startswith("/spine/")) or NO_JOURNAL.match(key) or "\n" in key or "\t" in key:
+            return
+        with self._jlock:
+            self.journal[key] = rel
+            try:
+                if not os.path.exists(self._journal_path()):
+                    self._journal_write({})
+                with open(self._journal_path(), "a", encoding="utf-8") as f:
+                    f.write(f"{key}\t{rel}\n")
+            except OSError:
+                pass
+
+    def forget(self):
+        """The send went through: every part is in its manifest."""
+        with self._jlock:
+            self.journal = {}
+            try:
+                os.remove(self._journal_path())
+            except OSError:
+                pass
+
+    # -- what a manifest of an earlier send still holds
+    def kept(self, old: dict, skip=()) -> dict:
+        """The files of `old` (a manifest written before) that stand for this game version: all of them when it was
+        made from the same game version (the time it was read on a computer doesn't count); after a game update, the
+        ones whose source the update left alone (unchanged()); none when that can't be told."""
+        if not old.get("id"):
+            return {}
+        urls = {k: f for k, f in (old.get("urls") or {}).items() if k not in skip}
+        if _game(old["id"]) == _game(self.svc.latest_snapshot_id()):
+            return urls
+        same = self.unchanged(old["id"])
+        return {k: f for k, f in urls.items() if same(k)} if same else {}
+
+    def unchanged(self, old_id: str):
+        """→ request -> whether the game version `old_id` answers it as this one does, from the two snapshots (None
+        when this computer has no snapshot of that version)."""
+        g = _game(old_id)
+        if g not in self._same:
+            sid = self.svc.latest_snapshot_id()
+            had = [s["id"] for s in self.svc.snapshots() if _game(s["id"]) == g]
+            try:
+                self._same[g] = _unchanged(self.svc.store.read_json(f"snapshots/{had[-1]}.json.gz"),
+                                           self.svc.load_snapshot(sid)) if had and sid else None
+            except Exception:
+                self._same[g] = None
+        return self._same[g]
 
     def _text(self, key: str, have: dict) -> str:
         """An answer that names what else to fetch (a list, an atlas): read back from the file the site keeps for it,
         asked from the app only when there is none — a second "Send to site" walks the lists without the app."""
-        rel = have.get(key)
+        rel = have.get(key) or self.journal.get(key)
         if rel:
             try:
                 with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8", errors="replace") as f:
@@ -503,7 +592,7 @@ class Exporter:
     def units(self) -> dict:
         old = self.read_manifest("units")
         sid = self.svc.latest_snapshot_id()
-        have = old.get("urls", {}) if old.get("id") == sid else {}  # another game version: every picture is asked again
+        have = self.kept(old)  # (another game version: only what it left alone is kept)
         units = self.svc.unit_db()
         # (the lists are the app's own making: a newer app writes them anew for the same game version)
         got = self.fetch_all(unit_urls(units), {k: f for k, f in have.items() if k != "/api/units"}, "site: Identities & E.G.O")
@@ -536,7 +625,7 @@ class Exporter:
         Spine files and the skill icons."""
         old = self.read_manifest("enemies")
         sid = self.svc.latest_snapshot_id()
-        have = old.get("urls", {}) if old.get("id") == sid else {}
+        have = self.kept(old)
         self.progress("site: Enemies", 0, 0)
         db = json.loads(self._get("/api/enemies")[0])
         keys = ["/api/enemies"] + [url_key("/api/enemy_thumb", app=a) for a in db.get("thumbs", [])]
@@ -548,8 +637,9 @@ class Exporter:
                 texts = json.loads(self._text(k, have))
             except Exception:
                 continue
-            for s in texts.get("skills", {}):
-                icon = f"Assets/Resources_moved/Sprite/SkillIcon/{s}.png"
+            for s, sk in texts.get("skills", {}).items():  # (the page's path: ui/db.js skillView)
+                sk = sk or {}
+                icon = sk.get("iconPath") or f"Assets/Resources_moved/Sprite/SkillIcon/{sk.get('icon') or s}.png"
                 thumbs.add(icon)
                 full.add(icon)
             sp = texts.get("spine") or []
@@ -599,7 +689,7 @@ class Exporter:
         without, only those with a skeleton). Renders with effects need the game's files and the app."""
         old = self.read_manifest("anim")
         sid = self.svc.latest_snapshot_id()
-        have = old.get("urls", {}) if old.get("id") == sid else {}
+        have = self.kept(old)
         self.progress("site: Animations", 0, 0)
         for _ in range(100):  # the enemies' chapters are sorted in the background on the first run
             chars = json.loads(self._get("/api/characters")[0])
@@ -706,7 +796,7 @@ class Exporter:
         plays with the Identities' data, Guess the track with the music.)"""
         old = self.read_manifest("quiz")
         sid = self.svc.latest_snapshot_id()
-        have = old.get("urls", {}) if old.get("id") == sid else {}
+        have = self.kept(old)
         q = self.svc.quiz()
         samples = {e[0] for e in (q.get("ids") or []) + (q.get("bosses") or []) if e}  # an entry: [sample name, whose, …]
         samples |= {ln[0] for c in q.get("chars") or [] for ln in c.get("lines") or []}  # Guess the character: [sample, text, where]
@@ -727,7 +817,7 @@ class Exporter:
         them by itself."""
         old = self.read_manifest("scenes")
         sid = self.svc.latest_snapshot_id()
-        have = old.get("urls", {}) if old.get("id") == sid else {}
+        have = self.kept(old)
         try:
             story = json.loads(self._get("/api/game_pics")[0]).get("story") or {}
         except Exception as e:
@@ -755,7 +845,7 @@ class Exporter:
         from . import gacha
         old = self.read_manifest("gacha")
         sid = self.svc.latest_snapshot_id()
-        have = old.get("urls", {}) if old.get("id") == sid else {}
+        have = self.kept(old)
         g = gacha.build(self.svc)
         keys = ["/api/gacha"] + [url_key("/api/gacha_ui", n=n) for n in gacha.UI_USED]
         # (the archive's banners too: Extraction → Banner archive shows their tiles, and "Pull" opens one of them)
@@ -784,12 +874,12 @@ class Exporter:
             self.failed.append(("/api/game_cards", str(e)))
             picked = {}
         # the app's answer is a preset (server.CARD_PRESET): the same as last time unless the preset was changed
-        kept = old.get("id") == sid and (old.get("cards") or {}) == picked
+        kept = bool(old.get("id")) and (old.get("cards") or {}) == picked
         if kept:
             picked = old["cards"]  # the same pictures as last time: nothing is uploaded again
         key = lambda u: url_key(urlsplit(u).path, **dict(parse_qsl(urlsplit(u).query)))  # noqa: E731
         keys = list(dict.fromkeys(key(u) for us in picked.values() for u in us))
-        urls = self.fetch_all(keys, old.get("urls", {}) if kept else {}, "site: Games (cards)")
+        urls = self.fetch_all(keys, self.kept(old) if kept else {}, "site: Games (cards)")
         m = {"kind": "cards", "id": sid, "urls": urls, "cards": {g: [u for u in us if key(u) in urls] for g, us in picked.items()}}
         self.write_manifest("cards", m)
         return m
@@ -799,7 +889,7 @@ class Exporter:
         for the game's picture paths, whose previews and pictures are fetched too. Returns how many got a file."""
         old = self.read_manifest("extra")
         sid = self.svc.latest_snapshot_id()
-        urls = dict(old.get("urls", {})) if old.get("id") == sid else {}
+        urls = self.kept(old)
         got = self.fetch_all([k for k in keys if k not in urls], {}, "site: what the pages asked for")
         paths = set()
 
@@ -832,7 +922,7 @@ class Exporter:
         old = self.read_manifest("buffs")
         fx = self.svc.buff_fx
         made = os.path.basename(fx.folder())  # (named by the game version and what draws the videos)
-        have = old.get("urls", {}) if old.get("id") == made else {}
+        have = old.get("urls", {}) if _game(old.get("id")) == _game(made) else {}
         st = {"list": fx.db()["list"], **fx.status()}
         names = list(dict.fromkeys(n for b in st["list"] for n in b.get("fx") or []))
         ready = set(st["have"])
@@ -860,7 +950,7 @@ class Exporter:
         old = self.read_manifest("tools")
         sid = self.svc.latest_snapshot_id()
         lists = ["/api/mirror", "/api/history"]
-        have = {k: f for k, f in old.get("urls", {}).items() if k not in lists} if old.get("id") == sid else {}
+        have = self.kept(old, lists)
         got = {}
         for k in lists:
             try:
@@ -1131,7 +1221,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
     def sweep(self) -> int:
         """Delete the files no manifest points at any more."""
-        keep = set()
+        keep = set(self.journal.values())  # (a send that broke off goes on with these)
         for fn in os.listdir(os.path.join(self.out, "d", "m")):
             if fn.endswith(".json.gz"):
                 keep.update(self.read_manifest(fn[:-8]).get("urls", {}).values())
@@ -1147,12 +1237,49 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 
 PULL_STAGE = "site: taking from the site"
+# what pull() takes of the site's parts (not the reports, the rendered videos or News: those have rules of their own)
+TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "cards", "tools", "extra", "music")
 
 
 def _game(made: str) -> str:
     """A snapshot's (or a renders folder's) name without the time it was read on this computer: the same game version
     on two computers."""
     return re.sub(r"_\d{8}-\d{6}", "", made or "")
+
+
+def _unchanged(a: dict, b: dict):
+    """→ request -> whether its answer is the same in the game version of snapshot b as in a's: what it is read from —
+    a bundle, a sound bank — is the same file in both (by its hash). Requests read from anything else (the game's
+    lists, its main build, pictures the app draws) say no and are asked again."""
+    ba, bb = a.get("bundles") or {}, b.get("bundles") or {}
+    aa, ab = a.get("assets") or {}, b.get("assets") or {}
+    fa, fb = a.get("files") or {}, b.get("files") or {}
+    banks = {}  # voice line → the bank it is in (the first one, as sound_index finds it)
+    for rel, rec in fb.items():
+        for name, *_ in rec.get("sounds") or []:
+            banks.setdefault(name.lower(), rel)
+
+    def bundle(n):
+        x, y = ba.get(n), bb.get(n)
+        return bool(x and y and x.get("hash") == y.get("hash") and not x.get("missing") and not y.get("missing"))
+
+    def same(key: str) -> bool:
+        path, _, qs = key.partition("?")
+        q = dict(p.split("=", 1) for p in qs.split("&") if "=" in p)
+        if path.startswith("/spine/"):  # /spine/<bundle>/<atlas>/<file>
+            return bundle(path.split("/")[2])
+        if path == "/api/thumb":  # named by its content
+            return True
+        if path in ("/api/object", "/api/clip", "/api/spine_scene", "/api/scene_sprite"):
+            return bundle(q.get("bundle", ""))
+        if path in ("/api/asset_img", "/api/asset_thumb"):
+            x, y = aa.get(q.get("path", "")), ab.get(q.get("path", ""))
+            return bool(x and y and x.get("bundle") and x["bundle"] == y.get("bundle") and bundle(x["bundle"]))
+        if path == "/api/quiz_audio":
+            rel = banks.get(q.get("s", "").lower())
+            return bool(rel and rel in fa and fa[rel].get("h") == fb[rel].get("h"))
+        return False
+    return same
 
 
 class Puller:
@@ -1247,7 +1374,8 @@ def pull(ex: Exporter, url: str) -> dict:
     videos (Animations → With effects, Buff effects) of this game version it lacks. A report taken off the site after
     this computer sent it is taken off here too. Refuses when the site shows a newer game version than this app has
     read: the upload would put the older data back.
-    → {"reports": taken, "removed": taken off here, "videos": taken, "files": files written}"""
+    The parts made from the game's files are taken too where this computer has none to go on from.
+    → {"reports": taken, "removed": taken off here, "videos": taken, "parts": taken, "files": files written}"""
     svc = ex.svc
     p = Puller(ex, url)
     ex.progress(PULL_STAGE, 0, 0)
@@ -1274,7 +1402,7 @@ def pull(ex: Exporter, url: str) -> dict:
         raise RuntimeError(f"the site has game data {site_game} and this app {mine or '(none)'} — start the app with the "
                            "game updated so it reads the new version, then send")
     names = set(idx.get("manifests") or [])
-    out = {"reports": 0, "removed": 0, "videos": 0}
+    out = {"reports": 0, "removed": 0, "videos": 0, "parts": 0}
     for name in sorted(n for n in names if n.startswith("report-") and not os.path.exists(ex._manifest_path(n))):
         m = p.manifest(name)
         if not m:
@@ -1324,6 +1452,21 @@ def pull(ex: Exporter, url: str) -> dict:
                     have.setdefault(cid, {})[v] = list(dict.fromkeys(have[cid].get(v, []) + ok))
             local["none"] = list(dict.fromkeys((local.get("none") or []) + (site.get("none") or [])))
         ex.write_manifest(name, local)
+    # the parts made from the game's files, where this computer has none to go on from: never sent from here, or sent
+    # from a game version it has no snapshot of any more (with one, Exporter.kept() keeps what the patch left alone).
+    # The site's part of the same game version comes whole; of an older one, as far as the patch left it alone.
+    for name in TAKEN_PARTS:
+        local = ex.read_manifest(name)
+        if name not in names or (local.get("id") and ex.unchanged(local["id"])):
+            continue
+        site = p.json(f"m/{name}.json.gz")
+        if site.get("v") != VERSION or not site.get("id"):
+            continue
+        if _game(site["id"]) != mine and (name == "music" or not ex.unchanged(site["id"])):
+            continue
+        site["urls"] = p.files(site.get("urls") or {})
+        ex.write_manifest(name, site)
+        out["parts"] += 1
     # the game versions the taken reports are between: the site's state lists them, this app may not have them
     snaps = {s["id"]: s for s in ((idx.get("inline") or {}).get("/api/state") or {}).get("snapshots") or []}
     if snaps:
@@ -1332,7 +1475,7 @@ def pull(ex: Exporter, url: str) -> dict:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(merged, f, ensure_ascii=False)
     out["files"] = p.taken
-    ex.fresh["taken from the site"] = out["reports"] + out["videos"]
+    ex.fresh["taken from the site"] = out["reports"] + out["videos"] + out["parts"]
     return out
 
 
@@ -1344,6 +1487,7 @@ def export(svc, base_url: str, reports: list[str] | None = None, units=True, pro
     if units:
         ex.pages()
     ex.shell()
+    ex.forget()
     return {"dir": ex.out, "failed": len(ex.failed), "size": size_of(ex.out)}
 
 
@@ -1486,6 +1630,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     chk = verify(ex, progress)
     size = size_of(packed_dir(svc))
     if not cfg["project"]:
+        ex.forget()
         return {"site": "", "dir": packed_dir(svc), "check": chk, **size}
     # what this upload changes on the site: the packed folder's files next to the ones sent the last time
     sent_path = os.path.join(svc.data_dir, "site_sent.json")
@@ -1502,6 +1647,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
             "data": {k: n for k, n in ex.fresh.items() if n}, "files": size["files"], "bytes": size["bytes"], "check": chk}
     with open(sent_path, "w", encoding="utf-8") as f:
         json.dump({"files": now, "last": last}, f)
+    ex.forget()
     return {"site": url, "dir": packed_dir(svc), "sent": last, **size}
 
 

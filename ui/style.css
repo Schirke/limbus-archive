@@ -780,6 +780,7 @@ button.gihint { cursor: pointer; } button.gihint:hover { border-color: var(--gol
 .bfhead h2 { margin: 0; font-size: 22px; } .bfhead h2.pos { color: #f8c200; } .bfhead h2.neg { color: #ff3b2f; } .bfhead h2.neu { color: #c49a6c; }
 .bfvids { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 440px)); gap: 10px; margin-bottom: 12px; }
 .bfvids figure { margin: 0; } .bfvids figcaption { font-size: 11px; opacity: .6; margin-top: 3px; word-break: break-all; }
+.bfvids .bfcap { opacity: 1; gap: 6px; align-items: center; } .bfvids .bfcap .mono { opacity: .6; } .bfcap button { font-size: 12px; padding: 2px 8px; }
 .bfvids video, .bfnone { width: 100%; aspect-ratio: 16 / 9; background: #0b090a radial-gradient(#2a2427, #0b090a); display: block; }
 .bfnone { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; opacity: .8; font-size: 13px; } .bfnone .progress { width: 160px; }
 .bfwho { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }

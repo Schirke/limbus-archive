@@ -21,6 +21,7 @@ DEFAULT_SETTINGS = {
     "game_dir": "",
     "auto_on_start": True,
     "thumbs": True,
+    "light": False,
     "ignore": DEFAULT_IGNORE,
 }
 
@@ -146,8 +147,8 @@ class Service:
             self.job = {"kind": kind, "running": True, "stage": "starting", "done": 0, "total": 0, "msg": "",
                         "started": time.time(), "error": None, "result": None}
 
-        def progress(stage, done, total, msg=""):
-            self.job.update(stage=stage, done=done, total=total, msg=msg)
+        def progress(stage, done, total, msg="", eta=None):
+            self.job.update(stage=stage, done=done, total=total, msg=msg, eta=eta)
 
         def runner():
             try:
@@ -169,7 +170,8 @@ class Service:
             prev_id = self.latest_snapshot_id()
             prev = self.load_snapshot(prev_id) if prev_id else None
             self._snapshotter = Snapshotter(self.store, self.game, ignore=self.settings["ignore"],
-                                            thumbs=self.settings["thumbs"], progress=progress)
+                                            thumbs=self.settings["thumbs"], progress=progress,
+                                            light=self.settings.get("light", False))
             snap = self._snapshotter.take(prev)
             result = {"snapshot": snap["id"]}
             if not (prev and auto_report):
@@ -1031,6 +1033,20 @@ class Service:
                 if "/SkillIcon/" in e["pic"]:  # (a Versus pick falls back to a skill's icon: not a portrait)
                     e["pic"] = ""
                 e["anim"] = e["app"] in battle
+            # newer story enemies' skill pictures sit in subfolders (SkillIcon/Ep9_2/132508.png): the page asks by path
+            root, sub = "Assets/Resources_moved/Sprite/SkillIcon/", {}
+            if self.ensure_browse():
+                con = sqlite3.connect(self.ensure_browse())
+                try:
+                    for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Sprite/SkillIcon/%'"):
+                        sub.setdefault(name, set()).add(c)
+                finally:
+                    con.close()
+            for s in db["skills"].values():
+                n = str(s.get("icon") or s["id"])
+                paths = sub.get(n) or set()
+                if paths and f"{root}{n}.png" not in paths:
+                    s["iconPath"] = min(paths)
             self.store.write_json(rel, db)
         self._enemies = (sid, db)
         return db
