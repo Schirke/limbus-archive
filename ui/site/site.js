@@ -113,7 +113,7 @@
   // once as #/community/stats/<key>.
   if (!checking.has("check")) {
     let opened = [], shut = false;
-    const here = () => { const [, name = "home", , id] = location.hash.split("/"); return [name, name === "db" && id ? id : ""]; };
+    const here = () => [location.hash.split("/")[1] || "home", ""];
     const tell = (leaving) => {
       if (shut) return;
       const body = JSON.stringify({ p: here()[0], o: opened.splice(0) });
@@ -122,6 +122,11 @@
     };
     window.addEventListener("hashchange", () => { if (opened.length < 50) opened.push(here()); });
     opened.push(here());
+    // an Identity's or E.G.O's card: opened by a click in the list (the link stays) or by a link — both come here
+    if (typeof openUnit === "function") {
+      const open = openUnit;
+      window.openUnit = function (id) { if (/^\d{5}$/.test(String(id)) && opened.length < 50) opened.push(["db", String(id), 1]); return open.apply(this, arguments); };
+    }
     tell();
     setInterval(() => { if (!document.hidden) tell(); }, 600e3);
     document.addEventListener("visibilitychange", () => { if (document.hidden && opened.length) tell(true); });

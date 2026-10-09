@@ -159,12 +159,12 @@ export class Stats extends DurableObject {
       bump("dv:" + (/iPad|Tablet|Android(?!.*Mobi)/i.test(ua) ? "Tablet" : /Mobi|iPhone/i.test(ua) ? "Phone" : "Desktop"));
     }
     this.put("INSERT INTO s VALUES (?, ?, ?, ?) ON CONFLICT (h) DO UPDATE SET at = excluded.at, p = excluded.p", h, day, now, page);
-    // the pages opened since the page told last: [[page, Identity or E.G.O]]; a page of before sends one, or a "beat"
+    // the pages opened since the page told last: [[page, Identity or E.G.O, 1 = its card alone, not a page]]; a page
+    // of before sends one, or a "beat"
     const opened = Array.isArray(m.o) ? m.o.slice(0, OPENED) : m.beat ? [] : [[m.p, m.u]];
     for (const o of opened) {
       if (!Array.isArray(o)) continue;
-      bump("p");
-      bump("pg:" + name(o[0]));
+      if (!o[2]) { bump("p"); bump("pg:" + name(o[0])); }
       if (/^\d{5}$/.test(o[1] || "")) bump("u:" + o[1]);
     }
   }
