@@ -79,7 +79,8 @@ def out_dir(svc) -> str:
 def config(svc) -> dict:
     """data/site_config.json: {"contact": "Discord: name", "audio": true, "video": true, "full_images": true,
     "project": the Cloudflare Worker the site is uploaded to (none: the site is only written to disk), "url": its address,
-    "index": true = search engines may list the site (kept out otherwise), "stats_key": who may open Site stats, "owner_key": who sees the allowance there (the page is opened once as
+    "index": true = search engines may list the site (kept out otherwise), "google_verify": Google Search Console's
+    code for the front page's verification tag, "stats_key": who may open Site stats, "owner_key": who sees the allowance there (the page is opened once as
     #/community/stats/<key>), "budget": {"day": the day of the month the Cloudflare plan's period starts
     on, "requests", "objects", "rows": what a period may spend of Worker requests, Durable Object requests and rows
     written before the count and the live rooms are closed until the next one (ui/site/worker.js)}}."""
@@ -1074,6 +1075,8 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         head = [f'<meta name="description" content="{e(desc)}">']
         if not self.cfg.get("index"):
             head.append('<meta name="robots" content="noindex, nofollow">')
+        if route == "home" and self.cfg.get("google_verify"):  # (Google Search Console: the site is ours)
+            head.append(f'<meta name="google-site-verification" content="{e(self.cfg["google_verify"])}">')
         if url:
             head += [f'<link rel="canonical" href="{e(here)}">', '<meta property="og:type" content="website">',
                      '<meta property="og:site_name" content="Limbus Archive">', f'<meta property="og:title" content="{e(full)}">',
