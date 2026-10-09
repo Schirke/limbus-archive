@@ -144,3 +144,10 @@ body.site #player { bottom: 58px; }
   .hbig { min-height: 50px; font-size: 22px; padding: 0 20px; }
   .htiles { grid-template-columns: 1fr; } .hids { grid-template-columns: repeat(2, 1fr); }
 }
+/* a section's own page as it is written (limbusdm/site.py): what search engines read, until the app draws the section */
+.seo { max-width: 1100px; margin: 0 auto; line-height: 1.5; }
+.seo h1 { margin: 0 0 6px; font-size: 26px; }
+.seo h2 { margin: 22px 0 6px; font-size: 17px; color: var(--gold); }
+.seo p { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
+.seo p b { color: var(--text); }
+.seonav { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 24px; font-size: 13px; }

@@ -11,7 +11,17 @@
   // line, the art of the newest Identities taking turns behind it, the latest patch, the sections and the newest
   // Identities. Somebody sent the bare link lands here.
   OPEN.add("home");
-  if (location.hash.length < 3) history.replaceState(null, "", "#/home");
+  // a section's own page (/db, /enemies…: limbusdm/site.py, written for search engines) opens the app on it
+  if (location.hash.length < 3) {
+    const page = location.pathname.replace(/^\/+|\/+$|\.html$/g, "");
+    history.replaceState(null, "", "/" + location.search + "#/" + (page && page !== "index" ? page : "home"));
+  }
+  const titled = () => {
+    const h = location.hash.slice(2).split("/"), t = (SITE.titles || {})[h[0] === "games" && h[1] === "track" ? "games/track" : h[0]];
+    document.title = t && h[0] !== "home" ? `${t} · Limbus Company · Limbus Archive` : "Limbus Archive";
+  };
+  window.addEventListener("hashchange", titled);
+  titled();
   document.querySelector("#top .brand").setAttribute("href", "#/home");
   const HOME_TILES = [
     ["patches", "patches", "Patches", "What every update changed: new units, highlights, texts, pictures, sounds.", "BottomMenu_1_11"],

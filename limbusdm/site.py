@@ -25,6 +25,7 @@ import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from html import escape as html_escape
 from urllib.parse import quote
 from urllib.request import urlopen
 
@@ -40,6 +41,28 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # the pages the site is written for (each has its part in Exporter); any other page of the UI is opened on the site
 # only when the check finds it asking for nothing the site lacks (verify)
 BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners"]
+# the sections' pages for search engines (Exporter.section_pages): route → (name, a line of what is there); the
+# games not named here take their name from the menu
+SECTIONS = {
+    "patches": ("Patch reports", "What every Limbus Company update changed, read from the game's files: new Identities and E.G.O, "
+                "changed skills and texts, new pictures, sounds and videos."),
+    "news": ("News", "Limbus Company developer notices and update announcements, each next to the report of what the update changed."),
+    "changes": ("Change history", "Buffs, nerfs and text changes of Identities, E.G.O and statuses in Limbus Company, update by update."),
+    "db": ("Identities & E.G.O", "Every Limbus Company Identity and E.G.O: skills, coins, passives, resistances, stats and full art."),
+    "enemies": ("Enemies", "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by Canto."),
+    "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
+    "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
+    "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
+    "teams": ("Team builder", "Put a Limbus Company team of Identities and E.G.O together and share it as a link or a team code."),
+    "mirror": ("Mirror Dungeon planner", "Limbus Company Mirror Dungeon: E.G.O gifts by keyword and tier, theme packs and their bosses."),
+    "banners": ("Banner archive", "Every Limbus Company Extraction banner: when it ran and who was on it."),
+    "gamegacha": ("Extraction", "A Limbus Company Extraction simulator, paid with the lunacy the site's games give."),
+    "games": ("Games", "Limbus Company guessing games: Identities, skills, enemies, music, Wordle, Connections and more, alone or live with friends."),
+    "live": ("Live match", "Play the Limbus Company guessing games with friends at the same time, in one room."),
+    "community": ("Community", "Who streams Limbus Company right now, and channels worth a look."),
+    "support": ("Support & credits", "Support the Limbus Archive project, and who made it."),
+    "home": ("Limbus Archive", "Limbus Company fan archive: patch highlights, Identity and E.G.O database, enemies, animations, music and mini-games."),
+}
 # requests the check never fetches by itself: the app's own state and controls, renders, the game's raw files, and the
 # ones a part of Exporter makes its own way
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
@@ -905,10 +928,12 @@ class Exporter:
         scripts = re.findall(r'<script src="([^"]+)"></script>\s*', html)
         html = re.sub(r'<script src="[^"]+"></script>\s*', "", html)
         stamp = str(int(time.time()))
+        pages = self.section_pages(html)
         boot = f"""<script>
-const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "scripts": [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]})};
+const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "titles": {r: t for r, (t, _, _) in pages.items()}, "scripts": [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]})};
 (async () => {{
-  const fail = (m) => {{ document.getElementById("main").innerHTML = '<div class="empty">' + m + '</div>'; }};
+  // (a section's page keeps the text it was written with: what a search engine reads, the app not starting)
+  const fail = (m) => {{ document.getElementById("main").insertAdjacentHTML("afterbegin", '<div class="empty">' + m + '</div>'); }};
   if (!("serviceWorker" in navigator)) return fail("This site needs service workers — open it in a normal (not private) window of a current browser.");
   try {{
     await navigator.serviceWorker.register("/sw.js");
@@ -927,16 +952,142 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 }})();
 </script>
 """
-        # search engines are kept out unless the site's settings say "index": true
-        found = ('<meta name="description" content="Limbus Company: patch highlights, Identity and E.G.O database, '
-                 'animations, music and mini-games.">' if self.cfg.get("index") else '<meta name="robots" content="noindex, nofollow">')
-        html = html.replace("</head>", f'{found}\n<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n</head>')
+        html = html.replace("</head>", f'<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n</head>')
         html = html.replace("</body>", boot + "</body>")
-        with open(os.path.join(self.out, "index.html"), "w", encoding="utf-8") as f:
-            f.write(html)
+        # every section has a page of its own (/db, /enemies…): its title, description and a text of what is there —
+        # the app's pages live after "#", which a search engine takes for the front page. A visitor gets the app
+        # opened on that section (ui/site/site.js)
+        for fn in os.listdir(self.out):
+            if fn.endswith(".html") and fn != "index.html":
+                os.remove(os.path.join(self.out, fn))
+        shutil.rmtree(os.path.join(self.out, "games"), ignore_errors=True)
+        url = (self.cfg.get("url") or "").rstrip("/")
+        for route in pages:
+            path = "index.html" if route == "home" else route + ".html"
+            os.makedirs(os.path.dirname(os.path.join(self.out, path)) or self.out, exist_ok=True)
+            with open(os.path.join(self.out, path), "w", encoding="utf-8") as f:
+                f.write(self._page(html, pages, route, url))
+        # search engines are kept out unless the site's settings say "index": true
         with open(os.path.join(self.out, "robots.txt"), "w") as f:
-            f.write("User-agent: *\nAllow: /\n" if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
+            f.write(("User-agent: *\nAllow: /\n" + (f"Sitemap: {url}/sitemap.xml\n" if url else "")) if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
+        # (the list of those pages, for a search engine to find them all)
+        sitemap = os.path.join(self.out, "sitemap.xml")
+        if self.cfg.get("index") and url:
+            day = time.strftime("%Y-%m-%d")
+            with open(sitemap, "w", encoding="utf-8") as f:
+                f.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                        + "".join(f"<url><loc>{url}/{'' if r == 'home' else r}</loc><lastmod>{day}</lastmod></url>\n" for r in pages)
+                        + "</urlset>\n")
+        elif os.path.exists(sitemap):
+            os.remove(sitemap)
         self.index()
+
+    # -- the sections' own pages, for search engines (shell)
+    def _answer(self, key: str):
+        """What the site answers to `key` (an /api/… list), read back from its own files; None when it has none."""
+        for fn in sorted(os.listdir(os.path.join(self.out, "d", "m"))):
+            if fn.startswith("report-") or not fn.endswith(".json.gz"):
+                continue
+            rel = self.read_manifest(fn[:-8]).get("urls", {}).get(key)
+            if isinstance(rel, str):
+                try:
+                    with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8") as f:
+                        return json.load(f)
+                except (OSError, ValueError):
+                    return None
+        return None
+
+    def section_pages(self, html: str) -> dict:
+        """{route: (title, description, the page's text)} for every section the site opens, the front page ("home")
+        first. The games' names come from the menu (ui/index.html), the lists from what the site holds."""
+        names = {}
+        for route, attrs, label in re.findall(r'<a href="#/([\w/]+)"([^>]*)>(.*?)</a>', html):
+            t = re.search(r'title="([^"]+)"', attrs)
+            names.setdefault(route, re.sub(r"<[^>]+>", "", label).strip() or (t.group(1) if t else ""))
+        open_ = set(self.open_routes()) | {"home"}
+        if "games" in open_:
+            open_.add("games/track")
+        pages = {}
+        for route in ["home"] + list(SECTIONS) + list(names):
+            if route in pages or route not in open_ or not (route in SECTIONS or names.get(route)):
+                continue
+            title, desc = SECTIONS.get(route) or (names[route], f"{names[route]}: a Limbus Company guessing game on Limbus Archive. "
+                                                                 "Play alone or in a live match with friends.")
+            pages[route] = (title, desc, self._section_text(route))
+        return pages
+
+    def _section_text(self, route: str) -> str:
+        """The lists a section shows, as plain text a search engine reads (the app draws the page over it)."""
+        e = lambda v: html_escape(str(v or ""))  # noqa: E731
+        out = []
+
+        def group(head, rows):  # rows: [(sub-heading, [names])]
+            rows = [(k, list(dict.fromkeys(x for x in v if x))) for k, v in rows]
+            rows = [(k, v) for k, v in rows if v]
+            if rows:
+                out.append(f"<h2>{e(head)}</h2>" + "".join(f"<p>{f'<b>{e(k)}</b>: ' if k else ''}{', '.join(e(x) for x in v)}</p>" for k, v in rows))
+
+        def by(items, key, name):
+            rows = {}
+            for x in items:
+                rows.setdefault(key(x) or "", []).append(name(x))
+            return list(rows.items())
+        if route in ("db", "teams", "anim"):
+            u = self._answer("/api/units") or {}
+            group("Identities", by(u.get("ids") or [], lambda x: x.get("sinnerName"), lambda x: x.get("title")))
+            group("E.G.O", by(u.get("egos") or [], lambda x: x.get("sinnerName"), lambda x: f"{x.get('name')} ({x.get('grade')})"))
+        elif route == "enemies":
+            d = self._answer("/api/enemies") or {}
+            group("Enemies and Abnormalities", by(d.get("list") or [], lambda x: x.get("group"), lambda x: x.get("name")))
+        elif route == "stages":
+            d = self._answer("/api/stages") or {}
+            group("Chapters", [("", [c.get("label") for c in d.get("chapters") or []])])
+        elif route == "buffs":
+            d = self._answer("/api/buffs") or {}
+            group("Statuses", [("", [b.get("name") for b in d.get("list") or []])])
+        elif route == "mirror":
+            d = self._answer("/api/mirror") or {}
+            group("Theme packs", [("", [p.get("name") for p in d.get("packs") or []])])
+            group("E.G.O gifts", by((d.get("gifts") or {}).values(), lambda x: x.get("kw") or "Other", lambda x: x.get("name")))
+        elif route == "changes":
+            d = self._answer("/api/history") or {}
+            cards = d.get("cards") or {}
+            group("Updates", [(p.get("day"), [(cards.get(c) or {}).get("name") for c in p.get("cards") or {}]) for p in d.get("patches") or []])
+        elif route in ("home", "patches", "news"):
+            d = self._answer("/api/news") or {}
+            group("Updates", [(p.get("day"), [(p.get("notice") or {}).get("title") or "Update"]) for p in (d.get("patches") or [])[:30]])
+        elif route == "banners":
+            d, u = self._answer("/api/gacha") or {}, self._answer("/api/units") or {}
+            who = {x.get("id"): f"{x.get('title')} {x.get('sinnerName')}" for x in u.get("ids") or []}
+            who.update({x.get("id"): f"{x.get('name')} {x.get('sinnerName')}" for x in u.get("egos") or []})
+            group("Banners", [("Until " + (b.get("end") or "")[:10] if b.get("end") else "", [who.get(i, str(i)) for i in b.get("pick") or []]) for b in d.get("archive") or []])
+        return "".join(out)
+
+    def _page(self, html: str, pages: dict, route: str, url: str) -> str:
+        """index.html as the page of one section: its own title, description, address and text."""
+        e = html_escape
+        title, desc, body = pages[route]
+        full = "Limbus Archive: Limbus Company patches, database, animations and games" if route == "home" else f"{title} · Limbus Company · Limbus Archive"
+        here = f"{url}/{'' if route == 'home' else route}"
+        pic = route.split("/")[0]
+        pic = pic if os.path.exists(os.path.join(resource_dir(), "ui", "site", "home", pic + ".webp")) else "db"
+        head = [f'<meta name="description" content="{e(desc)}">']
+        if not self.cfg.get("index"):
+            head.append('<meta name="robots" content="noindex, nofollow">')
+        if url:
+            head += [f'<link rel="canonical" href="{e(here)}">', '<meta property="og:type" content="website">',
+                     '<meta property="og:site_name" content="Limbus Archive">', f'<meta property="og:title" content="{e(full)}">',
+                     f'<meta property="og:description" content="{e(desc)}">', f'<meta property="og:url" content="{e(here)}">',
+                     f'<meta property="og:image" content="{e(url)}/ui/site/home/{pic}.webp">', '<meta name="twitter:card" content="summary_large_image">']
+            if route == "home":
+                head.append('<script type="application/ld+json">' + json.dumps({"@context": "https://schema.org", "@type": "WebSite",
+                                                                               "name": "Limbus Archive", "url": url + "/"}) + "</script>")
+        links = "".join(f'<a href="/{"" if r == "home" else r}">{e("Home" if r == "home" else t)}</a>' for r, (t, _, _) in pages.items() if r != route)
+        text = (f'<div class="seo"><h1>{e("Limbus Archive" if route == "home" else title)}</h1><p>{e(desc)}</p>{body}'
+                f'<nav class="seonav">{links}</nav></div>')
+        html = re.sub(r"<title>.*?</title>", f"<title>{e(full)}</title>", html, count=1)
+        html = html.replace("</head>", "\n".join(head) + "\n</head>", 1)
+        return html.replace('<main id="main"></main>', f'<main id="main">{text}</main>', 1)
 
     def index(self):
         names = sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "m")) if fn.endswith(".json.gz"))
@@ -1377,9 +1528,14 @@ def pack(src: str, dst: str) -> dict:
     again and nothing of it is uploaded twice. Files of PACK size and up (music, video, big art) stay on their own."""
     shutil.rmtree(os.path.join(dst, "ui"), ignore_errors=True)
     os.makedirs(dst, exist_ok=True)
+    # (a section's page that is gone from the site goes from here too: Exporter.shell)
+    for name in os.listdir(dst):
+        if name.endswith((".html", ".xml")) and not os.path.exists(os.path.join(src, name)):
+            os.remove(os.path.join(dst, name))
+    shutil.rmtree(os.path.join(dst, "games"), ignore_errors=True)
     for name in os.listdir(src):
         a, b = os.path.join(src, name), os.path.join(dst, name)
-        if name == "ui":
+        if name in ("ui", "games"):
             shutil.copytree(a, b)
         elif os.path.isfile(a):
             shutil.copyfile(a, b)
@@ -1489,6 +1645,11 @@ def serve_dir(root: str, port: int = 0):
         def end_headers(self):
             self.send_header("Cache-Control", "no-cache")
             super().end_headers()
+
+        def translate_path(self, path):
+            # a section's page: /db is db.html, as the host serves it
+            full = super().translate_path(path)
+            return full + ".html" if not os.path.exists(full) and os.path.isfile(full + ".html") else full
 
         def do_GET(self):
             m = re.match(r"bytes=(\d+)-(\d*)", self.headers.get("Range") or "")
