@@ -320,7 +320,7 @@ function openUnit(id) {
         <div class="panel"><h4>Stagger</h4>${x.stagger.map((p) => `<div><b class="gold">${Math.floor(hp * p / 100)}</b> <span class="muted small">(${p}%)</span></div>`).join("") || `<span class="muted">—</span>`}</div>
       </div>
       ${x.statuses.length ? `<div class="panel"><h4>Keywords</h4><div class="kwrow">${x.statuses.map((k) => `<span class="kw ${(UNITS.glossary[k] || {}).type || "neu"} big" data-kw="${k}">${statusIcon(k, "s28")}${esc(statusName(k))}</span>`).join("")}</div></div>` : ""}
-      ${x.assoc.length ? `<div class="panel"><h4>Trait Keywords</h4><div class="chips">${x.assoc.map((a) => `<span class="trait">${esc(a)}</span>`).join("")}</div></div>` : ""}`;
+      ${(x.traitKw || []).length ? `<div class="panel"><h4>Trait Keywords</h4><div class="chips">${x.traitKw.map((t) => `<span class="trait${/<s>/.test(t.name) ? " gone" : ""}">${esc(t.name.replace(/<[^>]*>/g, ""))}</span>`).join("")}</div></div>` : ""}`;
     } else {
       h += `<div class="panels two">
         <div class="panel"><h4>Cost</h4><div class="kwrow">${x.cost.map((c) => `<span class="kwi">${sinIcon(c.sin, "s28")}<b>×${c.n}</b></span>`).join("")}</div></div>

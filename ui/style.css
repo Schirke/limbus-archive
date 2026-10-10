@@ -267,6 +267,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .kwrow { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 .kwi { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
 .trait { font-size: 12px; padding: 2px 9px; background: #2a1d14; border: 1px solid #4a3424; border-radius: 3px; color: #d9b98f; }
+.trait.gone { color: #d40000; text-decoration: line-through; }
 .sinres { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; } .sinres > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .uprow { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; }
 .upbtn { width: 40px; height: 40px; padding: 0; background: #17110d; border: 1px solid #3a281b; border-radius: 6px; opacity: .55; }

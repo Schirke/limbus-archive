@@ -15,7 +15,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 13  # bump when the database layout changes (cached per snapshot)
+VERSION = 14  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -142,6 +142,25 @@ def threadspin(require: list | None) -> list[int]:
     return []
 
 
+def _trait_name(unit_kw: dict, code: str) -> str:
+    """The game's text as it is (a red struck-out one marks a title the character lost): the pages take the tags off,
+    and a language's table (langs.py) finds it by this very text."""
+    return str((unit_kw.get(f"UnitKeyword_{code}") or {}).get("content") or "")
+
+
+def _bare(s: str) -> str:
+    return _one_line(re.sub(r"<[^>]*>", "", s))
+
+
+def _traits(unit_kw: dict, codes: list) -> list[dict]:
+    out = []
+    for c in codes:
+        name = _trait_name(unit_kw, c)
+        if _bare(name) and not any(_bare(t["name"]) == _bare(name) for t in out):
+            out.append({"name": name})
+    return out
+
+
 def build(tables: dict, loc_dir: str) -> dict:
     loc_ids = _load(loc_dir, r"EN_Personalities(-.*)?\.json$")
     loc_egos = _load(loc_dir, r"EN_Egos(-.*)?\.json$")
@@ -152,6 +171,8 @@ def build(tables: dict, loc_dir: str) -> dict:
     keywords = _load(loc_dir, r"EN_BattleKeywords.*\.json$")
     tags = _load(loc_dir, r"EN_SkillTag.*\.json$")
     assoc = _load(loc_dir, r"EN_AssociationName.*\.json$")
+    # the game names both associations and unit keywords with UnitKeyword_<code>; codes it never names stay hidden in game
+    unit_kw = _load(loc_dir, r"EN_UnitKeyword.*\.json$")
     skills = _records(tables, "skill")
     passives = _records(tables, "passive")
     id_passives = {r.get("personalityID"): r for d in (tables.get("personality-passive") or {}).values()
@@ -186,8 +207,9 @@ def build(tables: dict, loc_dir: str) -> dict:
             "id": pid, "sinner": sinner, "sinnerName": SINNERS[sinner - 1] if 1 <= sinner <= 12 else _one_line(loc.get("name")),
             "title": _one_line(loc.get("title")), "rank": r.get("rank"), "season": r.get("season"),
             "date": _date(r.get("updatedDate") or r.get("releaseDate")),
-            "assoc": [_one_line((assoc.get(f"associationName_{a}") or {}).get("content")) or a.replace("_", " ").title()
-                      for a in r.get("associationList") or []],
+            "assoc": [_bare(_trait_name(unit_kw, a)) or _one_line((assoc.get(f"associationName_{a}") or {}).get("content"))
+                      or a.replace("_", " ").title() for a in r.get("associationList") or []],
+            "traitKw": _traits(unit_kw, (r.get("associationList") or []) + (r.get("unitKeywordList") or [])),
             "traits": r.get("unitKeywordList") or [],
             "keywords": kws, "statuses": [k for k in STATUSES if k in kws],
             "hp": (r.get("hp") or {}).get("defaultStat"), "hpLevel": (r.get("hp") or {}).get("incrementByLevel"),

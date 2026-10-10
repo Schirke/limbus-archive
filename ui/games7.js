@@ -54,7 +54,7 @@ const GN_ROUNDS = 5, GN_WORTH = 2000, GN_STEP = 400, GN_SLACK = 4;
 const GN_KINDS = { sinner: "SINNER", assoc: "FACTION", season: "SEASON" };
 const gn = { game: null, ids: [] };
 window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/gamechain")) gn.game = null; });
-const gnTraits = (x, hard) => [...(hard ? [] : [["sinner", x.sub]]), ...x.assoc.filter((k) => !k.startsWith("Limbus Company")).map((k) => ["assoc", k]),
+const gnTraits = (x, hard) => [...(hard ? [] : [["sinner", x.sub]]), ...x.assoc.filter((k) => !/^(Limbus Company|LC[A-Z]\??$)/.test(k)).map((k) => ["assoc", k]),
   ...(hard && x.season && x.season !== "—" ? [["season", x.season]] : [])];
 // what two Identities share ([kind, name]), or nothing
 function gnLink(a, b, hard) {
