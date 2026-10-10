@@ -36,10 +36,10 @@ const LANG = { id: "", list: null, tables: {} };
 try { LANG.id = localStorage.getItem(LANG_KEY) || ""; } catch {}
 if (LANG.id === "en") LANG.id = "";
 // the lists that carry the game's texts (others: the app's own words, file names, reports' raw records)
-const LANG_PAGES = /^\/api\/(units|enemies|enemy|buffs|music|mirror|bgm_tracks|quiz|gacha|sounds|stages|history|game_cards|characters|skills|versus_list)\b/;
-const LANG_STORY = /^\/api\/(quiz|gacha|sounds)\b/;  // …and the story / voice lines
+const LANG_PAGES = /^\/api\/(units|enemies|enemy|buffs|music|mirror|bgm_tracks|quiz|gacha|sounds|story|story_ep|stages|history|game_cards|characters|skills|versus_list)\b/;
+const LANG_STORY = /^\/api\/(quiz|gacha|sounds|story|story_ep)\b/;  // …and the story / voice lines
 // the fields that are a text to show; anything else only when it reads as a sentence (a name there may be a key)
-const LANG_FIELDS = new Set(["name", "title", "desc", "flavor", "coindescs", "panicDesc", "lowDesc", "sinnerName", "place", "who", "text", "line", "lines", "abName", "subtitle"]);
+const LANG_FIELDS = new Set(["name", "title", "desc", "flavor", "coindescs", "panicDesc", "lowDesc", "sinnerName", "place", "who", "text", "line", "lines", "abName", "subtitle", "role", "label"]);
 const LANG_MAPS = new Set(["keywords", "tags"]);  // {key: its name} lists (as lists of keys they stay)
 async function langTable(g) {
   const k = LANG.id + "/" + g;

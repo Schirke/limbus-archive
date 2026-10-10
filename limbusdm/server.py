@@ -618,6 +618,48 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     node = soundlib.find(db, json.loads(q["path"]))
                     return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {}})
                 return self._json(soundlib.outline(db["tree"]))
+            if p == "/api/story":  # Database → Story (limbusdm/story.py): chapters, episodes, Sinners' Identity stories
+                from . import story
+                lang = q.get("lang", "en")
+                return self._json(story.index(svc, lang if lang in story.LANGS else "en"))
+            if p == "/api/story_ep":  # one story file as scenes
+                from . import story
+                lang = q.get("lang", "en")
+                ep = story.episode_of(svc, q.get("id", ""), lang if lang in story.LANGS else "en")
+                return self._json(ep) if ep else self._json({"error": "no such story"}, 404)
+            if p == "/api/story_model":  # a layered standing picture: where its body and faces sit
+                from . import story
+                lay = story.model_layout(svc, q.get("path", "")) if q.get("path", "").startswith("Assets/Resources_moved/Story/StandingModel/") else None
+                return self._json(lay) if lay else self._json({"error": "no such model"}, 404)
+            if p == "/api/story_sprite":  # one sprite of such a model
+                from . import story
+                png = story.sprite_png(svc, q.get("b", ""), int(q.get("p", "0")))
+                if png is None:
+                    return self._send(404, b"no picture", "text/plain")
+                return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
+            if p == "/api/story_pic":  # a story picture as a kept, smaller WebP
+                from . import story
+                path = q.get("path", "")
+                png = story.picture(svc, path, int(q.get("m", "1920"))) if path.startswith("Assets/Resources_moved/Story/") else None
+                if png is None:
+                    return self._send(404, b"no picture", "text/plain")
+                return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
+            if p == "/api/story_audio":  # a story's voice / effect / music as a kept Ogg Opus
+                from . import story
+                got = story.audio(svc, q.get("s", ""))
+                if got is None:
+                    return self._send(404, b"no such sound", "text/plain")
+                return self._send(200, got[0], got[1], {"Cache-Control": "max-age=86400"})
+            if p == "/api/story_video":  # a story's video (Story/Video/<name>.mp4)
+                from . import story
+                found = story.assets(svc)["video"].get(q.get("name", "").lower())
+                rows = svc.lookup_container(found) if found else []
+                r = next((x for x in rows if x["type"] == "VideoClip"), None)
+                bundle_file = svc.object_file(r["bundle"]) if r else None
+                if not bundle_file:
+                    return self._send(404, b"no video", "text/plain")
+                data, mime, _fn = extract(bundle_file, int(r["pid"]))
+                return self._send(200, data, mime, {"Cache-Control": "max-age=86400"})
             if p == "/api/quiz_audio":  # one voice line by its sample's name
                 from .banks import export_wav
                 from .viewer import sound_index
