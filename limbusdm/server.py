@@ -657,9 +657,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 spines = svc.enemy_spines()
                 making = _drawn_thumbs(svc, db["list"], spines, done)
                 # twins: looks whose picture repeats an earlier one's in the handbook (Guess the enemy asks it once)
-                from .twins import repeats
+                from .twins import repeats, sparse
                 looks = [a for a in dict.fromkeys(e["app"] for e in db["list"]) if a in done]
-                twins = [looks[i] for i in repeats([os.path.join(_thumb_dir(svc), a + ".png") for a in looks])]
+                files = [os.path.join(_thumb_dir(svc), a + ".png") for a in looks]
+                twins = [looks[i] for i in dict.fromkeys(list(repeats(files)) + sparse(files))]  # (+ pictures with next to nothing drawn)
                 return self._json({**{k: v for k, v in db.items() if k not in ("skills", "passives", "list")},
                                    "list": [{**e, "spine": bool(spines.get(e["app"]))} for e in db["list"]],
                                    "thumbs": sorted({e["app"] for e in db["list"]} & done), "twins": twins, "nothumb": _no_thumbs(svc),

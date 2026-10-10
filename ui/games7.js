@@ -258,7 +258,7 @@ function gbDraw() {
       ${g.hard && !d ? `<input id="gbtype" class="dbq" placeholder="Buff or debuff…" autocomplete="off"><div id="gbsugg" class="gmsugg"></div><button class="toggle gmmore" id="gbskip">I don't know</button>`
       : g.hard ? `<div class="gmopts"><div class="gmopt ${d.ok ? "ok" : "bad"}"><b>${esc(d.said || "—")}</b><i>your answer</i></div></div>`
       : `<div class="gmopts">${g.opts.map((o) => `<button class="gmopt ${cls(o.key)}" data-k="${esc(o.key)}" ${d ? "disabled" : ""}><b>${esc(o.title)}</b><i>${d ? esc(o.sub) : ""}</i></button>`).join("")}</div>`}
-      ${d ? `<div class="gbdesc">${a.icon ? `<img src="${giThumb(a.icon)}" onerror="this.remove()">` : ""}<span>${esc(a.desc.split("\n").slice(0, 4).join("\n"))}</span></div>
+      ${d ? `<div class="gbdesc">${a.icon ? `<img src="${giThumb(a.icon)}" onerror="this.remove()">` : ""}<span>${fmtDesc(a.desc.split("\n").slice(0, 4).join("\n"))}</span></div>
         <div class="gmafter"><a href="#/buffs/${encodeURIComponent(a.id)}">Open in Buff effects →</a><button class="gmbtn" id="gbnext">${g.round + 1 < g.of ? "Next" : "Result"}</button></div>` : ""}</div></div>`;
   // an effect whose video can't be played: another one takes the round
   $("#main video").onerror = () => {

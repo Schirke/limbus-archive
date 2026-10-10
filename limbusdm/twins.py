@@ -61,3 +61,18 @@ def repeats(paths: list) -> dict[int, int]:
         _found.clear()
     _found[keys] = out
     return out
+
+
+def sparse(paths, least=0.05):
+    """Indexes of pictures with almost nothing drawn (Grant Us Love's idle shows only its tentacles: its body is not in the
+    picture) — a silhouette game cannot ask about them."""
+    from PIL import Image
+    out = []
+    for i, p in enumerate(paths):
+        try:
+            a = Image.open(p).convert("RGBA").getchannel("A")
+        except OSError:
+            continue
+        if sum(a.histogram()[128:]) < least * a.width * a.height:
+            out.append(i)
+    return out
