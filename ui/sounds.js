@@ -36,6 +36,7 @@ routes.sounds = async (args) => {
       <button class="sndnav" id="sndnext" title="Next" aria-label="Next"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l11-7z"/></svg></button>
       <span class="mono" id="sndclock">0:00</span><div class="sndseek" id="sndseek"><i></i></div><span class="mono muted" id="sndlen">0:00</span>
       <input type="range" id="sndvol" min="0" max="1" step="0.01" title="Volume" aria-label="Volume">
+      <button class="sndnav" id="sndclose" title="Close" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M5.6 4.2 12 10.6l6.4-6.4 1.4 1.4-6.4 6.4 6.4 6.4-1.4 1.4-6.4-6.4-6.4 6.4-1.4-1.4 6.4-6.4-6.4-6.4z"/></svg></button>
       <audio id="sndaudio" preload="none"></audio></div></div>`;
   const a = $("#sndaudio");
   a.volume = mediaVol();
@@ -54,6 +55,12 @@ routes.sounds = async (args) => {
   $("#sndtoggle").onclick = () => a.src && (a.paused ? a.play() : a.pause());
   $("#sndprev").onclick = () => snd.cur > 0 && sndPlay(snd.cur - 1);
   $("#sndnext").onclick = () => snd.cur + 1 < snd.list.length && sndPlay(snd.cur + 1);
+  $("#sndclose").onclick = () => {  // stops the sound and hides the bar (playing another brings it back)
+    a.pause(); a.removeAttribute("src"); a.load();
+    snd.cur = -1; snd.all = false;
+    $("#sndbar").hidden = true;
+    sndMark();
+  };
   try { snd.tree = snd.tree || await api("/api/sounds"); }
   catch (e) { $("#sndbody").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   sndDraw();
