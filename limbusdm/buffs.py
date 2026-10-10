@@ -392,9 +392,7 @@ class BuffFx:
 
     def _render(self, names: list[str]) -> set[str]:
         svc, fx = self.svc, self.db()["fx"]
-        exe, ff = viewer.viewer_exe(), viewer.ffmpeg_exe()
-        if not exe or not ff:
-            raise RuntimeError("LimbusViewer.exe or ffmpeg is missing")
+        exe, ff = viewer.tools()
         extra = [dict(fx[n], name=n) for n in names]
         job = dict(viewer.make_job(svc, HOST, False), effectKind="")
         have = set(job["bundles"])

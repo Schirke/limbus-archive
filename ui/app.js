@@ -4,6 +4,19 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const CJK = /[぀-ヿ㐀-鿿가-힯]/;
 const PAGE = 200;
+// every video / sound on the pages starts at the volume of Settings → Video volume (25 % at first); a volume set on one of them
+// is kept for the next. Versus videos (data-vol="keep") and the music players (not on the page) keep their own sound
+const MEDIA_VOL = "media.vol";
+const mediaVol = () => { try { const v = parseFloat(localStorage.getItem(MEDIA_VOL)); return v >= 0 && v <= 1 ? v : 0.25; } catch { return 0.25; } };
+document.addEventListener("loadstart", (e) => {
+  const m = e.target;
+  if (!(m instanceof HTMLMediaElement) || m.dataset.vol) return;
+  m.dataset.vol = "1"; m.volume = mediaVol();
+}, true);
+document.addEventListener("volumechange", (e) => {
+  const m = e.target;
+  if (m instanceof HTMLMediaElement && m.dataset.vol === "1" && !m.muted) try { localStorage.setItem(MEDIA_VOL, String(m.volume)); } catch {}
+}, true);
 
 async function api(path, body) {
   const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-Limbus-Datamine": "1" }, body: JSON.stringify(body) };
@@ -194,7 +207,7 @@ setInterval(refresh, 2000);
 // were read from the one before, or from nothing on the first run, so they are read again.
 function newSnapshot() {
   anim.data = null; UNITS = null; ENEMIES = null; STAGES = null; MIRROR = null; HISTORY = null; ga.data = null; gi.data = null; vs.maps = vs.bgm = null;
-  if (typeof vm !== "undefined") vm.cat = null;
+  if (typeof m2 !== "undefined") m2.cat = null;
   if (!$("#player")) muStart();
   if (["anim", "db", "enemies", "stages", "teams", "versus", "autobattler", "mirror", "vsmirror", "changes", "banners"].includes(location.hash.split("/")[1])) route();
 }
@@ -803,6 +816,7 @@ routes.anim = async () => {
     <div class="an-main" id="aview"><div class="an-empty">Pick a Sinner's Identity or E.G.O, or an enemy on the left.<br>
       <span class="muted small">Skills with the game's own effects and sounds, battle clips, single effects, and your mods — all for the one you pick.</span></div></div></div>`;
   $("#alist").innerHTML = `<div class="muted" style="padding:10px">Loading…</div>`;
+  setTimeout(() => loadSpinePlayer().catch(() => {}), 0);  // (the Spine player's script, meanwhile: a skeleton opens without waiting for it)
   if (!anim.data) anim.data = await api("/api/characters");
   await units().catch(() => null);
   anim.owned = new Set(await api("/api/mods_owned").catch(() => []));
@@ -1831,9 +1845,12 @@ async function openSpine(x, host) {
   host.querySelector(".spzip").onclick = () => exportObj({ spine: { bundle: x.bundle, atlas: x.atlas, base: x.base } });
   host.querySelector(".spgif").onclick = (e) => spineGif(x.base, e.target);
   host.querySelector(".spvid").onclick = (e) => spineVideo(x.base, e.target);
-  let sp;
-  try { sp = await loadSpinePlayer(); } catch (e) { host.querySelector(".spbox").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-  const scene = await api(`/api/spine_scene?bundle=${encodeURIComponent(x.bundle)}&atlas=${x.atlas}`).catch(() => ({}));
+  // (all at once: the player's script, the illustration's layers, the skeleton's atlas — not one after another)
+  spineAtlas(x.bundle, x.atlas);
+  const [sp, scene] = await Promise.all([loadSpinePlayer().catch((e) => e),
+    api(`/api/spine_scene?bundle=${encodeURIComponent(x.bundle)}&atlas=${x.atlas}`).catch(() => ({}))]);
+  if (sp instanceof Error) { host.querySelector(".spbox").innerHTML = `<div class="empty">${esc(sp.message)}</div>`; return; }
+  if (!host.isConnected) return;
   const hasScene = !!(scene.layers && scene.layers.some((l) => l.kind === "image"));
   const full = hasScene && spn.full !== false;
   if (hasScene) {
@@ -1850,6 +1867,7 @@ async function openSpine(x, host) {
   }
   // the stack of the illustration: runs of images share one WebGL canvas, every skeleton gets its own player;
   // a skeleton's origin sits at (ox, oy) of the frame, 1 skeleton unit = 1 frame pixel
+  scene.layers.forEach((l) => l.kind === "spine" && spineAtlas(x.bundle, l.atlas));
   const parts = [];
   for (const l of scene.layers) {
     if (l.kind === "image") {
@@ -1878,11 +1896,28 @@ async function openSpine(x, host) {
     sel.onchange = () => { spn.player.setAnimation(sel.value, true); spn.players.forEach((p) => p.play()); };
   }
 }
+// a skeleton's files' address, and its atlas (asked for once; the skeleton and pages are asked for meanwhile, so the player finds them on their way)
+const spineBase = (bundle, atlas) => `/spine/${encodeURIComponent(bundle)}/${atlas}.2/skeleton`;  // .2: pages scaled back to the atlas size (old cached copies are stretched)
+function spineAtlas(bundle, atlas) {
+  const base = spineBase(bundle, atlas);
+  spn.atlas = spn.atlas || new Map();
+  if (!spn.atlas.has(base)) {
+    const p = fetch(`${base}.atlas`).then((r) => r.ok ? r.text() : "").catch(() => "");
+    spn.atlas.set(base, p);
+    p.then((text) => {
+      if (!text) { spn.atlas.delete(base); return; }  // (asked again next time)
+      fetch(`${base}.json`).catch(() => {});
+      for (const ln of text.split("\n")) if (/\.(png|jpg|webp)$/i.test(ln.trim())) fetch(`${base.slice(0, -"skeleton".length)}${encodeURIComponent(ln.trim())}`).catch(() => {});
+    });
+    if (spn.atlas.size > 40) spn.atlas.delete(spn.atlas.keys().next().value);
+  }
+  return spn.atlas.get(base);
+}
 // one Spine player in `box`; resolves with the player once loaded (null if it could not play)
 async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
-  const base = `/spine/${encodeURIComponent(bundle)}/${atlas}.2/skeleton`;  // .2: pages scaled back to the atlas size (old cached copies are stretched)
+  const base = spineBase(bundle, atlas);
   // ~10% of atlases are not premultiplied; drawing them as premultiplied gives dark fringes
-  const atlasText = await fetch(`${base}.atlas`).then((r) => r.text()).catch(() => "");
+  const atlasText = await spineAtlas(bundle, atlas);
   const pma = /^\s*pma\s*:\s*true/mi.test(atlasText);
   return new Promise((resolve) => {
     const make = (vp) => new sp.SpinePlayer(box, {
@@ -3185,7 +3220,7 @@ function versusCard(key, spec, big) {
   return `<div class="card" ${big ? 'style="margin-top:10px"' : ""}><div class="row" style="gap:8px;margin-bottom:6px"><b class="grow">${esc(versusTitle(spec))}</b>
       <span class="muted small">${esc(what)}</span><button data-vsave="${key}">Save</button>
       <button data-vsgif="${key}" title="A GIF under 10 MB, for Discord">GIF</button><button data-vsagain="${key}" title="These settings back on the page">↻ Same settings</button></div>
-    <video controls preload="metadata" ${big === "play" ? "autoplay" : ""} src="/api/fx_video?id=${key}&name=Versus&t=${Date.now()}" style="width:100%;background:#000"></video></div>`;
+    <video controls preload="metadata" data-vol="keep" ${big === "play" ? "autoplay" : ""} src="/api/fx_video?id=${key}&name=Versus&t=${Date.now()}" style="width:100%;background:#000"></video></div>`;
 }
 // the Save / GIF / Same settings buttons of the cards in `el` (`list`: their {key, spec})
 function vsBindCards(el, list) {
@@ -3318,6 +3353,8 @@ routes.settings = async () => {
       <div class="hint">Needed for "before" pictures — the game deletes old files when it updates.</div>
       <label>Light mode</label><div><input type="checkbox" id="light" ${s.light ? "checked" : ""}> snapshots read 2 files at a time instead of all at once</div>
       <div class="hint">Slower, but needs much less memory and leaves the PC free — for weak PCs or 8 GB of memory.</div>
+      <label>Video volume</label><div class="row" style="gap:8px"><input type="range" id="mediavol" min="0" max="100" step="1" value="${Math.round(mediaVol() * 100)}"><span id="mediavoln">${Math.round(mediaVol() * 100)} %</span></div>
+      <div class="hint">How loud videos and sounds start on the pages (skills, effects, files). Versus and the music player keep their own volume. Saved at once.</div>
       <label>Ignored files</label><textarea id="ignore" class="mono">${esc(s.ignore.join("\n"))}</textarea>
       <div class="hint">Patterns of files that change on every launch (logs etc.), one per line.</div>
       <div></div><div><button class="primary" id="save">Save</button> <button id="open-data">Open data folder</button>
@@ -3330,6 +3367,10 @@ routes.settings = async () => {
   });
   $("#save").onclick = async () => { await api("/api/settings", collect()); toast("Saved"); refresh(); };
   $("#open-data").onclick = () => api("/api/open", { path: st.data_dir });
+  $("#mediavol").oninput = (e) => {
+    $("#mediavoln").textContent = e.target.value + " %";
+    try { localStorage.setItem(MEDIA_VOL, String(e.target.value / 100)); } catch {}
+  };
   api("/api/disk").then((r) => { if ($("#disk")) $("#disk").textContent = fmtSize(r.bytes); }).catch(() => {});
   if (st.site_publish) { main.insertAdjacentHTML("beforeend", `<h2>Website</h2><div class="card" id="sitebox"><span class="muted">Asking the site which build it shows…</span></div>`); drawSiteBox(); }
   $("#open-videos").onclick = () => api("/api/open", { path: st.data_dir + "\\videos" });

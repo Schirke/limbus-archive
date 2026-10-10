@@ -698,6 +698,7 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
     F = (a, b)
     out, place, runs = [], None, -1
     lands = 0  # (each landing's parts carry its number: one skill, see viewer.skill_cutins)
+    landed = None
     names = [a["name"], b["name"]]
     short = [n.split(" - ")[0] if " - " in n else n for n in names]
     if short[0] == short[1]:
@@ -715,7 +716,7 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
             e.update(place=place, runs=runs)
             place = None
         return e
-    ST = ("bleed", "burn", "rupture", "poise", "tremor")
+    ST = ("bleed", "burn", "rupture", "poise", "tremor") + tuple(fight.get("stExtra") or ())  # (+ a Mirror kit's things)
     carry, start = None, 0
 
     def flush():
@@ -770,6 +771,8 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
             if carry.get(k):
                 old = e.get(k) or [0.0, 0.0]
                 e[k] = [round(old[i] + carry[k][i] / mx[i], 4) for i in (0, 1)]
+        if carry.get("sh"):  # (both Shields after it, shares of each one's max HP: the player sets them at its end)
+            e["sh"] = [round(carry["sh"][i] / mx[i], 4) for i in (0, 1)]
         e.update(hasSt=True, stL=[x for n in ST if n in carry["st"][0] for x in [ST.index(n)] + carry["st"][0][n]],
                  stR=[x for n in ST if n in carry["st"][1] for x in [ST.index(n)] + carry["st"][1][n]])
     for s in fight["steps"]:
@@ -821,6 +824,8 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
             e["speed"] = round(max(RULES["clash_slowest"], RULES["clash_speed"] * min(1.0, 0.75 + 0.25 * lead_in / RULES["clash_quick"])), 3)
             if spec.get("numbers") and not s.get("defense"):
                 e.update(powL=s["pow"][0], powR=s["pow"][1])
+            if s.get("drum"):  # (Mirror 10414: her bullet drum fires one as the round starts)
+                e.update(drum=s["drum"], drumAt=0.0, drumRe=bool(s.get("drumRe")))
             if other is not None:
                 poff = round(V._clash_blow(other["events"]) - V._clash_blow(lead["events"]), 4)
                 e.update(partnerTl=dict(other, who=1 - who, poff=poff),
@@ -834,6 +839,25 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
             ev, lastt = e["events"], max((h["t"] for h in e["events"].get("hits") or []), default=None)
             if lastt is not None and ev.get("moves"):
                 e["events"] = dict(ev, moves=[m for m in ev["moves"] if m["t"] < lastt - 1e-3])
+            if s.get("mid") and landed and landed[2] == 1 - s["who"]:
+                # (a Mirror bonus shot during the other one's attack, after the coins it dodged — the parts of a coin as
+                # flush() maps them: on the attacker's next part it plays AT THE SAME TIME as its partner ("overlay": its
+                # shot takes its damage off the attacker before that part's blow); dodged to the end: right after it)
+                i0, P, _w, C = landed
+                hp = [k for k in range(P) if out[i0 + k]["events"].get("hits")]
+                pos = i0 + P
+                if hp and s["mid"] < C:
+                    last = max(h for j, h in enumerate(hp) if j * C // len(hp) < s["mid"]) if len(hp) >= C else hp[(s["mid"] - 1) * len(hp) // C]
+                    pos = i0 + last + 1
+                shot_at = min((h["t"] for h in s["anim"]["events"].get("hits") or []), default=0.0)
+                drum = dict(drum=s["drum"], drumAt=round(shot_at, 4), drumRe=bool(s.get("drumRe"))) if s.get("drum") else {}
+                if pos < i0 + P and "partnerTl" not in out[pos]:
+                    out[pos].update(partnerTl=dict(s["anim"], who=s["who"], poff=0.0), overlay=True, overlayDmg=round(s.get("dmgShare", 0), 4),
+                                    psounds=[dict(x) for x in s["anim"]["events"]["sounds"]], **drum)
+                    continue
+                # (a shot, not a COUNTER; coin: from just before its shot — the player ends a strike 0.5 s after its blow)
+                out.insert(pos, dict(e, recover=0.0, throwLast=False, counter=False, coin=True, **drum))
+                continue
             out.append(placed(e))
             continue
         # a landing: the skill with all its coins (a later skill: the camera closes in on its wind-up, tilted)
@@ -860,6 +884,7 @@ def script(fight: dict, a: dict, b: dict, spec: dict) -> list[dict]:
         for t in parts:
             t["dmg"] = round(s.get("dmgShare", 0) * len(t["events"].get("hits") or []) / n, 4)
         parts[0]["note"] = note(s)
+        landed = (len(out), len(parts), w, s.get("coins") or 1)  # (where this landing's parts are: a mid-attack shot goes in)
         out.append(placed(parts[0]))
         out += parts[1:]
     flush()

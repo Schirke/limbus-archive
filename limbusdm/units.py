@@ -15,7 +15,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 10  # bump when the database layout changes (cached per snapshot)
+VERSION = 11  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:

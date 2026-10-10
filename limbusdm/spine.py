@@ -4,8 +4,11 @@ Names are not unique (many skeletons are called "imported"), so everything goes 
 """
 from __future__ import annotations
 
+import hashlib
+import os
 import re
 import threading
+import time
 
 from .extract import _env, _lock, on_drop
 
@@ -63,17 +66,71 @@ def page_sizes(text: str) -> dict[str, tuple[int, int]]:
     return out
 
 
-def fit_page(png: bytes, size: tuple[int, int] | None) -> bytes:
+def fit_page(im, size: tuple[int, int] | None) -> bytes:
     """Unity resizes atlas pages to powers of two on import (678×812 → 512×1024). Spine meshes compute their UVs
-    from the real image size, so a stretched page shifts and cuts them: scale it back to the size in the atlas."""
+    from the real image size, so a stretched page shifts and cuts them: scale it back to the size in the atlas.
+    `im`: the page (PIL image) → PNG, written fast (it is kept on disk: cached())."""
     import io
     from PIL import Image
-    im = Image.open(io.BytesIO(png))
-    if not size or im.size == tuple(size):
-        return png
+    if size and im.size != tuple(size):
+        im = im.resize(tuple(size), Image.LANCZOS)
     buf = io.BytesIO()
-    im.resize(tuple(size), Image.LANCZOS).save(buf, "PNG")
+    im.save(buf, "PNG", compress_level=1)
     return buf.getvalue()
+
+
+# The files of a skeleton as the page gets them (pages fitted, the illustration's scene), kept on disk: an open
+# skeleton otherwise loads its bundle again (bundles leave memory after a minute, extract.IDLE_S) and fits its pages
+# again — a second or more each time. Named by the bundle file (path, size, time) and the request: a game update
+# makes new ones, and what was not asked for in CACHE_DAYS goes.
+CACHE_DIR = "spine_cache"
+CACHE_DAYS = 30
+_pruned: set[str] = set()
+
+
+def cached(data_dir: str, bundle_path: str, key: str, make, keep: bool = True) -> bytes:
+    """make() → bytes, kept in <data>/spine_cache under `key` of this bundle file (`keep` False: read if there, not
+    written — the site's export asks for every skeleton once and keeps its own copies)."""
+    d = os.path.join(data_dir, CACHE_DIR)
+    try:
+        st = os.stat(bundle_path)
+        name = hashlib.sha1(f"{bundle_path}|{st.st_size}|{st.st_mtime_ns}|{key}".encode("utf-8", "replace")).hexdigest()[:24]
+    except OSError:
+        return make()
+    f = os.path.join(d, name)
+    try:
+        with open(f, "rb") as fh:
+            data = fh.read()
+        if time.time() - os.path.getmtime(f) > 86400:  # (used: stays)
+            os.utime(f)
+        return data
+    except OSError:
+        pass
+    data = make()
+    if not keep:
+        return data
+    try:
+        os.makedirs(d, exist_ok=True)
+        tmp = f"{f}.{threading.get_ident()}.tmp"
+        with open(tmp, "wb") as fh:
+            fh.write(data)
+        os.replace(tmp, f)
+    except OSError:
+        pass
+    if d not in _pruned:
+        _pruned.add(d)
+        threading.Thread(target=_prune, args=(d,), daemon=True).start()
+    return data
+
+
+def _prune(d: str):
+    old = time.time() - CACHE_DAYS * 86400
+    for e in os.scandir(d):
+        try:
+            if e.stat().st_mtime < old or e.name.endswith(".tmp") and e.stat().st_mtime < time.time() - 3600:
+                os.remove(e.path)
+        except OSError:
+            pass
 
 
 def spine_map(bundle_path: str) -> dict[int, dict]:

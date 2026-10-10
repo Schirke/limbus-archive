@@ -1261,7 +1261,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpgift img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .mpgift.ex { border-color: #8a6a2c; }
 .mpgift.on { border-color: var(--gold); background: linear-gradient(#6a4a1d, #3b2710); box-shadow: inset 0 0 10px rgba(255, 138, 0, .55); }
-.mpgift u { position: absolute; left: 4px; top: 1px; font-size: 11px; text-decoration: none; color: var(--gold); text-shadow: 0 0 3px #000; }
+.mpgift u { position: absolute; left: 4px; top: 0; font: 16px "LC Bebas", sans-serif; text-decoration: none; color: var(--gold); text-shadow: 0 0 3px #000, 0 0 3px #000; }
 .mpgift s { position: absolute; right: 2px; bottom: 2px; font: 11px "LC Bebas", sans-serif; text-decoration: none; background: #6b3fa0; color: #fff; padding: 0 4px; letter-spacing: .06em; }
 .mpgi { width: 34px; height: 34px; background: #0c0807; border: 1px solid var(--line); object-fit: contain; flex: none; display: inline-block; }
 .mpgi.only { border-color: var(--gold); }
@@ -1390,6 +1390,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .vmsteps em { margin-left: 10px; align-self: center; font: 13px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; font-style: normal; color: var(--muted); }
 .vmstats .gold b, .vmstats .gold span { color: var(--gold); }
 .vmstats .gold b { display: inline-flex; align-items: center; gap: 6px; }
+.vmstats .vmshield b, .vmstats .vmshield span, .vmsh { color: #6cb8ff; }
 .vmcost { margin-left: 4px; font-weight: bold; }
 .vm .seg { display: inline-flex; align-items: center; gap: 4px; margin-right: 8px; }
 .vmstage.vmpack { align-items: center; }

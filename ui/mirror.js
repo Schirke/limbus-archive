@@ -98,7 +98,7 @@ function mpPicker() {
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}</div>
     <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}"`, esc(mpKw(k)))).join("")}</div>
     <div class="mpchips"><span class="muted small">Sort</span>${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => tg(mp.sort === k, `data-s="${k}"`, l)).join("")}<span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
-    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""}" data-g="${id}" data-pick>${g.pic ? `<img src="${imgThumb(g.pic)}" loading="lazy">` : ""}<u>${"I".repeat(g.tier)}</u>${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}</div>`).join("")}</div></div>`;
+    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""}" data-g="${id}" data-pick>${g.pic ? `<img src="${imgThumb(g.pic)}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}</div>`).join("")}</div></div>`;
 }
 
 function mpBuild(r) {

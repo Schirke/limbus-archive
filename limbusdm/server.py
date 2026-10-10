@@ -118,6 +118,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 body = f.read()
             self._send(200, body, ctype, {"Cache-Control": "no-cache", "ETag": tag})
 
+        def _keep(self) -> bool:
+            """Spine files made for this request are kept on disk: not for the site's export (limbusdm/site.py, urllib)."""
+            return not (self.headers.get("User-Agent") or "").startswith("Python-urllib")
+
         def _spine_file(self, p: str):
             """/spine/<bundle>/<atlas pid>/skeleton.json | skeleton.atlas | <page>.png"""
             from urllib.parse import unquote
@@ -127,7 +131,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             bundle, atlas_pid, fn = parts
             atlas_pid = atlas_pid.split(".")[0]  # "<pid>.<n>": n only busts the WebView's cache
             try:
-                data, mime = spine_file(svc, bundle, int(atlas_pid), fn)
+                data, mime = spine_file(svc, bundle, int(atlas_pid), fn, self._keep())
             except FileNotFoundError as e:
                 return self._send(404, str(e).encode(), "text/plain")
             return self._send(200, data, mime, {"Cache-Control": "max-age=3600"})
@@ -504,14 +508,18 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     return self._json({"error": "bundle not in the game cache"}, 404)
                 if p == "/api/scene_sprite":
                     return self._send(200, full_sprite(path, int(q["pid"])), "image/png", {"Cache-Control": "max-age=86400"})
-                scenes = art_scenes(path)
-                found = scenes.get(int(q["atlas"]))
-                if not found and scenes:
-                    # the illustration may use another cut of the same skeleton ("<base>_분리버전" next to "<base>")
-                    base = next((x["base"] for x in svc.spine_list() if x["bundle"] == q["bundle"] and x["atlas"] == q["atlas"]), None)
-                    cuts = {x["atlas"]: x["base"] for x in svc.spine_list() if x["bundle"] == q["bundle"]}
-                    found = next((sc for a, sc in scenes.items() if base and cuts.get(str(a), "").startswith(base)), None)
-                return self._json(found or {})
+
+                def scene():
+                    scenes = art_scenes(path)
+                    found = scenes.get(int(q["atlas"]))
+                    if not found and scenes:
+                        # the illustration may use another cut of the same skeleton ("<base>_분리버전" next to "<base>")
+                        base = next((x["base"] for x in svc.spine_list() if x["bundle"] == q["bundle"] and x["atlas"] == q["atlas"]), None)
+                        cuts = {x["atlas"]: x["base"] for x in svc.spine_list() if x["bundle"] == q["bundle"]}
+                        found = next((sc for a, sc in scenes.items() if base and cuts.get(str(a), "").startswith(base)), None)
+                    return json.dumps(found or {}, ensure_ascii=False).encode("utf-8")
+                from .spine import cached
+                return self._send(200, cached(svc.data_dir, path, f"scene/{int(q['atlas'])}", scene, self._keep()), "application/json; charset=utf-8")
             if p.startswith("/spine/"):
                 return self._spine_file(p)
             if p == "/api/asset_thumb":
@@ -577,9 +585,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._send(200, export_wav(*hit)[0], "audio/wav", {"Cache-Control": "max-age=86400"})
             if p == "/api/mirror":  # Tools → Mirror Dungeon planner: theme packs, their gifts, fusions
                 return self._json(svc.mirror_db())
-            if p == "/api/mirror/catalog":  # Versus → Mirror (limbusdm/versus_mirror.py): gifts with our effects, packs, rules
-                from . import versus_mirror as M
-                return self._json(M.page_catalog(svc))
+            if p == "/api/mirror/catalog":  # Versus → Mirror (limbusdm/versus_mirror2.py): gifts, packs, kits, rules
+                from . import versus_mirror2 as M2
+                return self._json(M2.page_catalog(svc))
             if p == "/api/history":  # Patches → Change history: what the kept reports changed in each card
                 return self._json({k: v for k, v in svc.history_db().items() if k != "stamp"})
             if p == "/api/gacha":  # Games → Extraction: the game's banners, pools, lines and sounds
@@ -786,9 +794,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 mods.save(svc, cid, b["name"], b)
                 return self._json({"mods": mods.list_mods(svc, cid)})
             if p == "/api/mirror/act":  # Versus → Mirror: one action on the page's run ({"run", "act", "arg"}) -> {"run", "fight"?}
-                from . import versus_mirror as M
+                from . import versus_mirror2 as M2
                 try:
-                    return self._json(M.act(svc, b.get("run"), b["act"], b.get("arg")))
+                    return self._json(M2.act(svc, b.get("run"), b["act"], b.get("arg")))
                 except KeyError as e:  # (something in the page's run the catalog doesn't have)
                     return self._json({"error": f"this run has something the game data doesn't know ({e}) — start a new run"}, 400)
                 except (ValueError, StopIteration) as e:
@@ -867,19 +875,26 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
     return H
 
 
-def spine_file(svc: Service, bundle: str, atlas_pid: int, fn: str) -> tuple[bytes, str]:
+def spine_file(svc: Service, bundle: str, atlas_pid: int, fn: str, keep: bool = True) -> tuple[bytes, str]:
     """skeleton.json | skeleton.atlas | <page>.png of a Spine skeleton in a bundle, linked by path id (names repeat:
-    many skeletons are called "imported")."""
-    from .spine import fit_page, page_sizes, spine_map
+    many skeletons are called "imported"). Kept on disk once made (spine.cached; `keep`)."""
+    from .spine import cached
     path = svc.object_file(bundle)
     if not path:
         raise FileNotFoundError("bundle not in the game cache")
+    mime = {"skeleton.atlas": "text/plain; charset=utf-8", "skeleton.json": "application/json"}.get(fn, "image/png")
+    return cached(svc.data_dir, path, f"{atlas_pid}/{fn}", lambda: _spine_make(svc, bundle, path, atlas_pid, fn), keep), mime
+
+
+def _spine_make(svc: Service, bundle: str, path: str, atlas_pid: int, fn: str) -> bytes:
+    from .extract import _env, _lock
+    from .spine import fit_page, page_sizes, spine_map
     entry = spine_map(path).get(atlas_pid) or {}
-    pid, mime = None, ""
+    pid = None
     if fn == "skeleton.atlas":
-        pid, mime = atlas_pid, "text/plain; charset=utf-8"
+        pid = atlas_pid
     elif fn == "skeleton.json":
-        pid, mime = entry.get("skel"), "application/json"
+        pid = entry.get("skel")
         if pid is None:  # not linked by a SkeletonDataAsset: fall back to the same base name
             base = svc.find_object_by_pid(bundle, str(atlas_pid))
             o = svc.find_object(bundle, "TextAsset", (base or {}).get("name", "")[:-6])
@@ -893,14 +908,19 @@ def spine_file(svc: Service, bundle: str, atlas_pid: int, fn: str) -> tuple[byte
                 if o:
                     path = svc.object_file(o["bundle"]) or path
             pid = int(o["pid"]) if o else None
-        mime = "image/png"
     if pid is None:
         raise FileNotFoundError("not found")
-    data, _m, _fn = extract(path, int(pid))
-    if mime == "image/png":
-        text = extract(svc.object_file(bundle), atlas_pid)[0].decode("utf-8", "replace")
-        data = fit_page(data, page_sizes(text).get(fn))
-    return data, mime
+    if fn in ("skeleton.atlas", "skeleton.json"):
+        return extract(path, int(pid))[0]
+    # (the page straight from the texture: not to PNG and back before it is fitted)
+    env = _env(path)
+    obj = next((o for o in env.objects if o.path_id == int(pid)), None)
+    if obj is None:
+        raise FileNotFoundError("not found")
+    with _lock:
+        im = obj.read().image
+    text = spine_file(svc, bundle, atlas_pid, "skeleton.atlas")[0].decode("utf-8", "replace")
+    return fit_page(im, page_sizes(text).get(fn))
 
 
 def spine_zip(svc: Service, bundle: str, atlas_pid: int, base: str) -> bytes:

@@ -16,6 +16,7 @@ Gift effects in the game are code: we don't read them — EFFECTS is our own sim
 from __future__ import annotations
 
 import random
+import re
 
 from . import versus_engine as E
 
@@ -42,6 +43,7 @@ RULES = {
     "status_max": 20,
     "poise_crit": 0.05, "crit_mult": 1.2,                # per Poise potency: a coin's crit chance; a crit's damage
     "tremor_max": 999,                                   # Tremor just piles up (no count): it is checked against the HP
+    "guard_max": 0.5,                                    # a guard takes at most this share off each blow
 }
 
 # keyword (as the gift data names it) → our status; the attack-type keywords' gifts are left out for now (user, 2026-10-09)
@@ -78,8 +80,19 @@ EFFECTS = {
     "": {1: {"hp": 0.08}, 2: {"lifesteal": 0.05}, 3: {"coin": 1, "hp": 0.05}, 4: {"last": 2.0, "dmg": 0.08}},
 }
 
+# Shield (2026-10-10): extra HP on top of the HP — all damage takes it first, statuses' too (user: Bleed, Burn, Rupture
+# don't go past it; Tremor counts HP + Shield). A gift whose game text gives Shield (catalog: SHIELD_GIFT on its description) starts each
+# boss fight with this share of the max HP as Shield, by tier (on top of its keyword's EFFECTS; x level_mult)
+SHIELD = {1: 0.08, 2: 0.12, 3: 0.16, 4: 0.20}
+SHIELD_GIFT = re.compile(r"(gains?|apply|applied as) [^.]{0,40}?Shield|Shield equal", re.I)
+
 
 # ------------------------------------------------------------------ the data (app side: needs the Service)
+
+# bosses our player can't show (checked 2026-10-10 by rendering every boss of the packs): drawn by Spine alone, which
+# the player has no runtime for — invisible, only their effects show; Don's carnival wheel (48 bodies high) fills the
+# picture with red, Don herself can't be made out
+NOT_BOSSES = {"8045_ElectricCentipedeAppearance", "8048_GentleFairyAppearance", "8390_RealDon_1pAppearance"}
 
 def catalog(svc) -> dict:
     """{"gifts": {id: {name, kw, tier, sin, desc, pic, price}}, "packs": [{id, name, pic, hard, bosses: [enemy prefab
@@ -97,7 +110,7 @@ def catalog(svc) -> dict:
         if (g.get("kw") or "") in ATK_OF:
             continue
         tier = g.get("tier") or 1
-        gifts[int(gid)] = dict(g, tier=tier, price=RULES["price"].get(min(tier, 5), 100))
+        gifts[int(gid)] = dict(g, tier=tier, price=RULES["price"].get(min(tier, 5), 100), shield=bool(SHIELD_GIFT.search(g.get("desc") or "")))
     packs = []
     for p in db["packs"]:
         bosses = []
@@ -105,7 +118,7 @@ def catalog(svc) -> dict:
             waves = stages._stage(st[sid])["waves"] if sid in st else []
             u = waves[0]["units"][0] if waves and waves[0]["units"] else None
             app = (en.get(u[0]) or {}).get("appearance") if u else None
-            if app and app not in bosses:
+            if app and app not in bosses and app not in NOT_BOSSES:
                 bosses.append(app)
         pool = [g for g in p["pool"] + p["excl"] if g in gifts]
         if bosses and pool:
@@ -138,6 +151,8 @@ def gift_mods(g: dict, level: int = 1) -> dict:
     eff = tab.get(min(4, max(1, g.get("tier") or 1)))
     k = RULES["level_mult"][max(1, min(3, level or 1)) - 1]
     out = {}
+    if g.get("shield"):
+        out["shield"] = SHIELD[min(4, max(1, g.get("tier") or 1))] * k
     for key, v in eff.items():
         if key in ("inflict", "self"):
             out[key] = {s: [round(pot * k), round(cnt * k)] for s, (pot, cnt) in v.items()}
@@ -153,7 +168,7 @@ def gift_mods(g: dict, level: int = 1) -> dict:
 def build_mods(build: list[dict], gifts: dict) -> dict:
     """The sum of a build's gifts (build: [{"id", "level" 1-3}]) as one modifier dict (see EFFECTS)."""
     m = {"base": 0, "coin": 0, "heads": 0.0, "coins": 0, "hp": 0.0, "dmg": 0.0, "take": 0.0, "lifesteal": 0.0,
-         "last": 1.0, "inflict": {}, "self": {}}
+         "shield": 0.0, "last": 1.0, "inflict": {}, "self": {}}
     for b in build:
         g = gifts.get(b["id"]) or gifts.get(str(b["id"]))
         if not g:
@@ -182,7 +197,7 @@ ST_HELP = {"bleed": "loses Potency HP at each clash it fights (Count − 1)",
            "burn": "loses Potency HP after each exchange (Count − 1)",
            "rupture": "each coin that hits it deals + Potency damage (Count − 1)",
            "poise": "each of its coins that hits crits with Potency × 5 % chance, × 1.2 damage (Count − 1)",
-           "tremor": "piles up; once it is as high as the HP left, the next skill or counter that hits kills (Tremor Burst)"}
+           "tremor": "piles up; once it is as high as the HP left (+ Shield), the next skill or counter that hits kills (Tremor Burst)"}
 
 
 def mods_text(m: dict) -> list[str]:
@@ -203,6 +218,8 @@ def mods_text(m: dict) -> list[str]:
         out.append(f"+{pct(m['heads'])} heads chance")
     if m.get("hp"):
         out.append(f"+{pct(m['hp'])} max HP")
+    if m.get("shield"):
+        out.append(f"Fight start: Shield {pct(min(1.0, m['shield']))} of max HP (takes damage before the HP)")
     if m.get("dmg"):
         out.append(f"+{pct(m['dmg'])} damage")
     for a, n in (("Slash", "Slash"), ("Penetrate", "Pierce"), ("Hit", "Blunt")):
@@ -240,9 +257,10 @@ class MirrorFight(E.Fight):
     - Rupture: each coin that hits it takes + Rupture potency HP (count - 1), on top of the landing's share (the cap
       on one landing's damage doesn't stop it; the step's "rup" lists each proc for the player);
     - Poise (own): each of its coins that hits crits with potency x poise_crit (x crit_mult damage; count - 1).
-    A status never takes the last HP outside a landing (the engine ends a fight on a landing). Each step carries
-    "st" (both sides' statuses after it) and, when it happened, "heal" / "tick" ([left, right] HP gained / lost
-    outside the hits) for the player."""
+    A status never takes the last HP outside a landing (the engine ends a fight on a landing). Shield (a build's
+    "shield" share of the max HP, at the start): all damage takes it before the HP, statuses' too. Each step carries
+    "st" (both sides' statuses after it), "sh" (both Shields after it, once anyone has one) and, when it happened,
+    "heal" / "tick" ([left, right] HP gained / lost outside the hits) for the player."""
 
     def __init__(self, a, b, seed, opts, hp_max, hp_now):
         R = dict(E.RULES, landing_cap=RULES["landing_cap"])
@@ -261,6 +279,8 @@ class MirrorFight(E.Fight):
         self._rup = []  # (this step's Rupture procs: HP each, on the side being hit)
         self._lethal = False  # (Rupture may take the last HP only inside a landing that may kill)
         self._coin_dmg = None  # (the landing being logged: its coins' damage)
+        self.sh = [round(m * min(1.0, (self.F[i].get("mods") or {}).get("shield", 0.0))) for i, m in enumerate(self.max)]
+        self.sh0, self.sh_used = list(self.sh), [0, 0]  # (Shield at the start; taken by damage)
 
     # --- coins
     def flip(self) -> bool:
@@ -294,24 +314,29 @@ class MirrorFight(E.Fight):
         total, missed, power, broken = 0, 0, sk["base"], False
         cap = round(self.max[d] * R["landing_cap"])
         if not lethal:
-            cap = min(cap, self.hp[d] - 1)
+            cap = min(cap, self.hp[d] - 1 + self.sh[d])
         per = self._coin_dmg = []  # (each coin's damage, for the player: its own animation takes it, see script)
         for _ in range(coins):
             per.append(0)
-            if self.flip():
+            head = self.flip()
+            if head:
                 power += sk["coin"]
             if defense == "Evade" and not broken:
                 if self.roll(g, g["coins"]) > power:
                     missed += 1
                     continue
                 broken = True
-            dmg = max(0, power - shield) if defense == "Guard" else power
-            shield = max(0, shield - power) if defense == "Guard" else 0
+            # (a guard's roll off each blow — but at most guard_max of it: a block never stops a blow whole, user 2026-10-10
+            # "sometimes no damage is dealt")
+            stop = min(shield, power * RULES["guard_max"]) if defense == "Guard" else 0
+            raw = self.coin_damage(w, sk, power, head)
+            dmg = raw * (1 - stop / power if power > 0 else 1) if defense == "Guard" else raw
+            shield = shield - stop if defense == "Guard" else 0
             if dmg <= 0:
                 continue
             if lethal and self.tremor_kills(d):  # (Tremor as high as its HP: this hit kills it)
-                per[-1] = self.hp[d]
-                self.hp[d], self._burst = 0, True
+                per[-1] = self.hp[d] + self.sh[d]
+                self.hp[d], self.sh[d], self._burst = 0, 0, True
                 break
             if total >= cap:
                 self.rupture(d)
@@ -330,10 +355,14 @@ class MirrorFight(E.Fight):
                  dmgShare=total / self.max[d], defense=defense, result=res, final=final)
         return final
 
+    def coin_damage(self, w, sk, power, head) -> float:
+        """A coin's damage before the defense and the target's numbers: its power (versus_mirror2 has its own)."""
+        return power
+
     def tremor_kills(self, i) -> bool:
-        """Side i's Tremor is as high as its HP left (a hit by a skill or counter kills it)."""
+        """Side i's Tremor is as high as its HP left + Shield (a hit by a skill or counter kills it)."""
         t = (self.st[i].get("tremor") or [0])[0]
-        return 0 < self.hp[i] <= t
+        return 0 < self.hp[i] and self.hp[i] + self.sh[i] <= t
 
     def counter(self, d, w):
         """(Exchanges) a counter on one whose Tremor reaches its HP: d strikes back with a whole skill that kills it;
@@ -349,9 +378,9 @@ class MirrorFight(E.Fight):
     def rupture(self, i):
         """A coin hit side i: its Rupture (potency HP, count - 1), never its last HP when the blow may not kill."""
         p = self.spend(i, "rupture")
-        n = min(p, self.hp[i] - (0 if self._lethal else 1))
+        n = min(p, self.hp[i] + self.sh[i] - (0 if self._lethal else 1))
         if n > 0:
-            self.hp[i] -= n
+            self.shield_first(i, n)
             self._rup.append(n)
 
     # --- statuses
@@ -372,11 +401,18 @@ class MirrorFight(E.Fight):
         return p
 
     def lose(self, i, n):
-        """A status tick: n HP off side i, never its last one."""
-        n = min(n, self.hp[i] - 1)
+        """A status tick: n HP off side i (its Shield first), never its last one."""
+        n = min(n, self.hp[i] - 1 + self.sh[i])
         if n > 0:
-            self.hp[i] -= n
+            self.shield_first(i, n)
             self._tick[i] += n
+
+    def shield_first(self, i, n):
+        """n damage on side i: its Shield takes it first, the rest off its HP."""
+        a = min(self.sh[i], n)
+        self.sh[i] -= a
+        self.sh_used[i] += a
+        self.hp[i] = max(0, self.hp[i] - (n - a))
 
     def hurt(self, i, dmg, atk, most) -> int:
         a = 1 - i
@@ -386,7 +422,7 @@ class MirrorFight(E.Fight):
         p = self.spend(a, "poise") if self.st[a].get("poise") else 0
         if p and self.rnd.random() < p * RULES["poise_crit"]:
             mult *= RULES["crit_mult"]
-        d = super().hurt(i, dmg * mult, atk, most)
+        d = self.take(i, dmg * mult, atk, most)
         if d > 0 and self.hp[i] > 0:
             self.rupture(i)
         if a == self._side and self._first and d > 0:
@@ -401,7 +437,17 @@ class MirrorFight(E.Fight):
                 self._heal[a] += h
         return d
 
+    def take(self, i, dmg, atk, most) -> int:
+        """versus_engine.Fight.hurt with Shield: side i takes dmg x its resistance to atk (at most `most`), its Shield
+        first, the rest off its HP."""
+        mult = self.F[i]["resist"].get(atk, 1.0) or 1.0
+        d = min(most, max(1, round(dmg * mult)))
+        self.shield_first(i, d)
+        return d
+
     def log(self, act, who, before, **kw):
+        if kw.get("final") and who in (0, 1):
+            self.sh[1 - who] = 0  # (the fall: whatever Shield is left goes with it)
         if act == "clash":
             for i in (0, 1):
                 self.lose(i, self.spend(i, "bleed"))
@@ -411,6 +457,8 @@ class MirrorFight(E.Fight):
         super().log(act, who, before, **kw)
         s = self.steps[-1]
         s["st"] = [{k: list(v) for k, v in x.items()} for x in self.st]
+        if any(self.sh0):
+            s["sh"] = list(self.sh)
         if any(self._heal):
             s["heal"] = list(self._heal)
         if any(self._tick):
@@ -462,9 +510,11 @@ def boss_fight(player: dict, boss: dict, build: list[dict], gifts: dict, floor: 
     o = dict(FIGHT_OPTS, **(opts or {}))
     if o.get("flow") == "series":
         o["rounds"] = RULES["series_rounds"]
-    r = MirrorFight(a, b, seed, o, (hp_p, hp_b), (hp_p if hp_now is None else hp_now, hp_b)).run()
+    mf = MirrorFight(a, b, seed, o, (hp_p, hp_b), (hp_p if hp_now is None else hp_now, hp_b))
+    r = mf.run()
     r["mods"] = mods
     r["fighters"] = (a, b)
+    r["shield"], r["shieldUsed"] = list(mf.sh0), list(mf.sh_used)
     return r
 
 
@@ -684,7 +734,8 @@ def fight_summary(fight: dict) -> dict:
             side[1 - i]["status"] += (s.get("tick") or [0, 0])[i]
             side[i]["heal"] += (s.get("heal") or [0, 0])[i]
     for i in (0, 1):
-        lost = fight["hpMax"][1 - i] - fight["hp"][1 - i]  # (the other one's HP lost overall, minus status ticks)
+        # (the other one's HP + Shield lost overall, minus status ticks)
+        lost = fight["hpMax"][1 - i] - fight["hp"][1 - i] + (fight.get("shieldUsed") or [0, 0])[1 - i]
         side[i]["hits"] = max(0, lost - side[i]["status"] + side[1 - i]["heal"])
     return {"winner": fight["winner"], "hp": fight["hp"], "hpMax": fight["hpMax"], "seconds": round(seconds(fight)),
             "clashes": fight["clashes"], "side": side}
@@ -757,6 +808,7 @@ def act(svc, run: dict | None, what: str, arg=None) -> dict:
     else:
         raise ValueError(f"unknown action {what}")
     m = build_mods(run["build"], cat["gifts"])  # (for the page: the max HP, the build's effects summed up)
-    run.update(hpMax=round(RULES["hp_player"] * (1 + m["hp"])), buildText=mods_text(m))
+    hp = round(RULES["hp_player"] * (1 + m["hp"]))
+    run.update(hpMax=hp, shield=round(hp * min(1.0, m["shield"])), buildText=mods_text(m))
     out["run"] = run
     return out

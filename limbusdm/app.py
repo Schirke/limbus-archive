@@ -94,6 +94,29 @@ def _unblock(root: str = ""):
                     pass
 
 
+def _window_place(w: int = 1400, h: int = 900) -> dict:
+    """The window's size and place: (w, h) shrunk to fit the screen's free area (without the taskbar) and centred in it.
+    Windows' own centring went by the window's full size, so on a screen smaller than 1400x900 (or one scaled to 125 %)
+    the window's bottom half went off under the taskbar. In pywebview's units (logical pixels: physical / scale)."""
+    if sys.platform != "win32":
+        return {"width": w, "height": h}
+    try:
+        import ctypes
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        u.SetProcessDPIAware()  # (pywebview does it too, a moment later: here so the free area comes in real pixels)
+        r = wintypes.RECT()
+        u.SystemParametersInfoW(0x30, 0, ctypes.byref(r), 0)  # SPI_GETWORKAREA, the main screen
+        s = (u.GetDpiForSystem() or 96) / 96
+        ax, ay, aw, ah = r.left / s, r.top / s, (r.right - r.left) / s, (r.bottom - r.top) / s
+        if aw < 200 or ah < 200:
+            raise ValueError
+        w, h = int(min(w, aw * 0.92)), int(min(h, ah * 0.92))
+        return {"width": w, "height": h, "x": int(ax + (aw - w) / 2), "y": int(ay + (ah - h) / 2)}
+    except Exception:
+        return {"width": w, "height": h}
+
+
 def main():
     link = _link(sys.argv)
     if _already_running(link):  # (the window that is open goes to the link's page)
@@ -112,11 +135,15 @@ def main():
             s.reconfigure(errors="backslashreplace")
     svc = Service(data_dir())
     state = {"window": None}
+    look = {"maximized": False}  # the window's look now, kept in data\window.json at closing
 
     def show(page: str = ""):
         w = state["window"]
         if w:
-            w.restore()
+            if look["maximized"]:  # (restore() would make a maximized window small)
+                w.maximize()
+            else:
+                w.restore()
             w.show()
             if page and re.fullmatch(r"#/[\w.%~/-]{1,200}", page):
                 w.evaluate_js(f"location.hash = {json.dumps(page)}")
@@ -162,8 +189,30 @@ def main():
                      daemon=True).start()
 
     from . import APP_TITLE
-    state["window"] = webview.create_window(APP_TITLE, f"http://127.0.0.1:{PORT}/{link}", width=1400, height=900,
-                                            min_size=(900, 600), background_color="#121012")
+    # the window opens maximized if it was closed maximized (data\window.json), else centred
+    win_path = os.path.join(data_dir(), "window.json" if PORT == 47821 else f"window_{PORT}.json")
+    try:
+        with open(win_path, encoding="utf-8") as f:
+            big = bool(json.load(f).get("maximized"))
+    except Exception:
+        big = False
+    state["window"] = win = webview.create_window(APP_TITLE, f"http://127.0.0.1:{PORT}/{link}", min_size=(900, 600),
+                                                  background_color="#121012", maximized=big, **_window_place())
+    look["maximized"] = big
+
+    def remember(v: bool):
+        look["maximized"] = v
+
+    def save():
+        try:
+            with open(win_path, "w", encoding="utf-8") as f:
+                json.dump(look, f)
+        except OSError:
+            pass
+
+    win.events.maximized += lambda: remember(True)
+    win.events.restored += lambda: remember(False)  # (back from minimized too: then it is the normal window again)
+    win.events.closing += save
     profile = "webview" if PORT == 47821 else f"webview_{PORT}"  # a running copy locks its WebView2 profile
     webview.start(private_mode=False, storage_path=os.path.join(data_dir(), profile))
     os._exit(0)

@@ -276,6 +276,8 @@ def unit_urls(units: dict) -> list[str]:
             icon = f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png"
             thumbs.add(icon)
             full.add(icon)  # drawn into its sin frame
+    # (an E.G.O's skills have no pictures of their own: its profile picture goes into their frames — ui/db.js skillView)
+    full.update(u["img"]["thumb"] for u in units.get("egos", []) if (u.get("img") or {}).get("thumb"))
     urls += [url_key("/api/asset_thumb", path=p) for p in sorted(thumbs)]
     urls += [url_key("/api/asset_img", path=p) for p in sorted(full)]
     return urls
@@ -615,6 +617,8 @@ class Exporter:
             im = x.get("img") or {}
             own = ([img(im["art"])] if im.get("art") else []) + [img(f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png")
                                                                   for s in (x.get("skills") or []) + (x.get("defense") or [])]
+            if not x.get("title") and im.get("thumb"):
+                own.append(img(im["thumb"]))
             cards.append((own, CARD_PACK))
             if im.get("art2"):
                 cards.append(([img(im["art2"])], CARD_PACK))
@@ -1255,6 +1259,48 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 PULL_STAGE = "site: taking from the site"
 # what pull() takes of the site's parts (not the reports, the rendered videos or News: those have rules of their own)
 TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "cards", "tools", "extra", "music")
+PULL_THREADS, PULL_TRIES = 10, 3
+PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
+PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped from it
+
+
+def pack_index_path(svc) -> str:
+    return os.path.join(svc.data_dir, PACK_INDEX)
+
+
+class PackIndex:
+    """{pack: {offset: file}} of the packs this computer made or took from the site. A pack is named by the files in it,
+    so what it holds never changes: pull() takes a pack from the site only when a file of it is missing here."""
+
+    def __init__(self, path: str):
+        self.path, self.lock, self.today, self.saved = path, threading.Lock(), int(time.time() // 86400), time.time()
+        d = _read_json(path)
+        self.packs = (d.get("packs") or {}) if d.get("v") == 1 else {}
+
+    def file(self, pack: str, off: int) -> str | None:
+        with self.lock:
+            p = self.packs.get(pack)
+            if not p:
+                return None
+            p["t"] = self.today
+            return p["f"].get(str(off))
+
+    def add(self, pack: str, off: int, rel: str):
+        with self.lock:
+            p = self.packs.setdefault(pack, {"f": {}})
+            p["t"] = self.today
+            p["f"][str(off)] = rel
+
+    def save(self, every: float = 0):
+        """Written now, or when `every` seconds went by since the last time (a pull that is cancelled keeps the rest)."""
+        with self.lock:
+            if time.time() - self.saved < every:
+                return
+            self.saved = time.time()
+            keep = {k: v for k, v in self.packs.items() if self.today - v.get("t", 0) <= PACK_INDEX_DAYS}
+            with open(self.path + ".tmp", "w", encoding="utf-8") as f:
+                json.dump({"v": 1, "packs": keep}, f, separators=(",", ":"))
+            os.replace(self.path + ".tmp", self.path)
 
 
 def _game(made: str) -> str:
@@ -1308,11 +1354,18 @@ class Puller:
         self.packs: dict[str, bytes] = {}
         self.lock = threading.Lock()
         self.taken = 0
+        self.index = PackIndex(pack_index_path(ex.svc))
 
     def get(self, path: str) -> bytes:
         from urllib.request import Request
-        with urlopen(Request(f"{self.url}/d/{path}", headers={"User-Agent": "LimbusArchive"}), timeout=300) as r:
-            return r.read()
+        for i in range(PULL_TRIES):
+            try:
+                with urlopen(Request(f"{self.url}/d/{path}", headers={"User-Agent": "LimbusArchive"}), timeout=300) as r:
+                    return r.read()
+            except Exception as e:
+                if i == PULL_TRIES - 1 or getattr(e, "code", None) == 404:
+                    raise
+                time.sleep(2 * (i + 1))
 
     def json(self, path: str):
         data = self.get(path)
@@ -1340,6 +1393,10 @@ class Puller:
                 self._put(rel, b"".join(self.get(p) for p in where["parts"]))
             return rel
         pack, off, size, ext = where  # in a pack: named again by its content, as _store named it
+        rel = self.index.file(pack, off)
+        full = rel and os.path.join(self.ex.out, "d", rel)
+        if full and os.path.exists(full) and os.path.getsize(full) == size:  # (the pack is not fetched for it)
+            return rel
         with self.lock:
             data = self.packs.get(pack)
         if data is None:
@@ -1349,31 +1406,42 @@ class Puller:
         data = data[off:off + size]
         h = hashlib.sha1(data).hexdigest()
         rel = f"f/{h[:2]}/{h}.{ext}"
-        if not os.path.exists(os.path.join(self.ex.out, "d", rel)):
+        full = os.path.join(self.ex.out, "d", rel)
+        if not os.path.exists(full) or os.path.getsize(full) != size:
             self._put(rel, data)
+        self.index.add(pack, off, rel)
         return rel
 
     def files(self, urls: dict) -> dict:
-        """{request: where on the site} → {request: file}; a pack is fetched once for all it holds."""
+        """{request: where on the site} → {request: file}; a pack is fetched once for all it holds. Raises when a file
+        could not be taken (the upload would take it off the site)."""
         by_pack: dict = {}
         for k, w in urls.items():
             by_pack.setdefault(w[0] if isinstance(w, list) else None, []).append(k)
         jobs = [ks for p, ks in by_pack.items() if p is not None] + [[k] for k in by_pack.get(None, [])]
-        out, done = {}, [0]
+        out, done, failed = {}, [0], []
 
         def one(ks):
             for k in ks:
                 try:
                     out[k] = self.file(urls[k])
                 except Exception as e:
-                    self.ex.failed.append((k, f"from the site: {e}"))
+                    with self.lock:
+                        failed.append((k, f"{type(e).__name__}: {e}"))
             with self.lock:
                 if isinstance(urls[ks[0]], list):
                     self.packs.pop(urls[ks[0]][0], None)
                 done[0] += len(ks)
                 self.ex.progress(PULL_STAGE, done[0], len(urls))
-        with ThreadPoolExecutor(6) as pool:
-            list(pool.map(one, jobs))
+            self.index.save(every=20)
+        try:
+            with ThreadPoolExecutor(PULL_THREADS) as pool:
+                list(pool.map(one, jobs))
+        finally:
+            self.index.save()
+        if failed:
+            raise RuntimeError(f"couldn't take {len(failed)} files from the site ({failed[0][1]}) — sending now would "
+                               "take them off it; send again")
         return {k: out[k] for k in urls if k in out}  # (in the manifest's order: pack() packs them in it)
 
     def manifest(self, name: str) -> dict:
@@ -1552,7 +1620,7 @@ def verify(ex: "Exporter", progress=None) -> dict:
     healed = ex.extra(want) if want else 0
     if healed:
         ex.shell()
-        pack(ex.out, packed)
+        pack(ex.out, packed, pack_index_path(ex.svc))
         again = sitecheck.check(packed, routes=list(res["misses"]), progress=progress)
         if not again["error"]:
             res["misses"] = again["misses"]
@@ -1563,7 +1631,7 @@ def verify(ex: "Exporter", progress=None) -> dict:
     with open(os.path.join(ex.out, "d", "check.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False)
     ex.shell()
-    pack(ex.out, packed)
+    pack(ex.out, packed, pack_index_path(ex.svc))
     return out
 
 
@@ -1642,7 +1710,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     ex.pages()
     ex.shell()
     progress("site: packing", 0, 0)
-    size = pack(ex.out, packed_dir(svc))
+    size = pack(ex.out, packed_dir(svc), pack_index_path(svc))
     chk = verify(ex, progress)
     size = size_of(packed_dir(svc))
     if not cfg["project"]:
@@ -1695,14 +1763,16 @@ def packed_dir(svc) -> str:
     return os.path.join(svc.data_dir, "site_packed")
 
 
-def pack(src: str, dst: str) -> dict:
+def pack(src: str, dst: str, index: str | None = None) -> dict:
     """The site as it goes up: a manifest's thousands of small files glued into packs (a host counts files).
 
     A manifest then names a small file as [pack, offset, length, extension]; the service worker fetches the pack
     once, keeps it and cuts the file out. Files go into packs in the order the page lists them, so one screen of
     pictures is a pack or two; a manifest's "groups" [[how many requests, pack size], …] start a pack anew and set
     its size for a run of them (_grouped). Packs are named by what is in them: a report that didn't change gives the same packs
-    again and nothing of it is uploaded twice. Files of PACK size and up (music, video, big art) stay on their own."""
+    again and nothing of it is uploaded twice. Files of PACK size and up (music, video, big art) stay on their own.
+    `index`: the PackIndex file that learns what each pack holds."""
+    idx = PackIndex(index) if index else None
     shutil.rmtree(os.path.join(dst, "ui"), ignore_errors=True)
     os.makedirs(dst, exist_ok=True)
     # (a section's page that is gone from the site goes from here too: Exporter.shell)
@@ -1761,6 +1831,8 @@ def pack(src: str, dst: str) -> dict:
             out = open(full + ".tmp", "wb") if write else None
             for rel, size in g:
                 where[rel] = [name, off, size, rel.split(".", 1)[1]]
+                if idx:
+                    idx.add(name, off, rel)
                 off += size
                 if out:
                     with open(os.path.join(src, "d", rel), "rb") as f:
@@ -1796,6 +1868,8 @@ def pack(src: str, dst: str) -> dict:
         for fn in files:
             if "f/" + os.path.relpath(os.path.join(d, fn), root).replace("\\", "/") not in loose:
                 os.remove(os.path.join(d, fn))
+    if idx:
+        idx.save()
     return size_of(dst)
 
 

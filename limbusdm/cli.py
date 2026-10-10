@@ -39,7 +39,7 @@ def main(argv=None):
         if argv[1:2] == ["serve"]:  # site serve [packed]
             return site.preview(site.packed_dir(svc) if argv[2:3] == ["packed"] else site.out_dir(svc))
         if argv[1:2] == ["pack"]:  # the folder that goes up: files glued into packs
-            r = site.pack(site.out_dir(svc), site.packed_dir(svc))
+            r = site.pack(site.out_dir(svc), site.packed_dir(svc), site.pack_index_path(svc))
             return print(f"{site.packed_dir(svc)}: {r['files']} files, {r['bytes'] / 1e6:.0f} MB")
         last = [0.0]
 

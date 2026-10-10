@@ -844,8 +844,9 @@ class Service:
                 return next((q for q in by_name.get(name, []) if f"/{folder}/" in q or f"/{folder}" in q), None)
             for x in db["ids"]:
                 i, img = x["id"], x["img"]
-                img["thumb"] = (find(f"{i}_normal.png", "UnitCgThumbnail") or find(f"{i}_normal_profile.png", "Profile")
-                                or find(f"{i}_normal.png", "Unit/CG") or img["thumb"])
+                # the full CG first: the game's own CG thumbnail is only 256x144 (blurry once a card stretches it)
+                img["thumb"] = (find(f"{i}_normal.png", "Unit/CG") or find(f"{i}_normal.png", "UnitCgThumbnail")
+                                or find(f"{i}_normal_profile.png", "Profile") or img["thumb"])
                 img["art"] = find(f"{i}_normal.png", "Unit/CG") or img["thumb"]
                 img["art2"] = find(f"{i}_gacksung.png", "Unit/CG")
             # keyword icons live in Buf/<icon>.png; drop the ones the game doesn't ship

@@ -7,6 +7,7 @@ here: dashes to the target, camera zoom / shake, sounds. Effects are switched on
 classes with the game's class names receive the timeline data)."""
 from __future__ import annotations
 
+import functools
 import glob
 import json
 import math
@@ -24,6 +25,11 @@ _lock = threading.Lock()
 VERSION = 22  # bump to re-render cached videos
 KEEP_SECONDS = 3600  # a render is deleted an hour after it was last watched (see Renderer.prune)
 WIDTH, HEIGHT = 1920, 1080  # the size of the game's own skill preview videos
+# the helper processes (the batch player, ffmpeg) below normal priority: a render that takes every core leaves the PC
+# usable (it still runs at full speed when nothing else wants the CPU); the Live player's own window keeps normal
+BG = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
+# x264 takes 1.5 threads per core by default (24 on 16 cores): 3 of 4 cores leaves the PC some, ~10 % slower
+X264 = ["-c:v", "libx264", "-threads", str(max(2, (os.cpu_count() or 4) * 3 // 4))]
 
 
 def viewer_exe() -> str | None:
@@ -34,6 +40,18 @@ def viewer_exe() -> str | None:
         if os.path.isfile(p):
             return os.path.normpath(p)
     return None
+
+
+def tools(ff: bool = True) -> tuple:
+    """(LimbusViewer.exe, ffmpeg or None when not `ff`), or a RuntimeError naming which is missing and what to do."""
+    exe, f = viewer_exe(), ffmpeg_exe() if ff else None
+    gone = ([] if exe else ["LimbusViewer.exe (the LimbusViewer folder next to LimbusArchive.exe)"]) + \
+           (["ffmpeg (_internal\\imageio_ffmpeg\\binaries)"] if ff and not f else [])
+    if gone:
+        raise RuntimeError(f"{' and '.join(gone)} {'are' if len(gone) > 1 else 'is'} missing. Unpack the whole "
+                           "LimbusArchive.zip again; if it goes missing again, your antivirus removed it: restore it from "
+                           "quarantine and add the LimbusArchive folder to its exceptions.")
+    return exe, f
 
 
 def ffmpeg_exe() -> str | None:
@@ -52,12 +70,12 @@ def discord_gif(src: str, out: str) -> str:
     A transparent WebM stays transparent (one palette entry kept for it)."""
     ff = ffmpeg_exe()
     if not ff:
-        raise RuntimeError("ffmpeg is missing")
+        tools()
     for width, fps in ((720, 25), (640, 20), (540, 18), (480, 15), (400, 15), (320, 12), (256, 10)):
         vf = (f"fps={fps},scale={width}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff:reserve_transparent=1[p];"
               f"[b][p]paletteuse=dither=bayer:bayer_scale=4:alpha_threshold=128")
         subprocess.run([ff, "-v", "error", "-y", "-i", src, "-filter_complex", vf, "-loop", "0", out],
-                       check=True, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       check=True, capture_output=True, creationflags=BG)
         if os.path.getsize(out) <= DISCORD_MAX:
             return out
     return out  # the smallest try; still over for a very long render
@@ -377,7 +395,7 @@ def effect_still(svc, cid, name: str, v: str) -> str | None:
         cmd = [ff, "-v", "error", "-y"] + (["-c:v", "libvpx-vp9"] if video.endswith(".webm") else []) + ["-i", video,
                "-vf", "scale=480:-2", "-pix_fmt", "rgba", os.path.join(tmp, "%04d.png")]
         try:
-            subprocess.run(cmd, check=True, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            subprocess.run(cmd, check=True, capture_output=True, creationflags=BG)
         except subprocess.CalledProcessError:
             return None  # (the video is still being written: asked again a moment later)
         files = sorted(glob.glob(os.path.join(tmp, "*.png")))
@@ -1184,8 +1202,8 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
         if spec.get("mirror"):
             # (Versus → Mirror: the run's boss fight — real HP carried over, the build's gifts, statuses; the same
             # fight the page's "Result now" gets, see versus_mirror.fight_of)
-            from . import versus_mirror as M
-            fight = M.fight_of(svc, spec["mirror"])
+            from . import versus_mirror as M, versus_mirror2 as M2
+            fight = (M2 if spec["mirror"].get("v") == 2 else M).fight_of(svc, spec["mirror"])
             fa, fb = fight["fighters"]
         else:
             fa = E.fighter(svc, left, spec.get("lname") or "", bool(spec.get("lskills")))
@@ -1265,18 +1283,24 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     if spec.get("mirror"):
         # (Mirror) real HP: the bars count the fight's own numbers, the player starts with what the last boss left;
         # the statuses' icons (each part's `st` names them by their number here)
-        from . import versus_mirror as M
+        from . import versus_mirror as M, versus_mirror2 as M2
         from .uiicons import icon_png
         for h, m in zip(job["hud"], fight["hpMax"]):
             h["hpMax"] = m
         hp0 = spec["mirror"].get("hp")
         job["hpStart"] = [1.0 if hp0 is None else max(0.01, min(1.0, hp0 / fight["hpMax"][0])), 1.0]
+        if any(fight.get("shield") or ()):  # (each one's Shield at the start, share of its max HP)
+            job["shStart"] = [round(n / m, 4) for n, m in zip(fight["shield"], fight["hpMax"])]
         icons = []
         for s_ in M.ST_NAME:  # (in versus_engine.script's ST order)
             icon_png(f"st_{M.ST_KW[s_]}", svc.game.data, svc.ui_cache_dir())
             p_ = os.path.join(svc.ui_cache_dir(), f"st_{M.ST_KW[s_]}.png")
             icons.append(p_ if os.path.isfile(p_) else "")
+        if fight.get("stExtra"):  # (Mirror kits' things under the HP: the game's buff icons, see versus_mirror2.KIT_ST)
+            icons += [M2.kit_icon(svc, k) for k in fight["stExtra"]]
         job["stIcons"] = icons
+        if (fight["fighters"][0].get("kit") == 10414):  # (Mirror: Ryōshū 10414's bullet drum, see versus_mirror2.DRUM_FX)
+            job["drum"] = M2.DRUM_FX
     from . import battle_ui  # (the game's own HUD pieces for the player: ViewerHud.cs)
     job["hudUi"] = battle_ui.folder(svc)
     m = next((x for x in battle_maps(svc) if x["name"] == spec.get("map")), None) if spec.get("map") else None
@@ -1586,7 +1610,7 @@ BGM_WORDS = [("아군전투", "ally battle"), ("적전투", "enemy battle"), ("�
 
 def _duration(ff: str, path: str) -> float:
     r = subprocess.run([ff, "-hide_banner", "-i", path], capture_output=True, text=True,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       creationflags=BG)
     m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r.stderr or "")
     return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else 0.0
 
@@ -1594,7 +1618,7 @@ def _duration(ff: str, path: str) -> float:
 def _video_seconds(ff: str, path: str) -> float:
     """How long a file's picture runs (its sound may run longer than the container says for it)."""
     r = subprocess.run([ff, "-hide_banner", "-i", path, "-map", "0:v:0", "-c", "copy", "-f", "null", "-"], capture_output=True,
-                       text=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       text=True, creationflags=BG)
     ts = re.findall(r"time=(\d+):(\d+):([\d.]+)", r.stderr or "")
     return int(ts[-1][0]) * 3600 + int(ts[-1][1]) * 60 + float(ts[-1][2]) if ts else _duration(ff, path)
 
@@ -1899,7 +1923,7 @@ def _cutin_card(art, sprite: bool, side: int, out: str, seconds: float = CUTIN_S
 
 def _has_audio(ff: str, path: str) -> bool:
     r = subprocess.run([ff, "-hide_banner", "-i", path], capture_output=True, text=True,
-                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                       creationflags=BG)
     return "Audio:" in (r.stderr or "")
 
 
@@ -2023,8 +2047,9 @@ def _burn_notes(ff: str, video: str, parts: list[dict]):
     with open(os.path.join(d, "notes.ass"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     tmp = os.path.join(d, "Versus.notes.mp4")
-    r = subprocess.run([ff, "-y", "-v", "error", "-i", "Versus.mp4", "-vf", "ass=notes.ass", "-c:v", "libx264", "-preset", "veryfast",
-                        "-crf", "20", "-c:a", "copy", "-movflags", "+faststart", "Versus.notes.mp4"], cwd=d, capture_output=True)
+    r = subprocess.run([ff, "-y", "-v", "error", "-i", "Versus.mp4", "-vf", "ass=notes.ass", *X264, "-preset", "veryfast",
+                        "-crf", "20", "-c:a", "copy", "-movflags", "+faststart", "Versus.notes.mp4"], cwd=d, capture_output=True,
+                       creationflags=BG)
     if r.returncode == 0 and os.path.exists(tmp):
         os.replace(tmp, video)
 
@@ -2101,10 +2126,33 @@ def _versus_intro(svc, ff, spec, video, seconds: float = 2.0):
           f"[2:v]setsar=1[v1];")
     fc += "[v0][1:a][v1][2:a]concat=n=2:v=1:a=1[v][a]" if has_a else "[v0][v1]concat=n=2:v=1:a=0[v]"
     cmd += ["-filter_complex", fc, "-map", "[v]"] + (["-map", "[a]", "-c:a", "aac", "-b:a", "160k"] if has_a else [])
-    cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", tmp]
-    subprocess.run(cmd, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    cmd += X264 + ["-preset", "veryfast", "-crf", "20", "-movflags", "+faststart", tmp]
+    subprocess.run(cmd, check=True, creationflags=BG)
     os.replace(tmp, video)
     os.remove(png)
+
+
+def _ego_filters(e: dict, v: str, a: str, k: int):
+    """The winner's E.G.O cut-in (Renderer._ego_plan's `e`) spliced into a fight's picture `v` and sound `a` (filter
+    labels) at its last skill: the card fades in over the fight, the cut-in and the fight's rest come through white
+    flashes. Returns its ffmpeg inputs (numbered from `k`), its filters and the new (picture, sound) labels."""
+    at, d, x, cd = e["at"], e["d"], e["x"], e["cd"]
+    ins = ["-i", e["clip"], "-framerate", "30", "-i", e["card"]]
+    ins += ["-i", e["start"]] if e["start"] else ["-f", "lavfi", "-t", f"{cd + 1:.2f}", "-i", "anullsrc=r=48000:cl=stereo"]
+    norm = "fps=30,format=yuv420p,setsar=1,settb=AVTB"
+    sound = f"[{k + 2}:a]aformat=channel_layouts=stereo:sample_rates=48000,apad," if e["start"] else f"[{k + 2}:a]"
+    fc = [f"{v}split[eg_v0][eg_v1]", f"{a}asplit[eg_a0][eg_a1]",
+          f"[eg_v0]trim=0:{at:.3f},setpts=PTS-STARTPTS,{norm}[eg_v1a]", f"[eg_v1]trim={at:.3f},setpts=PTS-STARTPTS,{norm}[eg_v3]",
+          f"[{k + 1}:v]{norm}[eg_vc]", f"[{k}:v]scale={WIDTH}:{HEIGHT},setpts=PTS-STARTPTS,{norm},trim=0:{d:.3f}[eg_v2]",
+          f"[eg_a0]atrim=0:{at:.3f},asetpts=PTS-STARTPTS[eg_a1a]", f"[eg_a1]atrim={at:.3f},asetpts=PTS-STARTPTS[eg_a3]",
+          f"{sound}atrim=0:{cd:.3f}[eg_ac]",
+          f"[{k}:a]aformat=channel_layouts=stereo:sample_rates=48000,atrim=0:{d:.3f},asetpts=PTS-STARTPTS[eg_a2]",
+          f"[eg_v1a][eg_vc]xfade=transition=fade:duration=0.1:offset={at - 0.1:.3f}[eg_v1c]",
+          f"[eg_v1c][eg_v2]xfade=transition=fadewhite:duration={x}:offset={at - 0.1 + cd - x:.3f}[eg_v12]",
+          f"[eg_v12][eg_v3]xfade=transition=fadewhite:duration={x}:offset={at - 0.1 + cd - x + d - x:.3f}[eg_v]",
+          "[eg_a1a][eg_ac]acrossfade=d=0.1[eg_a1c]", f"[eg_a1c][eg_a2]acrossfade=d={x}[eg_a12]",
+          f"[eg_a12][eg_a3]acrossfade=d={x}[eg_a]"]
+    return ins, fc, "[eg_v]", "[eg_a]"
 
 
 def bgm_tracks(svc) -> list[str]:
@@ -2394,15 +2442,13 @@ class PicQueue:
 
 def _player_run(work: str, job: dict, timeout: float):
     """One run of the player on `job` (its frames into `work`), waited for."""
-    exe = viewer_exe()
-    if not exe:
-        raise RuntimeError("LimbusViewer.exe is missing")
+    exe = tools(ff=False)[0]
     job = dict(job, out=work)
     jp = os.path.join(work, "job.json")
     with open(jp, "w", encoding="utf-8") as f:
         json.dump(job, f)
     subprocess.run([exe, "-batchmode", "-job", jp, "-logFile", os.path.join(work, "player.log")],
-                   timeout=timeout, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                   timeout=timeout, creationflags=BG)
 
 
 def make_stage_pics(svc, names: list[str]) -> set[str]:
@@ -2604,11 +2650,7 @@ class Renderer:
         st = self.jobs[(cid, v)]
         flags = set(v.split("_")) if v else set()
         try:
-            exe, ff = viewer_exe(), ffmpeg_exe()
-            if not exe:
-                raise RuntimeError("LimbusViewer.exe is missing")
-            if not ff:
-                raise RuntimeError("ffmpeg is missing")
+            exe, ff = tools()
             tails = "tails" in flags
             mod = None
             mname = next((f[2:] for f in flags if f.startswith("m-")), None)
@@ -2732,9 +2774,7 @@ class Renderer:
         spec = clash_base(spec)
         st = self.jobs[(key, "")]
         try:
-            exe, ff = viewer_exe(), ffmpeg_exe()
-            if not exe or not ff:
-                raise RuntimeError("LimbusViewer.exe or ffmpeg is missing")
+            exe, ff = tools()
             job, groups = versus_job(self.svc, spec)
             if spec.get("team"):  # (the intro card of a team fight: the first of each side and how many more)
                 tl, tr = job["teamIds"]
@@ -2746,9 +2786,16 @@ class Renderer:
             sidx = sound_index(self.svc)
             music = groups[0].pop("music", None)  # (laid under the finished video: through the intro and the E.G.O too)
             st["phase"] = "fight"  # (the UI's progress bar, see vsProgress)
-            self._play(exe, ff, job, groups, set(), out, sidx, st)
+            # the extras below go into the fight's own encode (_versus_compose); each one it did not take is made as
+            # before, a pass of its own over the finished video (a loop has none; "notes" must come between them)
+            post = None
+            if not job.get("loop") and not spec.get("notes"):
+                post = {"made": set()}
+                post["fn"] = functools.partial(self._versus_compose, exe, ff, spec, groups[0], music, sidx, st, post["made"])
+            self._play(exe, ff, job, groups, set(), out, sidx, st, post=post)
+            made = post["made"] if post else set()
             video = os.path.join(out, "Versus.mp4")
-            if spec.get("cutins", True) and not job.get("loop") and os.path.exists(video):
+            if spec.get("cutins", True) and not job.get("loop") and "cutins" not in made and os.path.exists(video):
                 st.update(msg="Skill cut-ins…", phase="cutins", current=None)
                 try:
                     self._versus_cutins(exe, ff, spec, groups[0], video)
@@ -2759,13 +2806,14 @@ class Renderer:
             spec = dict(spec, won=job.get("winner", 0))
             with open(os.path.join(out, "spec.json"), "w", encoding="utf-8") as f:
                 json.dump(spec, f, ensure_ascii=False)
-            if spec.get("ego") and os.path.exists(video):
+            if spec.get("ego") and "ego" not in made and os.path.exists(video):
                 st.update(msg="E.G.O cut-in…", phase="ego", current=None)
                 self._versus_ego(exe, ff, spec, groups[0], video, sidx, st)
-            if spec.get("intro") and os.path.exists(video):
+            if spec.get("intro") and "intro" not in made and os.path.exists(video):
                 st.update(msg="Intro…", phase="intro", current=None)
                 _versus_intro(self.svc, ff, spec, video)
-            if (music or spec.get("uisfx") and (spec.get("intro") or spec.get("death"))) and os.path.exists(video):
+            if (music or spec.get("uisfx") and (spec.get("intro") or spec.get("death"))) and "music" not in made \
+                    and os.path.exists(video):
                 st.update(msg="Music…", phase="music", current=None)
                 self._versus_audio(ff, video, music, sidx, spec)
             st.update(state="done", msg="")
@@ -2808,71 +2856,165 @@ class Renderer:
         tmp = video + ".mus.mp4"
         cmd = [ff, "-y", "-loglevel", "error", "-i", video] + ins + ["-filter_complex", ";".join(fc), "-map", "0:v", "-map", "[a]",
                                                                       "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", tmp]
-        subprocess.run(cmd, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        subprocess.run(cmd, check=True, creationflags=BG)
         os.replace(tmp, video)
         shutil.rmtree(tmpd, ignore_errors=True)
+
+    def _versus_compose(self, exe, ff, spec, group, music, sidx, st, made, cmd, filters, frames, v, a):
+        """A Versus video's extras in the fight's own encode (_encode's `extra`), not each a pass of its own over the
+        whole video (_versus_cutins, _versus_ego, _versus_intro, _versus_audio — the same pieces): the skill cut-ins over
+        the fight, the winner's E.G.O cut-in spliced in, the intro card before it all, the music and the win jingle under
+        it all. `made`: the extras it took in."""
+        names = sorted(x for x in os.listdir(frames) if re.fullmatch(r"\d{4}\.png", x))
+        end = len(names) / 30
+        if not names:
+            raise RuntimeError("no frames")
+        k = cmd.count("-i")  # (the next input's number)
+        tmp = os.path.join(frames, "extras")
+        os.makedirs(tmp, exist_ok=True)
+        if a is None:  # (a fight without a sound: silence under it, for the music)
+            cmd += ["-f", "lavfi", "-t", f"{end:.3f}", "-i", "anullsrc=r=48000:cl=stereo"]
+            a, k = f"[{k}:a]", k + 1
+        # the fight's sound as long as its picture (the pieces below are cut by time)
+        filters.append(f"{a}apad,atrim=0:{end:.3f}[fx_a]")
+        a, total = "[fx_a]", end
+        if spec.get("cutins", True):
+            st.update(msg="Skill cut-ins…", phase="cutins", current=None)
+            try:
+                items = self._cutin_plan(exe, spec, group, os.path.join(frames, "parts.txt"), os.path.join(frames, "timemap.txt"),
+                                         end, os.path.join(tmp, "cutins"), os.path.join(frames, "cutins.txt"))
+            except (OSError, ValueError, subprocess.SubprocessError):
+                items = []  # (only a decoration: the fight stays as it is)
+            for j, (s0, d) in enumerate(items):
+                cmd += ["-framerate", "30", "-i", os.path.join(d, "%03d.png")]
+                filters.append(f"[{k}:v]setpts=PTS-STARTPTS+{s0:.3f}/TB[fx_c{j}];{v}[fx_c{j}]overlay=eof_action=pass[fx_cv{j}]")
+                v, k = f"[fx_cv{j}]", k + 1
+            made.add("cutins")
+        if spec.get("ego"):
+            st.update(msg="E.G.O cut-in…", phase="ego", current=None)
+
+            def still_of(t, path):  # (the fight's frame at t, as an ffmpeg seek in its video takes it)
+                shutil.copyfile(os.path.join(frames, names[min(len(names) - 1, math.ceil(t * 30 - 1e-6))]), path)
+            e = self._ego_plan(exe, ff, group, os.path.join(frames, "parts.txt"), still_of, os.path.join(tmp, "ego"), sidx)
+            if e:
+                ins, fc, v, a = _ego_filters(e, v, a, k)
+                cmd += ins
+                filters += fc
+                k += 3
+                total += e["cd"] + e["d"] - 0.1 - 2 * e["x"]  # (each xfade overlaps its two pieces)
+            made.add("ego")
+        if spec.get("intro"):
+            secs = 2.0  # (as _versus_intro)
+            png = os.path.join(tmp, "intro.png")
+            _intro_card(self.svc, spec).save(png)
+            cmd += ["-loop", "1", "-framerate", "30", "-t", f"{secs}", "-i", png,
+                    "-f", "lavfi", "-t", f"{secs}", "-i", "anullsrc=r=48000:cl=stereo"]
+            filters.append(f"[{k}:v]format=yuv420p,fade=t=in:st=0:d=0.3,fade=t=out:st={secs - 0.35}:d=0.35,setsar=1[fx_iv];"
+                           f"{v}setsar=1[fx_mv];[fx_iv][{k + 1}:a][fx_mv]{a}concat=n=2:v=1:a=1[fx_xv][fx_xa]")
+            v, a, k, total = "[fx_xv]", "[fx_xa]", k + 2, total + secs
+            made.add("intro")
+        win = spec.get("uisfx") and (spec.get("intro") or spec.get("death"))
+        if music or win:  # (as _versus_audio)
+            labels = [a]
+            hit = _find_sound(sidx, music) if music else None
+            wav = self._wav(hit) if hit and os.path.isfile(hit[0]) else None
+            if music and not wav:
+                raise RuntimeError(f"the music track {music} could not be read from the game's sound banks")
+            if wav:
+                mp = os.path.join(tmp, "music.wav")
+                with open(mp, "wb") as f:
+                    f.write(wav)
+                cmd += ["-stream_loop", "-1", "-i", mp]
+                filters.append(f"[{k}:a]aformat=channel_layouts=stereo:sample_rates=48000,atrim=0:{total:.2f},volume=0.5,"
+                               f"afade=t=out:st={max(0.0, total - 1.5):.2f}:d=1.5[fx_m]")
+                labels.append("[fx_m]")
+                k += 1
+            hit = _find_sound(sidx, UI_SFX["win"]) if win else None
+            wwav = self._wav(hit) if hit and os.path.isfile(hit[0]) else None
+            if wwav:
+                wp = os.path.join(tmp, "win.wav")
+                with open(wp, "wb") as f:
+                    f.write(wwav)
+                cmd += ["-i", wp]
+                ms = int(max(0.0, total - 1.6) * 1000)
+                filters.append(f"[{k}:a]aformat=channel_layouts=stereo:sample_rates=48000,adelay={ms}|{ms},volume=0.8[fx_w]")
+                labels.append("[fx_w]")
+                k += 1
+            if len(labels) > 1:
+                filters.append(f"{''.join(labels)}amix=inputs={len(labels)}:normalize=0:duration=longest,atrim=0:{total:.2f}[fx_ma]")
+                a = "[fx_ma]"
+            made.add("music")
+        filters.append(f"{v}format=yuv420p[fx_v]")
+        st.update(msg="Encoding…", phase="intro", current=None)
+        return "[fx_v]", a
 
     def _versus_ego(self, exe, ff, spec, group, video, sidx, st):
         """The winner's E.G.O cut-in (picked in versus_job) spliced in before its last skill, right after the
         player's lead-in, through a white flash both ways."""
+        if not group.get("ego") or not _has_audio(ff, video):
+            return
+        work = video + ".egocard"
+
+        def still_of(t, path):
+            subprocess.run([ff, "-y", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", video, "-frames:v", "1", path],
+                           check=True, creationflags=BG)
+        try:
+            e = self._ego_plan(exe, ff, group, os.path.join(os.path.dirname(video), "Versus.parts.txt"), still_of, work, sidx, st)
+            if not e:
+                return
+            ins, fc, v, a = _ego_filters(e, "[0:v]", "[0:a]", 1)
+            tmp = video + ".ego.mp4"
+            cmd = [ff, "-y", "-loglevel", "error", "-i", video] + ins + [
+                   "-filter_complex", ";".join(fc), "-map", v, "-map", a,
+                   *X264, "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", tmp]
+            subprocess.run(cmd, check=True, creationflags=BG)
+            os.replace(tmp, video)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+    def _ego_plan(self, exe, ff, group, parts_txt, still_of, work, sidx, st=None):
+        """The pieces of the winner's E.G.O cut-in spliced into a Versus fight (_versus_ego, _versus_compose): its
+        cut-in (rendered and kept if not yet), where the winner's last skill starts in the fight (`parts_txt`, the
+        player's list), the card (frames into `work`; still_of(t, path) writes the fight's frame at t seconds) and the
+        E.G.O start sound. None when it can't be made."""
         ego = group.get("ego")
         if not ego:
-            return
+            return None
         ego_out = self.out_dir(ego["id"])
         clip = os.path.join(ego_out, _safe_name(ego["view"]) + ".mp4")
         if not os.path.exists(clip):
             job = make_job(self.svc, ego["id"], view=ego["view"])
             os.makedirs(ego_out, exist_ok=True)
-            self._play(exe, ff, job, job_groups(job), set(), ego_out, sidx, st)
-        if not os.path.exists(clip) or not _has_audio(ff, video) or not _has_audio(ff, clip):
-            return
+            self._play(exe, ff, job, job_groups(job), set(), ego_out, sidx,
+                       st if st is not None else {"state": "running", "msg": "", "done": [], "total": 0})
+        if not os.path.exists(clip) or not _has_audio(ff, clip):
+            return None
         # where the winner's last skill starts: the first of the final parts in the player's list
         try:
-            with open(os.path.join(os.path.dirname(video), "Versus.parts.txt"), encoding="utf-8") as f:
+            with open(parts_txt, encoding="utf-8") as f:
                 starts = [float(x.rstrip("\n").rpartition("\t")[2]) for x in f if x.strip()]
         except (OSError, ValueError):
-            return
+            return None
         n_final = sum(1 for t in group["parts"] if t.get("final"))
         if len(starts) < n_final or n_final == 0:
-            return
+            return None
         at, d, x = starts[-n_final], _video_seconds(ff, clip), 0.25
         if d <= 2 * x:
-            return
+            return None
         # the card: the battle's last frame darkened, the E.G.O's art on a slanted panel sliding in with ragged purple
         # edges and streaks, then golden hexagons breaking out of it (the game's E.G.O start)
-        work = video + ".egocard"
         os.makedirs(work, exist_ok=True)
         still = os.path.join(work, "still.png")
-        subprocess.run([ff, "-y", "-loglevel", "error", "-ss", f"{max(0.0, at - 0.04):.3f}", "-i", video, "-frames:v", "1", still],
-                       check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        still_of(max(0.0, at - 0.04), still)
         n = _ego_card(self.svc, ego["id"], still, work)
-        cd = n / 30
-        norm = "fps=30,format=yuv420p,setsar=1,settb=AVTB"
-        fc = (f"[0:v]trim=0:{at:.3f},setpts=PTS-STARTPTS,{norm}[v1];[0:v]trim={at:.3f},setpts=PTS-STARTPTS,{norm}[v3];"
-              f"[2:v]{norm}[vc];[1:v]scale={WIDTH}:{HEIGHT},setpts=PTS-STARTPTS,{norm},trim=0:{d:.3f}[v2];"
-              f"[0:a]atrim=0:{at:.3f},asetpts=PTS-STARTPTS[a1];[0:a]atrim={at:.3f},asetpts=PTS-STARTPTS[a3];"
-              f"[3:a]atrim=0:{cd:.3f}[ac];"
-              f"[1:a]aformat=channel_layouts=stereo:sample_rates=48000,atrim=0:{d:.3f},asetpts=PTS-STARTPTS[a2];"
-              f"[v1][vc]xfade=transition=fade:duration=0.1:offset={at - 0.1:.3f}[v1c];"
-              f"[v1c][v2]xfade=transition=fadewhite:duration={x}:offset={at - 0.1 + cd - x:.3f}[v12];"
-              f"[v12][v3]xfade=transition=fadewhite:duration={x}:offset={at - 0.1 + cd - x + d - x:.3f}[v];"
-              f"[a1][ac]acrossfade=d=0.1[a1c];[a1c][a2]acrossfade=d={x}[a12];[a12][a3]acrossfade=d={x}[a]")
-        tmp = video + ".ego.mp4"
         hit = _find_sound(sidx, UI_SFX["ego"])
         swav = self._wav(hit) if hit and os.path.isfile(hit[0]) else None
+        start = None
         if swav:
-            with open(os.path.join(work, "start.wav"), "wb") as f:
+            start = os.path.join(work, "start.wav")
+            with open(start, "wb") as f:
                 f.write(swav)
-            fc = fc.replace(f"[3:a]atrim=0:{cd:.3f}[ac];",
-                            f"[3:a]aformat=channel_layouts=stereo:sample_rates=48000,apad,atrim=0:{cd:.3f}[ac];")
-        cmd = [ff, "-y", "-loglevel", "error", "-i", video, "-i", clip, "-framerate", "30", "-i", os.path.join(work, "%03d.png")]
-        cmd += ["-i", os.path.join(work, "start.wav")] if swav else ["-f", "lavfi", "-t", f"{cd + 1:.2f}", "-i", "anullsrc=r=48000:cl=stereo"]
-        cmd += [
-               "-filter_complex", fc, "-map", "[v]", "-map", "[a]",
-               "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", tmp]
-        subprocess.run(cmd, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        shutil.rmtree(work, ignore_errors=True)
-        os.replace(tmp, video)
+        return {"at": at, "d": d, "x": x, "cd": n / 30, "clip": clip, "card": os.path.join(work, "%03d.png"), "start": start}
 
     def _battle_sprite(self, exe, cid):
         """A character's look in battle (PIL RGBA, transparent around it) for the cut-ins of those without art of
@@ -2891,7 +3033,7 @@ class Renderer:
                 with open(jp, "w", encoding="utf-8") as f:
                     json.dump(job, f)
                 subprocess.run([exe, "-batchmode", "-job", jp, "-logFile", os.path.join(work, "player.log")], timeout=300,
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                               creationflags=BG)
                 im = Image.open(os.path.join(work, "idle.png")).convert("RGBA")
                 box = im.getchannel("A").getbbox()
                 if box:
@@ -2924,15 +3066,38 @@ class Renderer:
         its whole skills longer than CUTIN_MIN, skill_cutins), leading into the skill's strongest moment (cutin_moments)
         where the player showed it (Versus.parts.txt / .timemap.txt), inside the skill and apart from the others; the
         last skill's not right at its start when the winner's E.G.O cut-in is spliced in before it (_versus_ego, later)."""
+        base = os.path.splitext(video)[0]
+        work = video + ".cutins"
+        try:
+            items = self._cutin_plan(exe, spec, group, base + ".parts.txt", base + ".timemap.txt", _video_seconds(ff, video),
+                                     work, base + ".cutins.txt")
+            if not items:
+                return
+            cmd, fc, prev = [ff, "-y", "-loglevel", "error", "-i", video], [], "[0:v]"
+            for k, (s0, d) in enumerate(items):
+                cmd += ["-framerate", "30", "-i", os.path.join(d, "%03d.png")]
+                fc.append(f"[{k + 1}:v]setpts=PTS-STARTPTS+{s0:.3f}/TB[c{k}];{prev}[c{k}]overlay=eof_action=pass[v{k}]")
+                prev = f"[v{k}]"
+            fc.append(f"{prev}format=yuv420p[v]")
+            tmp = video + ".cut.mp4"
+            cmd += ["-filter_complex", ";".join(fc), "-map", "[v]", "-map", "0:a?", *X264, "-preset", "veryfast",
+                    "-crf", "20", "-c:a", "copy", "-movflags", "+faststart", tmp]
+            subprocess.run(cmd, check=True, creationflags=BG)
+            os.replace(tmp, video)
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+    def _cutin_plan(self, exe, spec, group, parts_txt, timemap_txt, end, work, plan_txt):
+        """Where a Versus fight's skill cut-ins go (_versus_cutins: the rules) and their panels' frames (into `work`):
+        [(start in the fight's video, folder of its frames)], their plan written to `plan_txt` (for checking). `end`: the
+        fight's length; parts_txt / timemap_txt: what the player showed when (played_clock)."""
         entries = group["parts"]
         kills = not spec.get("team")
         cuts = skill_cutins(entries, kills, zoomed=kills, team_kills=not kills)
-        base = os.path.splitext(video)[0]
-        starts, when = played_clock(base + ".parts.txt", base + ".timemap.txt")
+        starts, when = played_clock(parts_txt, timemap_txt)
         if not cuts or not starts:
-            return
+            return []
         occ = _occurrences(entries)
-        end = _video_seconds(ff, video)
 
         def at(i, t=None):  # (where entry i's moment t — None: its start — is in the video)
             try:
@@ -2970,35 +3135,19 @@ class Renderer:
                 plan.append((s0, spec["left"] if g["who"] == 0 else spec["right"], g["who"], secs))
             free = s0 + secs + 0.5
         if not plan:
-            return
-        work = video + ".cutins"
+            return []
         os.makedirs(work, exist_ok=True)
-        try:
-            sets, items = {}, []
-            for s0, cid, side, secs in plan:
-                key = (str(cid), side, round(secs, 2))
-                if key not in sets:
-                    d = os.path.join(work, str(len(sets)))
-                    sets[key] = d if self._cutin_frames(exe, cid, side, d, secs) else None
-                if sets[key]:
-                    items.append((s0, sets[key]))
-            if not items:
-                return
-            cmd, fc, prev = [ff, "-y", "-loglevel", "error", "-i", video], [], "[0:v]"
-            for k, (s0, d) in enumerate(items):
-                cmd += ["-framerate", "30", "-i", os.path.join(d, "%03d.png")]
-                fc.append(f"[{k + 1}:v]setpts=PTS-STARTPTS+{s0:.3f}/TB[c{k}];{prev}[c{k}]overlay=eof_action=pass[v{k}]")
-                prev = f"[v{k}]"
-            fc.append(f"{prev}format=yuv420p[v]")
-            tmp = video + ".cut.mp4"
-            cmd += ["-filter_complex", ";".join(fc), "-map", "[v]", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast",
-                    "-crf", "20", "-c:a", "copy", "-movflags", "+faststart", tmp]
-            subprocess.run(cmd, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            os.replace(tmp, video)
-            with open(base + ".cutins.txt", "w", encoding="utf-8") as f:  # (where they are: for checking)
-                f.write("".join(f"{s0:.3f}\t{cid}\t{side}\t{secs:.2f}\n" for s0, cid, side, secs in plan))
-        finally:
-            shutil.rmtree(work, ignore_errors=True)
+        sets, items = {}, []
+        for s0, cid, side, secs in plan:
+            key = (str(cid), side, round(secs, 2))
+            if key not in sets:
+                d = os.path.join(work, str(len(sets)))
+                sets[key] = d if self._cutin_frames(exe, cid, side, d, secs) else None
+            if sets[key]:
+                items.append((s0, sets[key]))
+        with open(plan_txt, "w", encoding="utf-8") as f:  # (where they are: for checking)
+            f.write("".join(f"{s0:.3f}\t{cid}\t{side}\t{secs:.2f}\n" for s0, cid, side, secs in plan))
+        return items
 
     # ------------------------------------------------------------ live (the "Versus Live" tab)
     def start_live(self, spec: dict) -> dict:
@@ -3027,9 +3176,7 @@ class Renderer:
     def _run_live(self, spec: dict, st: dict):
         work = None
         try:
-            exe = viewer_exe()
-            if not exe:
-                raise RuntimeError("LimbusViewer.exe is missing")
+            exe = tools(ff=False)[0]
             spec = {k: x for k, x in spec.items() if k not in ("loop", "notes")}
             spec["mode"] = "clash"
             team = bool(spec.get("team"))  # (a team fight: Versus duels or the Auto Battler; the engine draws every skill)
@@ -3170,20 +3317,29 @@ class Renderer:
         ego, ff = group["ego"], ffmpeg_exe()
         ego_out = self.out_dir(ego["id"])
         cut = os.path.join(ego_out, _safe_name(ego["view"]) + ".mp4")
+        size = (1280, 720)
         if not ff:
             return None
         if not os.path.exists(cut):
-            job = make_job(self.svc, ego["id"], view=ego["view"])
-            os.makedirs(ego_out, exist_ok=True)
-            prog = {"state": "running", "msg": "", "done": [], "total": 0}  # (the cut-in's own progress, as a skill render's)
-            self._play(exe, ff, job, job_groups(job), set(), ego_out, sidx, prog)
+            # not rendered yet: made at the window's size and drawn once, not at 2x2 — a ninth of a render's pixels;
+            # kept apart from the renders' own (those are full size)
+            small = self.out_dir(f"{ego['id']}-live")
+            cut = os.path.join(small, _safe_name(ego["view"]) + ".mp4")
+            if not os.path.exists(cut):
+                job = dict(make_job(self.svc, ego["id"], view=ego["view"]), supersample=1)
+                os.makedirs(small, exist_ok=True)
+                prog = {"state": "running", "msg": "", "done": [], "total": 0}  # (the cut-in's own progress, as a skill render's)
+                self._play(exe, ff, job, job_groups(job), set(), small, sidx, prog, size=size)
         if not os.path.exists(cut):
             return None
-        size = (1280, 720)
+        try:
+            os.utime(cut)  # (used: kept another KEEP_SECONDS, as a watched render)
+        except OSError:
+            pass
         d = os.path.join(work, "ego")
         os.makedirs(os.path.join(d, "clip"))
         os.makedirs(os.path.join(d, "card"))
-        flags = dict(check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        flags = dict(check=True, creationflags=BG)
         subprocess.run([ff, "-y", "-loglevel", "error", "-i", cut, "-vf", f"fps=30,scale={size[0]}:{size[1]}", "-q:v", "3",
                         os.path.join(d, "clip", "%04d.jpg")], **flags)
         frames = len([x for x in os.listdir(os.path.join(d, "clip")) if x.endswith(".jpg")])
@@ -3243,9 +3399,10 @@ class Renderer:
                 out.append({"key": os.path.basename(d), "spec": spec, "time": os.path.getmtime(v)})
         return sorted(out, key=lambda x: -x["time"])
 
-    def _play(self, exe, ff, job, groups, flags, out, sidx, st, size=(WIDTH, HEIGHT)):
+    def _play(self, exe, ff, job, groups, flags, out, sidx, st, size=(WIDTH, HEIGHT), post=None):
         """One run of the Unity player; each video is encoded as soon as its frames are complete, several at a time.
-        groups None: the character's effects (the "effects" flag), one video each as the player lists them."""
+        groups None: the character's effects (the "effects" flag), one video each as the player lists them. post: see
+        _encode."""
         work = tempfile.mkdtemp(prefix="fx_", dir=out)
         effects = groups is None
         base = st.get("rendered", 0)
@@ -3264,12 +3421,12 @@ class Renderer:
                 json.dump(job, f)
             st["msg"] = "Rendering in Unity…"
             p = subprocess.Popen([exe, "-batchmode", "-job", jp, "-logFile", os.path.join(work, "player.log")],
-                                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                                 creationflags=BG)
             encoded = set()
             from concurrent.futures import ThreadPoolExecutor
 
             def encode(g):
-                self._encode(ff, work, out, g, sidx, flags)
+                self._encode(ff, work, out, g, sidx, flags, post)
                 st["done"].append(g["name"])
 
             with ThreadPoolExecutor(max(1, min(4, (os.cpu_count() or 4) // 3))) as pool:
@@ -3371,9 +3528,21 @@ class Renderer:
                 cache.pop(next(iter(cache)))
         return cache[hit]
 
-    def _encode(self, ff, work, out, group, sidx, flags=frozenset()):
+    def _encode(self, ff, work, out, group, sidx, flags=frozenset(), post=None):
         """One video per skill with its sounds: MP4 (H.264 + AAC), or with a transparent background WebM
-        (VP9 with alpha + Opus), which video editors take as a layer."""
+        (VP9 with alpha + Opus), which video editors take as a layer. post: {"fn", "made"}, more in the same encode
+        (_versus_compose, _encode_one's `extra`); if that fails, the video is made without it ("made" emptied)."""
+        if post:
+            try:
+                return self._encode_one(ff, work, out, group, sidx, flags, post["fn"])
+            except Exception:
+                post["made"].clear()
+                shutil.rmtree(os.path.join(work, group["name"], "extras"), ignore_errors=True)
+        return self._encode_one(ff, work, out, group, sidx, flags)
+
+    def _encode_one(self, ff, work, out, group, sidx, flags=frozenset(), extra=None):
+        """_encode. extra(cmd, filters, frames, picture, sound): adds its inputs and filters to the command and returns
+        the (picture, sound) filter labels to write (sound None: none)."""
         frames = os.path.join(work, group["name"])
         hdr, alpha = "16bit" in flags, "alpha" in flags
         pattern = os.path.join(frames, "%04d.exr" if hdr else "%04d.png")
@@ -3485,30 +3654,33 @@ class Renderer:
                            "[bg][fg]overlay=shortest=1:format=gbrp:alpha=premultiplied,setparams=color_trc=iec61966-2-1,format=yuv420p[vout]")
         else:
             filters.append(f"{vin}format=yuv420p[vout]")
+        vout, aout = "[vout]", "[aout]" if labels else None
+        if extra:
+            vout, aout = extra(cmd, filters, frames, vout, aout)
         graph = ";".join(filters)
         if len(graph) > 8000:  # dozens of clash rounds: past what a Windows command line holds, so from a file
             gp = os.path.join(frames, "filters.txt")
             with open(gp, "w", encoding="utf-8") as f:
                 f.write(graph)
-            cmd += ["-/filter_complex", gp, "-map", "[vout]"]  # (ffmpeg 7: an option's value read from a file)
+            cmd += ["-/filter_complex", gp, "-map", vout]  # (ffmpeg 7: an option's value read from a file)
         else:
-            cmd += ["-filter_complex", graph, "-map", "[vout]"]
-        if labels:
-            cmd += ["-map", "[aout]"]
+            cmd += ["-filter_complex", graph, "-map", vout]
+        if aout:
+            cmd += ["-map", aout]
         base = os.path.join(out, _safe_name(group["name"]))
         if alpha:
-            cmd += ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-row-mt", "1",
+            cmd += ["-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "24", "-row-mt", "1", "-threads", X264[3],
                     "-deadline", "realtime", "-cpu-used", "8",  # 7x faster than "good", same quality here
                     "-auto-alt-ref", "0", "-metadata:s:v:0", "alpha_mode=1"]
-            if labels:
+            if aout:
                 cmd += ["-c:a", "libopus", "-b:a", "160k"]
             cmd.append(base + ".webm")
         else:
-            cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-movflags", "+faststart"]
-            if labels:
+            cmd += X264 + ["-preset", "veryfast", "-crf", "20", "-movflags", "+faststart"]
+            if aout:
                 cmd += ["-c:a", "aac", "-b:a", "160k"]
             cmd.append(base + ".mp4")
-        subprocess.run(cmd, check=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        for f in ("parts.txt", "timemap.txt"):  # (Versus: where its parts and their moments are in the video)
+        subprocess.run(cmd, check=True, creationflags=BG)
+        for f in ("parts.txt", "timemap.txt", "cutins.txt"):  # (Versus: where its parts and their moments are in the video)
             if os.path.exists(os.path.join(frames, f)):
                 shutil.copyfile(os.path.join(frames, f), base + "." + f)
