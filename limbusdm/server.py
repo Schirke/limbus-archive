@@ -265,6 +265,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             p = u.path
             if p == "/" or p == "/index.html":
                 return self._file(os.path.join(ui_dir, "index.html"), "text/html; charset=utf-8")
+            if p == "/ext/ext.js":  # an optional extension: only from the data folder (ext), none of it ships with the app
+                f = os.path.join(svc.data_dir, "ext", "ext.js")
+                return self._file(f, "text/javascript; charset=utf-8") if os.path.exists(f) else self._send(404, b"", "text/plain")
             if p.startswith("/ui/"):
                 full = os.path.normpath(os.path.join(ui_dir, p[4:]))
                 if not full.startswith(os.path.normpath(ui_dir) + os.sep):
@@ -334,6 +337,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                                                                for x in arr] for k, arr in g["kinds"].items()}}
                                            for g in ch.get("groups", [])]}
                 return self._json(ch)
+            if p == "/api/ext/games":  # the extension's own data (ext.py next to ext.js)
+                f = os.path.join(svc.data_dir, "ext", "ext.py")
+                if not os.path.exists(f):
+                    return self._json({"error": "no extension"}, 404)
+                import importlib.util
+                spec = importlib.util.spec_from_file_location("limbus_ext", f)
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                return self._json(mod.handle(svc, q))
             if p == "/api/site_status":  # the web copy: the build the site shows next to this app's (Settings)
                 from . import site
                 return self._json(site.status(svc))

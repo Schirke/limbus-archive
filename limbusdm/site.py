@@ -1535,7 +1535,8 @@ def pull(ex: Exporter, url: str) -> dict:
             for cid, vs in (site.get("have") or {}).items():
                 for v, videos in vs.items():
                     ok = [n for n in videos if sitefx._key(key, int(cid), v, name=n) in local["urls"]]
-                    have.setdefault(cid, {})[v] = list(dict.fromkeys(have[cid].get(v, []) + ok))
+                    mine_v = have.setdefault(cid, {})
+                    mine_v[v] = list(dict.fromkeys(mine_v.get(v, []) + ok))
             local["none"] = list(dict.fromkeys((local.get("none") or []) + (site.get("none") or [])))
         ex.write_manifest(name, local)
     # the parts made from the game's files, where this computer has none to go on from: never sent from here, or sent

@@ -277,7 +277,8 @@ button.primary:disabled { filter: grayscale(.8); }
 .gmtile b { font-size: 21px; letter-spacing: .05em; }
 .gmtpic { clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); margin: -4px 4px -4px -4px; }
 .gmdot::after { width: 24px; height: 23px; border: 0; border-radius: 0; background: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_26") center / contain no-repeat; }
-.gmdot.done::after { background-image: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_27"); }
+a.gmdot:hover::after { background: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_27") center / contain no-repeat; filter: brightness(1.2); }
+.gmdot.done::after { background: url("/api/gacha_ui?n=New_MainUI_PersonalityList_2_27") center / contain no-repeat; filter: hue-rotate(85deg); }
 @media (max-width: 1250px) { .gmtop { grid-template-columns: 1fr; } }
 
 /* ---- Versus, the right column: one panel with tabs (Stage / Music / Options) ---- */

@@ -137,6 +137,7 @@ class Service:
             "version": __import__("limbusdm").__version__,
             "update": (getattr(self, "_update", None) or (0, None))[1],
             "site_publish": os.path.exists(os.path.join(self.data_dir, "site_config.json")),  # the web copy is set up here
+            "ext": os.path.exists(os.path.join(self.data_dir, "ext", "ext.js")),  # an extension is in the data folder
         }
 
     # ------------------------------------------------------------ jobs

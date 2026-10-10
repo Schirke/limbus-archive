@@ -234,8 +234,9 @@ function dbCard(x, newest) {
   // (the tile: the art with the Sinner's emblem, the rank and the season's plate on it; under it who, the title, the archetype)
   const sid = Math.floor(x.id / 100) % 100;
   return `<div class="ucard dcard d2" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">
-      ${x.date && x.date === newest ? `<span class="unew">NEW</span>` : ""}<span class="uem">${ico(`sinner_${sid}`, "s36", x.sinnerName, "")}</span>
+      <span class="uem">${ico(`sinner_${sid}`, "s36", x.sinnerName, "")}</span>
       <span class="urank">${isId ? rankIcons(x.rank) : ico(`grade_${x.grade}`, "s22", x.grade, x.grade)}</span>${seasonTag(x.season)}</div>
+    ${x.date && x.date === newest ? `<span class="unew">NEW</span>` : ""}
     <div class="ucap"><div class="uwho">${esc(x.sinnerName)}</div><div class="utitle">${esc(isId ? x.title : x.name)}</div>
       <div class="uarch">${line}</div></div></div>`;
 }
@@ -256,7 +257,9 @@ const RESIST = (v) => v >= 2 ? ["Fatal", "rfatal"] : v > 1 ? ["Weak", "rweak"] :
 // the battle UI's own coins (plain / Unbreakable / purple / green); a drawn coin if the icon can't be cut
 const coinIcon = (kind) => `<img class="ico coin" src="/api/ui_icon?k=coin${kind ? `_${kind}` : ""}" title="${kind === "super" ? "Unbreakable Coin" : "Coin"}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'), { className: 'coinico' }))">`;
 function skillView(s, up, level, label, fallbackImg, plain = false) {
-  const u = s.up[up] || topUp(s);
+  // a level the skill has no entry for: the nearest lower one; a skill not there yet at this Uptie (Skill 3 from Uptie III) shows its first level, marked
+  const ks = Object.keys(s.up).map(Number), low = ks.filter((k) => k <= up), lockAt = s.up[up] || low.length ? 0 : Math.min(...ks);
+  const u = s.up[up] || s.up[low.length ? Math.max(...low) : lockAt];
   const color = SIN_COLORS[u.sin] || "#777";
   const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = imgThumb(iconPath);
   const key = frameKey(u.sin, s.tier, label === "Defense");
@@ -271,7 +274,7 @@ function skillView(s, up, level, label, fallbackImg, plain = false) {
         <div class="skvbanner">${sinIcon(u.sin, "s20")}<span>${esc(u.name)}</span></div>
         <div class="skvmeta">${atkIcon(u, "s28")}<span class="skvoff" title="${u.atk ? "Offense" : "Defense"} level at Lv. ${level}: level ${level}, this skill ${(u.level || 0) >= 0 ? "+" : "−"}${Math.abs(u.level || 0)}">${off}</span><span class="skvlv">(${level}${(u.level || 0) >= 0 ? "+" : "−"}${Math.abs(u.level || 0)})</span>
           <span class="skvw">Atk Weight ${"<i class=\"wsq\"></i>".repeat(Math.max(1, u.targets || 1))}</span>
-          ${label ? `<span class="sklabel">${esc(label)}</span>` : ""}${u.sanity ? `<span class="muted small">${u.sanity} SP</span>` : ""}</div>
+          ${label ? `<span class="sklabel">${esc(label)}</span>` : ""}${lockAt ? `<span class="muted small" title="The game gives this skill from this Uptie on">Unlocks at Uptie ${ROMAN[lockAt - 1] || lockAt}</span>` : ""}${u.sanity ? `<span class="muted small">${u.sanity} SP</span>` : ""}</div>
       </div></div>
     ${u.desc ? `<div class="skdesc">${fmtDesc(u.desc, plain)}</div>` : ""}
     ${u.coindescs.map((c, i) => c.length ? `<div class="coinrow"><span class="coinbadge">${ROMAN[i] || i + 1}</span><div>${c.map((t) => fmtDesc(t, plain)).join("<br>")}</div></div>` : "").join("")}</div>`;
@@ -488,14 +491,39 @@ function drawBuilder() {
 }
 function pickFor(sid) {
   const list = UNITS.ids.filter((x) => x.sinner === sid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  let status = "";
+  let status = "", gi = -1;  // gi: the E.G.O grade being picked (-1 = the Identity)
+  const egoRow = () => {
+    const cur = MY.egos[sid] || [];
+    return `<div class="chips" style="margin-bottom:10px"><button class="toggle ${gi < 0 ? "on" : ""}" data-gi="-1">Identity</button>${GRADES.map((g, i) => {
+      const e = unitById(cur[i]);
+      return `<button class="toggle ${gi === i ? "on" : ""}" data-gi="${i}" title="${e ? esc(e.name) : "Empty"}">${ico(`grade_${g}`, "s18", g, g)}${e ? esc(e.name) : g}</button>`;
+    }).join("")}</div>`;
+  };
+  const drawEgo = () => {
+    const g = GRADES[gi], cur = MY.egos[sid] || [];
+    const arr = UNITS.egos.filter((x) => x.sinner === sid && x.grade === g).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    modal(`<h2 style="margin-top:0">${esc(UNITS.sinners[sid - 1])}</h2>${egoRow()}
+      <div class="chips" style="margin-bottom:10px">${cur[gi] ? `<button data-none="1">Remove</button>` : ""}</div>
+      <div class="ugrid small-cards">${arr.map((x) => unitCard(x, cur[gi] === x.id ? `<div class="picked">✓</div>` : "")).join("") || `<div class="muted">No ${g} E.G.O for this Sinner.</div>`}</div>`);
+    const body = $("#modal-body");
+    body.querySelectorAll("[data-gi]").forEach((b) => b.onclick = () => { gi = +b.dataset.gi; draw(); });
+    const set = (id) => {
+      const e = (MY.egos[sid] || []).slice(); while (e.length < GRADES.length) e.push(0);
+      e[gi] = id; MY.egos[sid] = e; saveMy(); drawBuilder(); drawEgo();
+    };
+    body.querySelectorAll("[data-u]").forEach((c) => c.onclick = () => set(+c.dataset.u));
+    const none = body.querySelector("[data-none]");
+    if (none) none.onclick = () => set(0);
+  };
   const draw = () => {
+    if (gi >= 0) return drawEgo();
     const arr = list.filter((x) => !status || x.statuses.includes(status));
-    modal(`<h2 style="margin-top:0">${esc(UNITS.sinners[sid - 1])}</h2>
+    modal(`<h2 style="margin-top:0">${esc(UNITS.sinners[sid - 1])}</h2>${egoRow()}
       <div class="chips" style="margin-bottom:10px">${UNITS.statuses.map((k) => `<button class="toggle ${status === k ? "on" : ""}" data-pst="${k}">${statusIcon(k, "s18")}${esc(statusName(k))}</button>`).join("")}
         ${MY.slots[sid] ? `<button data-none="1">Remove</button>` : ""}</div>
       <div class="ugrid small-cards">${arr.map((x) => unitCard(x, MY.slots[sid] === x.id ? `<div class="picked">✓</div>` : "")).join("")}</div>`);
     const body = $("#modal-body");
+    body.querySelectorAll("[data-gi]").forEach((b) => b.onclick = () => { gi = +b.dataset.gi; draw(); });
     body.querySelectorAll("[data-pst]").forEach((b) => b.onclick = () => { status = status === b.dataset.pst ? "" : b.dataset.pst; draw(); });
     body.querySelectorAll("[data-u]").forEach((c) => c.onclick = () => {
       MY.slots[sid] = +c.dataset.u;

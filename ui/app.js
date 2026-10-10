@@ -86,6 +86,10 @@ async function refresh() {
     STATE = await api("/api/state");
   } catch (e) { return; }
   renderStatus();
+  if (STATE.ext && !window.extLoaded) {  // an optional extension (the ext folder in the data folder, not part of the app's files)
+    window.extLoaded = true;
+    const s = document.createElement("script"); s.src = "/ext/ext.js"; s.onload = () => route(); document.head.appendChild(s);
+  }
   const j = STATE.job;
   if (j && !j.running && j.finished && refresh.lastJob !== j.finished) {
     if (refresh.lastJob !== undefined) {  // don't toast a job that finished before the window opened
