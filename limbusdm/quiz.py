@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-VERSION = 7
+VERSION = 8
 CHAR_LINES, CHAR_MIN = 40, 5  # lines kept of a story character (spread over the story), fewest to be asked about
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"]
 # the developers' notes call some bosses by a short name: note's word -> the start of the English name
@@ -111,11 +111,12 @@ def build(loc_root: str, sounds: dict, identities: set[int], enemies: list[dict]
           portraits: dict | None = None) -> dict:
     """loc_root: …/Localize; sounds: viewer.sound_index; enemies: the handbook's list; story: see characters().
     -> {"ids": [[sample, Identity id, when, text]], "bosses": [[sample, handbook entry id, text]], "chars": [...]}"""
-    ids = []
+    ids, have = [], set()  # (a line once: some Identities' rows come twice)
     for r in _rows(os.path.join(loc_root, "en", "PersonalityVoiceDlg"), r"EN_Voice_.*\.json$"):
         m = re.search(r"_(\d{5})_\d+$", str(r["id"]))
         text = _text(r.get("dlg"))
-        if m and int(m.group(1)) in identities and str(r["id"]).lower() in sounds and len(text) > 3:
+        if m and int(m.group(1)) in identities and str(r["id"]).lower() in sounds and len(text) > 3 and str(r["id"]).lower() not in have:
+            have.add(str(r["id"]).lower())
             ids.append([str(r["id"]).lower(), int(m.group(1)), _text(r.get("desc")), text])
 
     by_unit = {i: e for e in enemies for v in e["variants"] for i in v["ids"]}
@@ -136,7 +137,7 @@ def build(loc_root: str, sounds: dict, identities: set[int], enemies: list[dict]
         if e:
             words[nick] = e
     order = sorted(words, key=len, reverse=True)
-    bosses, seen = [], set()
+    bosses, seen = [], set(have)
     for r in _rows(os.path.join(loc_root, "en"), r"EN_BattleSpeechBubbleDlg.*\.json$"):
         sample, text, note = str(r["id"]).lower(), _text(r.get("dlg")), str(r.get("desc") or "") + " " + str(r["id"])
         if sample not in sounds or len(text) <= 3 or sample in seen:

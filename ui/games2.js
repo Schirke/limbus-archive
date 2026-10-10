@@ -50,7 +50,7 @@ async function giOpen(page, daily) {  // daily: opened by the "Daily" / "Duel" b
     // (one picture for two speakers: only the one the server kept, with the other's lines too)
     const chars = ((q || {}).chars || []).map((c, i) => { const b = c.boss && bosses.get(c.boss), s = c.sinner && ids.get(10001 + c.sinner * 100);
       return { key: "c" + i, id: c.boss || 0, name: c.name, title: c.name, sub: c.where, role: c.role, boss: !!c.boss, char: true, order: c.order, twin: c.twin != null,
-        pic: c.pic ? giThumb(c.pic) : b ? b.pic : s ? s.pic : "", lines: c.lines.map(([sm, text, where]) => ({ s: sm, when: where, text })) }; }).filter((c) => !c.twin);
+        pic: c.pic ? giThumb(c.pic) : b ? b.pic : s ? s.pic : "", lines: c.lines.map(([sm, text, where]) => ({ s: sm, when: where, text })) }; }).filter((c) => !c.twin && c.pic);  // (without any picture: left out)
     gi.data = { chars, all: [...ids.values()], ids: [...ids.values()].filter((x) => x.lines.length), bosses: [...bosses.values()].filter((x) => x.lines.length),
       sinners: (units || {}).sinners || [] };
   }
