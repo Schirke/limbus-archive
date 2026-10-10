@@ -59,6 +59,7 @@ function drawEnemies() {
 // sprite enemies without a portrait (the Arknights collab's, …): the app draws their idle pose with the player
 // (a few seconds each, in the background); their tiles fill in as the pictures come
 async function enDrawn() {
+  if (typeof SITE !== "undefined") return;  // (the site's copy of the list never changes)
   while (ENEMIES && ENEMIES.making && location.hash.startsWith("#/enemies") && !enDrawn.busy) {
     enDrawn.busy = true;
     await new Promise((ok) => setTimeout(ok, 8000));
