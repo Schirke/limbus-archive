@@ -135,6 +135,8 @@ def worker_config(svc) -> str:
         cfg["vars"]["BUDGET"] = json.dumps(config(svc)["budget"])
     if config(svc)["url"]:  # the site's own address: its old one (*.workers.dev) and www. move there (worker.js moved)
         cfg["vars"]["HOME"] = config(svc)["url"].rstrip("/")
+        # (a file is served without the Worker unless asked: the pages go through it, the data and the UI's files don't)
+        cfg["assets"]["run_worker_first"] = ["/*", "!/d/*", "!/ui/*", "!/sw.js"]
     path = os.path.join(folder, "wrangler.jsonc")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=1)
