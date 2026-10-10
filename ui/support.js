@@ -5,7 +5,7 @@
 
 const SUP = {
   repo: "https://github.com/Schirke/limbus-archive",
-  site: "https://limbus.shpep.workers.dev",
+  site: "https://limbus-archive.com",
   discord: "hines9278",
   // where money can be sent: [name, address, note] — the block is not drawn while this is empty
   money: [],

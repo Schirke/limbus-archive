@@ -214,10 +214,47 @@ async function flush(env) {
   } catch { /* the hits kept since the last time are lost */ }
 }
 
+// The site's old address (*.workers.dev) and www.: a page there has moved for good to the site's own (env.HOME,
+// limbusdm/site.py worker_config). A browser that was on the old one is handed a page first that takes along what the
+// site kept in it (localStorage, the own teams) in the new address' "#move=…" (site.py shell reads it); once it has
+// (cookie), and for search engines, the plain 301. Rooms, the count and the data are answered on every address: the
+// apps before 0.11.65 call the old one.
+const MOVE_PAGE = `<!doctype html><meta charset="utf-8"><title>Limbus Archive</title><meta name="robots" content="noindex">
+<p style="font:15px sans-serif;color:#888">Limbus Archive has moved to <a id="to" href="">limbus-archive.com</a>…</p>
+<script>
+(async () => {
+  const to = %TO%, m = { d: {}, h: location.hash };
+  document.getElementById("to").href = to;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); m.d[k] = localStorage.getItem(k); } } catch (e) {}
+  try {
+    const r = await Promise.race([caches.open("own").then((c) => c.match("/api/myteam")), new Promise((ok) => setTimeout(ok, 1500))]);
+    if (r) m.own = await r.text();
+  } catch (e) {}
+  document.cookie = "moved=1; max-age=31536000; path=/; secure; samesite=lax";
+  const move = Object.keys(m.d).length || m.own ? "#move=" + encodeURIComponent(JSON.stringify(m)) : location.hash;
+  location.replace(to + (move.length < 1.5e6 ? move : location.hash));
+})();
+</script>`;
+
+function moved(req, u, env) {
+  let home;
+  try { home = new URL(env.HOME); } catch { return null; }
+  const old = u.hostname.endsWith(".workers.dev");
+  if (u.hostname === home.hostname || !(old || u.hostname === "www." + home.hostname)) return null;
+  if ((req.method !== "GET" && req.method !== "HEAD") || req.headers.get("Upgrade") === "websocket") return null;
+  if (/^\/(room|stat|d|ui|api|spine)\/|^\/sw\.js$/.test(u.pathname)) return null;
+  const to = home.origin + u.pathname + u.search;
+  if (old && req.headers.get("Sec-Fetch-Dest") === "document" && !/(^|;\s*)moved=1/.test(req.headers.get("Cookie") || ""))
+    return new Response(MOVE_PAGE.replace("%TO%", JSON.stringify(to)), { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+  return Response.redirect(to, 301);
+}
+
 export default {
   async fetch(req, env, ctx) {
     const u = new URL(req.url), now = Date.now(), closed = now < G.off;
     G.w++;
+    const away = env.HOME && moved(req, u, env);
+    if (away) return away;
     try {
       const m = /^\/room\/([a-z0-9]{4,10})$/.exec(u.pathname);
       if (m) {

@@ -78,7 +78,7 @@ function gmCopy(text) {
 
 // A duel: a Daily challenge drawn from a seed of its own instead of the day — the same rounds for whoever opens the
 // link "<game>/duel/<seed>.<the sender's result>". Played on the Daily's fixed settings; it leaves today's Daily alone.
-const GM_SITE = "https://limbus.shpep.workers.dev";
+const GM_SITE = "https://limbus-archive.com";
 let gmDuelNext = null;
 // what a game's page was opened for (the part of the address after the game): true = start the challenge at once
 function gmAuto(game, args) {

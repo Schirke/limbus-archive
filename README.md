@@ -4,12 +4,12 @@
 </p>
 
 <p align="center">
-  <a href="https://limbus.shpep.workers.dev"><b>🌐 limbus.shpep.workers.dev</b></a><br>
+  <a href="https://limbus-archive.com"><b>🌐 limbus-archive.com</b></a><br>
   the website: patch reports, the database and the team builder in a browser, nothing to install
 </p>
 
 <p align="center">
-  <a href="https://limbus.shpep.workers.dev"><img alt="website" src="https://img.shields.io/badge/website-open-c9a227"></a>
+  <a href="https://limbus-archive.com"><img alt="website" src="https://img.shields.io/badge/website-open-c9a227"></a>
   <img alt="version" src="https://img.shields.io/github/v/release/Schirke/limbus-archive">
   <img alt="downloads" src="https://img.shields.io/github/downloads/Schirke/limbus-archive/total">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blue">
@@ -29,7 +29,7 @@ when the app runs (none of them is in this repository).
 
 ## Website
 
-**[limbus.shpep.workers.dev](https://limbus.shpep.workers.dev)** is a copy of the app that runs in a browser:
+**[limbus-archive.com](https://limbus-archive.com)** is a copy of the app that runs in a browser:
 patch reports, news and the change history, Identities & E.G.O, the enemy handbook, battle animations, the team
 builder, the Mirror Dungeon planner, the music player, the games with Extraction and its banner archive, and the live
 streams. The rest (skill renders with effects, Versus,

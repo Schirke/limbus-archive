@@ -38,6 +38,8 @@ EXT = {"image/png": "png", "image/webp": "webp", "image/jpeg": "jpg", "image/gif
 DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "enemies": True, "music": True, "spine": True, "clips": True,
             "games": True,
             "project": "", "url": ""}
+# the site's addresses it has moved from → where it is now (a config still naming the old one is read as the new)
+MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # the pages the site is written for (each has its part in Exporter); any other page of the UI is opened on the site
 # only when the check finds it asking for nothing the site lacks (verify)
 BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners"]
@@ -92,6 +94,7 @@ def config(svc) -> dict:
             c.update(json.load(f))
     except (OSError, ValueError):
         pass
+    c["url"] = MOVED.get((c["url"] or "").rstrip("/"), c["url"])
     return c
 
 
@@ -130,6 +133,8 @@ def worker_config(svc) -> str:
         cfg["vars"]["OWNER_KEY"] = config(svc)["owner_key"]
     if isinstance(config(svc).get("budget"), dict):  # what a period of the Cloudflare plan may spend (worker.js)
         cfg["vars"]["BUDGET"] = json.dumps(config(svc)["budget"])
+    if config(svc)["url"]:  # the site's own address: its old one (*.workers.dev) and www. move there (worker.js moved)
+        cfg["vars"]["HOME"] = config(svc)["url"].rstrip("/")
     path = os.path.join(folder, "wrangler.jsonc")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=1)
@@ -1023,6 +1028,17 @@ class Exporter:
         boot = f"""<script>
 const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "titles": {r: t for r, (t, _, _) in pages.items()}, "scripts": [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]})};
 (async () => {{
+  // come from the site's old address (ui/site/worker.js moved): what the browser kept there, where nothing is kept here
+  if (location.hash.startsWith("#move=")) {{
+    let m = {{}};
+    try {{ m = JSON.parse(decodeURIComponent(location.hash.slice(6))); }} catch (e) {{ /* the page as it is */ }}
+    history.replaceState(null, "", location.pathname + location.search + (m.h || ""));
+    try {{ for (const [k, v] of Object.entries(m.d || {{}})) if (localStorage.getItem(k) === null) localStorage.setItem(k, v); }} catch (e) {{ /* not kept */ }}
+    try {{
+      const c = await caches.open("own");
+      if (m.own && !(await c.match("/api/myteam"))) await c.put("/api/myteam", new Response(m.own, {{ headers: {{ "Content-Type": "application/json; charset=utf-8" }} }}));
+    }} catch (e) {{ /* not kept */ }}
+  }}
   // (a section's page keeps the text it was written with: what a search engine reads, the app not starting)
   const fail = (m) => {{ document.getElementById("main").insertAdjacentHTML("afterbegin", '<div class="empty">' + m + '</div>'); }};
   if (!("serviceWorker" in navigator)) return fail("This site needs service workers — open it in a normal (not private) window of a current browser.");
