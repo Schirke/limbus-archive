@@ -47,7 +47,7 @@ async function langTable(g) {
   return LANG.tables[k];
 }
 async function langApply(path, data) {
-  if (!LANG_PAGES.test(path)) return data;
+  if (!LANG_PAGES.test(path) || /^\/api\/sounds\/?$/.test(path)) return data;  // (the Sounds folders' names are their addresses)
   const ts = [await langTable("core")];
   if (LANG_STORY.test(path)) ts.push(await langTable("story"));
   const look = (s) => {
@@ -69,6 +69,9 @@ async function langApply(path, data) {
   };
   const put = (s, key) => s.length > 1 && (LANG_FIELDS.has(key) || /\S\s+\S+\s+\S/.test(s)) ? look(s) : null;
   if (data && typeof data === "object") walk(data, "");
+  // a {name: picture} list next to rows that name it: the translated names find their pictures too
+  if (data && data.pics && typeof data.pics === "object" && !Array.isArray(data.pics))
+    for (const [k, v] of Object.entries(data.pics)) { const x = put(k, ""); if (x !== null && !(x in data.pics)) data.pics[x] = v; }
   return data;
 }
 async function langList() {

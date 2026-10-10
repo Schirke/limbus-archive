@@ -24,7 +24,7 @@ routes.story = async (args) => {
   if (a === "read") { stRead(b); return; }
   if (a === "interv" || a === "mini" || a === "other") a = "main";
   if (a === "main" || a === "ident") { st.tab = a; if (b) st.sel[a] = b; }
-  stDraw();
+  storyDraw();
 };
 
 function stChapters() {
@@ -33,7 +33,7 @@ function stChapters() {
   return idx.ident.map((s) => ({ id: String(s.sinner), label: s.name, sinner: s.sinner, items: s.items }));
 }
 
-function stDraw() {
+function storyDraw() {
   const list = stChapters();
   const sel = String(st.sel[st.tab] ?? list[0]?.id);
   const cur = list.find((c) => String(c.id) === sel) || list[0];
