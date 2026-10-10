@@ -54,6 +54,28 @@ function drawEnemies() {
   $("#enq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { env.q = e.target.value; drawEnemyGrid(); }, 200); };
   drawEnemyGrid();
   enThumbs();
+  enDrawn();
+}
+// sprite enemies without a portrait (the Arknights collab's, …): the app draws their idle pose with the player
+// (a few seconds each, in the background); their tiles fill in as the pictures come
+async function enDrawn() {
+  while (ENEMIES && ENEMIES.making && location.hash.startsWith("#/enemies") && !enDrawn.busy) {
+    enDrawn.busy = true;
+    await new Promise((ok) => setTimeout(ok, 8000));
+    enDrawn.busy = false;
+    const d = await api("/api/enemies").catch(() => null);
+    if (!d || !ENEMIES) return;
+    const fresh = d.thumbs.filter((a) => !ENEMIES.thumbs.includes(a));
+    Object.assign(ENEMIES, { thumbs: d.thumbs, making: d.making });
+    for (const o of ENEMIES.list) {
+      const tile = fresh.includes(o.app) && document.querySelector(`.entile[data-e="${o.id}"]`);
+      if (!tile) continue;
+      const img = tile.querySelector("img");
+      if (img) img.remove();
+      tile.insertAdjacentHTML("afterbegin", enTileImg(o));
+      if (o.id === env.sel) drawEnemy();
+    }
+  }
 }
 
 function drawEnemyGrid() {
@@ -187,7 +209,7 @@ async function drawEnemy() {
   box.innerHTML = `<div class="enkick">${esc(v.label)}${v.cls ? ` · ${esc(v.cls)}` : ""}</div>
     <h2 class="enname">${esc(e.name)}<em>LV ${level}</em></h2>
     <div class="entags">${[...v.assoc, ...v.tags].map((t) => `<span>${esc(t)}</span>`).join("")}<span class="muted">id ${v.ids.slice(0, 4).join(", ")}${v.ids.length > 4 ? "…" : ""}</span></div>
-    <div class="enhead">${spine ? "" : `<div class="enpic">${e.pic ? `<img src="${imgFull(e.pic)}" onerror="this.remove()">` : ""}</div>`}
+    <div class="enhead">${spine ? "" : `<div class="enpic">${e.pic ? `<img src="${imgFull(e.pic)}" onerror="this.remove()">` : ENEMIES.thumbs.includes(e.app) ? `<img src="${enThumbUrl(e)}" onerror="this.remove()">` : ""}</div>`}
       ${spine ? `<div class="enspine wide" data-e="${e.id}" title="Its idle pose (Spine). All its animations: the Animations page"></div>` : ""}
       <div class="enstats">${stat("HP", hp, ico("hp", "s20", "HP", ""))}${stat("Speed", v.speed.length ? v.speed.join("-") : "—")}
         ${stat("Def level", `${level + v.def}<small>${v.def >= 0 ? "+" : ""}${v.def}</small>`, ico("def", "s20", "Defense level", ""))}${stat("Stagger", enStagger(v, level))}

@@ -922,6 +922,54 @@ class Service:
         self._quiz = (sid, db)
         return db
 
+    def sound_lib(self) -> dict:
+        """Database → Sounds: every sound of the latest snapshot's banks in folders (see soundlib.build)."""
+        import struct
+
+        from . import soundlib
+        from .banks import list_sounds
+        sid = self.latest_snapshot_id()
+        if not sid:
+            return {"banks": [], "tree": {"name": "", "n": 0, "kids": []}}
+        cached = getattr(self, "_sound_lib", None)
+        if cached and cached[0] == sid:
+            return cached[1]
+        rel = f"sound_lib/{sid}.json.gz"
+        db = self.store.read_json(rel)
+        if db is None or db.get("v") != soundlib.VERSION:
+            snap = self.load_snapshot(sid)
+            roots = {"install": self.game.game, "locallow": self.game.locallow}
+            samples, music = [], {}
+            for path, rec in snap["files"].items():
+                if not rec.get("sounds"):
+                    continue
+                label, _, sub = path.partition("/")
+                try:  # (numbered as export_wav reads the file now: see viewer.sound_index)
+                    got = [(x["name"], x["ms"]) for x in list_sounds(os.path.join(roots.get(label) or "", sub))]
+                except (OSError, ValueError, struct.error):
+                    got = [tuple(x) for x in rec["sounds"]]
+                samples += [(path, i, name, ms) for i, (name, ms) in enumerate(got)]
+            for t in self.music().get("tracks") or []:
+                sounds = (snap["files"].get(t["bank"]) or {}).get("sounds") or []
+                if t["i"] < len(sounds):
+                    music[(t["bank"], sounds[t["i"]][0].lower())] = t
+            story, path = {}, self.ensure_browse()  # the story's own files: which voice file a line plays
+            if path:
+                con = sqlite3.connect(path)
+                for name, h in con.execute("select name, h from o where type = 'TextAsset' and c like 'Assets/Resources_moved/Story/Effect/%'"):
+                    try:
+                        story[name.upper()] = [r for r in json.loads(self.store.get_blob(h).decode("utf-8-sig")).get("dataList", []) if r.get("voice")]
+                    except Exception:
+                        continue
+                con.close()
+            units = self.unit_db()
+            loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize")
+            pics = {c["name"]: c["pic"] for c in self.quiz().get("chars") or [] if c.get("pic")}  # (story speakers' pictures)
+            db = soundlib.build(samples, loc, story, units.get("ids") or [], units.get("egos") or [], music, pics)
+            self.store.write_json(rel, db)
+        self._sound_lib = (sid, db)
+        return db
+
     def stage_db(self) -> dict:
         """The story map of the latest snapshot (see stages.build): chapters, their nodes on the map and the fights."""
         import re
@@ -1001,6 +1049,9 @@ class Service:
                         icons.setdefault(name, c)
                 finally:
                     con.close()
+            from . import extra  # (those the game no longer has: shipped with the app)
+            for name, c in extra.files("Sprite/SkillIcon").items():
+                icons.setdefault(name, c)
             db = history.build(reports, lambda rid: history.load_report(self.data_dir, rid), self.unit_db(), self.enemy_db(), icons)
             db["stamp"] = stamp
             self.store.write_json(rel, db)
@@ -1043,6 +1094,9 @@ class Service:
                         sub.setdefault(name, set()).add(c)
                 finally:
                     con.close()
+            from . import extra  # (those the game no longer has: shipped with the app)
+            for name, c in extra.files("Sprite/SkillIcon").items():
+                sub.setdefault(name, {c})
             for s in db["skills"].values():
                 n = str(s.get("icon") or s["id"])
                 paths = sub.get(n) or set()

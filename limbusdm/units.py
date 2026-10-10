@@ -15,7 +15,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 11  # bump when the database layout changes (cached per snapshot)
+VERSION = 13  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -124,6 +124,14 @@ def passive_info(pid: int, passives: dict, loc_passives: dict, kind: str) -> dic
             "cost": cost, "mode": mode}
 
 
+def _upgrade(got: dict, info: dict) -> None:
+    """A passive listed again (same name) at a higher Uptie / Threadspin is its upgraded version: the page shows
+    the earlier one ("prev", a chain) below that level."""
+    old = got.get(info["name"])
+    if old:
+        info["prev"] = old.get("prev") if old["id"] == info["id"] else old
+
+
 def threadspin(require: list | None) -> list[int]:
     """[from, to] Threadspin levels from the game's conditions: CheckAwakenLevel2 → [2, 0] (0 = and up),
     CheckAwakenLevelBetween_2_4 → [2, 4]."""
@@ -138,7 +146,8 @@ def build(tables: dict, loc_dir: str) -> dict:
     loc_ids = _load(loc_dir, r"EN_Personalities(-.*)?\.json$")
     loc_egos = _load(loc_dir, r"EN_Egos(-.*)?\.json$")
     loc_skills = _load(loc_dir, r"EN_Skills.*\.json$")
-    loc_passives = _load(loc_dir, r"EN_Passives(-.*)?\.json$")
+    # EN_Passives_check4.json: the reworked passives an Identity gets at Uptie 4
+    loc_passives = _load(loc_dir, r"EN_Passives(-.*|_check\d+)?\.json$")
     loc_ego_passives = _load(loc_dir, r"EN_Passive_Ego(-.*)?\.json$")
     keywords = _load(loc_dir, r"EN_BattleKeywords.*\.json$")
     tags = _load(loc_dir, r"EN_SkillTag.*\.json$")
@@ -169,6 +178,7 @@ def build(tables: dict, loc_dir: str) -> dict:
                     if info["name"] == str(p) and not info["desc"]:
                         continue  # one the game never names or describes is internal (as with skills)
                     info["uptie"] = g.get("level")
+                    _upgrade(got, info)
                     got[info["name"]] = info
             pas += got.values()
         kws = r.get("skillKeywordList") or []
@@ -209,13 +219,17 @@ def build(tables: dict, loc_dir: str) -> dict:
                     s["label"] = label if not i else f"{label} {i + 1}"
                     sk.append(s)
         # the passive unlocks at Threadspin 2; some E.G.O have a second, upgraded one for a higher Threadspin
-        pas = []
+        # (Threadspin II–IV, then V+ on E.G.O with a 5th Threadspin): one passive per name, earlier versions in "prev"
+        got = {}
         for p in r.get("awakeningPassiveList") or []:
             if p not in loc_ego_passives:
                 continue  # no text in the game: an internal helper
             info = passive_info(p, passives, loc_ego_passives, "ego")
             info["threadspin"] = threadspin((passives.get(p) or {}).get("requireIDList"))
-            pas.append(info)
+            info["uptie"] = (info["threadspin"] or [2])[0]
+            _upgrade(got, info)
+            got[info["name"]] = info
+        pas = list(got.values())
         egos.append({
             "id": eid, "sinner": sinner, "sinnerName": SINNERS[sinner - 1] if 1 <= sinner <= 12 else "",
             "name": _one_line(loc.get("name")), "grade": r.get("egoType"), "season": r.get("season"),
@@ -223,7 +237,7 @@ def build(tables: dict, loc_dir: str) -> dict:
             "cost": [{"sin": SINS.get(c.get("attributeType"), c.get("attributeType")), "n": c.get("num")}
                      for c in r.get("requirementList") or []],
             "resist": {SINS.get(x.get("type"), x.get("type")): x.get("value") for x in r.get("attributeResistList") or []},
-            "skills": sk, "passives": pas,
+            "skills": sk, "passives": pas, "maxUp": r.get("maxEgoSyncLevel") or 4,
             "img": {"thumb": f"{ASSET}Unit/Profile/Ego/{eid}_awaken_profile.png", "art": f"{ASSET}Unit/EgoCG/{eid}_cg.png"},
         })
 

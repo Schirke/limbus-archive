@@ -5,12 +5,14 @@ import json
 import mimetypes
 import os
 import re
+import shutil
 import subprocess
 import threading
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from .extra import file_of as extra_file
 from .extract import extract
 from .paths import resource_dir
 from .service import Service
@@ -139,6 +141,14 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
         def _asset_thumb(self, path: str):
             """Small preview of a catalog image path: stored texture thumbnail, else the sprite rendered live."""
             rows = svc.lookup_container(path)
+            if not rows and extra_file(path):  # (a picture the game no longer has, shipped with the app)
+                import io
+                from PIL import Image
+                img = Image.open(extra_file(path))
+                img.thumbnail((256, 256))
+                buf = io.BytesIO()
+                img.save(buf, "PNG")
+                return self._send(200, buf.getvalue(), "image/png", {"Cache-Control": "max-age=86400"})
             for r in rows:
                 if r["type"] == "Texture2D" and r.get("h") and svc.store.thumb_path(r["h"]):
                     return self._file(svc.store.thumb_path(r["h"]), "image/webp", cache=True)
@@ -183,6 +193,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
         def _asset_img(self, path: str):
             """Full-size picture of a catalog path (Identity art, E.G.O CG…), straight from the game cache."""
             rows = svc.lookup_container(path)
+            if not rows and extra_file(path):
+                return self._file(extra_file(path), "image/png", cache=True)
             r = next((x for x in rows if x["type"] == "Texture2D"), None) or next((x for x in rows if x["type"] == "Sprite"), None)
             bundle_file = svc.object_file(r["bundle"]) if r else None
             if not bundle_file:
@@ -576,6 +588,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                                    "story": {k: sorted(set(v)) for k, v in story.items()}})
             if p == "/api/game_cards":  # the pictures on the cards of the Games page
                 return self._json(game_cards(svc, int(q.get("n", 12))))
+            if p == "/api/sounds":  # Database → Sounds (limbusdm/soundlib.py): all folders, one folder's sounds, a search
+                from . import soundlib
+                db = svc.sound_lib()
+                if q.get("q"):
+                    return self._json(soundlib.search(db, q["q"]))
+                if q.get("path"):
+                    node = soundlib.find(db, json.loads(q["path"]))
+                    return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {}})
+                return self._json(soundlib.outline(db["tree"]))
             if p == "/api/quiz_audio":  # one voice line by its sample's name
                 from .banks import export_wav
                 from .viewer import sound_index
@@ -634,13 +655,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 # until then); the sprite-drawn ones keep the portrait
                 done = {fn[:-4] for fn in os.listdir(_thumb_dir(svc))} if os.path.isdir(_thumb_dir(svc)) else set()
                 spines = svc.enemy_spines()
+                making = _drawn_thumbs(svc, db["list"], spines, done)
                 # twins: looks whose picture repeats an earlier one's in the handbook (Guess the enemy asks it once)
                 from .twins import repeats
                 looks = [a for a in dict.fromkeys(e["app"] for e in db["list"]) if a in done]
                 twins = [looks[i] for i in repeats([os.path.join(_thumb_dir(svc), a + ".png") for a in looks])]
                 return self._json({**{k: v for k, v in db.items() if k not in ("skills", "passives", "list")},
                                    "list": [{**e, "spine": bool(spines.get(e["app"]))} for e in db["list"]],
-                                   "thumbs": sorted({e["app"] for e in db["list"]} & done), "twins": twins, "nothumb": _no_thumbs(svc)})
+                                   "thumbs": sorted({e["app"] for e in db["list"]} & done), "twins": twins, "nothumb": _no_thumbs(svc),
+                                   "making": making})
             if p == "/api/enemy_thumb":
                 path = os.path.join(_thumb_dir(svc), _safe(q.get("app", "")) + ".png")
                 return self._file_live(path, "image/png") if os.path.exists(path) else self._send(404, b"", "text/plain")
@@ -1056,6 +1079,32 @@ def _thumb_dir(svc) -> str:
     return os.path.join(svc.data_dir, "enemy_thumbs")
 
 
+def _drawn_thumbs(svc, enemies: list, spines: dict, done: set) -> int:
+    """Sprite-drawn enemies without a portrait in the game (the Arknights collab's, …) get the player's picture of
+    their idle pose (Versus' make_fighter_pics) as their handbook picture: those made are copied into enemy_thumbs
+    (added to `done`), the rest queued. Returns how many are still being made."""
+    if not spines:  # (which ones are Spine-drawn is known only once the skeletons are linked)
+        return 0
+    from .viewer import _safe_name, fighter_pic_dir
+    bare = [a for a in dict.fromkeys(e.get("app") for e in enemies if not e.get("pic"))
+            if a and not spines.get(a) and _safe(a) not in done]
+    if not bare:
+        return 0
+    todo = []
+    for a in bare:
+        src = os.path.join(fighter_pic_dir(svc), _safe_name(a) + ".png")
+        if os.path.isfile(src):
+            os.makedirs(_thumb_dir(svc), exist_ok=True)
+            shutil.copyfile(src, os.path.join(_thumb_dir(svc), _safe(a) + ".png"))
+            done.add(_safe(a))
+        else:
+            todo.append(a)
+    if not todo:
+        return 0
+    st = svc.fx.fighter_pics(todo)
+    return len([a for a in todo if a not in st["failed"]])
+
+
 def _quiz_twins(svc, q: dict) -> dict:
     """The story's characters (Guess the character) with "twin" (the kept one's place) on those whose picture repeats
     another's: one portrait for two speakers keeps the speaker it is named after (StoryLog_Sanson: Sansón, not Narrator),
@@ -1213,6 +1262,24 @@ def export_object(svc: Service, b: dict) -> dict:
         with open(svc.store.thumb_path(b["thumb"]), "rb") as f:
             data = f.read()
         fn = (b.get("name") or b["thumb"]) + "_thumb.webp"
+    elif b.get("soundfolder"):  # Database → Sounds: a folder's own sounds as WAVs into a folder of that name
+        from . import soundlib
+        from .banks import export_wav
+        db = svc.sound_lib()
+        node = soundlib.find(db, b["soundfolder"])
+        rows = soundlib.items(db, node) if node else []
+        if not rows:
+            raise FileNotFoundError("no sounds in this folder")
+        if len(rows) > soundlib.SAVE_MAX:
+            raise ValueError(f"{len(rows)} sounds: too many to save at once (up to {soundlib.SAVE_MAX})")
+        dest = os.path.join(out_dir, _safe(" - ".join(b["soundfolder"]), 120))
+        os.makedirs(dest, exist_ok=True)
+        for bank, i, name, *_ in rows:
+            path = svc.real_path(bank)
+            if path:
+                with open(os.path.join(dest, _safe(name, 150) + ".wav"), "wb") as f:
+                    f.write(export_wav(path, i)[0])
+        return {"path": dest}
     else:
         raise ValueError("nothing to export")
     fn = "".join(c if c not in '<>:"/\\|?*' else "_" for c in fn)

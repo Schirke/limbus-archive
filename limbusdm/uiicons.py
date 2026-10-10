@@ -19,7 +19,7 @@ ICONS = {
     "def_Guard": "Icon_AttackType_guard", "def_Evade": "Icon_AttackType_evade", "def_Counter": "Icon_AttackType_counter",
     **{f"st_{k}": f"Personality{k}" for k in ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath", "Charge"]},
     **{f"rank_{n}": f"MainUI_Gacha_3_Rank{n}" for n in (1, 2, 3)},
-    "up_1": f"{PL}4_18", "up_2": f"{PL}4_17", "up_3": f"{PL}4_16", "up_4": f"{PL}4_37",
+    "up_1": f"{PL}4_18", "up_2": f"{PL}4_17", "up_3": f"{PL}4_16", "up_4": f"{PL}4_37", "up_5": f"{PL}4_40",
     "grade_ZAYIN": f"{PL}3_27", "grade_TETH": f"{PL}3_28", "grade_HE": f"{PL}3_38", "grade_WAW": f"{PL}3_39",
     "grade_ALEPH": f"{PL}3_29",
     # skill coins as the battle UI draws them: plain bronze, Unbreakable (red), the purple / green special coins

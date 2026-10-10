@@ -119,8 +119,11 @@ function drawDb() {
 function unitText(x) {
   const sk = [...(x.skills || []), ...(x.defense || [])].map((s) => { const u = s.up[Math.max(...Object.keys(s.up))]; return `${u.name} ${u.desc}`; });
   return [x.title, x.name, x.sinnerName, x.id, ...(x.assoc || []), ...(x.statuses || []).map(statusName), ...sk,
-    ...(x.passives || []).map((p) => `${p.name} ${p.desc}`)].join(" ").toLowerCase();
+    ...(x.passives || []).flatMap(pasVersions).map((p) => `${p.name} ${p.desc}`)].join(" ").toLowerCase();
 }
+// a passive and its earlier versions (lower Uptie / Threadspin)
+const pasVersions = (p) => p.prev ? [p, ...pasVersions(p.prev)] : [p];
+const pasAt = (p, up) => { while (p.prev && up < p.uptie) p = p.prev; return p; };
 const topUp = (s) => s.up[Math.max(...Object.keys(s.up))];
 function dbFiltered() {
   const isId = dbv.tab === "ids", q = dbv.q.trim().toLowerCase();
@@ -163,7 +166,7 @@ function kwPlainOf() {
   const count = (t) => String(t || "").replace(/<link="([^"]+)">|\[([A-Za-z0-9_]+)\]/g, (m, a, b) => { uses[a || b] = (uses[a || b] || 0) + 1; return m; });
   for (const x of [...UNITS.ids, ...UNITS.egos]) {
     for (const sk of [...(x.skills || []), ...(x.defense || [])]) for (const u of Object.values(sk.up)) { count(u.desc); u.coindescs.forEach((c) => c.forEach(count)); }
-    (x.passives || []).forEach((p) => count(p.desc));
+    (x.passives || []).flatMap(pasVersions).forEach((p) => count(p.desc));
   }
   const key = {};
   for (const [k, g] of Object.entries(UNITS.glossary)) {
@@ -287,7 +290,7 @@ function openUnit(id) {
   const x = unitById(id);
   if (!x) return;
   const isId = !!x.title;
-  let up = 4, art2 = false, tab = 0, level = MAX_LEVEL;
+  let up = x.maxUp || 4, art2 = false, tab = 0, level = MAX_LEVEL;
   // Skill 1-3 (+ the 0-copy skills that replace / follow them, shown under the same tier), Defense
   const main = x.skills.filter((s) => !isId || s.copies), extra = isId ? x.skills.filter((s) => !s.copies) : [];
   const lone = extra.filter((e) => !main.some((m) => m.tier === e.tier));
@@ -325,11 +328,11 @@ function openUnit(id) {
   };
   const right = () => {
     return `<div class="lvpanel"><span class="lvlabel">${isId ? "Uptie" : "Threadspin"}</span>
-        ${[1, 2, 3, 4].map((n) => `<button class="upbtn ${up === n ? "on" : ""}" data-up="${n}" title="${n}">${ico(`up_${n}`, "s22", "", ROMAN[n - 1])}</button>`).join("")}
+        ${Array.from({ length: x.maxUp || 4 }, (_, i) => i + 1).map((n) => `<button class="upbtn ${up === n ? "on" : ""}" data-up="${n}" title="${n}">${ico(`up_${n}`, "s22", "", ROMAN[n - 1])}</button>`).join("")}
         ${isId ? `<span class="lvlabel lv">Lv. <b id="lvn">${level}</b></span><input type="range" id="lvr" min="1" max="${MAX_LEVEL}" value="${level}">` : ""}</div>
       <div class="sktabs">${tabs.map(([n], i) => `<button class="${i === tab ? "on" : ""}" data-tab="${i}">${esc(n)}</button>`).join("")}</div>
       <div class="skpanel">${(tabs[tab] || [0, []])[1].length ? panel() : `<div class="muted">No skills.</div>`}</div>
-      ${x.passives.length ? `<h3 class="group">Passives</h3>${x.passives.map(passiveHtml).join("")}` : ""}`;
+      ${x.passives.length ? `<h3 class="group">Passives</h3>${x.passives.map((p) => passiveHtml(pasAt(p, up))).join("")}` : ""}`;
   };
   const draw = () => {
     modal(`<div class="ud"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}

@@ -16,7 +16,7 @@ import json
 import os
 import re
 
-VERSION = 3
+VERSION = 4
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 NUMS = {"defaultValue": "Base Power", "skillLevelCorrection": "Offense Level", "targetNum": "Atk Weight", "mpUsage": "SP cost"}
 GROUPS = ("Skills", "Passives", "Statuses", "Stats")

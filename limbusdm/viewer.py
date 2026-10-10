@@ -1946,6 +1946,10 @@ def enemy_portraits(svc) -> dict[str, str]:
                 pics.setdefault(c.rsplit("/", 1)[-1][:-len("_portrait.png")], c)
         finally:
             db.close()
+    from . import extra  # (those the game no longer has: shipped with the app)
+    for name, c in extra.files("Sprite/Unit/Portrait").items():
+        if name.endswith("_portrait"):
+            pics.setdefault(name[:-len("_portrait")], c)
     out = {}
     for data in svc.static_tables(list(content.UNIT_TABLES)).values():
         for t in data.values():
