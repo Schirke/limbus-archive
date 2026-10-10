@@ -124,6 +124,11 @@ class Service:
         out.sort(key=lambda r: r["new"].rsplit("_", 1)[-1], reverse=True)
         return out
 
+    def _ext(self) -> list[str]:
+        d = os.path.join(self.data_dir, "ext")
+        names = sorted(fn[:-3] for fn in os.listdir(d) if fn.endswith(".js")) if os.path.isdir(d) else []
+        return sorted(names, key=lambda n: n != "ext")
+
     def state(self):
         g = self.game
         return {
@@ -137,7 +142,7 @@ class Service:
             "version": __import__("limbusdm").__version__,
             "update": (getattr(self, "_update", None) or (0, None))[1],
             "site_publish": os.path.exists(os.path.join(self.data_dir, "site_config.json")),  # the web copy is set up here
-            "ext": os.path.exists(os.path.join(self.data_dir, "ext", "ext.js")),  # an extension is in the data folder
+            "ext": self._ext(),  # the extensions in the data folder (their scripts)
         }
 
     # ------------------------------------------------------------ jobs

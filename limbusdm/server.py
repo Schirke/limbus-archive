@@ -265,8 +265,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             p = u.path
             if p == "/" or p == "/index.html":
                 return self._file(os.path.join(ui_dir, "index.html"), "text/html; charset=utf-8")
-            if p == "/ext/ext.js":  # an optional extension: only from the data folder (ext), none of it ships with the app
-                f = os.path.join(svc.data_dir, "ext", "ext.js")
+            m = re.match(r"^/ext/(\w+)\.js$", p)
+            if m:  # an optional extension: only from the data folder (ext), none of it ships with the app
+                f = os.path.join(svc.data_dir, "ext", m.group(1) + ".js")
                 return self._file(f, "text/javascript; charset=utf-8") if os.path.exists(f) else self._send(404, b"", "text/plain")
             if p.startswith("/ui/"):
                 full = os.path.normpath(os.path.join(ui_dir, p[4:]))
@@ -337,15 +338,23 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                                                                for x in arr] for k, arr in g["kinds"].items()}}
                                            for g in ch.get("groups", [])]}
                 return self._json(ch)
-            if p == "/api/ext/games":  # the extension's own data (ext.py next to ext.js)
-                f = os.path.join(svc.data_dir, "ext", "ext.py")
+            m = re.match(r"^/api/ext/(\w+)$", p)
+            if m:  # the extension's own data (ext.py next to ext.js; any other: its own .py)
+                f = os.path.join(svc.data_dir, "ext", "ext.py" if m.group(1) == "games" else m.group(1) + ".py")
                 if not os.path.exists(f):
                     return self._json({"error": "no extension"}, 404)
                 import importlib.util
-                spec = importlib.util.spec_from_file_location("limbus_ext", f)
+                spec = importlib.util.spec_from_file_location("limbus_ext_" + m.group(1), f)
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
                 return self._json(mod.handle(svc, q))
+            if p == "/api/langs":  # the languages of the game's texts there are (limbusdm/langs.py)
+                from . import langs
+                return self._json(langs.listing(svc))
+            if p == "/api/lang":  # one language's table "English text → its text" (g: core / story)
+                from . import langs
+                f = langs.table_file(svc, q.get("id", ""), q.get("g", "core"))
+                return self._gz_json_file(f) if f else self._json({"error": "no such language"}, 404)
             if p == "/api/site_status":  # the web copy: the build the site shows next to this app's (Settings)
                 from . import site
                 return self._json(site.status(svc))

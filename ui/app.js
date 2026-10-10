@@ -24,8 +24,108 @@ async function api(path, body) {
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || r.statusText);
   if (body !== undefined && path.startsWith("/api/mod")) animMods.kept = {};  // a mod was changed: the lists are asked again
+  return body === undefined && LANG.id ? langApply(path, data) : data;
+}
+
+// ------------------------------------------------------------------ the game's texts in another language
+// (limbusdm/langs.py): the menu by the settings button, the choice kept in this browser. A language is a table
+// "English text → its text"; the lists the pages ask for get it put over their names and descriptions. The first
+// visit takes the browser's language when there is a translation of it.
+const LANG_KEY = "lang";
+const LANG = { id: "", list: null, tables: {} };
+try { LANG.id = localStorage.getItem(LANG_KEY) || ""; } catch {}
+if (LANG.id === "en") LANG.id = "";
+// the lists that carry the game's texts (others: the app's own words, file names, reports' raw records)
+const LANG_PAGES = /^\/api\/(units|enemies|enemy|buffs|music|mirror|bgm_tracks|quiz|gacha|sounds|stages|history|game_cards|characters|skills|versus_list)\b/;
+const LANG_STORY = /^\/api\/(quiz|gacha|sounds)\b/;  // …and the story / voice lines
+// the fields that are a text to show; anything else only when it reads as a sentence (a name there may be a key)
+const LANG_FIELDS = new Set(["name", "title", "desc", "flavor", "coindescs", "panicDesc", "lowDesc", "sinnerName", "place", "who", "text", "line", "lines", "abName", "subtitle"]);
+const LANG_MAPS = new Set(["keywords", "tags"]);  // {key: its name} lists (as lists of keys they stay)
+async function langTable(g) {
+  const k = LANG.id + "/" + g;
+  if (!LANG.tables[k]) LANG.tables[k] = fetch(`/api/lang?id=${encodeURIComponent(LANG.id)}&g=${g}`).then((r) => r.ok ? r.json() : {}).catch(() => ({}));
+  return LANG.tables[k];
+}
+async function langApply(path, data) {
+  if (!LANG_PAGES.test(path)) return data;
+  const ts = [await langTable("core")];
+  if (LANG_STORY.test(path)) ts.push(await langTable("story"));
+  const look = (s) => {
+    for (const t of ts) {
+      const x = t[s];
+      if (x !== undefined) return x;
+    }
+    const s2 = s.trim();
+    if (s2 !== s) for (const t of ts) if (t[s2] !== undefined) return s.replace(s2, () => t[s2]);
+    return null;
+  };
+  const walk = (o, key) => {
+    if (Array.isArray(o)) { for (let i = 0; i < o.length; i++) { if (typeof o[i] === "string") { const x = put(o[i], key); if (x !== null) o[i] = x; } else if (o[i] && typeof o[i] === "object") walk(o[i], key); } return; }
+    const named = LANG_MAPS.has(key);
+    for (const k of Object.keys(o)) {
+      const v = o[k];
+      if (typeof v === "string") { const x = put(v, named ? "name" : k); if (x !== null) o[k] = x; } else if (v && typeof v === "object") walk(v, k);
+    }
+  };
+  const put = (s, key) => s.length > 1 && (LANG_FIELDS.has(key) || /\S\s+\S+\s+\S/.test(s)) ? look(s) : null;
+  if (data && typeof data === "object") walk(data, "");
   return data;
 }
+async function langList() {
+  if (!LANG.list) LANG.list = fetch("/api/langs").then((r) => r.json()).then((o) => o.langs || []).catch(() => []);
+  return LANG.list;
+}
+function langSet(id) {
+  try { localStorage.setItem(LANG_KEY, id || "en"); } catch {}
+  location.reload();
+}
+// the best translation of the browser's language, the first time the site is opened
+async function langFirst() {
+  let saved = null;
+  try { saved = localStorage.getItem(LANG_KEY); } catch { return; }
+  if (saved !== null) return;
+  const list = await langList();
+  const want = (navigator.languages || [navigator.language || ""]).map((x) => x.toLowerCase());
+  const code = (l) => l.lang.toLowerCase();
+  for (const w of want) {
+    if (w.startsWith("en")) break;
+    const zh = w.startsWith("zh") ? (/(tw|hk|mo|hant)/.test(w) ? "zh-hant" : "zh-hans") : null;
+    const hits = list.filter((l) => zh ? code(l) === zh : code(l) === w || code(l).split("-")[0] === w.split("-")[0]);
+    if (!hits.length) continue;
+    hits.sort((a, b) => ((b.cover || {}).core || 0) - ((a.cover || {}).core || 0));
+    try { localStorage.setItem(LANG_KEY, hits[0].id); } catch {}
+    location.reload();
+    return;
+  }
+  try { localStorage.setItem(LANG_KEY, "en"); } catch {}
+}
+async function langMenu() {
+  const list = await langList();
+  const groups = new Map();
+  for (const l of list) { if (!groups.has(l.label)) groups.set(l.label, []); groups.get(l.label).push(l); }
+  const row = (l) => {
+    const c = l.cover && l.cover.core != null ? `${l.cover.core} %` : "";
+    const by = (l.authors || []).slice(0, 4).join(", ") + ((l.authors || []).length > 4 ? "…" : "");
+    return `<div class="langitem"><button class="langrow${LANG.id === l.id ? " on" : ""}" data-lang="${esc(l.id)}"><b>${esc(l.name)}</b>${c ? `<span class="muted small">${c} of the game's text</span>` : ""}
+      ${by ? `<span class="muted small langby">${esc(by)}</span>` : ""}</button>${l.link ? `<a class="small" href="${esc(l.link)}" target="_blank" rel="noopener">source</a>` : ""}</div>`;
+  };
+  modal(`<h2>Language</h2><p class="muted small">The game's texts — names, skills, passives, statuses, lines — as the game shows them in that language:
+      its own Korean and Japanese, and the players' translations (credit to their teams). The rest of the page stays in English.</p>
+    <div class="langlist"><div class="langgrp"><div class="langhead">English</div><div class="langitem"><button class="langrow${LANG.id ? "" : " on"}" data-lang=""><b>The game's own</b></button></div></div>
+    ${[...groups].map(([label, ls]) => `<div class="langgrp"><div class="langhead">${esc(label)}</div>${ls.map(row).join("")}</div>`).join("")}</div>`);
+  document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.onclick = () => langSet(b.dataset.lang));
+}
+(async () => {
+  const btn = document.querySelector("#navlang");
+  if (!btn) return;
+  btn.onclick = langMenu;
+  await langFirst();
+  const l = LANG.id && (await langList()).find((x) => x.id === LANG.id);
+  if (LANG.id && !l) { LANG.id = ""; try { localStorage.setItem(LANG_KEY, "en"); } catch {} }
+  btn.textContent = l ? l.lang.split("-")[0].toUpperCase() : "EN";
+  btn.title = l ? `${l.label} — ${l.name}` : "Language";
+  if (l) document.documentElement.lang = l.lang;
+})();
 function toast(html, ms = 4000) {
   const t = $("#toast");
   t.innerHTML = html;
@@ -86,9 +186,11 @@ async function refresh() {
     STATE = await api("/api/state");
   } catch (e) { return; }
   renderStatus();
-  if (STATE.ext && !window.extLoaded) {  // an optional extension (the ext folder in the data folder, not part of the app's files)
+  if (STATE.ext && !window.extLoaded) {  // optional extensions (the ext folder in the data folder, not part of the app's files)
     window.extLoaded = true;
-    const s = document.createElement("script"); s.src = "/ext/ext.js"; s.onload = () => route(); document.head.appendChild(s);
+    for (const n of Array.isArray(STATE.ext) ? STATE.ext : ["ext"]) {
+      const s = document.createElement("script"); s.src = `/ext/${n}.js`; s.async = false; s.onload = () => route(); document.head.appendChild(s);
+    }
   }
   const j = STATE.job;
   if (j && !j.running && j.finished && refresh.lastJob !== j.finished) {

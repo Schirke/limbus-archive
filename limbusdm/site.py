@@ -986,6 +986,30 @@ class Exporter:
         self.write_manifest("tools", m)
         return m
 
+    def langs(self) -> dict:
+        """The game's texts in other languages (limbusdm/langs.py): each language's tables and the list of them. A
+        table is kept while its texts are the same (`src`: the table file it was made from). A computer with no
+        players' translations of its own leaves the ones taken from the site as they are (pull)."""
+        from . import langs
+        old = self.read_manifest("langs")
+        if old and not langs.own(self.svc):
+            return old
+        src, keys = {}, []
+        for lang in langs.sources(self.svc):
+            for g in langs.GROUPS:
+                k = url_key("/api/lang", id=lang["id"], g=g)
+                try:
+                    src[k] = os.path.basename(langs.table_file(self.svc, lang["id"], g) or "")
+                except Exception as e:
+                    self.failed.append((k, str(e)))
+                    continue
+                keys.append(k)
+        have = {k: f for k, f in (old.get("urls") or {}).items() if k in src and (old.get("src") or {}).get(k) == src[k]}
+        files = self.fetch_all(keys + ["/api/langs"], have, "site: Languages")
+        m = {"kind": "langs", "id": self.svc.latest_snapshot_id(), "urls": files, "src": src}
+        self.write_manifest("langs", m)
+        return m
+
     def small(self) -> dict:
         """Pages that are one list each, asked again every time: News (the developers' notices from Steam, as they
         are when the site is sent)."""
@@ -1005,6 +1029,7 @@ class Exporter:
             self.scenes()
             self.gacha()
         self.units()
+        self.langs()
         self.small()
         self.tools()
         self.buffs()
@@ -1554,6 +1579,14 @@ def pull(ex: Exporter, url: str) -> dict:
         site["urls"] = p.files(site.get("urls") or {})
         ex.write_manifest(name, site)
         out["parts"] += 1
+    # the languages, on a computer with no players' translations of its own: the site's stay (Exporter.langs)
+    from . import langs
+    if "langs" in names and not langs.own(svc):
+        site = p.json("m/langs.json.gz")
+        if site.get("v") == VERSION:
+            site["urls"] = p.files(site.get("urls") or {})
+            ex.write_manifest("langs", site)
+            out["parts"] += 1
     # the game versions the taken reports are between: the site's state lists them, this app may not have them
     snaps = {s["id"]: s for s in ((idx.get("inline") or {}).get("/api/state") or {}).get("snapshots") or []}
     if snaps:
