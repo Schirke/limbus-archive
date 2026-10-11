@@ -261,8 +261,9 @@ const rAudioUrl = (s) => "/api/story_audio?s=" + encodeURIComponent(s);
 const rSpriteUrl = (lay, x) => `/api/story_sprite?b=${encodeURIComponent(lay.bundle)}&p=${x.s}`;
 const rSrc = (u) => R.blobs.get(u) || u;
 async function rPreload(ep, file) {
-  // (the story before keeps its blobs: its pictures may still be on screen; the one before that is let go)
-  for (const u of R.blobsOld.values()) URL.revokeObjectURL(u);
+  // (the story before keeps its blobs: its pictures may still be on screen; the one before that is let go, all but
+  // what the newer two still use)
+  const older = R.blobsOld;
   R.blobsOld = R.blobs; R.blobs = new Map();
   const lays = {};
   await Promise.all(Object.values(ep.models).filter((m) => m.psb).map(async (m) => { lays[m.psb] = await rLayout(m.psb); }));
@@ -284,6 +285,8 @@ async function rPreload(ep, file) {
   Object.values(ep.pics).forEach((p) => urls.add(stFull(p)));  // (pictures no line names in order)
   if (!need) need = urls.size;
   for (const u of urls) if (R.blobsOld.has(u)) R.blobs.set(u, R.blobsOld.get(u));
+  const live = new Set([...R.blobsOld.values(), ...R.blobs.values()]);
+  for (const b of older.values()) if (!live.has(b)) URL.revokeObjectURL(b);
   const list = [...urls].filter((u) => !R.blobs.has(u)), first = list.filter((u) => [...urls].indexOf(u) < need).length;
   const box = $("#rload"), num = $("#rlnum"), bar = $("#rlbar");
   let done = 0, next = 0, go;
