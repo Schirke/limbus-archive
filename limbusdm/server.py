@@ -201,7 +201,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             """Full-size picture of a catalog path, from the game cache."""
             rows = svc.lookup_container(path)
             if not rows and extra_file(path):
-                return self._file(extra_file(path), "image/png", cache=True)
+                return self._file(extra_file(path), "image/webp" if path.endswith(".webp") else "image/png", cache=True)
             r = next((x for x in rows if x["type"] == "Texture2D"), None) or next((x for x in rows if x["type"] == "Sprite"), None)
             bundle_file = svc.object_file(r["bundle"]) if r else None
             if not bundle_file:

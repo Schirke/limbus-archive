@@ -14,13 +14,13 @@ def _dir() -> str:
 
 
 def files(sub: str) -> dict[str, str]:
-    """{file name without .png: catalog path} of the pictures under ui/extra/<sub>/ (any depth)."""
+    """{file name without extension: catalog path} of the pictures under ui/extra/<sub>/ (any depth)."""
     base, out = os.path.join(_dir(), *sub.split("/")), {}
     for d, _dirs, fns in os.walk(base):
         for fn in fns:
-            if fn.endswith(".png"):
+            if fn.endswith((".png", ".webp")):
                 rel = os.path.relpath(os.path.join(d, fn), _dir()).replace(os.sep, "/")
-                out.setdefault(fn[:-4], ROOT + rel)
+                out.setdefault(os.path.splitext(fn)[0], ROOT + rel)
     return out
 
 

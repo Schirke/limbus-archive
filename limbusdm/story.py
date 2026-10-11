@@ -6,7 +6,7 @@ import json
 import os
 import re
 
-VERSION = 4  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 5  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
@@ -273,6 +273,78 @@ def _loc_root(svc) -> str:
 
 UNIT_CG = "Assets/Resources_moved/Sprite/Unit/CG/"
 
+# Ch. 8.5-EX Pilgrimage of Compassion: the game removed its scene scripts after the event; its texts stayed. Pictures
+# are shipped in ui/extra; backgrounds, music and who stands on stage are rebuilt from the texts (a guess).
+PC_ID, PC_NODE = 9120, 912000
+PC_BG = "Assets/Resources_moved/Story/Backgrounds/PC/"
+PC_ART = "Assets/Resources_moved/Sprite/StoryTheater/SubChapter9120/"
+PC_PLACES = [  # place (or its start) -> background
+    ("???", "story_foggy_beach"), ("A Certain Coast", "story_coast"), ("Iberian Coastline", "story_coast"),
+    ("Iberian Village", "story_village_inside_afternoon"), ("Faro Muerto, Entrance", "story_village_inside_afternoon"),
+    ("Faro Muerto, Clearing", "story_village_inside_night_on"), ("Faro Muerto Clearing", "story_village_inside_night_on"),
+    ("Faro Muerto, Yesterday", "story_village_inside_night_off"), ("Faro Muerto, Past", "story_village_inside_night_off"),
+    ("Faro Muerto, Unoccupied Building", "story_building_inside"), ("Faro Muerto, Coast", "story_coast_v1"),
+    ("Vessel Masas Bridge", "story_masas_controlroom"), ("Vessel Masas Control Room", "story_masas_controlroom_night"),
+    ("Vessel Masas Decks", "story_masas_deck"), ("Eye of Iberia, Entrance", "story_lighthouse_out"),
+    ("Eye of Iberia, Control Room", "story_lighthouse_control_room"), ("Mayors's Dungeon", "story_fathoms_mayors"),
+    ("Ægir", "story_aegir_on"), ("Daguanyuan", "story_daguanyuan_hong")]
+PC_ART_OF = {"PC01": "PC01", "PC02": "PC02_1", "PC03": "PC03", "PC04": "PC04", "PC05": "PC05", "PC06": "PC06_1",
+             "PC07": "PC07", "PC08": "PC08", "PC09": "PC09"}
+PC_MUSIC = "call_of_iberia"
+
+
+def _pc_files(svc) -> list[str]:
+    """The restored chapter's story files in order (PC01A, PC01B, …)."""
+    import glob
+    names = [os.path.basename(f)[3:-5] for f in glob.glob(os.path.join(_loc_root(svc), "en", "StoryData", "EN_PC*.json"))]
+    order = {"A": 1, "B": 0, "I": 2}  # (before the fight, after it, between)
+    return sorted((n for n in names if re.fullmatch(r"PC\d+[ABI]\d*", n)), key=lambda n: (int(n[2:4]), order.get(n[4], 3), n))
+
+
+def _pc_chapter(svc, lang: str) -> dict | None:
+    files = _pc_files(svc)
+    if not files:
+        return None
+    nodes = {int(r["id"]): (_line(r.get("title")), str(r.get("desc") or "").strip(), _line(r.get("place")))
+             for r in _rows(_loc_root(svc), lang, r"{L}_StageNode91.*\.json$") if str(r.get("id", "")).isdigit()}
+    chap = next((r for r in _rows(_loc_root(svc), lang, r"{L}_StageChapterText.*\.json$") if r.get("id") == f"chapter_h_{PC_ID}"), {})
+    eps, by = [], {}
+    for f in files:
+        n = int(f[2:4])
+        if n not in by:
+            title, desc, place = nodes.get(PC_NODE + n) or ("", "", "")
+            by[n] = {"node": PC_NODE + n, "title": title or f"Episode {n}", "desc": desc, "place": place, "parts": [], "n": f"8.5-{n}"}
+            eps.append(by[n])
+        art = PC_ART_OF.get(f[:4])
+        by[n]["parts"].append([f, {"A": "After", "B": "Before", "I": "Inter"}.get(f[4], ""), PC_ART + art + ".webp" if art else ""])
+    last = PC_ART + "PC01.webp"
+    for e in eps:
+        for part in e["parts"]:
+            last = part[2] = part[2] or last
+    return {"id": PC_ID, "label": _line(chap.get("chapter")) or "8.5-EX", "title": _line(chap.get("chaptertitle")) or "Pilgrimage of Compassion",
+            "kind": "restored", "number": "8.5", "company": _line(chap.get("company")), "area": _line(chap.get("area")),
+            "time": _line(chap.get("timeline")), "desc": "", "banner": "", "pic": PC_ART + "PC01.webp", "order": -1, "eps": eps}
+
+
+def _pc_effect(loc_rows: list[dict], models: dict) -> list[dict]:
+    """A scene script for a restored file: background by place, the theme, the last two speakers on stage."""
+    out, stage, first = [], [], True
+    for r in loc_rows:
+        row = {"id": r.get("id")}
+        place = _line(r.get("place")) if r.get("place") not in (None, -1) else ""
+        bg = next((b for pre, b in PC_PLACES if place.startswith(pre)), "") if place else ""
+        if bg:
+            row["bg"] = "pc_" + bg if not bg.startswith("story_daguanyuan") else bg
+        if first:
+            row["bgm"], first = PC_MUSIC, False
+            row["bg"] = row.get("bg") or "pc_story_foggy_beach"
+        m = str(r.get("model") or "")
+        if m and m in models and m not in stage:
+            stage = (stage + [m])[-2:]
+            row["characterlist"] = "ALL," + ",".join(f"{x}:{3 if i == 0 else 7}" for i, x in enumerate(stage))
+        out.append(row)
+    return out
+
 
 def assets(svc) -> dict:
     """Name → catalog path of the story's pictures and videos, once per snapshot."""
@@ -302,6 +374,11 @@ def assets(svc) -> dict:
         # a background named by its folder (Bus_boat_L: far sea + the bus over it) -> the folder, drawn layered
         for f in folders:
             out["bg"].setdefault(f.lower(), base + "Backgrounds/" + f + "/")
+        from . import extra  # the restored chapter's backgrounds
+        for name, c in extra.files("Story/Backgrounds/PC").items():
+            out["bg"]["pc_" + name.lower()] = c
+        for name, c in extra.files("Story/StandingSprite/PC").items():  # (and its people, by scenario fileName)
+            out["sprite"].setdefault(name.lower(), c)
         # Identity stories' CG: the Identity's own art
         for (c,) in con.execute("select distinct c from o where c like ? and type = 'Texture2D'", (UNIT_CG + "%",)):
             out["cg"].setdefault(os.path.splitext(os.path.basename(c))[0].lower(), c)
@@ -349,6 +426,9 @@ def index(svc, lang: str = "en") -> dict:
                     own = f"Assets/Resources_moved/Sprite/StoryTheater/SubChapter{ch['id']}/{part[0]}.png"
                     last = own if svc.lookup_container(own) else _banner(svc, part[2]) or last
                     part[2] = last
+        pc = _pc_chapter(svc, lang)
+        if pc:
+            db["main"].insert(0, pc)
         svc.store.write_json(rel, db)
     cached[lang] = (sid, db)
     svc._story_idx = cached
@@ -377,9 +457,10 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
     row = con.execute("select h from o where type = 'TextAsset' and name = ? collate nocase and c like 'Assets/Resources_moved/Story/Effect/%'",
                       (file_id,)).fetchone()
     con.close()
-    if not row:
+    pc = not row and re.fullmatch(r"PC\d+[ABI]\d*", file_id)
+    if not row and not pc:
         return None
-    effect = json.loads(svc.store.get_blob(row[0]).decode("utf-8-sig")).get("dataList", [])
+    effect = [] if pc else json.loads(svc.store.get_blob(row[0]).decode("utf-8-sig")).get("dataList", [])
     pre = LANGS[lang]
     fn = os.path.join(_loc_root(svc), lang, "StoryData", f"{pre}_{file_id}.json")
     if not os.path.exists(fn):
@@ -395,6 +476,10 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
         held = (key, {str(r.get("id")): r for r in _rows(_loc_root(svc), lang, r"{L}_ScenarioModelCodes.*\.json$")})
         svc._story_codes = held
     codes = held[1]
+    if pc:
+        if not loc_rows:
+            return None
+        effect = _pc_effect(loc_rows, _scenario(svc))
     return episode(file_id, effect, loc_rows, codes, _scenario(svc), sound_index(svc), assets(svc))
 
 
@@ -491,6 +576,11 @@ def picture(svc, path: str, limit: int = 1920) -> bytes | None:
     from . import extract
     if path.endswith("/"):
         return _layered(svc, path, limit)
+    from . import extra
+    own = extra.file_of(path)
+    if own:  # (a picture the game no longer has)
+        with open(own, "rb") as f:
+            return _webp(f.read(), limit)
     rows = svc.lookup_container(path)
     r = next((x for x in rows if x["type"] == "Texture2D"), None) or next((x for x in rows if x["type"] == "Sprite"), None)
     file = svc.object_file(r["bundle"]) if r else None
