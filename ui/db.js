@@ -157,7 +157,7 @@ const MAX_LEVEL = 65;  // the current level cap: HP = base + per level × level,
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 const SPEED_SVG = `<svg class="ico s28" viewBox="0 0 32 32"><path fill="#b4774a" stroke="#3a2418" stroke-width="1.5" d="M10 3h9l-1 12 9 5c3 2 3 6 0 7H6c-2 0-3-2-2-4l3-6z"/><path fill="#3a2418" d="M6 26h22v2H6z"/></svg>`;
 
-// many enemies' texts name a status in plain words ("Inflict 2 Bleed"): the enemy handbook marks those too.
+// many texts name a status in plain words ("Inflict 2 Bleed": enemies, older Identities / E.G.O): those are marked too.
 // A name several keywords share goes to the one the Identities' texts use most (Bleed → Laceration, not Bleeding)
 let kwPlain = null;
 function kwPlainOf() {
@@ -303,7 +303,7 @@ function openUnit(id) {
        ...((x.defense || []).length ? [["Defense", x.defense, "Defense"]] : [])]
     : x.skills.map((s) => [s.label || "Skill", [s], s.label || ""]);
   const panel = () => { const [, list, label] = tabs[tab] || [null, []];
-    return list.map((s, i) => skillView(s, up, level, label || (i ? "Extra" : ""), isId ? null : (s.label === "Corrosion" && x.img.art2) || x.img.thumb)).join(`<div class="sksep"></div>`); };
+    return list.map((s, i) => skillView(s, up, level, label || (i ? "Extra" : ""), isId ? null : (s.label === "Corrosion" && x.img.art2) || x.img.thumb, true)).join(`<div class="sksep"></div>`); };
   const left = () => {
     let h = `<div class="udart"><img src="${imgFull(art2 && x.img.art2 ? x.img.art2 : x.img.art)}" onerror="this.src='${imgThumb(x.img.thumb)}'">
         ${x.img.art2 ? `<button class="artbtn ${art2 ? "on" : ""}" id="art2" title="${isId ? "Art after uptie 3" : "Corrosion art"}">⟳</button>` : ""}</div>`;
@@ -335,7 +335,7 @@ function openUnit(id) {
         ${isId ? `<span class="lvlabel lv">Lv. <b id="lvn">${level}</b></span><input type="range" id="lvr" min="1" max="${MAX_LEVEL}" value="${level}">` : ""}</div>
       <div class="sktabs">${tabs.map(([n], i) => `<button class="${i === tab ? "on" : ""}" data-tab="${i}">${esc(n)}</button>`).join("")}</div>
       <div class="skpanel">${(tabs[tab] || [0, []])[1].length ? panel() : `<div class="muted">No skills.</div>`}</div>
-      ${x.passives.length ? `<h3 class="group">Passives</h3>${x.passives.map((p) => passiveHtml(pasAt(p, up))).join("")}` : ""}`;
+      ${x.passives.length ? `<h3 class="group">Passives</h3>${x.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}` : ""}`;
   };
   const draw = () => {
     modal(`<div class="ud"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
