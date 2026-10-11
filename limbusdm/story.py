@@ -278,15 +278,15 @@ UNIT_CG = "Assets/Resources_moved/Sprite/Unit/CG/"
 PC_ID, PC_NODE = 9120, 912000
 PC_BG = "Assets/Resources_moved/Story/Backgrounds/PC/"
 PC_ART = "Assets/Resources_moved/Sprite/StoryTheater/SubChapter9120/"
-PC_PLACES = [  # place (or its start) -> background
-    ("???", "story_foggy_beach"), ("A Certain Coast", "story_coast"), ("Iberian Coastline", "story_coast"),
-    ("Iberian Village", "story_village_inside_afternoon"), ("Faro Muerto, Entrance", "story_village_inside_afternoon"),
-    ("Faro Muerto, Clearing", "story_village_inside_night_on"), ("Faro Muerto Clearing", "story_village_inside_night_on"),
+PC_PLACES = [  # place (or its start) -> background, as the event showed them
+    ("???", "story_foggy_beach"), ("A Certain Coast", "story_foggy_beach"), ("Iberian Coastline", "story_foggy_beach"),
+    ("Iberian Village", "story_village_inside_night_off"), ("Faro Muerto, Entrance", "story_village_inside_night_off"),
+    ("Faro Muerto, Clearing", "story_village_inside_afternoon"), ("Faro Muerto Clearing", "story_village_inside_afternoon"),
     ("Faro Muerto, Yesterday", "story_village_inside_night_off"), ("Faro Muerto, Past", "story_village_inside_night_off"),
-    ("Faro Muerto, Unoccupied Building", "story_building_inside"), ("Faro Muerto, Coast", "story_coast_v1"),
+    ("Faro Muerto, Unoccupied Building", "story_building_inside"), ("Faro Muerto, Coast", "story_coast"),
     ("Vessel Masas Bridge", "story_masas_controlroom"), ("Vessel Masas Control Room", "story_masas_controlroom_night"),
     ("Vessel Masas Decks", "story_masas_deck"), ("Eye of Iberia, Entrance", "story_lighthouse_out"),
-    ("Eye of Iberia, Control Room", "story_lighthouse_control_room"), ("Mayors's Dungeon", "story_fathoms_mayors"),
+    ("Eye of Iberia, Control Room", "story_lighthouse_control_room"), ("Mayors's Dungeon", "story_fathoms_mayors_v1"),
     ("Ægir", "story_aegir_on"), ("Daguanyuan", "story_daguanyuan_hong")]
 PC_ART_OF = {"PC01": "PC01", "PC02": "PC02_1", "PC03": "PC03", "PC04": "PC04", "PC05": "PC05", "PC06": "PC06_1",
              "PC07": "PC07", "PC08": "PC08", "PC09": "PC09"}
@@ -326,18 +326,43 @@ def _pc_chapter(svc, lang: str) -> dict | None:
             "time": _line(chap.get("timeline")), "desc": "", "banner": "", "pic": PC_ART + "PC01.webp", "order": -1, "eps": eps}
 
 
-def _pc_effect(loc_rows: list[dict], models: dict) -> list[dict]:
-    """A scene script for a restored file: background by place, the theme, the last two speakers on stage."""
-    out, stage, first = [], [], True
+def _pc_scenes() -> dict:
+    """{file: {line number: background / CG}} read off the event's own playthrough (ui/extra/Story/pc_scenes.json)."""
+    from . import extra
+    path = extra.file_of("Assets/Resources_moved/Story/pc_scenes.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, TypeError, ValueError):
+        return {}
+
+
+def _pc_effect(file_id: str, loc_rows: list[dict], models: dict) -> list[dict]:
+    """A scene script for a restored file: backgrounds and pictures as the event showed them (else by place), the
+    theme, the last two speakers on stage."""
+    seen = _pc_scenes().get(file_id) or {}
+    out, stage, first, n, cg = [], [], True, 0, False
     for r in loc_rows:
         row = {"id": r.get("id")}
         place = _line(r.get("place")) if r.get("place") not in (None, -1) else ""
-        bg = next((b for pre, b in PC_PLACES if place.startswith(pre)), "") if place else ""
+        bg = next((b for pre, b in PC_PLACES if place.startswith(pre)), "") if place and not seen else ""
+        shown = seen.get(str(n)) if _tags(r.get("content")).strip() else None
+        if shown:
+            bg = ""
+            if shown == "black" or shown.startswith(("PC", "light")):
+                row["cg"], cg = "black" if shown == "black" else "pc_" + shown, True
+            else:
+                bg = shown
         if bg:
-            row["bg"] = "pc_" + bg if not bg.startswith("story_daguanyuan") else bg
+            row["bg"] = bg if bg.startswith("story_daguanyuan") else "pc_" + bg
+            if cg:
+                row["cg"], cg = "ALL:FadeOut", False
         if first:
             row["bgm"], first = PC_MUSIC, False
-            row["bg"] = row.get("bg") or "pc_story_foggy_beach"
+            if not row.get("bg") and not row.get("cg"):
+                row["bg"] = "pc_" + next((b for pre, b in PC_PLACES if place.startswith(pre)), "story_foggy_beach")
+        if _tags(r.get("content")).strip():
+            n += 1
         m = str(r.get("model") or "")
         if m and m in models and m not in stage:
             stage = (stage + [m])[-2:]
@@ -377,6 +402,9 @@ def assets(svc) -> dict:
         from . import extra  # the restored chapter's backgrounds
         for name, c in extra.files("Story/Backgrounds/PC").items():
             out["bg"]["pc_" + name.lower()] = c
+        for sub in ("Story/CG/PC", "Sprite/StoryTheater/SubChapter9120"):  # (pictures shown over the scene)
+            for name, c in extra.files(sub).items():
+                out["cg"]["pc_" + name.lower()] = c
         for name, c in extra.files("Story/StandingSprite/PC").items():  # (and its people, by scenario fileName)
             out["sprite"].setdefault(name.lower(), c)
         # Identity stories' CG: the Identity's own art
@@ -479,7 +507,7 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
     if pc:
         if not loc_rows:
             return None
-        effect = _pc_effect(loc_rows, _scenario(svc))
+        effect = _pc_effect(file_id, loc_rows, _scenario(svc))
     return episode(file_id, effect, loc_rows, codes, _scenario(svc), sound_index(svc), assets(svc))
 
 
