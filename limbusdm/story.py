@@ -6,7 +6,7 @@ import json
 import os
 import re
 
-VERSION = 1  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 2  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
@@ -47,7 +47,10 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
         m = re.match(r"CHAPTER_(\d+)$", str(r.get("id", "")))
         if m:
             blurb[int(m.group(1))] = str(r.get("desc") or "").strip()
-    nodes = {r["id"]: _line(r.get("title")) for r in _rows(loc, lang, r"{L}_StageNode.*\.json$") if "id" in r}
+    nodes = {}  # node id -> (title, blurb); ids are strings in the files
+    for r in _rows(loc, lang, r"{L}_StageNode.*\.json$"):
+        if str(r.get("id", "")).isdigit():
+            nodes[int(r["id"])] = (_line(r.get("title")), str(r.get("desc") or "").strip())
     other, event = {}, {}
     for r in _rows(loc, lang, r"{L}_StoryTheaterOther\.json$"):
         m = re.match(r"STORY_(\d+)$", str(r.get("id", "")))
@@ -73,9 +76,10 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
                     node = s.get("nodeId")
                     ep = by_node.get(node)
                     if ep is None:
-                        ep = by_node[node] = {"node": node, "title": nodes.get(node) or other.get(node) or "", "parts": []}
+                        title, desc = nodes.get(node) or (other.get(node) or "", "")
+                        ep = by_node[node] = {"node": node, "title": title, "desc": desc, "parts": []}
                         eps.append(ep)
-                    ep["parts"].append([s["storyId"], s.get("stageDetail") or ""])
+                    ep["parts"].append([s["storyId"], s.get("stageDetail") or "", s.get("fullBannerId") or ""])
                 c = chap.get(sid) or {}
                 label = _line(c.get("chapter")) or ""
                 title = _line(c.get("chaptertitle")) or event.get(sid, "")
@@ -144,12 +148,12 @@ def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict,
             for ent in re.split(r",(?![^\[]*\])", str(row["cg"])):
                 name, _, how = ent.strip().partition(":")
                 name = name.strip()
-                if not name or name.lower() in ("blackscreen", "none"):
-                    continue
-                if name.lower() in assets["solid"]:
+                if name.lower() == "blackscreen":
+                    name = "black"
+                if not name or name.lower() == "none":
                     continue
                 if how.strip().lower().startswith(("fadeout", "off")):
-                    if state["cg"] == name:
+                    if name.upper() == "ALL" or (state["cg"] or "").lower() == name.lower():
                         change("cg", "")
                 else:
                     change("cg", name)
@@ -191,12 +195,28 @@ def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict,
                 speaker_model = speaker_model or name
             if changed:
                 pending["cl"] = [[m, s] for m, s in state["chars"].items()]
-        feeling = str(row.get("feeling") or "")
+        feels = []
+        feeling = str(row.get("feeling") or "").strip()
         if feeling:
-            who_model = speaker_model or next(reversed(state["chars"]), "")
-            if who_model and state["feel"].get(who_model) != feeling:
-                state["feel"][who_model] = feeling
-                pending.setdefault("f", {})[who_model] = feeling
+            feels.append((speaker_model or next(reversed(state["chars"]), ""), feeling))
+        for fx in re.split(r",(?![^\[]*\])", str(row.get("effect") or "")):
+            kind, _, args = fx.strip().partition(":")
+            kind = kind.strip().lower()
+            if kind == "feeling":  # "Feeling:<model>=<face>": someone else's face
+                who, _, face = args.partition("=")
+                feels.append((who.strip(), face.strip()))
+            elif kind == "cameramovezoom":  # mode=on:horizontal=…:vertical=…:zoom=…:duration=…
+                kv = dict(x.split("=", 1) for x in args.split(":") if "=" in x)
+                try:
+                    cam = {k: float(kv[k]) for k in ("horizontal", "vertical", "zoom", "duration") if k in kv}
+                except ValueError:
+                    continue
+                pending["cam"] = {"h": cam.get("horizontal", 0), "v": cam.get("vertical", 0), "z": cam.get("zoom", 1),
+                                  "d": cam.get("duration", 0.5)} if kv.get("mode", "on").strip() == "on" else {"d": cam.get("duration", 0.3)}
+        for who_model, face in feels:
+            if who_model and face and state["feel"].get(who_model) != face:
+                state["feel"][who_model] = face
+                pending.setdefault("f", {})[who_model] = face
         text = _tags(t.get("content"))
         voice = str(row.get("voice") or "")
         if not text.strip() and not voice and not row.get("video"):
@@ -233,7 +253,7 @@ def _model_info(row: dict, assets: dict) -> dict:
     """A speaker's picture: plain (`img`) or layered (`psb`), and the name's colour."""
     f = str(row.get("fileName") or "")
     out = {"name": row.get("enname") or "", "color": row.get("nameTagColor") or "", "side": row.get("staringSide") or "",
-           "y": row.get("bottomYPos") or 0}
+           "y": row.get("bottomYPos") or 0, "s": row.get("scale") or 1}
     if f.lower() in assets["sprite"]:
         out["img"] = assets["sprite"][f.lower()]
     elif f.lower() in assets["psb"]:
@@ -306,17 +326,28 @@ def index(svc, lang: str = "en") -> dict:
         names = {x.get("sinner"): x.get("sinnerName") for x in svc.unit_db().get("ids") or []}
         for sn in db["ident"]:
             sn["name"] = names.get(sn["sinner"]) or f"Sinner {sn['sinner']}"
-        found = assets(svc)
-        for ch in db["main"] + db["other"]:  # a banner is "Story_BG/<name>" or "Story_CG/<name>": its catalog path
-            kind, _, name = ch["banner"].partition("/")
-            if ch["banner"].startswith("Assets/"):  # (the Prologue's is a catalog path without its extension)
-                ch["pic"] = next((c for c in (ch["banner"] + ".png", ch["banner"]) if svc.lookup_container(c)), "")
-            else:
-                ch["pic"] = found["bg" if kind == "Story_BG" else "cg"].get(name.lower()) or ""
+        for ch in db["main"] + db["other"]:
+            ch["pic"] = _banner(svc, ch["banner"])
+            last = ch["pic"]
+            for ep in ch["eps"]:  # each story's own picture as the Story Theater shows it, else the one before
+                for part in ep["parts"]:
+                    own = f"Assets/Resources_moved/Sprite/StoryTheater/SubChapter{ch['id']}/{part[0]}.png"
+                    last = own if svc.lookup_container(own) else _banner(svc, part[2]) or last
+                    part[2] = last
         svc.store.write_json(rel, db)
     cached[lang] = (sid, db)
     svc._story_idx = cached
     return db
+
+
+def _banner(svc, banner: str) -> str:
+    """A banner id ("Story_BG/<name>", "Story_CG/<name>" or a catalog path without extension) -> its catalog path."""
+    if not banner:
+        return ""
+    if banner.startswith("Assets/"):
+        return next((c for c in (banner + ".png", banner) if svc.lookup_container(c)), "")
+    kind, _, name = banner.partition("/")
+    return assets(svc)["bg" if kind == "Story_BG" else "cg"].get(name.lower()) or ""
 
 
 def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:

@@ -2,7 +2,7 @@
 // the mouse to read faster.
 "use strict";
 
-const st = { idx: null, tab: "main", sel: {}, ep: null, list: [], i: 0 };
+const st = { idx: null, tab: "main", sel: {}, pick: {}, ep: null, list: [], i: 0 };
 const stSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const stGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const ST_TABS = [["main", "Main Story"], ["ident", "Identity Archive"]];
@@ -46,33 +46,49 @@ function storyDraw() {
     const tag = c.kind === "mini" ? "Mini" : c.label;
     const name = c.kind === "mini" ? (c.title || c.label) : (c.title || c.label);
     const card = `<button class="stcanto" data-id="${c.id}" aria-expanded="${on}"><span class="art"${c.pic ? ` style="background-image:url('${stImg(c.pic)}')"` : ""}></span>
-      <span class="tag">${esc(tag)}</span>${c.time ? `<span class="code">${esc(c.time)}</span>` : ""}<span class="name">${esc(name)}</span><span class="count">${c.eps.length} episodes</span></button>`;
+      <span class="tag">${esc(tag)}</span>${c.time ? `<span class="code">${esc(c.time)}</span>` : ""}<span class="name">${esc(name)}</span><span class="count">${c.eps.reduce((n, e) => n + e.parts.length, 0)} episodes</span></button>`;
     const grp = st.tab === "main" && c.kind !== "main" ? (c.kind === "intervallo" ? "Intervallo" : "Mini stories") : "";
     if (grp && grp !== last) { cards += `<div class="stgroup">${grp}</div>`; last = grp; }
     cards += card;
   }
-  const sub = (cur) => [cur.company, cur.area, cur.time, `${cur.eps.length} episodes`].filter(Boolean).map(esc).join(" · ");
+  const nEps = (c) => c.eps.reduce((n, e) => n + e.parts.length, 0);
+  const sub = (cur) => [cur.company, cur.area, cur.time, `${nEps(cur)} episodes`].filter(Boolean).map(esc).join(" · ");
   const head = !cur ? "" : st.tab === "ident" ? `<h2>${esc(cur.label)}</h2><div class="stsub">${cur.items.length} Identity stories</div>`
     : `<h2>${esc(cur.kind === "mini" ? (cur.title || cur.label) : cur.label + (cur.title ? ": " + cur.title : ""))}</h2>
        <div class="stsub">${sub(cur)}</div>${cur.desc ? `<div class="stdesc">${esc(cur.desc)}</div>` : ""}`;
-  const items = !cur ? [] : st.tab === "ident"
-    ? cur.items.map((it, k) => ({ n: String(k + 1), title: it.name, parts: [[it.story, ""]], icon: `/api/char_icon?id=${it.id}` }))
-    : cur.eps;
-  const nodes = items.map((e, k) => `<li class="epnode${st.last && e.parts.some((p) => p[0] === st.last) ? " last" : ""}">
-      <span class="stdot">${esc(String(e.n).split("-").pop())}</span>
-      <div class="strow" role="button" tabindex="0" data-f="${esc(e.parts[0][0])}"><span><span class="stid">${esc(e.n)}</span><br><span class="stt">${esc(e.title)}</span></span>
-        <span class="stparts">${e.parts.map((p) => `<button data-f="${esc(p[0])}" class="${p[1] === "Before" ? "pre" : p[1] === "After" ? "post" : ""}">${ST_PART[p[1]] || "Read"}</button>`).join("")}</span></div></li>`).join("");
+  // every story file is one episode, as in the game's Story Theater: a picture, a strip of Ep. 1…N, a panel with Enter
+  const eps = !cur ? [] : st.tab === "ident"
+    ? cur.items.map((it) => ({ id: it.story, n: "", title: it.name, detail: "", pic: "", icon: `/api/char_icon?id=${it.id}` }))
+    : cur.eps.flatMap((e) => e.parts.map((p) => ({ id: p[0], n: e.n, title: e.title, desc: e.desc, detail: p[1], pic: p[2] || cur.pic })));
+  const key = st.tab + ":" + (cur ? cur.id : "");
+  let at = st.pick[key];
+  if (at == null || !eps[at]) at = Math.max(0, eps.findIndex((e) => e.id === st.last));
+  st.pick[key] = at;
+  const ep = eps[at];
+  const pic = ep && (ep.pic ? `background-image:url('${stFull(ep.pic, 1280)}')` : ep.icon ? `background-image:url('${ep.icon}')` : "");
+  const view = !ep ? "" : `<div class="stview">
+      <div class="stbanner${ep.icon ? " icon" : ""}" style="${pic}"><span class="stbtag">EP.${at + 1}</span></div>
+      <div class="stinfo"><div class="stepl">${st.tab === "ident" ? "Identity story" : "Episode"}</div><div class="stepn">${esc(ep.n || String(at + 1))}</div>
+        ${ST_PART[ep.detail] ? `<div class="stpart ${ep.detail.toLowerCase()}">${ST_PART[ep.detail]}</div>` : ""}
+        <div class="stept">${esc(ep.title)}</div>${ep.desc ? `<div class="stepd">${esc(ep.desc)}</div>` : ""}
+        <button type="button" class="stenter" data-f="${esc(ep.id)}">Enter</button></div></div>`;
+  const track = eps.map((e, k) => `<button type="button" class="stent${k === at ? " on" : ""}${e.id === st.last ? " last" : ""}" data-k="${k}" title="${esc((e.n ? e.n + " " : "") + e.title + (ST_PART[e.detail] ? " · " + ST_PART[e.detail] : ""))}"><span>Ep. ${k + 1}</span><i></i></button>`).join("");
   $("#stpage").innerHTML = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}
 </div>
-    <div class="stmain"><div class="stcantos">${cards}</div><section class="stpanel">${head}<ol class="epnodes">${nodes}</ol></section></div>`;
+    <div class="stmain"><div class="stcantos">${cards}</div><section class="stpanel">${head}${view}<div class="sttrack">${track}</div></section></div>`;
   $(".stcantos").scrollTop = keep; $(".stpanel").scrollTop = cur && String(cur.id) === st.drawn ? keepP : 0;
   st.drawn = cur && String(cur.id);
+  const tr = $(".sttrack"), on = $(".sttrack .on");
+  if (on) tr.scrollLeft = on.offsetLeft - (tr.clientWidth - on.offsetWidth) / 2;
   document.querySelectorAll(".sttab").forEach((b) => b.onclick = () => { location.hash = "#/story/" + b.dataset.tab; });
   document.querySelectorAll(".stcanto").forEach((b) => b.onclick = () => { st.sel[st.tab] = b.dataset.id; location.hash = `#/story/${st.tab}/${b.dataset.id}`; });
-  document.querySelectorAll(".epnode .strow").forEach((r) => {
-    r.onclick = (e) => { const f = e.target.closest("button")?.dataset.f || r.dataset.f; stOpen(f, cur); };
-    r.onkeydown = (e) => { if (e.key === "Enter") stOpen(r.dataset.f, cur); };
+  document.querySelectorAll(".stent").forEach((b) => {
+    b.onclick = () => { st.pick[key] = +b.dataset.k; storyDraw(); };
+    b.ondblclick = () => stOpen(eps[+b.dataset.k].id, cur);
   });
+  const enter = $(".stenter");
+  if (enter) enter.onclick = () => stOpen(enter.dataset.f, cur);
+  $(".stbanner")?.addEventListener("click", () => enter?.click());
 }
 
 // a chapter's files in order, so a story goes on
@@ -95,12 +111,14 @@ const R = { el: null, ep: null, i: 0, rate: 1, hold: false, held: 0, auto: false
   wait: 0, voice: null, voiceEnd: true, bgm: null, bgmName: "", media: new Map(), layouts: new Map(), chars: new Map(), log: [], timer: 0, open: false, ui: stGet("story.ui", "") };
 const R_STEPS = [[0, 1], [1500, 2], [2100, 4], [2800, 6], [3600, 12]];
 const R_CPS = 52;  // letters a second at x1
+// the game's story stage: 2400 x 1350, slot n stands at x = (n - 5) * 200 from the middle, its foot 400 below the bottom
+const ST_W = 2400, ST_H = 1350, ST_SLOT = 200, ST_FOOT = -400, ST_BOX = [1750, 2115];
 
 function rEnsure() {
   if (R.el) return;
   const el = document.createElement("div");
   el.id = "streader";
-  el.innerHTML = `<div class="rstage" id="rstage"><div class="rbgimg" id="rbg"></div><div class="rchars" id="rchars"></div><div class="rcgimg" id="rcg"></div><div class="rfade" id="rfade"></div>
+  el.innerHTML = `<div class="rstage" id="rstage"><div class="rcam" id="rcam"><div class="rbgimg" id="rbg"></div><div class="rchars" id="rchars"></div><div class="rcgimg" id="rcg"></div></div><div class="rfade" id="rfade"></div>
     <div class="rbar"><i id="rbar"></i></div><div class="rinfo" id="rinfo"></div>
     <div class="rhud"><button type="button" id="rauto">Auto</button><button type="button" id="rmenubtn">Menu</button></div>
     <div class="rmenu" id="rmenu"><button data-a="log">Log</button><button data-a="voice"></button><button data-a="ui"></button><button data-a="skip">Skip to end of this story</button><button data-a="exit">Exit to list</button></div>
@@ -110,7 +128,10 @@ function rEnsure() {
     <div class="rend" id="rend"></div></div>`;
   document.body.append(el);
   R.el = el;
-  R.fit = () => { const s = $("#rstage"); if (s && s.clientWidth) el.style.setProperty("--u", (s.clientWidth / 1920).toFixed(4)); };
+  R.fit = () => {
+    const s = $("#rstage");
+    if (s && s.clientWidth) { el.style.setProperty("--u", (s.clientWidth / 1920).toFixed(4)); el.style.setProperty("--k", (s.clientWidth / ST_W).toFixed(5)); }
+  };
   new ResizeObserver(R.fit).observe(el);
   window.addEventListener("resize", R.fit);
   const stage = $("#rstage");
@@ -202,13 +223,14 @@ async function rLoad(file, at) {
 }
 // every line's state (what the scene shows) from the changes the lines carry
 function rFold(lines) {
-  const s = { bg: "", cg: "", chars: [], feel: {} }, out = [];
+  const s = { bg: "", cg: "", chars: [], feel: {}, cam: {} }, out = [];
   for (const l of lines) {
     if ("bg" in l) s.bg = l.bg;
     if ("cg" in l) s.cg = l.cg;
     if (l.cl) s.chars = l.cl.map((x) => x.slice());
     if (l.f) Object.assign(s.feel, l.f);
-    out.push({ bg: s.bg, cg: s.cg, chars: s.chars.map((x) => x.slice()), feel: Object.assign({}, s.feel) });
+    if (l.cam) s.cam = l.cam;
+    out.push({ bg: s.bg, cg: s.cg, chars: s.chars.map((x) => x.slice()), feel: Object.assign({}, s.feel), cam: s.cam });
   }
   return out;
 }
@@ -253,6 +275,10 @@ function rShow(i) {
   $("#rchars").style.display = cgp ? "none" : "";
   R.el.classList.toggle("mono", !l.m && !l.who && !s.chars.length && !cgp && (!bgp || /black/i.test(s.bg)));
   rChars(s, l.m);
+  // the camera: zoom on a point given in half screens from the middle (CameraMoveZoom)
+  const cam = s.cam, z = cam.z || 1, rc = $("#rcam");
+  rc.style.transition = `transform ${l.cam ? cam.d || 0 : 0}s ease-in-out`;
+  rc.style.transform = cam.z ? `translate(${cam.h * z * 50}%, ${cam.v * z * 50}%) scale(${z})` : "none";
   // text
   $("#rwho").textContent = l.who || "";
   $("#rrole").textContent = l.role || "";
@@ -325,8 +351,8 @@ function rVideo(name) {
   R.bgm?.pause();
 }
 
-// speakers' pictures
-async function rChars(s, speaker) {
+// speakers' pictures, placed as the game's Standing (0-10) slots place them
+function rChars(s, speaker) {
   const ep = R.ep, box = $("#rchars"), want = new Map(s.chars.map(([m, slot]) => [m, slot]));
   for (const [m, node] of R.chars) if (!want.has(m)) { node.el.remove(); R.chars.delete(m); }
   const many = want.size > 1;
@@ -336,41 +362,58 @@ async function rChars(s, speaker) {
     let node = R.chars.get(m);
     if (!node || node.slot !== slot || node.file !== R.file) {
       node?.el.remove();
-      const el = document.createElement("div"), inner = document.createElement("div");
-      el.className = "stchar"; inner.className = "stin"; el.append(inner);
-      node = { el, slot, file: R.file, face: null, faces: {}, psb: !!info.psb };
+      node = rStand(m, info, slot);
       R.chars.set(m, node);
-      box.append(el);
-      const flip = (info.side === "left" && slot < 4) || (info.side === "right" && slot > 4);
-      el.style.left = `${slot / 8 * 100}%`;
-      el.style.bottom = `calc(var(--u) * ${info.y || 0}px)`;
-      const sc = `calc(var(--u) * 0.68 * ${flip ? "-1" : "1"})`;
-      inner.style.transform = `scale(${sc}, calc(var(--u) * 0.68)) translateX(-50%)`;
-      if (info.img) {
-        inner.innerHTML = `<img src="${stFull(info.img, 1400)}" alt="">`;
-      } else {
-        const lay = await rLayout(info.psb);
-        if (!lay || R.chars.get(m) !== node) continue;
-        const body = lay.layers.filter((x) => !x.n.startsWith("face_") && x.n !== "pivot");
-        const faces = lay.layers.filter((x) => x.n.startsWith("face_"));
-        const all = body.concat(faces);
-        const l0 = Math.min(...all.map((x) => x.l)), b0 = Math.min(...all.map((x) => x.b));
-        const w = Math.max(...all.map((x) => x.l + x.w)) - l0, h = Math.max(...all.map((x) => x.b + x.h)) - b0;
-        inner.style.width = w + "px"; inner.style.height = h + "px";
-        const url = (x) => `/api/story_sprite?b=${encodeURIComponent(lay.bundle)}&p=${x.s}`;
-        const put = (x) => `<img class="rlay" data-n="${esc(x.n)}" style="left:${x.l - l0}px;bottom:${x.b - b0}px;width:${x.w}px;height:${x.h}px;z-index:${x.o}" src="${url(x)}" alt="">`;
-        inner.innerHTML = body.map(put).join("") + faces.map((x) => put(x).replace("<img", "<img hidden")).join("");
-        node.faces = Object.fromEntries([...inner.querySelectorAll("img[data-n^=face_]")].map((im) => [im.dataset.n, im]));
-      }
+      box.append(node.el);
     }
-    // the expression
-    if (node.psb && Object.keys(node.faces).length) {
-      const f = s.feel[m] || "idle", names = Object.keys(node.faces);
-      const pick = node.faces["face_" + f] ? "face_" + f : node.faces.face_idle ? "face_idle" : names.find((n) => /idle|normal|default/.test(n)) || names[0];
-      if (node.face !== pick) { if (node.face) node.faces[node.face].hidden = true; node.faces[pick].hidden = false; node.face = pick; }
-    }
+    rFace(node, m);
     node.el.classList.toggle("rdim", many && !!speaker && m !== speaker);
+    node.el.style.zIndex = m === speaker ? 20 : slot === 5 ? 10 : 10 - Math.abs(slot - 5);
   }
+}
+// one standing picture: a 0 x 0 point at the slot's foot, the picture scaled around it
+function rStand(m, info, slot) {
+  const el = document.createElement("div"), inner = document.createElement("div");
+  el.className = "stchar"; inner.className = "stin"; el.append(inner);
+  // pictures drawn looking one way turn toward the middle
+  const flip = (info.side === "left" && slot < 5) || (info.side === "right" && slot > 5);
+  const node = { el, slot, file: R.file, face: null, faces: null, flip };
+  el.style.left = `${(ST_W / 2 + (slot - 5) * ST_SLOT) / ST_W * 100}%`;
+  el.style.bottom = `${(ST_FOOT + (info.y || 0)) / ST_H * 100}%`;
+  const sc = info.s || 1;
+  inner.style.transform = `scale(calc(var(--k) * ${flip ? -sc : sc}), calc(var(--k) * ${sc}))`;
+  if (info.img) {  // a flat picture: fitted into the slot's 1750 x 2115 box like a UI image
+    const im = new Image();
+    im.alt = "";
+    im.onload = () => {
+      const f = Math.min(ST_BOX[0] / im.naturalWidth, ST_BOX[1] / im.naturalHeight), w = im.naturalWidth * f, h = im.naturalHeight * f;
+      Object.assign(im.style, { position: "absolute", width: w + "px", height: h + "px", left: -w / 2 + "px", bottom: (ST_BOX[1] - h) / 2 + "px" });
+      inner.append(im);
+    };
+    im.src = stFull(info.img, 2048);
+    return node;
+  }
+  rLayout(info.psb).then((lay) => {  // a layered model: body + one face, in its own pixels around its origin
+    if (!lay || R.chars.get(m) !== node) return;
+    const url = (x) => `/api/story_sprite?b=${encodeURIComponent(lay.bundle)}&p=${x.s}`;
+    const put = (x, face) => `<img class="rlay" data-n="${esc(x.n)}"${face ? " hidden" : ""} style="left:${x.l}px;bottom:${x.b}px;width:${x.w}px;height:${x.h}px;z-index:${x.o}" src="${url(x)}" alt="">`;
+    inner.innerHTML = lay.layers.filter((x) => x.n !== "pivot").map((x) => put(x, x.n.startsWith("face_"))).join("");
+    node.faces = Object.fromEntries([...inner.querySelectorAll("img[data-n^=face_]")].map((im) => [im.dataset.n, im]));
+    rFace(node, m);
+  });
+  return node;
+}
+// the face the line asks for: face_<feeling>, or its _L / _R take looking toward the middle; none = the body's own face
+function rFace(node, m) {
+  if (!node.faces) return;
+  const f = (R.states[R.i]?.feel || {})[m] || "idle", look = (node.slot > 5) !== node.flip ? "L" : node.slot === 5 && !node.flip ? "L" : "R";
+  const has = (n) => node.faces["face_" + n] ? "face_" + n : "";
+  const pick = has(f) || has(`${f}_${look}`) || has(`${f}_${look === "L" ? "R" : "L"}`)
+    || (node.face && f !== "idle" ? node.face : "") || has("idle") || has("idle_" + look) || "";
+  if (node.face === pick) return;
+  if (node.face) node.faces[node.face].hidden = true;
+  if (pick) node.faces[pick].hidden = false;
+  node.face = pick;
 }
 
 function rLogShow() {

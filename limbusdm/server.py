@@ -653,7 +653,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/story_pic":  # a story picture as a kept, smaller WebP
                 from . import story
                 path = q.get("path", "")
-                png = story.picture(svc, path, int(q.get("m", "1920"))) if path.startswith("Assets/Resources_moved/Story/") else None
+                png = story.picture(svc, path, int(q.get("m", "1920"))) if path.startswith(("Assets/Resources_moved/Story/", "Assets/Resources_moved/Sprite/StoryTheater/")) else None
                 if png is None:
                     return self._send(404, b"no picture", "text/plain")
                 return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
