@@ -14,6 +14,7 @@ STAGES = ("story", "battle-story", "battle-ab", "battle-dungeon")  # tables whos
 PART = {"B": "Before", "I": "Inter", "A": "After"}  # a file name's letter after its number
 # April Fools' Day 2023: its scene script is gone, its text and one glitch picture stayed; place -> what it showed
 FOOLS_2023 = "E000X"
+DANTE = "단테"  # (his model name in the texts)
 FOOLS_PLACES = [("???", "bg", "blackbg"), ("#*%", "cg", "E000X_8"), ("Aboard Mephistopheles", "bg", "Bus_Inside_1")]
 FOOLS_BANNER = "Assets/Resources_moved/Sprite/Banner/banner_AprilFools2_event_en"
 
@@ -508,11 +509,32 @@ def _pc_effect(file_id: str, loc_rows: list[dict], models: dict) -> list[dict]:
     return out
 
 
-def _fools_effect(loc_rows: list[dict], models: dict) -> list[dict]:
-    """A scene script for April Fools' Day 2023: the picture by its place (FOOLS_PLACES), the last two speakers on stage."""
+def _fools_voices(loc_rows: list[dict], voices) -> dict[int, str]:
+    """{row: clip} of April Fools' Day 2023: its clips E000X-<n> are numbered one past their line (the text gained a
+    row), so line n-1, else n; a spoken line first."""
+    said = lambda i: i < len(loc_rows) and bool(_tags(loc_rows[i].get("content")).strip()) and loc_rows[i].get("model") != DANTE  # noqa: E731
+    spoken = lambda i: said(i) and bool(loc_rows[i].get("model") or loc_rows[i].get("teller"))  # noqa: E731
+    out = {}
+    for k in range(1, len(loc_rows) + 1):
+        name = f"{FOOLS_2023}-{k:02d}"
+        if name.lower() in voices:
+            at = next((i for test in (spoken, said) for i in (k - 1, k) if i not in out and test(i)), None)
+            if at is not None:
+                out[at] = name
+    return out
+
+
+def _fools_effect(loc_rows: list[dict], models: dict, voices) -> list[dict]:
+    """A scene script for April Fools' Day 2023: the picture by its place (FOOLS_PLACES), its voices, the last two
+    speakers on stage."""
     out, stage, cg = [], [], False
-    for r in loc_rows:
+    said = _fools_voices(loc_rows, voices)
+    for n, r in enumerate(loc_rows):
         row = {"id": r.get("id")}
+        if n in said:
+            row["voice"] = said[n]
+        elif r.get("model") == DANTE and "d_wick" in voices:  # (Dante's ticking, as the other stories have it)
+            row["voice"] = "D_Wick"
         place = _line(r.get("place")) if r.get("place") not in (None, -1) else ""
         hit = next((x for x in FOOLS_PLACES if place.startswith(x[0])), None) if place else None
         if hit and hit[1] == "cg":
@@ -709,7 +731,7 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
     if pc:
         if not loc_rows:
             return None
-        effect = _fools_effect(loc_rows, _scenario(svc)) if file_id.upper() == FOOLS_2023 else _pc_effect(file_id, loc_rows, _scenario(svc))
+        effect = _fools_effect(loc_rows, _scenario(svc), sound_index(svc)) if file_id.upper() == FOOLS_2023 else _pc_effect(file_id, loc_rows, _scenario(svc))
     return episode(file_id, effect, loc_rows, codes, _scenario(svc), sound_index(svc), assets(svc))
 
 
