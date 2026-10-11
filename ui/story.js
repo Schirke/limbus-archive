@@ -48,9 +48,9 @@ function storyDraw() {
     }
     const tag = c.kind === "mini" ? "Mini" : c.label;
     const name = c.kind === "mini" ? (c.title || c.label) : (c.title || c.label);
-    const card = `<button class="stcanto${c.kind === "restored" ? " restored" : ""}" data-id="${c.id}" aria-expanded="${on}"><span class="art"${c.pic ? ` style="background-image:url('${stImg(c.pic)}')"` : ""}></span>
+    const card = `<button class="stcanto${c.kind === "restored" || c.kind === "fools" ? " restored" : ""}" data-id="${c.id}" aria-expanded="${on}"><span class="art"${c.pic ? ` style="background-image:url('${stImg(c.pic)}')"` : ""}></span>
       <span class="tag">${esc(tag)}</span>${c.time ? `<span class="code">${esc(c.time)}</span>` : ""}<span class="name">${esc(name)}</span><span class="count">${c.eps.reduce((n, e) => n + e.parts.length, 0)} episodes</span></button>`;
-    const grp = st.tab === "main" && c.kind !== "main" ? ({ intervallo: "Intervallo", restored: "Restored" })[c.kind] || "Mini stories" : st.tab === "main" && last === "Restored" ? "Main story" : "";
+    const grp = st.tab === "main" && c.kind !== "main" ? ({ intervallo: "Intervallo", restored: "Restored", fools: "Restored", extra: "Other" })[c.kind] || "Mini stories" : st.tab === "main" && last === "Restored" ? "Main story" : "";
     if (grp && grp !== last) { cards += `<div class="stgroup">${grp}</div>`; last = grp; }
     cards += card;
   }
@@ -59,7 +59,8 @@ function storyDraw() {
   const head = !cur ? "" : st.tab === "ident" ? `<h2>${esc(cur.label)}</h2><div class="stsub">${cur.items.length} Identity stories</div>`
     : `<h2>${esc(cur.kind === "mini" ? (cur.title || cur.label) : cur.label + (cur.title ? ": " + cur.title : ""))}</h2>
        <div class="stsub">${sub(cur)}</div>${cur.desc ? `<div class="stdesc">${esc(cur.desc)}</div>` : ""}
-       ${cur.kind === "restored" ? `<div class="strestored"><b>Restored</b> The game removed this story when its event ended. The texts are the game's own and the scenes are put back together as the event showed them; who stands where is a best guess. Face changes and the rest of the story's music were removed from the game.</div>` : ""}`;
+       ${cur.kind === "restored" ? `<div class="strestored"><b>Restored</b> The game removed this story when its event ended. The texts are the game's own and the scenes are put back together as the event showed them; who stands where is a best guess. Face changes and the rest of the story's music were removed from the game.</div>` : ""}
+       ${cur.kind === "fools" ? `<div class="strestored"><b>Restored</b> The game played these only on April Fools' Day; it doesn't show them any more.</div>` : ""}`;
   // every story file is one episode, as in the game's Story Theater: a picture, a strip of Ep. 1…N, a panel with Enter
   const eps = !cur ? [] : st.tab === "ident"
     ? cur.items.map((it) => ({ id: it.story, n: "", title: it.name, detail: "", pic: "", icon: `/api/char_icon?id=${it.id}` }))

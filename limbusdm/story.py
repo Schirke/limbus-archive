@@ -6,10 +6,12 @@ import json
 import os
 import re
 
-VERSION = 5  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 6  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
+STAGES = ("story", "battle-story", "battle-ab", "battle-dungeon")  # tables whose stages name the story files they play
+PART = {"B": "Before", "I": "Inter", "A": "After"}  # a file name's letter after its number
 
 
 def _rows(loc: str, lang: str, pattern: str) -> list[dict]:
@@ -35,8 +37,15 @@ def _roman(s: str) -> str:
     return s
 
 
-def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | None = None) -> dict:
-    """The Story page's list {"main", "other", "ident"}."""
+def _stem(f: str) -> tuple[str, str]:
+    """S926I2 -> ("S926", "Inter"): the files of one stage share a stem."""
+    m = re.match(r"(.*?\d+)([A-Z])\d*$", f)
+    return (m.group(1), PART.get(m.group(2), "")) if m else (f, "")
+
+
+def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | None = None, files: set | None = None) -> dict:
+    """The Story page's list {"main", "other", "ident"}. `files`: the story files there are (lower case); with it the
+    files the Story Theater leaves out are put in too (_left_out)."""
     chap = {}
     for r in _rows(loc, lang, r"{L}_StageChapterText.*\.json$"):
         m = re.match(r"chapter_[a-z]+_(\d+)$", str(r.get("id", "")))
@@ -61,39 +70,40 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
             event[int(m.group(1))] = _line(r.get("title"))
 
     def chapters(kind: str) -> list[dict]:
-        out, seen = [], set()
+        out, subs = [], {}  # (a Canto's later parts carry its id again: a1c9p2, a1c9p3)
         for fname in sorted(tables.get(f"storytheater-{kind}") or {}, key=lambda f: [int(x) for x in re.findall(r"\d+", f)] or [0]):
             data = tables[f"storytheater-{kind}"][fname]
             for sub in (data.get("list") or []) if isinstance(data, dict) else []:
                 sid, stories = sub.get("subChapterId"), sub.get("storyList") or []
-                if not isinstance(sid, int) or sid in seen or not any(x.get('storyId') for x in stories):
+                if not isinstance(sid, int) or not any(x.get('storyId') for x in stories):
                     continue
-                seen.add(sid)
-                eps, by_node = [], {}
-                for s in stories:
-                    if not s.get("storyId"):
-                        continue
-                    node = s.get("nodeId")
-                    ep = by_node.get(node)
-                    if ep is None:
-                        title, desc, place = nodes.get(node) or (other.get(node) or "", "", "")
-                        ep = by_node[node] = {"node": node, "title": title, "desc": desc, "place": place, "parts": []}
-                        eps.append(ep)
-                    ep["parts"].append([s["storyId"], s.get("stageDetail") or "", s.get("fullBannerId") or ""])
-                c = chap.get(sid) or {}
-                label = _line(c.get("chapter")) or ""
-                title = _line(c.get("chaptertitle")) or event.get(sid, "")
-                number = _line(c.get("chapterNumber"))
-                if kind == "other" and not label.startswith("Intervallo"):
-                    label = "Mini"
-                for i, ep in enumerate(eps, 1):
-                    ep["n"] = f"{number.lstrip('0') or '0'}-{i}" if kind == "main" and number != "" else str(i)
-                    if not ep["title"]:
-                        ep["title"] = f"Episode {ep['n']}"
-                out.append({"id": sid, "label": label or title, "title": title if label else "", "kind": "intervallo" if label.startswith("Intervallo") else "mini" if kind == "other" else "main", "number": number,
-                            "company": _line(c.get("company")), "area": _line(c.get("area")), "time": _line(c.get("timeline")),
-                            "desc": blurb.get(sid, ""), "banner": next((x.get("fullBannerId") for x in stories if x.get("storyId") and x.get("fullBannerId")), ""),
-                            "order": sub.get("sortingOrder") or 0, "eps": eps})
+                if sid in subs:
+                    had = {x.get("storyId") for x in subs[sid][1]}
+                    subs[sid][1].extend(x for x in stories if x.get("storyId") not in had)
+                else:
+                    subs[sid] = (sub, list(stories))
+        for sid, (sub, stories) in subs.items():
+            eps, by_node = [], {}
+            for s in stories:
+                if not s.get("storyId"):
+                    continue
+                node = s.get("nodeId")
+                ep = by_node.get(node)
+                if ep is None:
+                    title, desc, place = nodes.get(node) or (other.get(node) or "", "", "")
+                    ep = by_node[node] = {"node": node, "title": title, "desc": desc, "place": place, "parts": []}
+                    eps.append(ep)
+                ep["parts"].append([s["storyId"], s.get("stageDetail") or "", s.get("fullBannerId") or ""])
+            c = chap.get(sid) or {}
+            label = _line(c.get("chapter")) or ""
+            title = _line(c.get("chaptertitle")) or event.get(sid, "")
+            number = _line(c.get("chapterNumber"))
+            if kind == "other" and not label.startswith("Intervallo"):
+                label = "Mini"
+            out.append({"id": sid, "label": label or title, "title": title if label else "", "kind": "intervallo" if label.startswith("Intervallo") else "mini" if kind == "other" else "main", "number": number,
+                        "company": _line(c.get("company")), "area": _line(c.get("area")), "time": _line(c.get("timeline")),
+                        "desc": blurb.get(sid, ""), "banner": next((x.get("fullBannerId") for x in stories if x.get("storyId") and x.get("fullBannerId")), ""),
+                        "order": sub.get("sortingOrder") or 0, "eps": eps})
         return out
 
     main = chapters("main")
@@ -105,7 +115,6 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
         except ValueError:
             return 99.0
     oth.sort(key=lambda c: (c["kind"] != "intervallo", _num(c) if c["kind"] == "intervallo" else 0, c["id"]))
-
     ident = []
     for fname in sorted((tables.get("storytheater-personality") or {}), key=lambda f: f):
         data = tables["storytheater-personality"][fname]
@@ -120,7 +129,129 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
                 items.sort(key=lambda x: (x["order"], x["id"] or 0))
                 ident.append({"sinner": ch.get("characterId"), "items": items})
     ident.sort(key=lambda s: s["sinner"] or 0)
+    if files is not None:
+        fools, extra = _left_out(main + oth, tables, nodes, files - {str(it["story"]).lower() for sn in ident for it in sn["items"]})
+        main[:0] = fools
+        oth += extra
+    for c in main + oth:
+        for i, ep in enumerate(c["eps"], 1):
+            ep["n"] = f"{c['number'].lstrip('0') or '0'}-{i}" if c["kind"] == "main" and c["number"] != "" else str(i)
+            if not ep["title"]:
+                ep["title"] = f"Episode {ep['n']}"
     return {"v": VERSION, "main": main, "other": oth, "ident": ident}
+
+
+def _stage_files(st: dict) -> list[str]:
+    """The story files a stage plays: its own, on entering / leaving, between rounds."""
+    story = st.get("story") if isinstance(st.get("story"), dict) else {}
+    out = [st.get("storyId")] + list(story.get("enter") or []) + list(story.get("exit") or []) + \
+        [o.get("storyID") for o in story.get("others") or [] if isinstance(o, dict)]
+    return [f for f in out if isinstance(f, str) and f]
+
+
+def _april_fools(tables: dict) -> dict:
+    """{file: year} of the April Fools' Day stories: played by a storybattle-fools stage, or opened on April 1st in Korea."""
+    from datetime import datetime, timedelta
+    out = {}
+    for name, data in (tables.get("battle-story") or {}).items():
+        if "fool" in name.lower():
+            for st in (data.get("list") or []) if isinstance(data, dict) else []:
+                if isinstance(st, dict):
+                    out.update({f.lower(): str(st.get("id"))[:4] for f in _stage_files(st)})
+    for data in (tables.get("open-story-by-date") or {}).values():
+        for r in (data.get("list") or []) if isinstance(data, dict) else []:
+            try:
+                day = datetime.fromisoformat(str(r["startDate"]).replace("Z", "+00:00")) + timedelta(hours=9)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if (day.month, day.day) == (4, 1) and isinstance(r.get("storyId"), str):
+                out.setdefault(r["storyId"].lower(), str(day.year))
+    return out
+
+
+def _left_out(chs: list[dict], tables: dict, nodes: dict, files: set) -> tuple[list[dict], list[dict]]:
+    """Puts in the story files the Story Theater doesn't list (the newest Canto before it is added, a fight's
+    interludes, events): after the one before them in story-loading-cg. The rest: ([April Fools' Day], [the others])."""
+    where = {}  # file -> the stage (node) that plays it
+    for t in STAGES:
+        for data in (tables.get(t) or {}).values():
+            for st in (data.get("list") or []) if isinstance(data, dict) else []:
+                if isinstance(st, dict) and isinstance(st.get("id"), int):
+                    for f in _stage_files(st):
+                        where.setdefault(f.lower(), st["id"])
+    order = {}  # chapter id -> its files in order
+    for data in (tables.get("story-loading-cg") or {}).values():
+        for r in (data.get("list") or []) if isinstance(data, dict) else []:
+            if isinstance(r, dict) and isinstance(r.get("id"), int):
+                order.setdefault(r["id"], []).extend(f for f in r.get("storyIds") or [] if isinstance(f, str))
+    placed = {p[0].lower(): ep for c in chs for ep in c["eps"] for p in ep["parts"]}
+
+    def new_ep(f):
+        title, desc, place = nodes.get(where.get(f.lower())) or ("", "", "")
+        return {"node": where.get(f.lower()), "title": title, "desc": desc, "place": place, "parts": []}
+
+    for c in chs:
+        mine = {id(ep) for ep in c["eps"]}
+        by_stem = {_stem(p[0])[0]: ep for ep in c["eps"] for p in ep["parts"]}
+        prev = None
+        for f in order.get(c["id"], []):
+            k = f.lower()
+            if k in placed or k not in files:
+                prev = f if k in placed and id(placed[k]) in mine else prev
+                continue
+            stem, detail = _stem(f)
+            ep = by_stem.get(stem)
+            if ep is None:  # an episode of its own, after the one before it
+                before = placed.get(prev.lower()) if prev else None
+                at = next((i + 1 for i, e in enumerate(c["eps"]) if e is before), 0)
+                ep = by_stem[stem] = new_ep(f)
+                c["eps"].insert(at, ep)
+                mine.add(id(ep))
+            ids = [p[0] for p in ep["parts"]]
+            ep["parts"].insert(ids.index(prev) + 1 if prev in ids else len(ids), [f, detail, ""])
+            placed[k] = ep
+            prev = f
+    names = {f.lower(): f for fs in order.values() for f in fs}
+    rank = lambda p: ("BXIAC".find(p[0][len(_stem(p[0])[0]):][:1] or "?"), len(p[0]), p[0])  # noqa: E731  (a stage's files in play order)
+    # files no list names: with their stage's episode, else (S<Canto><nn>) in their Canto by number
+    stems = {_stem(p[0])[0]: ep for c in chs for ep in c["eps"] for p in ep["parts"]}
+    cantos = sorted(((c["number"].lstrip("0"), c) for c in chs if c["kind"] == "main" and c["number"].lstrip("0").isdigit()),
+                    key=lambda x: -len(x[0]))
+    for k in sorted(f for f in files if f not in placed):
+        f = names.get(k) or k.upper()
+        stem, detail = _stem(f)
+        ep = stems.get(stem)
+        if ep is None:
+            n, c = next(((n, c) for n, c in cantos if re.fullmatch(rf"S{n}\d\d", stem)), (None, None))
+            if c is None:
+                continue
+            num = lambda e: [int(_stem(p[0])[0][1 + len(n):]) for p in e["parts"] if re.fullmatch(rf"S{n}\d\d", _stem(p[0])[0])]  # noqa: E731
+            at = max((i + 1 for i, e in enumerate(c["eps"]) if num(e) and min(num(e)) < int(stem[1 + len(n):])), default=0)
+            ep = stems[stem] = new_ep(f)
+            c["eps"].insert(at, ep)
+        ep["parts"].append([f, detail, ""])
+        ep["parts"].sort(key=rank)
+        placed[k] = ep
+    # the rest, one episode per stage
+    fools = _april_fools(tables)
+    years = {_stem(f.upper())[0]: y for f, y in fools.items()}
+    eps, fool_eps = {}, {}
+    for k in sorted(f for f in files if f not in placed):
+        f = names.get(k) or k.upper()
+        stem, detail = _stem(f)
+        year = fools.get(k) or years.get(stem)
+        box, key = (fool_eps, year) if year else (eps, stem)
+        if key not in box:
+            box[key] = new_ep(f)
+            box[key]["title"] = f"April Fools' Day {year}" if year else box[key]["title"] or stem
+        box[key]["parts"].append([f, detail, ""])
+        box[key]["parts"].sort(key=rank)
+    blank = {"title": "", "number": "", "company": "", "area": "", "time": "", "banner": "", "order": 0}
+    return ([{**blank, "id": 1, "label": "April Fools' Day", "kind": "fools", "desc": "Stories the game played only on April 1st.",
+              "eps": [fool_eps[y] for y in sorted(fool_eps)]}] if fool_eps else [],
+            [{**blank, "id": 0, "label": "Not in the Story Theater", "kind": "extra",
+              "desc": "Story files the game's Story Theater doesn't list: events, a fight's interludes and the like.",
+              "eps": list(eps.values())}] if eps else [])
 
 
 def _tags(text: str) -> str:
@@ -442,9 +573,9 @@ def index(svc, lang: str = "en") -> dict:
     rel = f"story/index_{lang}_{sid}.json.gz"
     db = svc.store.read_json(rel)
     if db is None or db.get("v") != VERSION:
-        tables = svc.static_tables(["storytheater-main", "storytheater-other", "storytheater-personality"])
+        tables = svc.static_tables(["storytheater-main", "storytheater-other", "storytheater-personality", "story-loading-cg", "open-story-by-date", *STAGES])
         ids = {x["id"]: {"name": x.get("title") or "", "sinner": x.get("sinnerName")} for x in svc.unit_db().get("ids") or []}
-        db = build_index(tables, _loc_root(svc), lang, ids)
+        db = build_index(tables, _loc_root(svc), lang, ids, _files(svc))
         names = {x.get("sinner"): x.get("sinnerName") for x in svc.unit_db().get("ids") or []}
         for sn in db["ident"]:
             sn["name"] = names.get(sn["sinner"]) or f"Sinner {sn['sinner']}"
@@ -463,6 +594,19 @@ def index(svc, lang: str = "en") -> dict:
     cached[lang] = (sid, db)
     svc._story_idx = cached
     return db
+
+
+def _files(svc) -> set | None:
+    """The story files of the latest snapshot (lower case)."""
+    import sqlite3
+    path = svc.ensure_browse()
+    if not path:
+        return None
+    con = sqlite3.connect(path)
+    try:
+        return {n.lower() for (n,) in con.execute("select name from o where type = 'TextAsset' and c like 'Assets/Resources_moved/Story/Effect/%'")}
+    finally:
+        con.close()
 
 
 def _banner(svc, banner: str) -> str:

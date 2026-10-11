@@ -256,8 +256,8 @@ def unit_urls(units: dict) -> list[str]:
         elif isinstance(o, str) and o.startswith("Assets/"):
             (full if key in ("art", "art2") else thumbs).add(o)
     walk(units)
-    for u in units.get("ids", []) + units.get("egos", []):
-        # skill pictures by `icon`, defense skills too
+    for u in units.get("ids", []):
+        # skill pictures by `icon`, defense skills too (E.G.O skills have none: the page draws the E.G.O's picture)
         for s in (u.get("skills") or []) + (u.get("defense") or []):
             icon = f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png"
             thumbs.add(icon)
@@ -591,7 +591,7 @@ class Exporter:
         for x in ids + units.get("egos", []):
             im = x.get("img") or {}
             own = ([img(im["art"])] if im.get("art") else []) + [img(f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png")
-                                                                  for s in (x.get("skills") or []) + (x.get("defense") or [])]
+                                                                  for s in (x.get("skills") or []) + (x.get("defense") or []) if x.get("title")]
             if not x.get("title") and im.get("thumb"):
                 own.append(img(im["thumb"]))
             cards.append((own, CARD_PACK))
