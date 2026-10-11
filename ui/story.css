@@ -164,18 +164,20 @@
 #streader .rhx:hover { color: #fff; }
 #streader.noui .rbox, #streader.noui .rfade, #streader.noui .rplace, #streader.noui .rhex, #streader.noui .rhud { display: none; }
 
-/* Identity Archive: the Sinners' badges hung on a wall */
-.stboard { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 34px 22px; padding: 26px 26px 30px; margin-top: 10px; border: 1px solid var(--line);
-  background: #0c0908 url(/api/gacha_ui?n=MainUI_PersonalityStory_8) center / cover; }
-.stbadge { position: relative; padding: 0; border: 0; background: none; cursor: pointer; transform: rotate(var(--tilt)); transition: transform .18s; text-align: center; }
+/* Identity Archive: the Sinners' badges hung on a wall (sizes follow the badge's own width: cqw) */
+.stboard { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(22px, 3.4vw, 40px) clamp(8px, 1.6vw, 22px); padding: clamp(22px, 3vw, 30px) clamp(8px, 2vw, 26px) clamp(14px, 2vw, 26px);
+  margin-top: 10px; border: 1px solid var(--line); background: #0c0908 url(/api/gacha_ui?n=MainUI_PersonalityStory_8) center / cover; }
+.stbadge { position: relative; padding: 0; border: 0; background: none; cursor: pointer; transform: rotate(var(--tilt)); transition: transform .18s; text-align: center; container-type: inline-size; min-width: 0; }
 .stbadge:hover { transform: rotate(0deg) translateY(-6px); }
-.stbadge .clip { position: absolute; left: 50%; top: -26px; width: 22px; height: 40px; margin-left: -11px; z-index: 2; border-radius: 4px; background: linear-gradient(90deg, #4a4a4a, #9a9a9a 45%, #555); box-shadow: 0 2px 4px #000; }
-.stbadge .clip::after { content: ""; position: absolute; left: 6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #1d1d1d; }
+.stbadge .clip { position: absolute; left: 50%; top: -8cqw; width: 7cqw; height: 13cqw; margin-left: -3.5cqw; z-index: 2; border-radius: 1.2cqw; background: linear-gradient(90deg, #4a4a4a, #9a9a9a 45%, #555); box-shadow: 0 2px 4px #000; }
+.stbadge .clip::after { content: ""; position: absolute; left: 50%; top: 2cqw; width: 3.2cqw; height: 3.2cqw; margin-left: -1.6cqw; border-radius: 50%; background: #1d1d1d; }
 .stbadge .bcard { position: relative; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .7)); }
 .stbadge img { display: block; width: 100%; height: auto; }
-.stbadge b { position: absolute; left: 0; right: 0; bottom: 4.5%; font: 700 clamp(14px, 1.7vw, 26px) / 1 "LC Pretendard", "Segoe UI", sans-serif; color: #f2c500; text-shadow: 0 2px 0 #3a0603, 0 0 6px #000; }
+.stbadge b { position: absolute; left: 2%; right: 2%; bottom: 4.5%; font: 700 9.5cqw / 1 "LC Pretendard", "Segoe UI", sans-serif; color: #f2c500; text-shadow: 0 .5cqw 0 #3a0603, 0 0 2cqw #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stbadge:hover .bcard { filter: drop-shadow(0 0 10px rgba(248, 180, 0, .7)) drop-shadow(0 6px 10px rgba(0, 0, 0, .7)); }
-.stbadge em { display: block; margin-top: 6px; font-style: normal; font-size: 12px; color: var(--muted); }
+.stbadge em { display: block; margin-top: 2cqw; font-style: normal; font-size: max(10px, 4.6cqw); color: var(--muted); }
+@media (max-width: 900px) { .stboard { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .stboard { grid-template-columns: repeat(3, minmax(0, 1fr)); } .stbadge:hover { transform: rotate(var(--tilt)); } }
 .stidhead { display: flex; align-items: baseline; gap: 14px; margin: 12px 0; flex-wrap: wrap; }
 .stidhead h2 { margin: 0; }
-@media (max-width: 900px) { .stboard { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .stidgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .stidgrid .utitle { font-size: 15px; } .stidgrid .uarch { font-size: 11px; } .stidhead h2 { font-size: 22px; } }
