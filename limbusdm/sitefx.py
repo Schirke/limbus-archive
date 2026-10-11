@@ -117,13 +117,37 @@ def counts(svc) -> dict:
     from .site import Exporter
     try:
         m = _read(Exporter(svc, ""))
-        return {"have": len(m["have"]), "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False}
+        out = {"have": len(m["have"]), "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False}
     except Exception:
-        return {"have": 0, "total": 0, "videos": 0, "running": False}
+        out = {"have": 0, "total": 0, "videos": 0, "running": False}
+    try:
+        st = svc.buff_fx.status()
+        out["buffs"] = {"have": len(st["have"]), "total": len(svc.buff_fx.db()["fx"]), "failed": len(st["failed"])}
+    except Exception:
+        pass
+    return out
 
 
 def stop():
     _stop.set()
+
+
+def _buffs(svc, progress) -> dict:
+    """Buff effects' videos (Database → Buff effects): every one not made at this renderer version."""
+    bf = svc.buff_fx
+    bf.start(None)
+    total = bf.status()["queue"]
+    while True:
+        st = bf.status()
+        if not st["busy"] and not st["queue"]:
+            break
+        if _stop.is_set():
+            with bf.lock:
+                bf.queue = []  # (the batch being rendered ends first)
+        progress("site: rendering buff effects", max(0, total - st["queue"]), total, ", ".join(st["current"])[:80])
+        time.sleep(1.5)
+    st = bf.status()
+    return {"have": len(st["have"]), "failed": len(st["failed"])}
 
 
 def render_all(svc, base_url: str, progress=None) -> dict:
@@ -132,6 +156,9 @@ def render_all(svc, base_url: str, progress=None) -> dict:
     from .site import Exporter
     progress = progress or (lambda stage, done, total, msg="": None)
     _stop.clear()
+    buffs = _buffs(svc, progress)  # (first: a few minutes, the skills take hours)
+    if _stop.is_set():
+        return {"buffs": buffs}
     ex = Exporter(svc, base_url)
     m = _read(ex)
     before = json.loads(json.dumps(m["have"]))
@@ -169,4 +196,4 @@ def render_all(svc, base_url: str, progress=None) -> dict:
         ex.write_manifest("fx", m)
     _lists(ex, m, before)
     ex.write_manifest("fx", m)
-    return {"fx": {"made": made, "failed": failed, "left": max(0, len(todo) - made - failed), "have": len(m["have"])}}
+    return {"fx": {"made": made, "failed": failed, "left": max(0, len(todo) - made - failed), "have": len(m["have"])}, "buffs": buffs}
