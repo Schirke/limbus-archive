@@ -988,7 +988,7 @@ details.an-opts summary { cursor: pointer; }
 .stmap.drag { cursor: grabbing; } .stmap.drag a { pointer-events: none; }
 .stcanvas { position: relative; }
 .stcanvas img, .stcanvas svg { position: absolute; left: 0; top: 0; pointer-events: none; }
-.stcanvas polyline { fill: none; stroke: #e9e1d4; stroke-opacity: .55; stroke-width: 2; stroke-dasharray: 6 5; }
+.stcanvas polyline { fill: none; stroke: #ffb52e; stroke-width: 3; stroke-linejoin: round; filter: drop-shadow(0 0 3px #ff7a00) drop-shadow(0 0 6px #ff5a00); }
 .stnode { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; border: 2px solid #c0392b; background: #1b1113; color: #fff;
   font: 11px/20px Consolas, monospace; text-align: center; text-decoration: none; box-shadow: 0 0 6px #000; }
 .stnode.story { width: 12px; height: 12px; margin: -6px 0 0 -6px; border-color: #8fa3b5; background: #1d2730; }

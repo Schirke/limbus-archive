@@ -115,14 +115,17 @@
 /* the alternative look */
 #streader.alt .rbar, #streader.alt .rinfo { display: block; }
 #streader.alt .rrep { display: block; }
-#streader.alt .rfade { background: linear-gradient(transparent, rgba(13, 10, 9, .95) 50%); }
-#streader.alt .rwho b { color: var(--gold); }
-#streader.alt .rwho i { color: var(--cream); }
-#streader.alt .rhud button { background: #1f1612; color: var(--cream); border: 1px solid var(--line); border-radius: 0; clip-path: var(--cut); font-size: calc(var(--u) * 30px); font-weight: 700; font-family: inherit; font-style: normal; letter-spacing: .08em; text-transform: uppercase; box-shadow: none; }
-#streader.alt .rmenu { background: #120d0b; border-color: var(--line); }
-#streader.alt .rmenu button { border-bottom-color: #2a1d15; color: var(--cream); }
-#streader.alt .rmenu button:hover { background: var(--panel2); color: var(--gold); }
-#streader.alt .rlogh, #streader.alt .rlog { background: rgba(12, 8, 7, .97); border-color: var(--line); }
+#streader.alt .rhud button { clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); padding-inline: calc(var(--u) * 56px); }
+/* the game's look: menu, log and end screen in the app's colours */
+#streader:not(.alt) .rmenu { background: #120d0b; border-color: var(--line); }
+#streader:not(.alt) .rmenu button { border-bottom-color: #2a1d15; color: var(--cream); }
+#streader:not(.alt) .rmenu button:hover { background: var(--panel2); color: var(--gold); }
+#streader:not(.alt) .rlog, #streader:not(.alt) .rlogh, #streader:not(.alt) .rlogh button { background: rgba(12, 8, 7, .97); border-color: var(--line); color: var(--cream); }
+#streader:not(.alt) .rlogb b { color: var(--gold); }
+#streader:not(.alt) .rlogb p { color: #e9dcc2; }
+#streader:not(.alt) .rend p { color: #b9a58a; }
+#streader:not(.alt) .rend button { background: #1f1612; color: var(--cream); border: 1px solid var(--line); border-radius: 0; }
+#streader:not(.alt) .rend button:hover { color: var(--gold); border-color: var(--gold); }
 /* the game's look (default): plates, hex buttons, the text band */
 @font-face { font-family: "LC Mikodacs"; src: url(/api/font?name=Mikodacs); font-display: swap; }
 @font-face { font-family: "LC Pretendard"; src: url(/api/font?name=Pretendard-Regular); font-display: swap; }

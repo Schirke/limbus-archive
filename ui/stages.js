@@ -51,6 +51,9 @@ function stDraw() {
   }
   $("#stlist").innerHTML = c.nodes.map((n) => `<a href="#/stages/${c.id}/${n.id}" data-n="${n.id}" class="strow ${n.kind}">
       <span>${esc(n.n)}</span><i title="${ST_KIND[n.kind][1]}">${ST_KIND[n.kind][0]}</i><b>${esc(n.title || ST_KIND[n.kind][1])}</b>${n.kind !== "story" && ST_EPS.has(n.id) ? `<em title="Has story scenes">❝</em>` : ""}${n.lv ? `<span class="r">Lv ${n.lv}</span>` : ""}</a>`).join("");
+  // the smallest zoom that fills the page's width
+  const box = $("#stmap");
+  if (box && c.cols) { const i = ST_ZOOM.findIndex((t) => t * c.cols >= box.clientWidth); stv.zoom = i < 0 ? ST_ZOOM.length - 1 : i; }
   stMap();
   stMark(true);
   stCard();
@@ -60,10 +63,11 @@ function stMap() {
   const box = $("#stmap"), c = stChapter();
   if (!box) return;
   const t = ST_ZOOM[stv.zoom], k = t / STAGES.tile, w = c.cols * t, h = c.rows * t;
-  const at = (n) => [Math.round(n.x * k), Math.round(n.y * k)];
+  // rows and posy count from the bottom, as in Unity
+  const at = (n) => [Math.round(n.x * k), Math.round(h - n.y * k)];
   box.innerHTML = `<div class="stcanvas" style="width:${w}px;height:${h}px">
       ${Object.entries(c.tiles).map(([rc, path]) => { const [r, col] = rc.split("_");
-        return `<img loading="lazy" draggable="false" src="${imgThumb(path)}" style="left:${col * t}px;top:${r * t}px;width:${t}px;height:${t}px" onerror="this.remove()">`; }).join("")}
+        return `<img loading="lazy" draggable="false" src="${imgThumb(path)}" style="left:${col * t}px;top:${(c.rows - 1 - r) * t}px;width:${t}px;height:${t}px" onerror="this.remove()">`; }).join("")}
       <svg width="${w}" height="${h}"><polyline points="${c.nodes.map((n) => at(n).join(",")).join(" ")}"/></svg>
       ${c.nodes.map((n, i) => { const [x, y] = at(n);
         return `<a class="stnode ${n.kind}" href="#/stages/${c.id}/${n.id}" data-n="${n.id}" style="left:${x}px;top:${y}px" title="${esc(`${n.n} · ${n.title || ST_KIND[n.kind][1]}`)}">${n.kind === "story" ? "" : esc(n.n.split("-").pop())}</a>`; }).join("")}
