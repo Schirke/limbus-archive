@@ -940,14 +940,19 @@ class Exporter:
         old = self.read_manifest("buffs")
         fx = self.svc.buff_fx
         made = os.path.basename(fx.folder())  # (named by the game version and what draws the videos)
-        have = old.get("urls", {}) if _game(old.get("id")) == _game(made) else {}
+        same = _game(old.get("id")) == _game(made)
+        have = old.get("urls", {}) if same else {}
+        # the renderer's version before: its videos stay until made again (as the skills' do: sitefx._read)
+        prev = {} if same or _no_renderer(old.get("id")) != _no_renderer(made) else \
+            {k: f for k, f in old.get("urls", {}).items() if k.startswith("/api/buff_video")}
         st = {"list": fx.db()["list"], **fx.status()}
         names = list(dict.fromkeys(n for b in st["list"] for n in b.get("fx") or []))
         ready = set(st["have"])
         # and those the site has already
         keys = [url_key("/api/buff_video", name=n) for n in names if _safe_name(n) in ready or url_key("/api/buff_video", name=n) in have]
         urls = self.fetch_all(keys, have, "site: Buff effects")
-        on_site = {n for n in names if url_key("/api/buff_video", name=n) in urls}
+        urls.update({k: f for k, f in prev.items() if k not in urls})
+        on_site ={n for n in names if url_key("/api/buff_video", name=n) in urls}
         st.update(have=sorted({_safe_name(n) for n in on_site}), failed=[n for n in names if n not in on_site],
                   queue=0, current=[], busy=False, error="", available=False)
         urls["/api/buffs"] = self._store(json.dumps(st, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
@@ -1335,6 +1340,11 @@ class PackIndex:
 def _game(made: str) -> str:
     """Snapshot / renders folder name without its local read time."""
     return re.sub(r"_\d{8}-\d{6}", "", made or "")
+
+
+def _no_renderer(made: str) -> str:
+    """A renders folder's game version alone (without "_v<renderer>[_<n>]")."""
+    return re.sub(r"_v\d+(?:_\d+)?$", "", _game(made))
 
 
 def _unchanged(a: dict, b: dict):
