@@ -6,7 +6,7 @@ import json
 import os
 import re
 
-VERSION = 3  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 4  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
@@ -242,8 +242,10 @@ def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict,
     for ln in lines:  # the pictures the lines name -> their catalog paths
         for key, kind in (("bg", "bg"), ("cg", "cg")):
             name = ln.get(key)
-            if name and name.lower() in assets[kind]:
-                pics[f"{kind}:{name}"] = assets[kind][name.lower()]
+            # ("Unit_CG/10207_normal.png" = 10207_normal)
+            found = name and (assets[kind].get(name.lower()) or assets[kind].get(os.path.splitext(name.lower().rsplit("/", 1)[-1])[0]))
+            if found:
+                pics[f"{kind}:{name}"] = found
         if ln.get("vid") and ln["vid"].lower() in assets["video"]:
             pics[f"vid:{ln['vid']}"] = assets["video"][ln["vid"].lower()]
     return {"id": file_id, "lines": lines, "models": used, "pics": pics}
@@ -269,6 +271,9 @@ def _loc_root(svc) -> str:
     return os.path.join(svc.game.data or "", "Assets", "Resources_moved", "Localize")
 
 
+UNIT_CG = "Assets/Resources_moved/Sprite/Unit/CG/"
+
+
 def assets(svc) -> dict:
     """Name → catalog path of the story's pictures and videos, once per snapshot."""
     import sqlite3
@@ -281,16 +286,25 @@ def assets(svc) -> dict:
     if path:
         con = sqlite3.connect(path)
         base = "Assets/Resources_moved/Story/"
+        folders = set()
         for name, typ, c in con.execute("select name, type, c from o where c like ? and type in ('Texture2D', 'Sprite', 'VideoClip')",
                                         (base + "%",)):
             rest = c[len(base):]
             kind = {"Backgrounds": "bg", "CG": "cg", "StandingSprite": "sprite", "StoryPortrait": "portrait", "Video": "video"}.get(rest.split("/")[0])
+            if kind == "bg" and rest.count("/") == 2 and os.path.basename(c).lower().startswith("far_"):
+                folders.add(rest.split("/")[1])
             if kind:
                 out[kind].setdefault(os.path.splitext(os.path.basename(c))[0].lower(), c)
                 if kind == "cg" and rest.startswith("CG/Default/"):  # (white, black, red…: the fades' colours)
                     out["solid"][os.path.splitext(os.path.basename(c))[0].lower()] = c
         for (c,) in con.execute("select distinct c from o where c like ? and c like '%.psb'", (base + "StandingModel/%",)):
             out["psb"].setdefault(os.path.splitext(os.path.basename(c))[0].lower(), c)
+        # a background named by its folder (Bus_boat_L: far sea + the bus over it) -> the folder, drawn layered
+        for f in folders:
+            out["bg"].setdefault(f.lower(), base + "Backgrounds/" + f + "/")
+        # Identity stories' CG: the Identity's own art
+        for (c,) in con.execute("select distinct c from o where c like ? and type = 'Texture2D'", (UNIT_CG + "%",)):
+            out["cg"].setdefault(os.path.splitext(os.path.basename(c))[0].lower(), c)
         con.close()
     svc._story_assets = (sid, out)
     return out
@@ -475,6 +489,8 @@ def _webp(png: bytes, limit: int, quality: int = 85) -> bytes:
 def picture(svc, path: str, limit: int = 1920) -> bytes | None:
     """A background / CG / standing picture by catalog path, as a kept WebP."""
     from . import extract
+    if path.endswith("/"):
+        return _layered(svc, path, limit)
     rows = svc.lookup_container(path)
     r = next((x for x in rows if x["type"] == "Texture2D"), None) or next((x for x in rows if x["type"] == "Sprite"), None)
     file = svc.object_file(r["bundle"]) if r else None
@@ -482,6 +498,40 @@ def picture(svc, path: str, limit: int = 1920) -> bytes | None:
         return None
     return _disk(svc, "pics", f"{path}|{r['bundle']}|{r['pid']}|{limit}", ".webp",
                  lambda: _webp(extract.extract(file, int(r["pid"]))[0], limit))
+
+
+def _layered(svc, folder: str, limit: int) -> bytes | None:
+    """A background folder's pictures one over the other: far_* first."""
+    import io
+    import sqlite3
+
+    from PIL import Image
+
+    from . import extract
+    con = sqlite3.connect(svc.ensure_browse())
+    rows = con.execute("select c, bundle, pid from o where c like ? and type = 'Texture2D' order by c", (folder + "%",)).fetchall()
+    con.close()
+    rows = [r for r in rows if r[0].count("/") == folder.count("/")]
+    if not rows:
+        return None
+    rows.sort(key=lambda r: not os.path.basename(r[0]).lower().startswith("far_"))
+
+    def make():
+        out = None
+        for c, bundle, pid in rows:
+            file = svc.object_file(bundle)
+            if not file:
+                continue
+            im = Image.open(io.BytesIO(extract.extract(file, int(pid))[0])).convert("RGBA")
+            if out is None:
+                out = Image.new("RGBA", im.size)
+            out.alpha_composite(im if im.size == out.size else im.resize(out.size))
+        if out is None:
+            return None
+        buf = io.BytesIO()
+        out.convert("RGB").save(buf, "PNG")
+        return _webp(buf.getvalue(), limit)
+    return _disk(svc, "pics", f"{folder}|{'|'.join(str(r[2]) for r in rows)}|{limit}", ".webp", make)
 
 
 def sprite_png(svc, bundle: str, pid: int) -> bytes | None:
