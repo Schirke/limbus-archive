@@ -16,7 +16,7 @@ PART = {"B": "Before", "I": "Inter", "A": "After"}  # a file name's letter after
 # are shipped in ui/extra); line -> what it shows, by the text (each parody's picture, a glitch between them)
 FOOLS_2023 = "E000X"
 DANTE = "단테"  # (his model name in the texts)
-FOOLS_SCENES = {0: ("bg", "blackbg"), 2: ("cg", "E000X_8"), 6: ("bg", "blackbg"), 8: ("bg", "story_sinclair_classroom"),
+FOOLS_SCENES = {0: ("bg", "blackbg"), 2: ("cg", "E000X_8"), 6: ("bg", "blackbg"),
                 25: ("cg", "E000X_1"), 27: ("cg", "E000X_2"), 29: ("cg", "E000X_3_1"), 32: ("cg", "E000X_3_2"), 42: ("cg", "E000X_4"),
                 45: ("cg", "E000X_5"), 54: ("cg", "E000X_6"), 56: ("cg", "E000X_7"), 57: ("cg", "E000X_7_1"), 58: ("cg", "E000X_7_2"),
                 59: ("cg", "E000X_7_3"), 60: ("cg", "E000X_7_4"), 61: ("cg", "E000X_7_5"), 63: ("cg", "E000X_8"),
