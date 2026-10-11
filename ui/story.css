@@ -1,5 +1,6 @@
 /* Database → Story: list and reader */
 #stpage { display: flex; flex-direction: column; gap: 14px; height: calc(100vh - 120px); min-height: 420px; }
+#stpage.ident { height: auto; }
 .sttabs { display: flex; gap: 2px; flex-wrap: wrap; align-items: flex-end; padding-bottom: 0; border-bottom: 1px solid var(--line); }
 .sttab { padding: 6px 20px 5px; font: 16px "LC Bebas", sans-serif; letter-spacing: .1em; text-transform: uppercase; background: #140e0b; color: var(--text); border: 1px solid var(--line); border-bottom: 0; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); cursor: pointer; }
 .sttab[aria-selected=true] { background: var(--cream); color: #1a0f08; border-color: var(--cream); }

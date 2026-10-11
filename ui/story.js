@@ -34,6 +34,7 @@ function stChapters() {
 }
 
 function storyDraw() {
+  $("#stpage").classList.remove("ident");
   const list = stChapters();
   const sel = String(st.sel[st.tab] ?? list[0]?.id);
   const cur = list.find((c) => String(c.id) === sel) || list[0];
@@ -99,6 +100,7 @@ const ST_TILT = [-2, 1.5, -1, 2.5, -1.5, 1, 2, -2.5, 1, -1, 2, -1.5];
 async function stIdentDraw() {
   const tabs = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}</div>`;
   const list = st.idx.ident, s = list.find((x) => x.sinner === st.sinner);
+  $("#stpage").classList.add("ident");  // (as tall as its content: the page scrolls, the footer stays below)
   if (!s) {
     $("#stpage").innerHTML = `${tabs}<div class="stboard">${list.map((x, i) => `<button type="button" class="stbadge" data-s="${x.sinner}" style="--tilt:${ST_TILT[i % 12]}deg">
         <i class="clip"></i><span class="bcard"><img src="/api/gacha_ui?n=MainUI_PersonalityStory_7_${x.sinner - 1}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(x.name)}</b></span><em>${x.items.length} stories</em></button>`).join("")}</div>`;
