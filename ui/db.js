@@ -270,15 +270,18 @@ function skillView(s, up, level, label, fallbackImg, plain = false) {
   // missing level: nearest lower; not unlocked yet: first level, marked
   const ks = Object.keys(s.up).map(Number), low = ks.filter((k) => k <= up), lockAt = s.up[up] || low.length ? 0 : Math.min(...ks);
   const u = s.up[up] || s.up[low.length ? Math.max(...low) : lockAt];
+  // changed from the previous Uptie / Threadspin: drawn like the texts' highlight
+  const pl = ks.filter((k) => k < up), prev = !s.up[up] || !pl.length ? null : s.up[Math.max(...pl)];
+  const chg = (f) => prev && f(prev) !== f(u) ? " hl" : "";
   const color = SIN_COLORS[u.sin] || "#777";
   const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = imgThumb(iconPath);
   const key = frameKey(u.sin, s.tier, label === "Defense");
-  const coin = u.coin == null ? "" : `${u.op === "SUB" ? "−" : "+"}${u.coin}`;
+  const coinOf = (v) => v.coin == null ? "" : `${v.op === "SUB" ? "−" : "+"}${v.coin}`, coin = coinOf(u);
   const off = level + (u.level || 0);
   return `<div class="skv" style="--sin:${color}">
     <div class="skvtop">
-      ${u.base != null ? `<div class="skvbase">${u.base}</div>` : ""}
-      <div class="skvicon${key ? " framed" : ""}"><img ${key ? `data-src="${icon}" style="visibility:hidden"` : `src="${icon}"`} ${key ? `data-frame="${key}" data-art="${imgFull(iconPath)}" ${fallbackImg ? `data-art2="${imgFull(fallbackImg)}"` : ""} data-name="${esc(`${s.id} ${u.name}`)}" title="Click to save the icon in its frame" onclick="saveIcon(this)"` : ""} onerror="${fallbackImg ? `this.onerror=null;this.src='${imgThumb(fallbackImg)}'` : "this.remove()"}">${coin ? `<span class="skvcoin">${esc(coin)}</span>` : ""}</div>
+      ${u.base != null ? `<div class="skvbase${chg((v) => v.base)}">${u.base}</div>` : ""}
+      <div class="skvicon${key ? " framed" : ""}"><img ${key ? `data-src="${icon}" style="visibility:hidden"` : `src="${icon}"`} ${key ? `data-frame="${key}" data-art="${imgFull(iconPath)}" ${fallbackImg ? `data-art2="${imgFull(fallbackImg)}"` : ""} data-name="${esc(`${s.id} ${u.name}`)}" title="Click to save the icon in its frame" onclick="saveIcon(this)"` : ""} onerror="${fallbackImg ? `this.onerror=null;this.src='${imgThumb(fallbackImg)}'` : "this.remove()"}">${coin ? `<span class="skvcoin${chg(coinOf)}">${esc(coin)}</span>` : ""}</div>
       <div class="skvmain">
         <div class="skvcoins">${Array.from({ length: u.coins }, (_, i) => coinIcon((u.coinkinds || [])[i] || "")).join("")}${s.copies ? `<span class="copies">×${s.copies}</span>` : ""}</div>
         <div class="skvbanner">${sinIcon(u.sin, "s20")}<span>${esc(u.name)}</span></div>

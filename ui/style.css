@@ -297,6 +297,8 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 /* uptie changes: bright yellow like the game; .nohl = switched off (db.js #hltog) */
 .hl { color: #ffd51c; text-shadow: 0 0 6px rgba(255, 196, 0, .55); }
 .nohl .hl { color: inherit; text-shadow: none; }
+.skvbase.hl { color: #ffd51c; } .skvcoin.hl { color: #ffd51c; box-shadow: 0 0 0 2px #ffd51c, 0 0 8px rgba(255, 196, 0, .7); }
+.nohl .skvbase.hl { color: #e8c79a; } .nohl .skvcoin.hl { color: #fff; box-shadow: none; }
 .hltog { margin-left: auto; padding: 4px 10px; font-size: 12px; background: #17110d; border: 1px solid #3a281b; color: #a89580; opacity: .7; }
 .hltog.on { opacity: 1; color: #ffd51c; border-color: #f2c541; }
 .tg { color: #59b8ff; }
