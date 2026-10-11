@@ -60,7 +60,7 @@ function storyDraw() {
     : `<h2>${esc(cur.kind === "mini" ? (cur.title || cur.label) : cur.label + (cur.title ? ": " + cur.title : ""))}</h2>
        <div class="stsub">${sub(cur)}</div>${cur.desc ? `<div class="stdesc">${esc(cur.desc)}</div>` : ""}
        ${cur.kind === "restored" ? `<div class="strestored"><b>Restored</b> The game removed this story when its event ended. The texts are the game's own and the scenes are put back together as the event showed them; who stands where is a best guess. Face changes and the rest of the story's music were removed from the game.</div>` : ""}
-       ${cur.kind === "fools" ? `<div class="strestored"><b>Restored</b> The game played these only on April Fools' Day; it doesn't show them any more. 2023's scenes were removed: its text is the game's own, the pictures and who stands where are a best guess.</div>` : ""}`;
+       ${cur.kind === "fools" ? `<div class="strestored"><b>Restored</b> The game played these only on April Fools' Day; it doesn't show them any more. 2023's scene script was removed: its text, voices and pictures are the event's own; when each comes and who stands where are a best guess.</div>` : ""}`;
   // every story file is one episode, as in the game's Story Theater: a picture, a strip of Ep. 1…N, a panel with Enter
   const eps = !cur ? [] : st.tab === "ident"
     ? cur.items.map((it) => ({ id: it.story, n: "", title: it.name, detail: "", pic: "", icon: `/api/char_icon?id=${it.id}` }))

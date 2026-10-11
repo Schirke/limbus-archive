@@ -6,16 +6,21 @@ import json
 import os
 import re
 
-VERSION = 7  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 8  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
 STAGES = ("story", "battle-story", "battle-ab", "battle-dungeon")  # tables whose stages name the story files they play
 PART = {"B": "Before", "I": "Inter", "A": "After"}  # a file name's letter after its number
-# April Fools' Day 2023: its scene script is gone, its text and one glitch picture stayed; place -> what it showed
+# April Fools' Day 2023: its scene script is gone, its text, voices and one glitch picture stayed (the other pictures
+# are shipped in ui/extra); line -> what it shows, by the text (each parody's picture, a glitch between them)
 FOOLS_2023 = "E000X"
 DANTE = "단테"  # (his model name in the texts)
-FOOLS_PLACES = [("???", "bg", "blackbg"), ("#*%", "cg", "E000X_8"), ("Aboard Mephistopheles", "bg", "Bus_Inside_1")]
+FOOLS_SCENES = {0: ("bg", "blackbg"), 2: ("cg", "E000X_8"), 6: ("bg", "blackbg"), 8: ("bg", "story_sinclair_classroom"),
+                25: ("cg", "E000X_1"), 27: ("cg", "E000X_2"), 29: ("cg", "E000X_3_1"), 32: ("cg", "E000X_3_2"), 42: ("cg", "E000X_4"),
+                45: ("cg", "E000X_5"), 54: ("cg", "E000X_6"), 56: ("cg", "E000X_7"), 57: ("cg", "E000X_7_1"), 58: ("cg", "E000X_7_2"),
+                59: ("cg", "E000X_7_3"), 60: ("cg", "E000X_7_4"), 61: ("cg", "E000X_7_5"), 63: ("cg", "E000X_8"),
+                65: ("bg", "Bus_Inside_1")}
 FOOLS_BANNER = "Assets/Resources_moved/Sprite/Banner/banner_AprilFools2_event_en"
 
 
@@ -525,8 +530,7 @@ def _fools_voices(loc_rows: list[dict], voices) -> dict[int, str]:
 
 
 def _fools_effect(loc_rows: list[dict], models: dict, voices) -> list[dict]:
-    """A scene script for April Fools' Day 2023: the picture by its place (FOOLS_PLACES), its voices, the last two
-    speakers on stage."""
+    """A scene script for April Fools' Day 2023: its pictures (FOOLS_SCENES), its voices, the last two speakers on stage."""
     out, stage, cg = [], [], False
     said = _fools_voices(loc_rows, voices)
     for n, r in enumerate(loc_rows):
@@ -535,12 +539,11 @@ def _fools_effect(loc_rows: list[dict], models: dict, voices) -> list[dict]:
             row["voice"] = said[n]
         elif r.get("model") == DANTE and "d_wick" in voices:  # (Dante's ticking, as the other stories have it)
             row["voice"] = "D_Wick"
-        place = _line(r.get("place")) if r.get("place") not in (None, -1) else ""
-        hit = next((x for x in FOOLS_PLACES if place.startswith(x[0])), None) if place else None
-        if hit and hit[1] == "cg":
-            row["cg"], cg = hit[2], True
-        elif hit:
-            row["bg"] = hit[2]
+        kind, name = FOOLS_SCENES.get(n, ("", ""))
+        if kind == "cg":
+            row["cg"], cg = name, True
+        elif kind:
+            row["bg"] = name
             if cg:
                 row["cg"], cg = "ALL:FadeOut", False
         m = str(r.get("model") or "")
@@ -585,6 +588,8 @@ def assets(svc) -> dict:
         for sub in ("Story/CG/PC", "Sprite/StoryTheater/SubChapter9120"):  # (pictures shown over the scene)
             for name, c in extra.files(sub).items():
                 out["cg"]["pc_" + name.lower()] = c
+        for name, c in extra.files("Story/CG/SpotEvent").items():  # (April Fools' Day 2023's)
+            out["cg"].setdefault(name.lower(), c)
         for name, c in extra.files("Story/StandingSprite/PC").items():  # (and its people, by scenario fileName)
             out["sprite"].setdefault(name.lower(), c)
         # Identity stories' CG: the Identity's own art
@@ -665,7 +670,7 @@ def _first_picture(svc, file_id: str) -> str:
     import sqlite3
     a = assets(svc)
     if file_id.upper() == FOOLS_2023:
-        return a["cg"].get(FOOLS_PLACES[1][2].lower(), "")
+        return a["cg"].get("e000x_1") or a["cg"].get("e000x_8", "")
     path = svc.ensure_browse()
     if not path:
         return ""
