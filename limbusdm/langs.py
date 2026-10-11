@@ -25,7 +25,7 @@ import urllib.request
 
 from . import REPO
 
-VERSION = 3
+VERSION = 4
 PUB_BRANCH = "lang-data"
 # (the branch's commit is asked from the repository as git does — no API, no hourly limit — and its files by that commit)
 PUB_REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
@@ -266,12 +266,13 @@ def _build(svc, src: dict) -> dict:
 
 
 TAG = re.compile(r"</?([a-zA-Z-]+)(?:=[^>]*)?>")
+READ = {"link", "style", "sprite", "color", "u", "b", "i", "s"}  # marks the pages read (db.js fmtDesc: a status' <link>…)
 
 
 def _own_tags(en: str, x: str) -> str:
     """the game's text marks a translation adds for its own look (<cspace=-2px>, <nobr>, <size>…) are left out: the
-    pages draw only the marks the English text has"""
-    keep = {m.group(1).lower() for m in TAG.finditer(en)}
+    pages draw only the marks they read and the ones the English text has"""
+    keep = READ | {m.group(1).lower() for m in TAG.finditer(en)}
     return TAG.sub(lambda m: m.group(0) if m.group(1).lower() in keep else "", x)
 
 
