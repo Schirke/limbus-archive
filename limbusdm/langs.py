@@ -6,7 +6,11 @@ folder isn't taken, what is shown is chosen.
 A language is a table "English text → its text", made from the files side by side (the same file, the same id, the
 same field). The pages put it over the English the app answers with (ui/app.js langApply), so nothing else of the
 app is made twice. Two parts: "core" (names, skills, passives, statuses…) and "story" (story, voice lines), the
-second asked for only by the pages that show lines."""
+second asked for only by the pages that show lines.
+
+Made tables can also be published (the `lang-data` branch of the app's repository: index.json + the tables): every
+app then lists those languages too and takes a table from there instead of making it — a few MB, no half a minute
+over the game's files. A computer's own pack or own Korean / Japanese stays first while its table is made."""
 from __future__ import annotations
 
 import collections
@@ -16,8 +20,18 @@ import json
 import os
 import re
 import threading
+import time
+import urllib.request
+
+from . import REPO
 
 VERSION = 2
+PUB_BRANCH = "lang-data"
+# (the branch's commit is asked from the repository as git does — no API, no hourly limit — and its files by that commit)
+PUB_REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
+PUB_RAW = f"https://raw.githubusercontent.com/{REPO}/%s/%s"
+PUB_KEEP = 600  # seconds the published list is used before it is asked again
+SAFE = re.compile(r"^[\w.-]+$")
 GROUPS = ("core", "story")
 STORY = re.compile(r"(^|/)(storydata|personalityvoicedlg|egovoicedig|battleannouncerdlg|bgmlyrics)/|dlg|voice", re.I)
 # letters a pack draws with its own font only (the private use area): such a text stays English on the pages
@@ -32,6 +46,8 @@ NATIVE = {"ko": "한국어", "ja": "日本語", "ru": "Русский", "es": "E
           "pl": "Polski", "tr": "Türkçe", "id": "Bahasa Indonesia", "uk": "Українська"}
 _lock = threading.Lock()
 _en: dict = {}  # the English files read once: (signature, {file: {id: record}})
+_pub: dict = {"at": 0.0, "doc": None, "reading": False}  # the published list: when it was asked, what it said
+_last = [None]  # the language asked for last (kept in lang_cache/last.txt: made ready at the next start)
 
 
 def _loc(svc) -> str:
@@ -71,8 +87,61 @@ def _listed(root: str, prefix: str = "", rel: str = "") -> dict[str, tuple]:
     return out
 
 
+def _get(url: str, timeout: int, ua: str = "LimbusArchive") -> bytes:
+    req = urllib.request.Request(url, headers={"User-Agent": ua})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return r.read()
+
+
+def _pub_read(svc):
+    try:
+        refs = _get(PUB_REFS, 10, "git/2.45")
+        m = re.search(rb"([0-9a-f]{40}) refs/heads/" + PUB_BRANCH.encode() + rb"\n", refs)
+        if not m:  # nothing published yet
+            doc = {}
+        else:
+            sha = m.group(1).decode()
+            doc = json.loads(_get(PUB_RAW % (sha, "index.json"), 15))
+            doc["sha"] = sha
+        _pub["doc"] = doc
+        os.makedirs(_cache_dir(svc), exist_ok=True)
+        with open(os.path.join(_cache_dir(svc), "published.json"), "w", encoding="utf-8") as f:
+            json.dump(doc, f, ensure_ascii=False)
+    except Exception:  # offline: the list read before stays
+        pass
+    finally:
+        _pub["reading"] = False
+
+
+def published(svc) -> dict:
+    """The published languages {"sha", "langs": [{id, name, lang, version, authors, link, cover, sig, files}]}, {} when
+    none. The first time it is asked at once; later the last list answers and a new one is read in the background."""
+    if _pub["doc"] is None:
+        try:
+            with open(os.path.join(_cache_dir(svc), "published.json"), encoding="utf-8") as f:
+                _pub["doc"] = json.load(f)
+        except (OSError, ValueError):
+            _pub["doc"] = {}
+            _pub["at"] = time.time()
+            _pub["reading"] = True
+            _pub_read(svc)
+    if time.time() - _pub["at"] > PUB_KEEP and not _pub["reading"]:
+        _pub["at"] = time.time()
+        _pub["reading"] = True
+        threading.Thread(target=_pub_read, args=(svc,), daemon=True).start()
+    return _pub["doc"] or {}
+
+
+def forget_published(svc):
+    """read the published list again now (after publishing)"""
+    _pub["at"] = time.time()
+    _pub["reading"] = True
+    _pub_read(svc)
+
+
 def sources(svc) -> list[dict]:
-    """The languages there are: [{id, name, lang, label, dir, prefix, version, authors, link}]"""
+    """The languages there are: [{id, name, lang, label, dir, prefix, version, authors, link, pub}] — dir None = only
+    published; pub = the published copy of it, if any"""
     out, seen = [], set()
     loc = _loc(svc)
     for code, prefix, lang in OFFICIAL:
@@ -99,6 +168,16 @@ def sources(svc) -> list[dict]:
             out.append({"id": name, "name": meta.get("name") or name, "lang": meta.get("lang") or _lang_of(name), "dir": d,
                         "prefix": "", "version": str(meta.get("version") or ""), "authors": meta.get("authors") or [],
                         "link": meta.get("link") or ""})
+    for e in published(svc).get("langs") or []:
+        if not isinstance(e, dict) or not SAFE.match(str(e.get("id", ""))) or not SAFE.match(str(e.get("sig", ""))):
+            continue
+        mine = next((s for s in out if s["id"] == e["id"]), None)
+        if mine:
+            mine["pub"] = e
+        else:
+            out.append({"id": e["id"], "name": e.get("name") or e["id"], "lang": e.get("lang") or _lang_of(e["id"]), "dir": None,
+                        "prefix": None, "version": str(e.get("version") or ""), "authors": e.get("authors") or [],
+                        "link": e.get("link") or "", "pub": e})
     for s in out:
         s["label"] = NATIVE.get(s["lang"], s["lang"])
     return out
@@ -185,29 +264,104 @@ def _paths(svc, src: dict, en_sig: str) -> tuple[str, dict]:
     return base, {g: f"{base}.{g}.json.gz" for g in GROUPS}
 
 
-def table_file(svc, lid: str, group: str) -> str | None:
-    """The table of a language's part, as a gzip'd JSON file (made the first time and kept until the texts change)."""
+def source_key(svc, src: dict) -> str:
+    """what a language's tables on this computer are made of (the name its files start with): the published copy says
+    the same when it was made of the same files"""
+    return os.path.basename(_paths(svc, src, _en_sig(svc))[0])
+
+
+def _drop_old(svc, lid: str, base: str):
+    """the same language's tables of older texts"""
+    for old in os.listdir(_cache_dir(svc)):
+        if old.startswith(lid + ".") and not os.path.join(_cache_dir(svc), old).startswith(base + "."):
+            try:
+                os.remove(os.path.join(_cache_dir(svc), old))
+            except OSError:
+                pass
+
+
+def _fetch_pub(svc, e: dict) -> dict:
+    """the published tables of a language, downloaded once (kept by their signature)"""
+    base = os.path.join(_cache_dir(svc), f"{e['id']}.p{e['sig']}")
+    files = {g: f"{base}.{g}.json.gz" for g in GROUPS}
+    if all(os.path.exists(p) for p in files.values()):
+        return files
+    sha = (_pub["doc"] or {}).get("sha", "")
+    names = e.get("files") or {}
+    if not re.match(r"^[0-9a-f]{40}$", sha) or not all(SAFE.match(str(names.get(g, ""))) for g in GROUPS):
+        raise ValueError("the published list is not readable")
+    os.makedirs(_cache_dir(svc), exist_ok=True)
+    for g, p in files.items():
+        data = _get(PUB_RAW % (sha, names[g]), 120)
+        if data[:2] != b"\x1f\x8b":
+            raise ValueError("not a table")
+        with open(p + ".tmp", "wb") as f:
+            f.write(data)
+        os.replace(p + ".tmp", p)
+    with open(base + ".meta.json", "w", encoding="utf-8") as f:
+        json.dump({"cover": e.get("cover")}, f)
+    _drop_old(svc, e["id"], base)
+    return files
+
+
+def _remember(svc, lid: str):
+    if _last[0] == lid:
+        return
+    _last[0] = lid
+    try:
+        os.makedirs(_cache_dir(svc), exist_ok=True)
+        with open(os.path.join(_cache_dir(svc), "last.txt"), "w", encoding="utf-8") as f:
+            f.write(lid)
+    except OSError:
+        pass
+
+
+def table_file(svc, lid: str, group: str, local: bool = False) -> str | None:
+    """The table of a language's part, as a gzip'd JSON file. This computer's own one when it is made; else the
+    published one (for a pack: only when made of the same files); else made here and kept until the texts change.
+    local: always this computer's own (what is published is made so)."""
     src = next((s for s in sources(svc) if s["id"] == lid), None)
     if not src or group not in GROUPS:
         return None
     with _lock:
+        if not local:
+            _remember(svc, lid)
+        pub = src.get("pub")
+        if src["dir"] is None:
+            return _fetch_pub(svc, pub)[group]
         base, files = _paths(svc, src, _en_sig(svc))
-        if not all(os.path.exists(p) for p in files.values()):
-            made = _build(svc, src)
-            os.makedirs(_cache_dir(svc), exist_ok=True)
-            for old in os.listdir(_cache_dir(svc)):  # the same language's tables of older texts
-                if old.startswith(src["id"] + ".") and not os.path.join(_cache_dir(svc), old).startswith(base + "."):
-                    try:
-                        os.remove(os.path.join(_cache_dir(svc), old))
-                    except OSError:
-                        pass
-            for g, p in files.items():
-                with open(p + ".tmp", "wb") as f:
-                    f.write(gzip.compress(json.dumps(made["tables"][g], ensure_ascii=False).encode("utf-8"), 6, mtime=0))
-                os.replace(p + ".tmp", p)
-            with open(base + ".meta.json", "w", encoding="utf-8") as f:
-                json.dump({"cover": made["cover"]}, f)
+        if all(os.path.exists(p) for p in files.values()):
+            return files[group]
+        if pub and not local and (src["prefix"] or pub.get("src") == os.path.basename(base)):
+            try:
+                return _fetch_pub(svc, pub)[group]
+            except Exception:  # (offline: made here)
+                pass
+        made = _build(svc, src)
+        os.makedirs(_cache_dir(svc), exist_ok=True)
+        _drop_old(svc, src["id"], base)
+        for g, p in files.items():
+            with open(p + ".tmp", "wb") as f:
+                f.write(gzip.compress(json.dumps(made["tables"][g], ensure_ascii=False).encode("utf-8"), 6, mtime=0))
+            os.replace(p + ".tmp", p)
+        with open(base + ".meta.json", "w", encoding="utf-8") as f:
+            json.dump({"cover": made["cover"]}, f)
         return files[group]
+
+
+def warm(svc):
+    """At the start: the language asked for last is made ready (downloaded or made) before a page asks for it."""
+    try:
+        with open(os.path.join(_cache_dir(svc), "last.txt"), encoding="utf-8") as f:
+            lid = f.read().strip()
+    except OSError:
+        return
+    _last[0] = lid
+    time.sleep(5)  # (after the window's first requests)
+    try:
+        table_file(svc, lid, "core")
+    except Exception:
+        pass
 
 
 def listing(svc) -> dict:
@@ -215,16 +369,19 @@ def listing(svc) -> dict:
     out, en_sig = [], _en_sig(svc)
     for s in sources(svc):
         cover = None
-        try:
-            base, _ = _paths(svc, s, en_sig)
-            with open(base + ".meta.json", encoding="utf-8") as f:
-                cover = json.load(f)["cover"]
-        except (OSError, ValueError, KeyError):
-            pass
+        if s["dir"]:
+            try:
+                base, _ = _paths(svc, s, en_sig)
+                with open(base + ".meta.json", encoding="utf-8") as f:
+                    cover = json.load(f)["cover"]
+            except (OSError, ValueError, KeyError):
+                pass
+        if cover is None and s.get("pub"):
+            cover = s["pub"].get("cover")
         out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link")} | {"cover": cover})
     return {"langs": out}
 
 
 def own(svc) -> bool:
-    """Whether this computer has players' translations (not only the game's own languages)."""
-    return any(s["prefix"] == "" for s in sources(svc))
+    """Whether this computer has players' translations (its own packs or published ones), not only the game's own languages."""
+    return any(s["id"] not in {o[0] for o in OFFICIAL} for s in sources(svc))

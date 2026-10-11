@@ -87,12 +87,21 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 svc._answers = {**{k: v for k, v in getattr(svc, "_answers", {}).items() if k[0] == self._memo[0]}, self._memo: body}
             self._send(code, body, "application/json; charset=utf-8")
 
-        def _gz_json_file(self, path):
+        def _gz_json_file(self, path, tag=None):
+            """tag: the file's name says what is in it, so the window keeps it and only asks "still the same?" (304)"""
             if not os.path.exists(path):
                 return self._json({"error": "not found"}, 404)
+            if tag and self.headers.get("If-None-Match") == tag:
+                self._replied = True
+                self.send_response(304)
+                self.send_header("ETag", tag)
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                return
             with open(path, "rb") as f:
                 body = f.read()
-            self._send(200, body, "application/json; charset=utf-8", {"Content-Encoding": "gzip"})
+            self._send(200, body, "application/json; charset=utf-8",
+                       {"Content-Encoding": "gzip", **({"Cache-Control": "no-cache", "ETag": tag} if tag else {})})
 
         def _file(self, path, ctype=None, cache=False):
             if not path or not os.path.exists(path):
@@ -354,7 +363,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/lang":  # one language's table "English text → its text" (g: core / story)
                 from . import langs
                 f = langs.table_file(svc, q.get("id", ""), q.get("g", "core"))
-                return self._gz_json_file(f) if f else self._json({"error": "no such language"}, 404)
+                return self._gz_json_file(f, f'"{os.path.basename(f)}"') if f else self._json({"error": "no such language"}, 404)
             if p == "/api/site_status":  # the web copy: the build the site shows next to this app's (Settings)
                 from . import site
                 return self._json(site.status(svc))
@@ -1379,4 +1388,6 @@ def serve(svc: Service, port: int, on_show=None) -> ThreadingHTTPServer:
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     if getattr(svc, "fx", None) is not None:
         threading.Thread(target=svc.fx.prewarm, daemon=True).start()
+    from . import langs
+    threading.Thread(target=langs.warm, args=(svc,), daemon=True).start()
     return httpd

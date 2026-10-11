@@ -78,7 +78,20 @@ async function langList() {
   if (!LANG.list) LANG.list = fetch("/api/langs").then((r) => r.json()).then((o) => o.langs || []).catch(() => []);
   return LANG.list;
 }
-function langSet(id) {
+// the new language's table is fetched before the page starts again: the window keeps it, so the pages after the
+// reload get it at once, and a language that can't be had leaves the page as it is
+async function langSet(id) {
+  if (id && id !== LANG.id) {
+    document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.disabled = true);
+    const l = (await langList()).find((x) => x.id === id);
+    toast(`Loading ${esc(l ? l.label : id)}…`, 60000);
+    const ok = await fetch(`/api/lang?id=${encodeURIComponent(id)}&g=core`).then((r) => r.ok && r.arrayBuffer()).catch(() => false);
+    if (!ok) {
+      toast("This language could not be loaded. Try again later.");
+      document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.disabled = false);
+      return;
+    }
+  }
   try { localStorage.setItem(LANG_KEY, id || "en"); } catch {}
   location.reload();
 }
@@ -128,6 +141,8 @@ async function langMenu() {
   btn.textContent = l ? l.lang.split("-")[0].toUpperCase() : "EN";
   btn.title = l ? `${l.label} — ${l.name}` : "Language";
   if (l) document.documentElement.lang = l.lang;
+  // the lines' table (voice games, Sounds, Extraction) is fetched while nothing else is asked
+  if (l) setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => langTable("story")), 4000);
 })();
 function toast(html, ms = 4000) {
   const t = $("#toast");
