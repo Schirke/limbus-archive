@@ -17,7 +17,7 @@ import time
 
 CAB_RE = re.compile(r"cab-[0-9a-f]+")
 _lock = threading.Lock()
-VERSION = 22  # bump to re-render cached videos
+VERSION = 23  # bump to re-render cached videos
 KEEP_SECONDS = 3600  # a render is deleted an hour after it was last watched (see Renderer.prune)
 WIDTH, HEIGHT = 1920, 1080  # the size of the game's own skill preview videos
 # helper processes below normal priority
