@@ -102,7 +102,7 @@ function stPlaylist(file) {
   const eps = (c) => (c.eps || c.items?.map((it) => ({ title: it.name, n: "", parts: [[it.story, ""]] })) || []);
   const chapters = [...st.idx.main, ...st.idx.other, ...st.idx.ident.map((s) => ({ label: s.name, items: s.items }))];
   const own = st.chapter && eps(st.chapter).some((e) => e.parts.some((p) => p[0] === file)) ? st.chapter : chapters.find((c) => eps(c).some((e) => e.parts.some((p) => p[0] === file)));
-  for (const e of own ? eps(own) : []) for (const p of e.parts) found.push({ id: p[0], title: e.title, n: e.n, detail: p[1] });
+  for (const e of own ? eps(own) : []) for (const p of e.parts) found.push({ id: p[0], title: e.title, n: e.n, detail: p[1], place: e.place || "" });
   return { list: found.length ? found : [{ id: file, title: file, n: "", detail: "" }], title: own ? (own.title || own.label) : "" };
 }
 
@@ -111,18 +111,20 @@ const R = { el: null, ep: null, i: 0, rate: 1, hold: false, held: 0, auto: false
   wait: 0, voice: null, voiceEnd: true, bgm: null, bgmName: "", media: new Map(), layouts: new Map(), chars: new Map(), log: [], timer: 0, open: false, ui: stGet("story.ui", "") };
 const R_STEPS = [[0, 1], [1500, 2], [2100, 4], [2800, 6], [3600, 12]];
 const R_CPS = 52;  // letters a second at x1
-// the game's story stage: 2400 x 1350, slot n stands at x = (n - 5) * 200 from the middle, its foot 400 below the bottom
-const ST_W = 2400, ST_H = 1350, ST_SLOT = 200, ST_FOOT = -400, ST_BOX = [1750, 2115];
+// the game's story stage: 2400 x 1350, slot n at x = (n - 5) * 140 from the middle (200 in the prefab; 140 measured on
+// in-game screenshots), its foot 400 below the bottom
+const ST_W = 2400, ST_H = 1350, ST_SLOT = 140, ST_FOOT = -400;
 
 function rEnsure() {
   if (R.el) return;
   const el = document.createElement("div");
   el.id = "streader";
-  el.innerHTML = `<div class="rstage" id="rstage"><div class="rcam" id="rcam"><div class="rbgimg" id="rbg"></div><div class="rchars" id="rchars"></div><div class="rcgimg" id="rcg"></div></div><div class="rfade" id="rfade"></div>
+  el.innerHTML = `<div class="rstage" id="rstage"><div class="rcam" id="rcam"><div class="rbgimg" id="rbg"></div><div class="rchars" id="rchars"></div><div class="rcgimg" id="rcg"></div></div><div class="rvig"></div><div class="rfade" id="rfade"></div><div class="rplace" id="rplace"></div>
+    <div class="rhex" id="rhex"><button type="button" class="rhx" data-h="skip" title="Skip to the end"><svg viewBox="0 0 24 24"><path d="M3 5l9 7-9 7zM12 5l9 7-9 7z"/></svg></button><button type="button" class="rhx" data-h="auto" title="Auto"><b>AUTO</b></button><button type="button" class="rhx" data-h="log" title="Log"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zM14 3v5h5M9 11h8M9 14h8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button><button type="button" class="rhx" data-h="hide" title="Hide the interface"><b>UI</b></button><button type="button" class="rhx" data-h="set" title="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 5.1l2 1.6-2 3.5-2.4-.9a8 8 0 0 1-2.2 1.3L15.4 22h-4l-.4-2.6a8 8 0 0 1-2.2-1.3l-2.4.9-2-3.5 2-1.6a8 8 0 0 1 0-2.6l-2-1.6 2-3.5 2.4.9a8 8 0 0 1 2.2-1.3L11.4 2h4l.4 2.6a8 8 0 0 1 2.2 1.3l2.4-.9 2 3.5-2 1.6a8 8 0 0 1 0 2.6z"/></svg></button><button type="button" class="rhx" data-h="more" title="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.6"/></svg></button></div>
     <div class="rbar"><i id="rbar"></i></div><div class="rinfo" id="rinfo"></div>
     <div class="rhud"><button type="button" id="rauto">Auto</button><button type="button" id="rmenubtn">Menu</button></div>
     <div class="rmenu" id="rmenu"><button data-a="log">Log</button><button data-a="voice"></button><button data-a="ui"></button><button data-a="skip">Skip to end of this story</button><button data-a="exit">Exit to list</button></div>
-    <div class="rbox" id="rbox"><div class="rwho"><b id="rwho"></b><i id="rrole"></i><button type="button" class="rrep" id="rrep" title="Replay voice">▶ voice</button></div><div class="rtxt" id="rtxt"></div><div class="rnext">▼</div></div>
+    <div class="rbox" id="rbox"><div class="rplates" id="rplates"><div class="rtitle" id="rtitle"></div><div class="rname" id="rname"></div></div><div class="rwho"><b id="rwho"></b><i id="rrole"></i><button type="button" class="rrep" id="rrep" title="Replay voice">▶ voice</button></div><div class="rtxt" id="rtxt"></div><div class="rnext">▼</div></div>
     <div class="rspeed" id="rspeed"></div><div class="rvid" id="rvid"></div>
     <div class="rlog" id="rlog"><div class="rlogh"><b>Log</b><button type="button" id="rlogx">Close</button></div><div class="rlogb" id="rlogb"></div></div>
     <div class="rend" id="rend"></div></div>`;
@@ -136,9 +138,10 @@ function rEnsure() {
   window.addEventListener("resize", R.fit);
   const stage = $("#rstage");
   let t0 = 0, hz = 0, down = false;
-  const skip = (e) => e.target.closest(".rhud, .rmenu, .rlog, .rend, .rrep, .rvid");
+  const skip = (e) => e.target.closest(".rhud, .rhex, .rmenu, .rlog, .rend, .rrep, .rvid");
   stage.addEventListener("pointerdown", (e) => {
     if (skip(e)) return;
+    if (R.el.classList.contains("noui")) { R.el.classList.remove("noui"); return; }  // (a tap brings the hidden interface back)
     $("#rmenu").classList.remove("on");
     t0 = performance.now(); down = true;
     hz = setInterval(() => {
@@ -157,9 +160,20 @@ function rEnsure() {
   };
   stage.addEventListener("pointerup", up);
   stage.addEventListener("pointerleave", up);
-  $("#rauto").onclick = (e) => { e.stopPropagation(); R.auto = !R.auto; e.currentTarget.classList.toggle("on", R.auto); };
+  $("#rauto").onclick = (e) => { e.stopPropagation(); R.auto = !R.auto; e.currentTarget.classList.toggle("on", R.auto); $('.rhx[data-h=auto]').classList.toggle("on", R.auto); };
   $("#rmenubtn").onclick = (e) => { e.stopPropagation(); rMenuSync(); $("#rmenu").classList.toggle("on"); };
   $("#rrep").onclick = (e) => { e.stopPropagation(); rVoice(R.i); };
+  // the game's row of buttons, folded behind the menu one
+  $("#rhex").onclick = (e) => {
+    e.stopPropagation();
+    const h = e.target.closest(".rhx")?.dataset.h;
+    if (h === "more") $("#rhex").classList.toggle("open");
+    if (h === "skip") rShow(R.ep.lines.length - 1);
+    if (h === "auto") $("#rauto").click();
+    if (h === "log") rLogShow();
+    if (h === "hide") setTimeout(() => R.el.classList.add("noui"));
+    if (h === "set") { rMenuSync(); $("#rmenu").classList.toggle("on"); }
+  };
   $("#rlogx").onclick = (e) => { e.stopPropagation(); $("#rlog").classList.remove("on"); };
   $("#rmenu").onclick = (e) => {
     e.stopPropagation();
@@ -185,7 +199,7 @@ function rEnsure() {
 function rMenuSync() {
   const m = $("#rmenu");
   m.querySelector('[data-a=voice]').textContent = "Voice: " + (R.voiceOn ? "on" : "off");
-  m.querySelector('[data-a=ui]').textContent = "Reader look: " + (R.ui ? "Alternative" : "Game");
+  m.querySelector('[data-a=ui]').textContent = "Reader look: " + (R.ui ? "Archive" : "Game");
 }
 function rRate(r, show) {
   R.rate = r;
@@ -282,6 +296,14 @@ function rShow(i) {
   // text
   $("#rwho").textContent = l.who || "";
   $("#rrole").textContent = l.role || "";
+  // the game's name plates: the title above, the name on the speaker's colour
+  const mi = ep.models[l.m] || {}, title = l.role || mi.nick || "";
+  $("#rplates").style.display = l.who ? "" : "none";
+  $("#rtitle").textContent = title; $("#rtitle").style.display = title ? "" : "none";
+  $("#rname").textContent = l.who || "";
+  $("#rname").style.setProperty("--tag", /^#?[0-9a-f]{6}$/i.test(mi.color || "") ? "#" + mi.color.replace("#", "") : "");
+  $("#rname").style.setProperty("--tagc", /^#?[0-9a-f]{6}$/i.test(mi.fc || "") ? "#" + mi.fc.replace("#", "") : "");
+  $("#rplace").textContent = R.meta.place || ""; $("#rplace").style.display = R.meta.place ? "" : "none";
   $("#rtxt").innerHTML = rHtml(l.text || "");
   R.spans = [...$("#rtxt").querySelectorAll(".rc")];
   R.typed = 0; R.wait = 0; R.done = !R.spans.length;
@@ -382,12 +404,12 @@ function rStand(m, info, slot) {
   el.style.bottom = `${(ST_FOOT + (info.y || 0)) / ST_H * 100}%`;
   const sc = info.s || 1;
   inner.style.transform = `scale(calc(var(--k) * ${flip ? -sc : sc}), calc(var(--k) * ${sc}))`;
-  if (info.img) {  // a flat picture: fitted into the slot's 1750 x 2115 box like a UI image
+  if (info.img) {  // a flat picture: its own pixels, standing on the foot (matches in-game screenshots)
     const im = new Image();
     im.alt = "";
     im.onload = () => {
-      const f = Math.min(ST_BOX[0] / im.naturalWidth, ST_BOX[1] / im.naturalHeight), w = im.naturalWidth * f, h = im.naturalHeight * f;
-      Object.assign(im.style, { position: "absolute", width: w + "px", height: h + "px", left: -w / 2 + "px", bottom: (ST_BOX[1] - h) / 2 + "px" });
+      const w = im.naturalWidth, h = im.naturalHeight;
+      Object.assign(im.style, { position: "absolute", width: w + "px", height: h + "px", left: -w / 2 + "px", bottom: "0" });
       inner.append(im);
     };
     im.src = stFull(info.img, 2048);

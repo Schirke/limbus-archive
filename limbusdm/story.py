@@ -6,7 +6,7 @@ import json
 import os
 import re
 
-VERSION = 2  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 3  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
@@ -50,7 +50,7 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
     nodes = {}  # node id -> (title, blurb); ids are strings in the files
     for r in _rows(loc, lang, r"{L}_StageNode.*\.json$"):
         if str(r.get("id", "")).isdigit():
-            nodes[int(r["id"])] = (_line(r.get("title")), str(r.get("desc") or "").strip())
+            nodes[int(r["id"])] = (_line(r.get("title")), str(r.get("desc") or "").strip(), _line(r.get("place")))
     other, event = {}, {}
     for r in _rows(loc, lang, r"{L}_StoryTheaterOther\.json$"):
         m = re.match(r"STORY_(\d+)$", str(r.get("id", "")))
@@ -76,8 +76,8 @@ def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | Non
                     node = s.get("nodeId")
                     ep = by_node.get(node)
                     if ep is None:
-                        title, desc = nodes.get(node) or (other.get(node) or "", "")
-                        ep = by_node[node] = {"node": node, "title": title, "desc": desc, "parts": []}
+                        title, desc, place = nodes.get(node) or (other.get(node) or "", "", "")
+                        ep = by_node[node] = {"node": node, "title": title, "desc": desc, "place": place, "parts": []}
                         eps.append(ep)
                     ep["parts"].append([s["storyId"], s.get("stageDetail") or "", s.get("fullBannerId") or ""])
                 c = chap.get(sid) or {}
@@ -253,7 +253,8 @@ def _model_info(row: dict, assets: dict) -> dict:
     """A speaker's picture: plain (`img`) or layered (`psb`), and the name's colour."""
     f = str(row.get("fileName") or "")
     out = {"name": row.get("enname") or "", "color": row.get("nameTagColor") or "", "side": row.get("staringSide") or "",
-           "y": row.get("bottomYPos") or 0, "s": row.get("scale") or 1}
+           "y": row.get("bottomYPos") or 0, "s": row.get("scale") or 1, "fc": row.get("nameFontColor") or "",
+           "nick": row.get("enNickName") or ""}
     if f.lower() in assets["sprite"]:
         out["img"] = assets["sprite"][f.lower()]
     elif f.lower() in assets["psb"]:

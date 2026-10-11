@@ -123,3 +123,32 @@
 #streader.alt .rmenu button { border-bottom-color: #2a1d15; color: var(--cream); }
 #streader.alt .rmenu button:hover { background: var(--panel2); color: var(--gold); }
 #streader.alt .rlogh, #streader.alt .rlog { background: rgba(12, 8, 7, .97); border-color: var(--line); }
+/* the game's look (default): plates, hex buttons, the text band */
+@font-face { font-family: "LC Mikodacs"; src: url(/api/font?name=Mikodacs); font-display: swap; }
+@font-face { font-family: "LC Pretendard"; src: url(/api/font?name=Pretendard-Regular); font-display: swap; }
+#streader .rvig { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, #000 0, rgba(0, 0, 0, .75) 8%, transparent 20%, transparent 80%, rgba(0, 0, 0, .75) 92%, #000 100%), linear-gradient(#000 0, rgba(0, 0, 0, .6) 8%, transparent 18%), radial-gradient(ellipse at 50% 45%, transparent 60%, rgba(0, 0, 0, .55) 100%); }
+#streader.alt .rvig, #streader.alt .rplace, #streader.alt .rhex, #streader.alt .rplates { display: none; }
+#streader:not(.alt) .rhud, #streader:not(.alt) .rwho { display: none; }
+#streader:not(.alt) .rfade { left: calc(var(--u) * 150px); right: calc(var(--u) * 150px); top: calc(var(--u) * 832px); bottom: calc(var(--u) * 34px); height: auto;
+  background: repeating-linear-gradient(transparent 0 3px, rgba(255, 255, 255, .025) 3px 4px), linear-gradient(90deg, transparent, rgba(14, 11, 8, .82) 10%, rgba(14, 11, 8, .82) 90%, transparent);
+  border-top: calc(var(--u) * 2px) solid; border-image: linear-gradient(90deg, transparent, rgba(120, 95, 65, .5) 15%, rgba(120, 95, 65, .5) 85%, transparent) 1; }
+#streader:not(.alt) .rbox { top: calc(var(--u) * 902px); left: calc(var(--u) * 377px); right: calc(var(--u) * 380px); bottom: 0; padding: 0; }
+#streader:not(.alt) .rtxt { font: calc(var(--u) * 27px) / 1.55 "LC Pretendard", "Pretendard", "Noto Sans", sans-serif; color: #e9dcc2; letter-spacing: -.01em; min-height: 0; }
+#streader:not(.alt) .rnext { right: calc(var(--u) * -40px); bottom: calc(var(--u) * 60px); color: #c9a77a; font-size: calc(var(--u) * 20px); }
+#streader.mono:not(.alt) .rbox { top: calc(var(--u) * 902px); display: block; text-align: left; }
+#streader.mono:not(.alt) .rfade { top: 0; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, .7); border: 0; }
+#streader .rplates { position: absolute; left: calc(var(--u) * -297px); top: calc(var(--u) * -108px); width: calc(var(--u) * 260px); font-family: "LC Mikodacs", "LC Bebas", sans-serif; text-align: center; }
+#streader .rtitle { width: calc(var(--u) * 200px); padding: calc(var(--u) * 8px) 0 calc(var(--u) * 4px); rotate: -3deg; background: linear-gradient(#4c3726, #2e2117); border-top: calc(var(--u) * 2px) solid #6e5338; border-bottom: calc(var(--u) * 2px) solid #6e5338; color: #c9a77a; font-size: calc(var(--u) * 24px); line-height: 1; box-shadow: 0 calc(var(--u) * 4px) calc(var(--u) * 8px) rgba(0, 0, 0, .5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#streader .rname { margin: calc(var(--u) * -4px) 0 0 calc(var(--u) * 30px); width: calc(var(--u) * 220px); padding: calc(var(--u) * 20px) calc(var(--u) * 8px) calc(var(--u) * 14px); rotate: -4deg; background: linear-gradient(rgba(255, 255, 255, .1), rgba(0, 0, 0, .15)), var(--tag, #6b4c31); border-top: calc(var(--u) * 2px) solid rgba(255, 255, 255, .25); border-bottom: calc(var(--u) * 3px) solid rgba(0, 0, 0, .35); outline: calc(var(--u) * 2px) solid rgba(255, 255, 255, .15); outline-offset: calc(var(--u) * 4px); color: var(--tagc, #f3e6cf); font-size: calc(var(--u) * 34px); line-height: 1.05; text-shadow: 0 calc(var(--u) * 2px) 0 rgba(0, 0, 0, .45); box-shadow: 0 calc(var(--u) * 6px) calc(var(--u) * 12px) rgba(0, 0, 0, .55); overflow-wrap: anywhere; }
+#streader .rplace { position: absolute; z-index: 3; left: calc(var(--u) * 45px); top: calc(var(--u) * 34px); min-width: calc(var(--u) * 320px); padding: calc(var(--u) * 22px) calc(var(--u) * 40px) calc(var(--u) * 16px) calc(var(--u) * 50px); rotate: -4deg; background: linear-gradient(#1c1510, #0d0a08); border-top: calc(var(--u) * 2px) solid #5a4a3a; border-bottom: calc(var(--u) * 2px) solid #5a4a3a; box-shadow: inset 0 0 0 calc(var(--u) * 1px) #3a3027, 0 calc(var(--u) * 8px) calc(var(--u) * 16px) rgba(0, 0, 0, .6); font: calc(var(--u) * 32px) / 1 "LC Mikodacs", "LC Bebas", sans-serif; color: #efe2c8; pointer-events: none; }
+#streader .rhex { position: absolute; z-index: 4; top: calc(var(--u) * 36px); right: calc(var(--u) * 92px); display: flex; gap: calc(var(--u) * 16px); }
+#streader .rhx { width: calc(var(--u) * 80px); height: calc(var(--u) * 80px); padding: 0; border: 0; cursor: pointer; background: #7d6542; clip-path: polygon(30% 0, 70% 0, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0 70%, 0 30%); position: relative; display: none; color: #e8dcc4; }
+#streader .rhx::before { content: ""; position: absolute; inset: calc(var(--u) * 4px); background: radial-gradient(#3a302a, #1a1512); clip-path: inherit; }
+#streader .rhx > * { position: relative; }
+#streader .rhx svg { width: 46%; height: 46%; fill: currentColor; }
+#streader .rhx b { font: calc(var(--u) * 26px) / 1 "LC Bebas", sans-serif; letter-spacing: .02em; }
+#streader .rhx[data-h=auto] b { font-size: calc(var(--u) * 19px); }
+#streader .rhx[data-h=more], #streader .rhex.open .rhx { display: grid; place-items: center; }
+#streader .rhex.open .rhx[data-h=more], #streader .rhx.on { background: #d4a72c; color: #f5c84a; }
+#streader .rhx:hover { color: #fff; }
+#streader.noui .rbox, #streader.noui .rfade, #streader.noui .rplace, #streader.noui .rhex, #streader.noui .rhud { display: none; }
