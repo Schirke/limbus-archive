@@ -946,7 +946,9 @@ class Exporter:
                     continue
                 keys.append(k)
         have = {k: f for k, f in (old.get("urls") or {}).items() if k in src and (old.get("src") or {}).get(k) == src[k]}
-        files = self.fetch_all(keys + ["/api/langs"], have, "site: Languages")
+        from . import uilang  # interface dictionaries: small, asked every time
+        ui = ["/api/ui_langs"] + [url_key("/api/ui_lang", lang=c) for c in uilang.available(self.svc)]
+        files = self.fetch_all(keys + ["/api/langs"] + ui, have, "site: Languages")
         m = {"kind": "langs", "id": self.svc.latest_snapshot_id(), "urls": files, "src": src}
         self.write_manifest("langs", m)
         return m

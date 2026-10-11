@@ -357,6 +357,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/langs":  # the languages of the game's texts there are (limbusdm/langs.py)
                 from . import langs
                 return self._json(langs.listing(svc))
+            if p == "/api/ui_lang":  # the interface's dictionary {English template: translation}
+                from . import uilang
+                return self._json(uilang.dictionary(svc, q.get("lang", "")))
+            if p == "/api/ui_langs":
+                from . import uilang
+                return self._json({"langs": uilang.available(svc)})
+            if p == "/api/ui_lang/status":
+                from . import uilang
+                return self._json(uilang.status(svc))
             if p == "/api/lang":  # one language's table "English text → its text" (g: core / story)
                 from . import langs
                 f = langs.table_file(svc, q.get("id", ""), q.get("g", "core"))
@@ -844,6 +853,28 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/community_rec":
                 from . import community
                 return self._json(community.save_recommended(b.get("lines") or []))
+            if p.startswith("/api/ui_lang/"):  # interface translation (limbusdm/uilang.py); only where the web copy is set up
+                from . import uilang
+                if not os.path.exists(os.path.join(svc.data_dir, "site_config.json")):
+                    return self._json({"error": "not here"}, 403)
+                lang = str(b.get("lang") or "")
+                if p == "/api/ui_lang/seen":
+                    return self._json({"new": uilang.add_seen(svc, b.get("strings") or [], b.get("page") or "")})
+                if p == "/api/ui_lang/translate":
+                    return self._json({"started": uilang.start(svc, "translate", lang=lang)})
+                if p == "/api/ui_lang/crawl":
+                    routes = [str(r) for r in b.get("routes") or [] if re.match(r"^[\w/-]+$", str(r))] or None
+                    return self._json({"started": uilang.start(svc, "crawl", port=self.server.server_address[1], routes=routes)})
+                if p == "/api/ui_lang/export":
+                    path = uilang.export_csv(svc, lang)
+                    subprocess.Popen(["explorer", "/select,", path])
+                    return self._json({"path": path})
+                if p == "/api/ui_lang/import":
+                    try:
+                        return self._json(uilang.import_csv(svc, lang, str(b.get("text") or "")))
+                    except ValueError as e:
+                        return self._json({"error": str(e)}, 400)
+                return self._json({"error": "not found"}, 404)
             if p == "/api/settings":
                 svc.save_settings(b)
                 return self._json(svc.settings)

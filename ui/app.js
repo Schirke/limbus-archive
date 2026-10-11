@@ -124,10 +124,14 @@ async function langMenu() {
       ${by ? `<span class="muted small langby">${esc(by)}</span>` : ""}</button>${l.link ? `<a class="small" href="${esc(l.link)}" target="_blank" rel="noopener">source</a>` : ""}</div>`;
   };
   modal(`<h2>Language</h2><p class="muted small">The game's texts — names, skills, passives, statuses, lines — as the game shows them in that language:
-      its own Korean and Japanese, and the players' translations (credit to their teams). The rest of the page stays in English.</p>
+      its own Korean and Japanese, and the players' translations (credit to their teams).</p>
     <div class="langlist"><div class="langgrp"><div class="langhead">English</div><div class="langitem"><button class="langrow${LANG.id ? "" : " on"}" data-lang=""><b>The game's own</b></button></div></div>
-    ${[...groups].map(([label, ls]) => `<div class="langgrp"><div class="langhead">${esc(label)}</div>${ls.map(row).join("")}</div>`).join("")}</div>`);
+    ${[...groups].map(([label, ls]) => `<div class="langgrp"><div class="langhead">${esc(label)}</div>${ls.map(row).join("")}</div>`).join("")}</div>
+    <label class="small"><input type="checkbox" id="uilangon"> The app's own buttons and texts too, where they are translated</label>`);
   document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.onclick = () => langSet(b.dataset.lang));
+  const on = $("#uilangon");
+  try { on.checked = localStorage.getItem("ui_lang") !== "off"; } catch {}
+  on.onchange = () => { try { localStorage.setItem("ui_lang", on.checked ? "on" : "off"); } catch {} if (LANG.id) location.reload(); };
 }
 (async () => {
   const btn = document.querySelector("#navlang");
