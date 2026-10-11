@@ -36,17 +36,15 @@
     const main = $("#main"), here = () => !!main.querySelector(".home");
     clearInterval(homeTimer);
     main.innerHTML = `<div class="home"><div class="hhero"></div></div>`;
-    try { await units(); } catch (e) { /* the page without the Identities then */ }
-    if (!here()) return;
-    const ids = typeof UNITS !== "undefined" && UNITS && UNITS.ids || [];
-    const byDate = [...ids].sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.id - a.id);
-    const newest = byDate.length ? byDate[0].date || "" : "";
-    // banner: the newest Identities in turn
-    const slides = byDate.filter((x) => x.date === newest && x.img && x.img.art).slice(0, 6);
-    const games = document.querySelectorAll("#subnav a[data-game]").length;
+    let ids = typeof UNITS !== "undefined" && UNITS && UNITS.ids || [];
     const day = (r) => { const m = /^build (\d\d\.\d\d)\.(\d{4}) · taken (.+)$/.exec(fmtSnap(r.new)); return m ? { d: m[1], y: m[2], taken: m[3] } : { d: fmtSnap(r.new), y: "", taken: "" }; };
     const draw = () => {
       if (!here()) return;
+      const byDate = [...ids].sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.id - a.id);
+      const newest = byDate.length ? byDate[0].date || "" : "";
+      // banner: the newest Identities in turn
+      const slides = byDate.filter((x) => x.date === newest && x.img && x.img.art).slice(0, 6);
+      const games = document.querySelectorAll("#subnav a[data-game]").length;
       const reps = STATE && STATE.reports || [], last = reps[0], prev = reps[1];
       const a = last && day(last), b = prev && day(prev);
       main.querySelector(".home").innerHTML = `<div class="hhero"><i class="hart"></i><i class="hart"></i>
@@ -89,8 +87,11 @@
       main.querySelectorAll(".hdots button").forEach((d) => { d.onclick = () => { show(+d.dataset.i); turn(); }; });
       show(0); turn();
     };
-    // (the reports come with the app's state: drawn once it is here)
-    if (typeof STATE !== "undefined" && STATE) draw(); else refresh.hook = () => { refresh.hook = null; draw(); };
+    // (drawn once the app's state is here, again when the Identities come: their pack can be slow)
+    let drawn = false;
+    const first = () => { drawn = true; draw(); };
+    if (typeof STATE !== "undefined" && STATE) first(); else refresh.hook = () => { refresh.hook = null; first(); };
+    if (!ids.length) units().then((u) => { ids = u && u.ids || []; if (drawn && ids.length) draw(); }).catch(() => { /* the page without the Identities then */ });
   };
   const checking = new URLSearchParams(location.search);
   if (checking.has("check")) {
