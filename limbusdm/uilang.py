@@ -116,6 +116,8 @@ def dictionary(svc, lang: str) -> dict:
     if not re.match(r"^[a-z]{2}(-[A-Za-z]{2,4})?$", lang or ""):
         return {}
     if os.path.exists(lang_file(svc, lang)):
+        if not offered(svc, lang):
+            return {}
         return {k: v[0] for k, v in table(svc, lang).items() if v and v[0] and k.lower() not in NAMES}
     return _published(svc, lang)
 
@@ -142,22 +144,49 @@ def _published(svc, lang: str) -> dict:
     return _read(path, {})
 
 
+def local_langs(svc) -> list:
+    """Languages with a dictionary file on this computer, offered or not."""
+    names = [fn[:-5] for fn in os.listdir(_dir(svc))] if os.path.isdir(_dir(svc)) else []
+    return sorted(x for x in names if re.match(r"^[a-z]{2}(-[A-Za-z]{2,4})?$", x))
+
+
+def _off(svc) -> list:
+    return _read(os.path.join(_dir(svc), "off.json"), [])
+
+
+def offered(svc, lang: str) -> bool:
+    return lang not in _off(svc)
+
+
+def set_offer(svc, lang: str, on: bool):
+    """Unoffered: kept on disk, but used nowhere and not published."""
+    off = [x for x in _off(svc) if x != lang] + ([] if on else [lang])
+    _write(os.path.join(_dir(svc), "off.json"), off)
+
+
+def delete(svc, lang: str):
+    for p in (lang_file(svc, lang), os.path.join(_dir(svc), f"mt_cache_{lang}.json")):
+        if os.path.exists(p):
+            os.remove(p)
+    set_offer(svc, lang, True)
+
+
 def available(svc) -> list:
-    """UI languages there are (local files and published)."""
+    """UI languages there are (offered local files and published ones)."""
     from . import langs
-    local = [fn[:-5] for fn in os.listdir(_dir(svc))] if os.path.isdir(_dir(svc)) else []
-    local = [x for x in local if re.match(r"^[a-z]{2}(-[A-Za-z]{2,4})?$", x)]
-    return sorted(set(local) | set((langs.published(svc).get("ui") or {}).keys()))
+    local = local_langs(svc)
+    pub = [x for x in (langs.published(svc).get("ui") or {}) if x not in local]
+    return sorted([x for x in local if offered(svc, x)] + pub)
 
 
 def status(svc) -> dict:
-    s = strings(svc)
+    s = {k: v for k, v in strings(svc).items() if k.lower() not in NAMES}
     out = {"strings": len(s), "langs": {}, "job": dict(_job)}
-    for lang in available(svc):
-        t = table(svc, lang) if os.path.exists(lang_file(svc, lang)) else {}
-        s = {k: v for k, v in s.items() if k.lower() not in NAMES}
+    for lang in sorted(set(available(svc)) | set(local_langs(svc))):
+        local = os.path.exists(lang_file(svc, lang))
+        t = table(svc, lang) if local else {}
         done = [k for k in s if (t.get(k) or [""])[0]]
-        out["langs"][lang] = {"local": os.path.exists(lang_file(svc, lang)), "done": len(done),
+        out["langs"][lang] = {"local": local, "on": offered(svc, lang), "done": len(done),
                               "human": sum(1 for k in done if t[k][1] == "h"), "missing": len(s) - len(done)}
     return out
 

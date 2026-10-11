@@ -869,6 +869,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     path = uilang.export_csv(svc, lang)
                     subprocess.Popen(["explorer", "/select,", path])
                     return self._json({"path": path})
+                if p == "/api/ui_lang/offer" and lang in uilang.local_langs(svc):
+                    uilang.set_offer(svc, lang, bool(b.get("on")))
+                    return self._json({"ok": True})
+                if p == "/api/ui_lang/delete" and lang in uilang.local_langs(svc):
+                    uilang.delete(svc, lang)
+                    return self._json({"ok": True})
                 if p == "/api/ui_lang/import":
                     try:
                         return self._json(uilang.import_csv(svc, lang, str(b.get("text") or "")))
