@@ -101,7 +101,7 @@ async function stIdentDraw() {
   const list = st.idx.ident, s = list.find((x) => x.sinner === st.sinner);
   if (!s) {
     $("#stpage").innerHTML = `${tabs}<div class="stboard">${list.map((x, i) => `<button type="button" class="stbadge" data-s="${x.sinner}" style="--tilt:${ST_TILT[i % 12]}deg">
-        <i class="clip"></i><span class="card"><img src="/api/gacha_ui?n=MainUI_PersonalityStory_7_${x.sinner - 1}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(x.name)}</b></span><em>${x.items.length} stories</em></button>`).join("")}</div>`;
+        <i class="clip"></i><span class="bcard"><img src="/api/gacha_ui?n=MainUI_PersonalityStory_7_${x.sinner - 1}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(x.name)}</b></span><em>${x.items.length} stories</em></button>`).join("")}</div>`;
   } else {
     $("#stpage").innerHTML = `${tabs}<div class="muted">Loading…</div>`;
     await units();
