@@ -580,6 +580,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 elif _re.fullmatch(r"2\d{4}", cid):
                     path = f"{base}Profile/Ego/{cid}_awaken_profile.png"
                 else:
+                    drawn = os.path.join(_thumb_dir(svc), _safe(cid) + ".png")  # the handbook's battle-look picture
+                    if cid and os.path.exists(drawn):
+                        return self._file_live(drawn, "image/png")
                     from .viewer import enemy_portrait
                     path = enemy_portrait(svc, cid)
                 if path and cid.isdigit() and not svc.lookup_container(path):  # no profile picture (the first Identities): its list picture
