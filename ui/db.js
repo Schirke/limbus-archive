@@ -304,6 +304,7 @@ function openUnit(id) {
   if (!x) return;
   const isId = !!x.title;
   let up = x.maxUp || 4, art2 = false, tab = 0, level = MAX_LEVEL;
+  let hl = true; try { hl = localStorage.getItem("udHl") !== "0"; } catch {}
   // Skills 1-3 with their copies, Defense
   const main = x.skills.filter((s) => !isId || s.copies), extra = isId ? x.skills.filter((s) => !s.copies) : [];
   const lone = extra.filter((e) => !main.some((m) => m.tier === e.tier));
@@ -342,13 +343,14 @@ function openUnit(id) {
   const right = () => {
     return `<div class="lvpanel"><span class="lvlabel">${isId ? "Uptie" : "Threadspin"}</span>
         ${Array.from({ length: x.maxUp || 4 }, (_, i) => i + 1).map((n) => `<button class="upbtn ${up === n ? "on" : ""}" data-up="${n}" title="${n}">${ico(`up_${n}`, "s22", "", ROMAN[n - 1])}</button>`).join("")}
-        ${isId ? `<span class="lvlabel lv">Lv. <b id="lvn">${level}</b></span><input type="range" id="lvr" min="1" max="${MAX_LEVEL}" value="${level}">` : ""}</div>
+        ${isId ? `<span class="lvlabel lv">Lv. <b id="lvn">${level}</b></span><input type="range" id="lvr" min="1" max="${MAX_LEVEL}" value="${level}">` : ""}
+        <button class="hltog ${hl ? "on" : ""}" id="hltog" title="Highlight what changed from the previous ${isId ? "Uptie" : "Threadspin"}">Changes</button></div>
       <div class="sktabs">${tabs.map(([n], i) => `<button class="${i === tab ? "on" : ""}" data-tab="${i}">${esc(n)}</button>`).join("")}</div>
       <div class="skpanel">${(tabs[tab] || [0, []])[1].length ? panel() : `<div class="muted">No skills.</div>`}</div>
       ${x.passives.length ? `<h3 class="group">Passives</h3>${x.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}` : ""}`;
   };
   const draw = () => {
-    modal(`<div class="ud"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
+    modal(`<div class="ud${hl ? "" : " nohl"}"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
         <div class="grow"><div class="udtitle">${esc(isId ? x.title : x.name)}</div>
         <div class="muted small">${esc(x.sinnerName)} · id ${x.id}${x.date ? ` · updated ${esc(x.date)}` : ""}</div></div>
         ${isId ? `<button id="toanim">Battle animations →</button>` : ""}</div>
@@ -360,6 +362,10 @@ function openUnit(id) {
     const body = $("#modal-body");
     body.querySelectorAll("[data-up]").forEach((b) => b.onclick = () => { up = +b.dataset.up; redraw(); });
     body.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { tab = +b.dataset.tab; redraw(); });
+    $("#hltog").onclick = () => {
+      hl = !hl; try { localStorage.setItem("udHl", hl ? "1" : "0"); } catch {}
+      $(".ud").classList.toggle("nohl", !hl); $("#hltog").classList.toggle("on", hl);
+    };
     const r = $("#lvr");
     if (r) r.oninput = () => { level = +r.value; $("#lvn").textContent = level; $("#udleft").innerHTML = left(); $(".skpanel").innerHTML = panel(); bindLeft(); };
     bindLeft();

@@ -294,7 +294,11 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .kw.pos { color: #f8c200; } .kw.neg { color: #ff3b2f; } .kw.neu { color: #c49a6c; }
 .kw.big { text-decoration: none; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
 .kwico { width: 16px; height: 16px; vertical-align: -3px; margin-right: 2px; object-fit: contain; }
-.hl { color: #ffe08a; }
+/* uptie changes: bright yellow like the game; .nohl = switched off (db.js #hltog) */
+.hl { color: #ffd51c; text-shadow: 0 0 6px rgba(255, 196, 0, .55); }
+.nohl .hl { color: inherit; text-shadow: none; }
+.hltog { margin-left: auto; padding: 4px 10px; font-size: 12px; background: #17110d; border: 1px solid #3a281b; color: #a89580; opacity: .7; }
+.hltog.on { opacity: 1; color: #ffd51c; border-color: #f2c541; }
 .tg { color: #59b8ff; }
 .skdesc .tg:first-child { } .tg { white-space: nowrap; }
 #kwtip { position: fixed; z-index: 200; background: #0f0b08; border: 1px solid #5a4030; border-radius: 6px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.6); color: #ead9c2; font-size: 13px; }
