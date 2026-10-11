@@ -141,6 +141,8 @@ def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict,
             pending[key] = val
 
     for row in effect:
+        if isinstance(row.get("id"), int) and row["id"] < 0:  # (a header row: "Episode S0_1")
+            continue
         t = loc.get(row.get("id")) or {}
         if row.get("bg"):
             change("bg", str(row["bg"]).split(":")[0])
