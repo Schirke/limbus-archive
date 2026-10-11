@@ -16,7 +16,7 @@ const imgFull = (path) => `/api/asset_img?path=${encodeURIComponent(path)}`;
 let FRAMES = null;
 const frameImgs = {};
 const loadImg = (src) => frameImgs[src] || (frameImgs[src] = new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; }));
-const frameKey = (sin, tier, defense) => defense ? "defense" : SIN_COLORS[sin] && sin !== "None" ? `${sin.toLowerCase()}_${Math.min(3, Math.max(1, tier || 1))}` : "";
+const frameKey = (sin, tier, defense) => defense ? (SIN_COLORS[sin] && sin !== "None" ? `defense_${sin.toLowerCase()}` : "defense") : SIN_COLORS[sin] && sin !== "None" ? `${sin.toLowerCase()}_${Math.min(3, Math.max(1, tier || 1))}` : "";
 async function framedIcon(art, key) {
   FRAMES = FRAMES || await fetch("/ui/frames/frames.json").then((r) => r.json());
   const f = FRAMES[key];
