@@ -129,8 +129,8 @@ def kit_fighter(base: dict, cid: int, skills_t) -> dict:
     k = KITS[cid]
     by = {s["group"]: s for s in base["skills"]}
 
-    def mk(g, sid):
-        s = by.get(g)
+    def mk(g, sid):  # (a short name like "S1" matches the timeline's suffix: patches rename the prefix)
+        s = by.get(g) or next((x for n, x in by.items() if n.endswith("_" + g)), None)
         if s is None:
             return None
         d = E._skill(sid, skills_t)
