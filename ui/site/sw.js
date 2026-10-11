@@ -32,13 +32,67 @@ const getJson = async (path) => {
 async function load() {
   const idx = await getJson("index.json");
   if (site && site.stamp === idx.stamp) { loaded = Date.now(); return site; }
-  const urls = new Map();
-  for (const m of await Promise.all(idx.manifests.map((n) => getJson(`m/${n}.json.gz`))))
-    for (const [k, f] of Object.entries(m.urls || {})) urls.set(k, f);
-  site = { stamp: idx.stamp, inline: idx.inline || {}, live: idx.live || {}, tr: idx.tr || [], urls };
+  let urls = null;
+  if (!idx.keys) {  // (a copy not packed: every manifest read whole)
+    urls = new Map();
+    for (const m of await Promise.all(idx.manifests.map((n) => getJson(`m/${n}.json.gz`))))
+      for (const [k, f] of Object.entries(m.urls || {})) urls.set(k, f);
+  }
+  site = { stamp: idx.stamp, inline: idx.inline || {}, live: idx.live || {}, tr: idx.tr || [], keys: idx.keys, urls };
   tr = null;
+  shards.clear();
   loaded = Date.now();
+  if (idx.keys && idx.keys.files) prune(idx.keys.files).catch(() => {});
   return site;
+}
+// the request → file table in shards (limbusdm/site.py key_group, _key_shards)
+const shards = new Map();
+function fnv(s) {
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(s)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h;
+}
+function group(k) {
+  const i = k.indexOf("?"), path = i < 0 ? k : k.slice(0, i);
+  if (path.startsWith("/spine/")) return "/spine/" + path.split("/")[2];
+  const got = new Map();
+  if (i >= 0) for (const part of k.slice(i + 1).split("&")) {
+    const j = part.indexOf("=");
+    if (j >= 0 && !got.has(part.slice(0, j))) got.set(part.slice(0, j), part.slice(j + 1));
+  }
+  for (const name of ["bundle", "id"]) if (got.has(name)) return `${path}?${name}=${got.get(name)}`;
+  return path;
+}
+function shard(name) {
+  let p = shards.get(name);
+  if (!p) {
+    p = kept("k/" + name).then((b) => gunzip(new Response(b)).json());
+    shards.set(name, p);
+    p.catch(() => shards.delete(name));
+    if (shards.size > 120) shards.delete(shards.keys().next().value);
+  }
+  return p;
+}
+async function lookup(s, k) {
+  if (s.urls) return s.urls.get(k);
+  let g = group(k);
+  const n = s.keys.split[g];
+  if (n) g += "#" + (fnv(k) % n);
+  const name = s.keys.f[fnv(g) % s.keys.f.length];
+  return name ? (await shard(name))[k] : undefined;
+}
+// files of older copies of the site go from the browser's cache once a new copy is read
+async function prune(list) {
+  const meta = await caches.open("meta"), seen = await meta.match("/pruned");
+  if (seen && (await seen.text()) === list) return;
+  const keep = new Set((await (await kept("k/" + list).then((b) => gunzip(new Response(b)))).json()).map((f) => DATA + f));
+  keep.add(DATA + "k/" + list);
+  const cache = await caches.open("packs");
+  for (const r of await cache.keys()) {
+    const path = new URL(r.url).pathname;
+    if (!keep.has(path)) { await cache.delete(r); packs.delete(path.slice(DATA.length)); }
+  }
+  await meta.put("/pruned", new Response(list));
 }
 function ready(force) {
   // re-read the index every few minutes
@@ -82,7 +136,8 @@ async function answer(req, u, e) {
   if (s.live[k]) {  // read from where the app reads it, now
     try { return json(await (await fetch(s.live[k], { cache: "no-cache" })).json()); } catch (err) { return json({}); }
   }
-  const file = s.urls.get(k);
+  let file;
+  try { file = await lookup(s, k); } catch (err) { return json({ error: "The site's data didn't load: " + err.message }, 503); }
   if (!file) { miss(e, k); return json({ error: ONLY_APP }, 404); }
   if (Array.isArray(file)) return packed(req, file);
   // a file stored in parts

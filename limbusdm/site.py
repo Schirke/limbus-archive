@@ -998,8 +998,9 @@ class Exporter:
         html = re.sub(r'<script src="[^"]+"></script>\s*', "", html)
         stamp = str(int(time.time()))
         pages = self.section_pages(html)
+        script_urls = [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]
         boot = f"""<script>
-const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "titles": {r: t for r, (t, _, _) in pages.items()}, "scripts": [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]})};
+const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "titles": {r: t for r, (t, _, _) in pages.items()}, "scripts": script_urls})};
 (async () => {{
   // come from the site's old address (ui/site/worker.js moved): what the browser kept there, where nothing is kept here
   if (location.hash.startsWith("#move=")) {{
@@ -1032,7 +1033,9 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 }})();
 </script>
 """
-        html = html.replace("</head>", f'<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n</head>')
+        # (scripts fetched while the worker starts; they run after it, as before)
+        preload = "".join(f'<link rel="preload" as="script" href="{s}">\n' for s in script_urls)
+        html = html.replace("</head>", f'<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n{preload}</head>')
         html = html.replace("</body>", boot + "</body>")
         # a page per section for search engines; visitors get the app on that section
         for fn in os.listdir(self.out):
@@ -1714,6 +1717,66 @@ def packed_dir(svc) -> str:
     return os.path.join(svc.data_dir, "site_packed")
 
 
+KEY_SHARDS = 256  # the request → file table cut in this many files: the worker reads only the one a request is in
+KEY_SPLIT = 400  # a group with more requests is spread over several shards
+
+
+def _fnv(s: str) -> int:
+    """FNV-1a over UTF-8; ui/site/sw.js has the same."""
+    h = 0x811C9DC5
+    for b in s.encode("utf-8"):
+        h = ((h ^ b) * 0x01000193) & 0xFFFFFFFF
+    return h
+
+
+def key_group(k: str) -> str:
+    """Requests one page asks together (a bundle's, an id's) share a shard; ui/site/sw.js has the same."""
+    path, _, q = k.partition("?")
+    if path.startswith("/spine/"):
+        return "/spine/" + path.split("/")[2]
+    got = {}
+    for part in q.split("&") if q else ():
+        name, eq, v = part.partition("=")
+        if eq and name not in got:
+            got[name] = v
+    for name in ("bundle", "id"):
+        if name in got:
+            return f"{path}?{name}={got[name]}"
+    return path
+
+
+def _put_shard(dst: str, obj) -> str:
+    raw = json.dumps(obj, ensure_ascii=False, separators=(",", ":"), sort_keys=isinstance(obj, dict)).encode("utf-8")
+    name = hashlib.sha1(raw).hexdigest()[:16] + ".json.gz"
+    full = os.path.join(dst, "d", "k", name)
+    if not os.path.exists(full):
+        with open(full + ".tmp", "wb") as f:
+            f.write(gzip.compress(raw, mtime=0))
+        os.replace(full + ".tmp", full)
+    return name
+
+
+def _key_shards(dst: str, packed_urls: dict) -> dict:
+    """d/k: the manifests' requests cut by key_group (later manifests win, as sw.js read them whole)."""
+    with open(os.path.join(dst, "d", "index.json"), encoding="utf-8") as f:
+        order = json.load(f).get("manifests") or []
+    urls = {}
+    for name in order:
+        urls.update(packed_urls.get(name) or {})
+    counts = {}
+    for k in urls:
+        g = key_group(k)
+        counts[g] = counts.get(g, 0) + 1
+    split = {g: -(-n // KEY_SPLIT) for g, n in counts.items() if n > KEY_SPLIT}
+    buckets = [{} for _ in range(KEY_SHARDS)]
+    for k, v in urls.items():
+        g = key_group(k)
+        if g in split:
+            g += "#" + str(_fnv(k) % split[g])
+        buckets[_fnv(g) % KEY_SHARDS][k] = v
+    return {"f": [_put_shard(dst, b) if b else "" for b in buckets], "split": split}
+
+
 def pack(src: str, dst: str, index: str | None = None) -> dict:
     """The site as it goes up: small files glued into content-named packs ([pack, offset, length, ext] in the manifest), in
     page order; big files stay alone."""
@@ -1731,11 +1794,12 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
             shutil.copytree(a, b)
         elif os.path.isfile(a):
             shutil.copyfile(a, b)
-    for sub in ("m", "p", "tr", "f"):
+    for sub in ("m", "p", "tr", "f", "k"):
         os.makedirs(os.path.join(dst, "d", sub), exist_ok=True)
     shutil.copyfile(os.path.join(src, "d", "index.json"), os.path.join(dst, "d", "index.json"))
     shutil.copytree(os.path.join(src, "d", "tr"), os.path.join(dst, "d", "tr"), dirs_exist_ok=True)
     packs, loose, parts = set(), set(), {}  # parts: {a part's file: (the big file, where the part starts in it)}
+    packed_urls = {}
     for fn in sorted(os.listdir(os.path.join(src, "d", "m"))):
         with gzip.open(os.path.join(src, "d", "m", fn), "rt", encoding="utf-8") as f:
             m = json.load(f)
@@ -1786,6 +1850,7 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
                 out.close()
                 os.replace(full + ".tmp", full)
         m["urls"] = {k: where[rel] for k, rel in m.get("urls", {}).items()}
+        packed_urls[fn[:-8]] = m["urls"]
         with gzip.open(os.path.join(dst, "d", "m", fn), "wt", encoding="utf-8") as f:
             json.dump(m, f, ensure_ascii=False)
     whole = {v[0] for v in parts.values()}
@@ -1804,7 +1869,18 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
             out.write(f.read(size))
         os.replace(full + ".tmp", full)
     loose = (loose - whole) | set(parts)
-    for sub, keep in (("p", packs), ("m", set(os.listdir(os.path.join(src, "d", "m")))), ("tr", set(os.listdir(os.path.join(src, "d", "tr"))))):
+    shards = _key_shards(dst, packed_urls)
+    files = sorted({"p/" + n for n in packs} | loose | {"k/" + n for n in shards["f"] if n})
+    shards["files"] = _put_shard(dst, files)
+    with open(os.path.join(dst, "d", "index.json"), encoding="utf-8") as f:
+        ix = json.load(f)
+    ix["keys"] = shards
+    with open(os.path.join(dst, "d", "index.json"), "w", encoding="utf-8") as f:
+        json.dump(ix, f, ensure_ascii=False)
+    with open(os.path.join(dst, "_headers"), "w", encoding="utf-8") as f:
+        f.write("".join(f"/d/{sub}/*\n  Cache-Control: public, max-age=31536000, immutable\n" for sub in ("p", "f", "k")))
+    keep_k = {n for n in shards["f"] if n} | {shards["files"]}
+    for sub, keep in (("p", packs), ("k", keep_k), ("m", set(os.listdir(os.path.join(src, "d", "m")))), ("tr", set(os.listdir(os.path.join(src, "d", "tr"))))):
         for fn in os.listdir(os.path.join(dst, "d", sub)):
             if fn not in keep:
                 os.remove(os.path.join(dst, "d", sub, fn))
