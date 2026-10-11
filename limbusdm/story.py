@@ -6,12 +6,16 @@ import json
 import os
 import re
 
-VERSION = 6  # bump when the index / an episode's layout changes (cached per snapshot)
+VERSION = 7  # bump when the index / an episode's layout changes (cached per snapshot)
 LANGS = {"en": "EN", "kr": "KR", "jp": "JP"}
 DETAIL = {"Before": "Pre-battle", "Inter": "Interlude", "After": "Post-battle"}
 UNIT = 100  # a Unity unit is 100 pixels of a standing picture
 STAGES = ("story", "battle-story", "battle-ab", "battle-dungeon")  # tables whose stages name the story files they play
 PART = {"B": "Before", "I": "Inter", "A": "After"}  # a file name's letter after its number
+# April Fools' Day 2023: its scene script is gone, its text and one glitch picture stayed; place -> what it showed
+FOOLS_2023 = "E000X"
+FOOLS_PLACES = [("???", "bg", "blackbg"), ("#*%", "cg", "E000X_8"), ("Aboard Mephistopheles", "bg", "Bus_Inside_1")]
+FOOLS_BANNER = "Assets/Resources_moved/Sprite/Banner/banner_AprilFools2_event_en"
 
 
 def _rows(loc: str, lang: str, pattern: str) -> list[dict]:
@@ -152,7 +156,7 @@ def _stage_files(st: dict) -> list[str]:
 def _april_fools(tables: dict) -> dict:
     """{file: year} of the April Fools' Day stories: played by a storybattle-fools stage, or opened on April 1st in Korea."""
     from datetime import datetime, timedelta
-    out = {}
+    out = {FOOLS_2023.lower(): "2023"}
     for name, data in (tables.get("battle-story") or {}).items():
         if "fool" in name.lower():
             for st in (data.get("list") or []) if isinstance(data, dict) else []:
@@ -247,7 +251,7 @@ def _left_out(chs: list[dict], tables: dict, nodes: dict, files: set) -> tuple[l
         box[key]["parts"].append([f, detail, ""])
         box[key]["parts"].sort(key=rank)
     blank = {"title": "", "number": "", "company": "", "area": "", "time": "", "banner": "", "order": 0}
-    return ([{**blank, "id": 1, "label": "April Fools' Day", "kind": "fools", "desc": "Stories the game played only on April 1st.",
+    return ([{**blank, "id": 1, "label": "April Fools' Day", "kind": "fools", "desc": "Stories the game played only on April 1st.", "banner": FOOLS_BANNER,
               "eps": [fool_eps[y] for y in sorted(fool_eps)]}] if fool_eps else [],
             [{**blank, "id": 0, "label": "Not in the Story Theater", "kind": "extra",
               "desc": "Story files the game's Story Theater doesn't list: events, a fight's interludes and the like.",
@@ -504,6 +508,27 @@ def _pc_effect(file_id: str, loc_rows: list[dict], models: dict) -> list[dict]:
     return out
 
 
+def _fools_effect(loc_rows: list[dict], models: dict) -> list[dict]:
+    """A scene script for April Fools' Day 2023: the picture by its place (FOOLS_PLACES), the last two speakers on stage."""
+    out, stage, cg = [], [], False
+    for r in loc_rows:
+        row = {"id": r.get("id")}
+        place = _line(r.get("place")) if r.get("place") not in (None, -1) else ""
+        hit = next((x for x in FOOLS_PLACES if place.startswith(x[0])), None) if place else None
+        if hit and hit[1] == "cg":
+            row["cg"], cg = hit[2], True
+        elif hit:
+            row["bg"] = hit[2]
+            if cg:
+                row["cg"], cg = "ALL:FadeOut", False
+        m = str(r.get("model") or "")
+        if m and m in models and m not in stage:
+            stage = (stage + [m])[-2:]
+            row["characterlist"] = "ALL," + ",".join(f"{x}:{3 if i == 0 else 7}" for i, x in enumerate(stage))
+        out.append(row)
+    return out
+
+
 def assets(svc) -> dict:
     """Name → catalog path of the story's pictures and videos, once per snapshot."""
     import sqlite3
@@ -585,7 +610,8 @@ def index(svc, lang: str = "en") -> dict:
             for ep in ch["eps"]:  # each story's own picture as the Story Theater shows it, else the one before
                 for part in ep["parts"]:
                     own = f"Assets/Resources_moved/Sprite/StoryTheater/SubChapter{ch['id']}/{part[0]}.png"
-                    last = own if svc.lookup_container(own) else _banner(svc, part[2]) or last
+                    last = own if svc.lookup_container(own) else _banner(svc, part[2]) or \
+                        (ch["kind"] in ("fools", "extra") and _first_picture(svc, part[0])) or last
                     part[2] = last
         pc = _pc_chapter(svc, lang)
         if pc:
@@ -597,16 +623,46 @@ def index(svc, lang: str = "en") -> dict:
 
 
 def _files(svc) -> set | None:
-    """The story files of the latest snapshot (lower case)."""
+    """The story files of the latest snapshot (lower case), and the restored ones whose text is there."""
     import sqlite3
     path = svc.ensure_browse()
     if not path:
         return None
     con = sqlite3.connect(path)
     try:
-        return {n.lower() for (n,) in con.execute("select name from o where type = 'TextAsset' and c like 'Assets/Resources_moved/Story/Effect/%'")}
+        out = {n.lower() for (n,) in con.execute("select name from o where type = 'TextAsset' and c like 'Assets/Resources_moved/Story/Effect/%'")}
     finally:
         con.close()
+    if os.path.exists(os.path.join(_loc_root(svc), "en", "StoryData", f"EN_{FOOLS_2023}.json")):
+        out.add(FOOLS_2023.lower())
+    return out
+
+
+def _first_picture(svc, file_id: str) -> str:
+    """The first background or picture a story file shows (a list card's picture); "" when none."""
+    import sqlite3
+    a = assets(svc)
+    if file_id.upper() == FOOLS_2023:
+        return a["cg"].get(FOOLS_PLACES[1][2].lower(), "")
+    path = svc.ensure_browse()
+    if not path:
+        return ""
+    con = sqlite3.connect(path)
+    try:
+        row = con.execute("select h from o where type = 'TextAsset' and name = ? collate nocase and c like 'Assets/Resources_moved/Story/Effect/%'",
+                          (file_id,)).fetchone()
+    finally:
+        con.close()
+    try:
+        rows = json.loads(svc.store.get_blob(row[0]).decode("utf-8-sig")).get("dataList", []) if row else []
+    except (AttributeError, ValueError):
+        return ""
+    for r in rows:
+        for key in ("cg", "bg"):
+            name = str(r.get(key) or "").split(",")[0].split(":")[0].strip().lower()
+            if name and name != "all" and name not in a["solid"] and name in a[key]:
+                return a[key][name]
+    return ""
 
 
 def _banner(svc, banner: str) -> str:
@@ -631,7 +687,7 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
     row = con.execute("select h from o where type = 'TextAsset' and name = ? collate nocase and c like 'Assets/Resources_moved/Story/Effect/%'",
                       (file_id,)).fetchone()
     con.close()
-    pc = not row and re.fullmatch(r"PC\d+[ABI]\d*", file_id)
+    pc = not row and (re.fullmatch(r"PC\d+[ABI]\d*", file_id) or file_id.upper() == FOOLS_2023)
     if not row and not pc:
         return None
     effect = [] if pc else json.loads(svc.store.get_blob(row[0]).decode("utf-8-sig")).get("dataList", [])
@@ -653,7 +709,7 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
     if pc:
         if not loc_rows:
             return None
-        effect = _pc_effect(file_id, loc_rows, _scenario(svc))
+        effect = _fools_effect(loc_rows, _scenario(svc)) if file_id.upper() == FOOLS_2023 else _pc_effect(file_id, loc_rows, _scenario(svc))
     return episode(file_id, effect, loc_rows, codes, _scenario(svc), sound_index(svc), assets(svc))
 
 
