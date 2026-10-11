@@ -2,7 +2,9 @@
 // the mouse to read faster.
 "use strict";
 
-const st = { idx: null, tab: "main", sel: {}, pick: {}, ep: null, list: [], i: 0 };
+const st = { idx: null, tab: "main", sel: {}, pick: {}, ep: null, list: [], i: 0, shut: new Set(), jump: false };
+const ST_PHONE = matchMedia("(max-width: 760px)");  // accordion
+ST_PHONE.addEventListener("change", () => { if ($("#stpage .stmain")) storyDraw(); });
 const stSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const stGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const ST_TABS = [["main", "Main Story"], ["ident", "Identity Archive"]];
@@ -39,11 +41,12 @@ function storyDraw() {
   const sel = String(st.sel[st.tab] ?? list[0]?.id);
   const cur = list.find((c) => String(c.id) === sel) || list[0];
   const keep = $(".stcantos")?.scrollTop || 0, keepP = $(".stpanel")?.scrollTop || 0;
+  const phone = ST_PHONE.matches, shut = phone && st.shut.has(st.tab + ":" + sel);
   let cards = "", last = "";
   for (const c of list) {
-    const on = cur && String(c.id) === String(cur.id);
+    const on = cur && String(c.id) === String(cur.id) && !shut;
     if (st.tab === "ident") {
-      cards += `<button class="stcanto ident" data-id="${c.id}" aria-expanded="${on}"><img class="sinico" src="/api/ui_icon?k=sinner_${c.sinner}" alt=""><span class="name">${esc(c.label)}</span></button>`;
+      cards += `<button class="stcanto ident" data-id="${c.id}" aria-expanded="${on}"><img class="sinico" src="/api/ui_icon?k=sinner_${c.sinner}" alt=""><span class="name">${esc(c.label)}</span></button>` + (on ? "" : "");
       continue;
     }
     const tag = c.kind === "mini" ? "Mini" : c.label;
@@ -52,7 +55,7 @@ function storyDraw() {
       <span class="tag">${esc(tag)}</span>${c.time ? `<span class="code">${esc(c.time)}</span>` : ""}<span class="name">${esc(name)}</span><span class="count">${c.eps.reduce((n, e) => n + e.parts.length, 0)} episodes</span></button>`;
     const grp = st.tab === "main" && c.kind !== "main" ? ({ intervallo: "Intervallo", restored: "Restored", fools: "Restored", extra: "Other" })[c.kind] || "Mini stories" : st.tab === "main" && last === "Restored" ? "Main story" : "";
     if (grp && grp !== last) { cards += `<div class="stgroup">${grp}</div>`; last = grp; }
-    cards += card;
+    cards += card + (on ? "" : "");  // panel spot
   }
   const nEps = (c) => c.eps.reduce((n, e) => n + e.parts.length, 0);
   const sub = (cur) => [cur.company, cur.area, cur.time, `${nEps(cur)} episodes`].filter(Boolean).map(esc).join(" · ");
@@ -78,15 +81,22 @@ function storyDraw() {
         <div class="stept">${esc(ep.title)}</div>${ep.desc ? `<div class="stepd">${esc(ep.desc)}</div>` : ""}
         <button type="button" class="stenter" data-f="${esc(ep.id)}">Enter</button></div></div>`;
   const track = eps.map((e, k) => `<button type="button" class="stent${k === at ? " on" : ""}${e.id === st.last ? " last" : ""}" data-k="${k}" title="${esc((e.n ? e.n + " " : "") + e.title + (ST_PART[e.detail] ? " · " + ST_PART[e.detail] : ""))}"><span>Ep. ${k + 1}</span><i></i></button>`).join("");
+  const panel = `<section class="stpanel">${head}${view}<div class="sttrack">${track}</div></section>`;
   $("#stpage").innerHTML = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}
 </div>
-    <div class="stmain"><div class="stcantos">${cards}</div><section class="stpanel">${head}${view}<div class="sttrack">${track}</div></section></div>`;
-  $(".stcantos").scrollTop = keep; $(".stpanel").scrollTop = cur && String(cur.id) === st.drawn ? keepP : 0;
+    <div class="stmain"><div class="stcantos">${cards.replace("", phone ? panel : "")}</div>${phone ? "" : panel}</div>`;
+  $(".stcantos").scrollTop = keep; const pn = $(".stpanel"); if (pn) pn.scrollTop = cur && String(cur.id) === st.drawn ? keepP : 0;
   st.drawn = cur && String(cur.id);
   const tr = $(".sttrack"), on = $(".sttrack .on");
   if (on) tr.scrollLeft = on.offsetLeft - (tr.clientWidth - on.offsetWidth) / 2;
   document.querySelectorAll(".sttab").forEach((b) => b.onclick = () => { location.hash = "#/story/" + b.dataset.tab; });
-  document.querySelectorAll(".stcanto").forEach((b) => b.onclick = () => { st.sel[st.tab] = b.dataset.id; location.hash = `#/story/${st.tab}/${b.dataset.id}`; });
+  document.querySelectorAll(".stcanto").forEach((b) => b.onclick = () => {
+    const k = st.tab + ":" + b.dataset.id, same = b.dataset.id === sel;
+    st.jump = ST_PHONE.matches;
+    if (st.jump && same) { st.shut.has(k) ? st.shut.delete(k) : st.shut.add(k); return storyDraw(); }  // open ↔ closed
+    st.shut.delete(k); st.sel[st.tab] = b.dataset.id; location.hash = `#/story/${st.tab}/${b.dataset.id}`;
+  });
+  if (st.jump) { st.jump = false; $(".stcanto[aria-expanded=true]")?.scrollIntoView({ block: "start" }); }
   document.querySelectorAll(".stent").forEach((b) => {
     b.onclick = () => { st.pick[key] = +b.dataset.k; storyDraw(); };
     b.ondblclick = () => stOpen(eps[+b.dataset.k].id, cur);

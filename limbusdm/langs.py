@@ -365,9 +365,141 @@ def warm(svc):
         pass
 
 
+FONT_DIRS = {"title": "Title", "text": "Context"}
+FONT_CHOICES = {"title": ("pack", "sofia"), "text": ("pack",)}
+SOFIA = "fonts/SofiaSansExtraCondensed-SemiBold.ttf"  # (in ui/: OFL, fonts/OFL-SofiaSans.txt)
+REF_TEXT = (0.700, 1.079, 0.251)  # Segoe UI: cap height, ascent, descent (em)
+_metric_cache: dict = {}
+
+
+def _fonts_file(svc) -> str:
+    return os.path.join(svc.data_dir, "lang", "_fonts.json")
+
+
+def font_modes(svc) -> dict:
+    """{pack id: {"title": "pack" / "sofia", "text": "pack"}}: the fonts a language's pages use"""
+    try:
+        with open(_fonts_file(svc), encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for k, v in (d.items() if isinstance(d, dict) else ()):
+        if isinstance(v, dict):
+            v = {kind: c for kind, c in v.items() if c in FONT_CHOICES.get(kind, ())}
+            if v:
+                out[k] = v
+    return out
+
+
+def set_font_mode(svc, lid: str, kind: str, choice: str):
+    d = font_modes(svc)
+    m = d.setdefault(lid, {})
+    if choice in FONT_CHOICES.get(kind, ()):
+        m[kind] = choice
+    else:
+        m.pop(kind, None)
+    d = {k: v for k, v in d.items() if v}
+    os.makedirs(os.path.dirname(_fonts_file(svc)), exist_ok=True)
+    with open(_fonts_file(svc) + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(d, f)
+    os.replace(_fonts_file(svc) + ".tmp", _fonts_file(svc))
+
+
+def _font_path(src: dict, kind: str) -> str | None:
+    """a pack's own font (Font/Title, Font/Context); Bebas skipped (Latin only)"""
+    if not src.get("dir") or src.get("prefix") or kind not in FONT_DIRS:
+        return None
+    try:
+        found = [e for e in os.scandir(os.path.join(src["dir"], "Font", FONT_DIRS[kind]))
+                 if e.is_file() and e.name.lower().endswith((".ttf", ".otf")) and "bebas" not in e.name.lower()]
+    except OSError:
+        return None
+    return max(found, key=lambda e: e.stat().st_size).path if found else None
+
+
+def font_file(svc, lid: str, kind: str) -> str | None:
+    return _font_path(next((s for s in sources(svc) if s["id"] == lid), {}), kind)
+
+
+def _metrics(data: bytes) -> tuple | None:
+    """(cap height, ascent, descent) in em, from the font's head / OS/2 tables"""
+    import struct
+    try:
+        base = struct.unpack(">I", data[12:16])[0] if data[:4] == b"ttcf" else 0
+        n = struct.unpack(">H", data[base + 4:base + 6])[0]
+        tables = {data[base + 12 + 16 * i:base + 16 + 16 * i]: struct.unpack(">I", data[base + 20 + 16 * i:base + 24 + 16 * i])[0] for i in range(n)}
+        upm = struct.unpack(">H", data[tables[b"head"] + 18:tables[b"head"] + 20])[0]
+        o = tables[b"OS/2"]
+        ver, sel = struct.unpack(">H", data[o:o + 2])[0], struct.unpack(">H", data[o + 62:o + 64])[0]
+        ta, td = struct.unpack(">hh", data[o + 68:o + 72])
+        wa, wd = struct.unpack(">HH", data[o + 74:o + 78])
+        cap = struct.unpack(">h", data[o + 88:o + 90])[0] if ver >= 2 else 0
+        asc, desc = (ta, -td) if sel & 128 else (wa, wd)  # (as the browser on Windows)
+        return ((cap or 0.7 * upm) / upm, asc / upm, desc / upm)
+    except (KeyError, struct.error, ZeroDivisionError):
+        return None
+
+
+def _metrics_of(path: str) -> tuple | None:
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    key = (path, st.st_size, int(st.st_mtime))
+    if key not in _metric_cache:
+        with open(path, "rb") as f:
+            _metric_cache[key] = _metrics(f.read())
+    return _metric_cache[key]
+
+
+def _ref_title(svc) -> tuple:
+    """the game's Bebas: what the titles' letters are fitted to"""
+    if "bebas" not in _metric_cache:
+        from .uiicons import font_file as ui_font
+        data = None
+        try:
+            data = ui_font("BebasKai", svc.game.data, svc.ui_cache_dir())
+        except Exception:
+            pass
+        _metric_cache["bebas"] = (data and _metrics(data)) or (0.700, 0.950, 0.250)
+    return _metric_cache["bebas"]
+
+
+def _fit(m: tuple | None, ref: tuple) -> str:
+    """descriptors: the same cap height and line as the font it stands next to"""
+    if not m:
+        return ""
+    k = ref[0] / m[0]
+    return f"size-adjust: {100 * k:.1f}%; ascent-override: {100 * ref[1] / k:.1f}%; descent-override: {100 * ref[2] / k:.1f}%; line-gap-override: 0%;"
+
+
+def _fonts(svc, src: dict, mode: dict | None) -> dict:
+    """{"title" / "text": {"url", "css"}}: the fonts a language's pages use (none: the app's own)"""
+    from .paths import resource_dir
+    out = {}
+    for kind, choice in (mode or {}).items():
+        if choice == "sofia":
+            p, url = os.path.join(resource_dir(), "ui", SOFIA), "/ui/" + SOFIA
+        else:
+            p = _font_path(src, kind)
+            if not p:
+                continue
+            st = os.stat(p)
+            v = hashlib.sha1(f"{p}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
+            url = f"/api/langfont?id={src['id']}&k={kind}&v={v}"  # (params sorted: the site's name)
+        out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT)}
+    return out
+
+
+def font_names(svc) -> dict:
+    """{pack id: {"title": file name, "text": file name}}"""
+    return {s["id"]: {k: os.path.basename(p) for k in FONT_DIRS if (p := _font_path(s, k))} for s in sources(svc)}
+
+
 def listing(svc) -> dict:
     """The language menu's list with coverage."""
-    out, en_sig = [], _en_sig(svc)
+    out, en_sig, modes = [], _en_sig(svc), font_modes(svc)
     for s in sources(svc):
         cover = None
         if s["dir"]:
@@ -379,7 +511,8 @@ def listing(svc) -> dict:
                 pass
         if cover is None and s.get("pub"):
             cover = s["pub"].get("cover")
-        out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link")} | {"cover": cover})
+        out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link")}
+                   | {"cover": cover, "fonts": _fonts(svc, s, modes.get(s["id"]))})
     return {"langs": out}
 
 

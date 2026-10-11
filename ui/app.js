@@ -21,7 +21,7 @@ async function api(path, body) {
   const opt = body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json", "X-Limbus-Datamine": "1" }, body: JSON.stringify(body) };
   const r = await fetch(path, opt);
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || r.statusText);
+  if (!r.ok) throw Object.assign(new Error(data.error || r.statusText), { trace: data.trace || "" });
   if (body !== undefined && path.startsWith("/api/mod")) animMods.kept = {};  // a mod was changed: the lists are asked again
   return body === undefined && LANG.id ? langApply(path, data) : data;
 }
@@ -34,6 +34,20 @@ const LANG_KEY = "lang";
 const LANG = { id: "", list: null, tables: {}, back: new Map() };
 try { LANG.id = localStorage.getItem(LANG_KEY) || ""; } catch {}
 if (LANG.id === "en") LANG.id = "";
+// a pack's own fonts: titles in place of the game's Bebas, texts too when set; kept for the next load.
+// Only for letters past Latin-1 (English keeps Bebas / Segoe UI; punctuation and arrows too); css: sized to stand next to them
+const LANG_RANGE = "unicode-range: U+0100-1FFF, U+2C00-FFFF;";
+function langFonts(f) {
+  let st = document.getElementById("langfonts");
+  if (!st) { st = document.createElement("style"); st.id = "langfonts"; document.head.appendChild(st); }
+  f = f || {};
+  const face = (fam, x) => `@font-face { font-family: "${fam}"; src: url(${x.url || x}); font-display: swap; ${LANG_RANGE} ${x.css || ""} }`;
+  st.textContent = (f.title ? face("LC Bebas", f.title) : "")
+    + (f.text ? `${face("LC Lang", f.text)}
+      html, body { font-family: "LC Lang", "Segoe UI", system-ui, sans-serif; }` : "");
+  try { localStorage.setItem("lang_fonts", JSON.stringify({ id: LANG.id, f })); } catch {}
+}
+try { const s = JSON.parse(localStorage.getItem("lang_fonts") || "null"); if (s && LANG.id && s.id === LANG.id) langFonts(s.f); } catch {}
 // lists that carry the game's texts
 const LANG_PAGES = /^\/api\/(units|enemies|enemy|buffs|music|mirror|bgm_tracks|quiz|gacha|sounds|story|story_ep|stages|history|game_cards|characters|skills|versus_list)\b/;
 const LANG_STORY = /^\/api\/(quiz|gacha|sounds|story|story_ep)\b/;  // …and the story / voice lines
@@ -149,6 +163,7 @@ async function langMenu() {
   btn.textContent = l ? l.lang.split("-")[0].toUpperCase() : "EN";
   btn.title = l ? `${l.label} — ${l.name}` : "Language";
   if (l) document.documentElement.lang = l.lang;
+  langFonts(l && l.fonts);
   // the lines' table (voice games, Sounds, Extraction) is fetched while nothing else is asked
   if (l) setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => langTable("story")), 4000);
 })();

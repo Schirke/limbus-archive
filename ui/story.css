@@ -57,7 +57,7 @@
 .stent.on span { color: #f8d200; font-size: 34px; font-style: italic; font-weight: 700; line-height: .9; }
 .stent.on i { background: radial-gradient(#1a1410 0 22%, #ffb347 23% 27%, #1a1410 28% 45%, #ff9a1f 46% 52%, #1a1410 53% 68%, #ff8a00 69% 80%, #1a1410 81%); box-shadow: 0 0 0 2px #000, 0 0 18px rgba(255, 140, 0, .7); }
 @media (max-width: 1100px) { .stview { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 760px) { #stpage { height: auto; } .stmain { grid-template-columns: minmax(0, 1fr); } .stcantos, .stpanel { max-height: none; overflow: visible; } }
+@media (max-width: 760px) { .stcanto { scroll-margin-top: 64px; } .stcantos .stpanel { flex: none; margin: 0 0 10px; } #stpage { height: auto; } .stmain { grid-template-columns: minmax(0, 1fr); } .stcantos, .stpanel { max-height: none; overflow: visible; } }
 
 /* ---- the reader ---- */
 #streader { position: fixed; inset: 0; z-index: 90; background: #000; display: none; user-select: none; -webkit-user-select: none; --u: 1; }

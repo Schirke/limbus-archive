@@ -1,6 +1,6 @@
-// Versus → Mirror (versus_mirror2.py): 5 floors, 4 kit characters, deck, shop, fusions, economy. Run kept in
+// Versus → Mirror: 5 floors, 4 kit characters, deck, shop, fusions, economy. Run kept in
 // localStorage; /api/mirror/act answers.
-const m2 = { cat: null, run: null, fight: null, busy: false, kw: null, sel: null, live: null, asked: new Set() };
+const m2 = { cat: null, run: null, fight: null, busy: false, kw: null, sel: null, live: null, asked: new Set(), fail: null };
 const M2_KEEP = "vsmirror";
 const m2Save = () => { try { localStorage.setItem(M2_KEEP, JSON.stringify({ run: m2.run, fight: m2.fight })); } catch { /* not kept */ } };
 function m2Load() {
@@ -64,16 +64,53 @@ async function m2Act(act, arg = null) {
   const note = $("#m2note");
   if (note && ["new", "id", "leave", "fight"].includes(act)) note.textContent = act === "fight" ? "Fighting…" : "Getting the fighters ready…";
   try {
-    if (act === "new" && arg === null) arg = { bossSt: m2BossSt() };
+    if (act === "new" && arg === null) arg = { bossSt: m2BossSt(), flow: m2Flow() };
     const r = await api("/api/mirror/act", { run: act === "new" ? null : m2.run, act, arg });
     m2.run = r.run;
+    m2.fail = null;
     if (r.fight) m2.fight = r.fight;
     if (act === "new") m2.fight = null;
     if (!["buy", "sell", "enhance"].includes(act)) m2.sel = null;
     m2Save();
-  } catch (e) { toast(esc(e.message)); }
+  } catch (e) { m2.fail = { act, arg: typeof arg === "object" ? null : arg, error: e.message + (e.trace ? "\n" + e.trace : "") }; toast(esc(e.message)); }
   m2.busy = false;
   m2Draw();
+}
+
+// Debug (versus_debugkit): the run code (seed + switches + every action) rebuilds a run anywhere; the report is the
+// run read out as text. Send either one to whoever looks into a problem.
+function m2Debug() {
+  const r = m2.run;
+  return `<details class="card m2dbg"><summary>Debug${r ? ` · seed ${r.seed}` : ""}${m2.fail ? ` · <span class="bad">last action failed</span>` : ""}</summary>
+    <div class="vmsmall">A run code holds the seed and every action: whoever gets it sees the same run. The report adds the build, the log and the boss fight beat by beat.</div>
+    <div class="vmrow">${r ? `<button id="m2dcode">Copy run code</button><button id="m2drep">Copy report</button>` : ""}</div>
+    <div class="vmrow"><input id="m2din" type="text" placeholder="Paste a run code (or just a seed number) here" style="flex:1"><button id="m2dload">Load</button></div>
+    <textarea id="m2dout" readonly rows="6" hidden style="width:100%;font:12px monospace"></textarea></details>`;
+}
+async function m2DebugCall(b) {
+  const out = $("#m2dout");
+  try {
+    const r = await api("/api/mirror/debug", Object.assign({ run: m2.run, fail: m2.fail }, b));
+    return r;
+  } catch (e) { if (out) { out.hidden = false; out.value = e.message; } toast(esc(e.message)); return null; }
+}
+function m2DebugWire() {
+  const out = $("#m2dout");
+  const give = async (text, what) => {
+    out.hidden = false; out.value = text; out.select();
+    try { await navigator.clipboard.writeText(text); toast(what + " copied"); } catch { toast("Copy it from the box below"); }
+  };
+  if ($("#m2dcode")) $("#m2dcode").onclick = async () => { const r = await m2DebugCall({ op: "code" }); if (r) give(r.code, "Run code"); };
+  if ($("#m2drep")) $("#m2drep").onclick = async () => { const r = await m2DebugCall({ op: "report" }); if (r) give(r.report, "Report"); };
+  $("#m2dload").onclick = async () => {
+    const code = $("#m2din").value.trim();
+    if (!code) return;
+    const r = await m2DebugCall({ op: "load", code, run: null, fail: null });
+    if (!r) return;
+    m2.run = r.run; m2.fight = null; m2.fail = null; m2.sel = null; m2Save();
+    if (r.note) toast(esc(r.note));
+    m2Draw();
+  };
 }
 
 function m2Draw() {
@@ -83,10 +120,11 @@ function m2Draw() {
   const head = !r ? "" : `<div class="vmsteps">${["Character", ...Array.from({ length: F }, (_, i) => `Floor ${i + 1}`), "End"].map((s, i) => {
     const at = r.phase === "id" ? 0 : r.phase === "end" ? F + 1 : r.floor + 1;
     return `<span class="${i === at ? "on" : i < at ? "done" : ""}">${s}</span>`;
-  }).join("")}<em>${r.phase === "id" ? "" : { shop: "Shop", pack: "Pick the floor", boss: "Boss", reward: "Reward", end: "" }[r.phase] || ""}</em></div>`;
+  }).join("")}<em>${r.phase === "id" ? "" : { shop: "Shop", pack: "Pick the floor", boss: "Boss", reward: "Reward", end: "" }[r.phase] || ""}${r.flow === "series" ? " · Exchanges off" : ""}</em></div>`;
   const body = !r ? m2Start() : r.phase === "id" ? m2Pick() : r.phase === "shop" ? m2Shop() : r.phase === "pack" ? m2Packs()
     : r.phase === "boss" ? m2Boss() : r.phase === "reward" ? m2Reward() : m2End();
-  main.innerHTML = `<div class="vm m2">${head}${body}<div id="m2note" class="muted small"></div></div>`;
+  main.innerHTML = `<div class="vm m2">${head}${body}<div id="m2note" class="muted small"></div>${m2Debug()}</div>`;
+  m2DebugWire();
   main.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
     const a = b.dataset.arg;
     m2Act(b.dataset.act, a === undefined ? null : /^-?\d+$/.test(a) ? +a : a);
@@ -94,6 +132,7 @@ function m2Draw() {
   main.querySelectorAll("[data-sel]").forEach((b) => b.onclick = () => { m2.sel = m2.sel === +b.dataset.sel ? null : +b.dataset.sel; m2Draw(); });
   const bst = $("#m2bossst");
   if (bst) bst.onchange = () => { try { localStorage.setItem("vsmirror.bossSt", bst.checked ? "1" : "0"); } catch { /* not kept */ } };
+  main.querySelectorAll("[data-flow]").forEach((b) => b.onclick = () => { try { localStorage.setItem("vsmirror.flow", b.dataset.flow); } catch { /* not kept */ } m2Draw(); });
   const kw = $("#m2kw");
   if (kw) kw.onchange = () => { m2.kw = kw.value; };
   if ($("#m2kwr")) $("#m2kwr").onclick = () => m2Act("refresh", m2.kw);
@@ -108,6 +147,8 @@ const m2StatusHelp = () => `<div class="card vmhelp"><h2>Statuses</h2>${m2.cat.s
 
 // start switch: bosses deal their pack's status
 const m2BossSt = () => { try { return localStorage.getItem("vsmirror.bossSt") === "1"; } catch { return false; } };
+const m2Flow = () => { try { return localStorage.getItem("vsmirror.flow") === "series" ? "series" : ""; } catch { return ""; } };
+const m2FlowBox = () => `<span class="vmlbl">Exchanges</span> <button class="toggle ${m2Flow() === "series" ? "" : "on"}" data-flow="" title="Clashes in exchanges of 2-5, then a skill lands (longer fights)">On</button><button class="toggle ${m2Flow() === "series" ? "on" : ""}" data-flow="series" title="One clash after another; the winner often follows with its whole skill (shorter fights, same kits)">Off</button>`;
 const m2BossStBox = () => `<label class="toggle"><input type="checkbox" id="m2bossst" ${m2BossSt() ? "checked" : ""}> Bosses deal their pack's status</label>`;
 
 function m2Start() {
@@ -116,7 +157,7 @@ function m2Start() {
     <div class="sub">${R.floors} floors. Pick one of four characters — each plays its own way. Skills come from a deck (S1 ×3, S2 ×2, S3 ×1). Each floor: shop → pick a pack
       (its keyword, boss and reward are shown) → boss. Gift slots are few (${R.slots[0]}, +${R.slots[1]} per boss); held Cost earns interest
       (+${R.interest[0]} per ${R.interest[1]}, at most +${R.interest[2]}); three gifts of a recipe fuse into one. A lost boss ends the run.</div>
-    <div class="vmrow"><button class="primary" data-act="new">New run ›</button>${m2BossStBox()}</div>${m2StatusHelp()}`;
+    <div class="vmrow"><button class="primary" data-act="new">New run ›</button>${m2BossStBox()} ${m2FlowBox()}</div>${m2StatusHelp()}`;
 }
 
 function m2KitBox(id, big = false) {
@@ -313,7 +354,7 @@ function m2End() {
   return `<span class="vmkick">Run result</span><h1>${r.won ? "Run cleared" : "Run lost"}</h1>
     <div class="card vmstats">${st.map(([v, k]) => `<div><b>${v}</b><span>${k}</span></div>`).join("")}</div>
     <div class="vmshop2">${m2Side()}<div><div class="card vmowned">${r.build.map((b) => m2Gift(b.id, b.level)).join("")}</div>${fs.map(m2FightBox).join("")}</div></div>
-    <div class="vmrow"><button class="primary" data-act="new">New run ›</button>${m2BossStBox()}</div>`;
+    <div class="vmrow"><button class="primary" data-act="new">New run ›</button>${m2BossStBox()} ${m2FlowBox()}</div>`;
 }
 
 // (styles of what v1's .vm* classes don't have)
@@ -329,6 +370,9 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 .m2face.huge { width: 200px; height: 200px; border-width: 3px; border-color: var(--gold); }
 .vmfought .m2face img { width: 100%; height: 100%; border: 0; }
 .m2 .vmtag.m2final { left: auto; right: 0; top: 10px; background: #ff4b3a; color: #fff; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%); padding: 3px 10px 2px 22px; }
+.m2dbg { margin-top: 18px; font-size: 13px; }
+.m2dbg summary { cursor: pointer; color: var(--muted, #9a8a78); }
+.m2dbg .vmrow { margin-top: 8px; }
 .m2kit { font-size: 13px; line-height: 1.45; display: flex; flex-direction: column; gap: 2px; }
 .m2kit .good { color: #8fd18a; }
 .m2words { font-style: italic; color: var(--cream); margin-bottom: 4px; }

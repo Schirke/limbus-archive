@@ -1024,6 +1024,11 @@ class Exporter:
                     self.failed.append((k, str(e)))
                     continue
                 keys.append(k)
+        for lang in langs.listing(self.svc)["langs"]:  # the packs' own fonts
+            for f in (lang.get("fonts") or {}).values():
+                if f["url"].startswith("/api/"):  # (/ui/ ones go with the pages)
+                    src[f["url"]] = f["url"]
+                    keys.append(f["url"])
         have = {k: f for k, f in (old.get("urls") or {}).items() if k in src and (old.get("src") or {}).get(k) == src[k]}
         from . import uilang  # interface dictionaries: small, asked every time
         ui = ["/api/ui_langs"] + [url_key("/api/ui_lang", lang=c) for c in uilang.available(self.svc)]
@@ -1070,7 +1075,7 @@ class Exporter:
     def shell(self):
         """index.html, UI files, service worker, d/index.json."""
         ui = os.path.join(resource_dir(), "ui")
-        shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico"))
+        shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico", "fx"))
         shutil.copyfile(os.path.join(ui, "site", "sw.js"), os.path.join(self.out, "sw.js"))
         with open(os.path.join(ui, "index.html"), encoding="utf-8") as f:
             html = f.read()

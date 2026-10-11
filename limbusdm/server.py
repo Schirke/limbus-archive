@@ -373,6 +373,14 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import langs
                 f = langs.table_file(svc, q.get("id", ""), q.get("g", "core"))
                 return self._gz_json_file(f, f'"{os.path.basename(f)}"') if f else self._json({"error": "no such language"}, 404)
+            if p == "/api/langfont":  # a language pack's own font (k: title / text)
+                from . import langs
+                f = langs.font_file(svc, q.get("id", ""), q.get("k", ""))
+                if not f:
+                    return self._send(404, b"no font", "text/plain")
+                with open(f, "rb") as fh:
+                    data = fh.read()
+                return self._send(200, data, "font/otf" if data[:4] == b"OTTO" else "font/ttf", {"Cache-Control": "max-age=31536000"})
             if p == "/api/site_status":  # the web copy: the build the site shows next to this app's (Settings)
                 from . import site
                 return self._json(site.status(svc))
@@ -946,6 +954,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     return self._json({"error": f"this run has something the game data doesn't know ({e}) — start a new run"}, 400)
                 except (ValueError, StopIteration) as e:
                     return self._json({"error": str(e) or "that can't be done now"}, 400)
+                except Exception as e:  # (a bug: the page gets the traceback for its Debug report)
+                    import traceback
+                    return self._json({"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()}, 500)
+            if p == "/api/mirror/debug":  # Versus → Mirror → Debug: run code / load / report (versus_debugkit)
+                from . import versus_debugkit as debugkit
+                try:
+                    return self._json(debugkit.page_call(svc, b))
+                except (ValueError, KeyError) as e:
+                    return self._json({"error": str(e) or "that can't be done"}, 400)
             if p == "/api/versus":
                 spec = {k: b.get(k) for k in ("left", "right", "skill", "mode", "rounds", "winner", "rskill")}
                 spec.update({k: b[k] for k in ("map", "speed", "pause", "rspeed", "rpause", "lskills", "rskills", "defend", "counter",
