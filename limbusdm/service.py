@@ -241,8 +241,8 @@ class Service:
         from . import updater
 
         def fn(progress):
-            cached = getattr(self, "_update", None)
-            v = updater.install(self.data_dir, progress, cached[1] if cached else None)
+            self._update = None  # (asked anew: a remembered release may have lost its zip since)
+            v = updater.install(self.data_dir, progress)
             updater.quit_soon(2.0)
             return {"updated_to": v}
 
