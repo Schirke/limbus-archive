@@ -83,7 +83,7 @@ function stMap() {
     const n = c.nodes.find((x) => x.id === +a.dataset.n), s = n && stStory(n);
     if (!s || e.defaultPrevented || box.classList.contains("drag")) return;
     e.preventDefault();
-    stRead(n, s);
+    stNodeRead(n, s);
   }));
   box.style.height = Math.min(h, 560) + 18 + "px";
   // the map is dragged about like in the game (a click on a node still opens it)
@@ -109,7 +109,7 @@ function stMark(scroll) {
 // a node's story scenes (not the dungeons': not done yet)
 const stStory = (n) => (n.kind === "dungeon" ? null : ST_EPS.get(n.id));
 const stPartName = (n, part) => (n.kind === "story" ? "Story" : ST_PART[part] || "Story");
-function stRead(n, s) {
+function stNodeRead(n, s) {
   const parts = s[0].parts;
   if (parts.length === 1) return stOpen(parts[0][0], s[1]);
   modal(`<div class="stpick"><div class="enkick">${esc(n.n)}</div><h2>${esc(n.title || s[0].title)}</h2>
