@@ -1010,10 +1010,7 @@ details.an-opts summary { cursor: pointer; }
 .stcard.dungeon .band, .stcard.other .band { background: linear-gradient(90deg, #6b4a0c, #a3761a); }
 .stcard:hover { z-index: 5; border-color: #d8c08f; }
 .stcard.on { z-index: 4; border-color: var(--gold); box-shadow: 0 0 0 2px #2a1f17, 0 0 18px rgba(248, 180, 0, .45); }
-.stcard .reads { display: none; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
-.stcard.on .reads { display: flex; }
-.stcard .reads button { flex: 1; padding: 2px 4px; font-size: 11px; background: #2a1f17; border: 1px solid #9c8462; color: var(--cream); cursor: pointer; white-space: nowrap; }
-.stcard .reads button:hover { border-color: var(--gold); color: var(--gold); }
+.stpick h2 { margin: 2px 0 14px; } .stpickb { display: flex; gap: 8px; flex-wrap: wrap; } .stpickb button { flex: 1; min-width: 140px; }
 .stcanvas polyline { fill: none; stroke: #ffb52e; stroke-width: 3; stroke-linejoin: round; filter: drop-shadow(0 0 3px #ff7a00) drop-shadow(0 0 6px #ff5a00); }
 .stnode { position: absolute; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%; border: 2px solid #c0392b; background: #1b1113; color: #fff;
   font: 11px/20px Consolas, monospace; text-align: center; text-decoration: none; box-shadow: 0 0 6px #000; }

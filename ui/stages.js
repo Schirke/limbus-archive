@@ -50,7 +50,7 @@ function stDraw() {
     $("#stout").onclick = () => { stv.zoom = Math.max(0, stv.zoom - 1); stMap(); stMark(true); };
   }
   $("#stlist").innerHTML = c.nodes.map((n) => `<a href="#/stages/${c.id}/${n.id}" data-n="${n.id}" class="strow ${n.kind}">
-      <span>${esc(n.n)}</span><i title="${ST_KIND[n.kind][1]}">${ST_KIND[n.kind][0]}</i><b>${esc(n.title || ST_KIND[n.kind][1])}</b>${n.kind !== "story" && ST_EPS.has(n.id) ? `<em title="Has story scenes">❝</em>` : ""}${n.lv ? `<span class="r">Lv ${n.lv}</span>` : ""}</a>`).join("");
+      <span>${esc(n.n)}</span><i title="${ST_KIND[n.kind][1]}">${ST_KIND[n.kind][0]}</i><b>${esc(n.title || ST_KIND[n.kind][1])}</b>${n.kind === "fight" && ST_EPS.has(n.id) ? `<em title="Has story scenes">❝</em>` : ""}${n.lv ? `<span class="r">Lv ${n.lv}</span>` : ""}</a>`).join("");
   // close up, as the game shows it (the map scrolls to the picked node)
   stv.zoom = ST_ZOOM.length - 1;
   stMap();
@@ -76,9 +76,15 @@ function stMap() {
       ${c.nodes.map((n) => { const [x, y] = at(n);  // the game's cards over (or under) the nodes
         return `<a class="stcard ${n.up === false ? "down" : "up"} ${n.kind}" href="#/stages/${c.id}/${n.id}" data-n="${n.id}" style="left:${x}px;top:${y}px;width:${cw}px">
           <span class="pic"><img loading="lazy" draggable="false" src="/api/stage_node_pic?id=${n.id}" alt="" onerror="this.remove()"></span>
-          <span class="band"><i>${ST_KIND[n.kind][0]}</i><em>${esc(n.n)}</em><b>${esc(n.title || ST_KIND[n.kind][1])}</b></span>${stCardReads(n, c)}</a>`; }).join("")}
+          <span class="band"><i>${ST_KIND[n.kind][0]}</i><em>${esc(n.n)}</em><b>${esc(n.title || ST_KIND[n.kind][1])}</b></span></a>`; }).join("")}
     </div>`;
-  box.querySelectorAll(".stcard [data-read]").forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const s = ST_EPS.get(+b.dataset.node); if (s) stOpen(b.dataset.read, s[1]); });
+  // a card with a story opens it (a choice when it has a part before and after the fight); others pick the node
+  box.querySelectorAll(".stcard").forEach((a) => a.addEventListener("click", (e) => {
+    const n = c.nodes.find((x) => x.id === +a.dataset.n), s = n && stStory(n);
+    if (!s || e.defaultPrevented || box.classList.contains("drag")) return;
+    e.preventDefault();
+    stRead(n, s);
+  }));
   box.style.height = Math.min(h, 560) + 18 + "px";
   // the map is dragged about like in the game (a click on a node still opens it)
   let drag = null;
@@ -100,10 +106,15 @@ function stMark(scroll) {
   if (row) row.parentElement.scrollTop = row.offsetTop - row.parentElement.clientHeight / 2;  // (scrollIntoView would move the page too)
 }
 
-// the story buttons on a map card (shown on the picked node's)
-function stCardReads(n) {
-  const s = ST_EPS.get(n.id);
-  return s ? `<span class="reads">${s[0].parts.map(([id, part]) => `<button type="button" data-read="${esc(id)}" data-node="${n.id}">❝ ${esc(ST_PART[part] || "Story")}</button>`).join("")}</span>` : "";
+// a node's story scenes (not the dungeons': not done yet)
+const stStory = (n) => (n.kind === "dungeon" ? null : ST_EPS.get(n.id));
+const stPartName = (n, part) => (n.kind === "story" ? "Story" : ST_PART[part] || "Story");
+function stRead(n, s) {
+  const parts = s[0].parts;
+  if (parts.length === 1) return stOpen(parts[0][0], s[1]);
+  modal(`<div class="stpick"><div class="enkick">${esc(n.n)}</div><h2>${esc(n.title || s[0].title)}</h2>
+    <div class="stpickb">${parts.map(([id, part]) => `<button class="toggle" data-read="${esc(id)}">❝ ${esc(stPartName(n, part))}</button>`).join("")}</div></div>`);
+  document.querySelectorAll(".stpick [data-read]").forEach((b) => b.onclick = () => { closeModal(); stOpen(b.dataset.read, s[1]); });
 }
 
 // a fight (a node's own, or one inside a dungeon): its waves with arena, themes and enemies
@@ -129,12 +140,12 @@ function stFight(f, n) {
 function stCard() {
   const box = $("#stcard"), c = stChapter(), n = stNode(c);
   if (!box || !n) return;
-  const fights = n.kind === "dungeon" ? n.fights || [] : n.waves ? [n] : [], story = ST_EPS.get(n.id);
+  const fights = n.kind === "dungeon" ? n.fights || [] : n.waves ? [n] : [], story = stStory(n);
   const i = c.nodes.indexOf(n), near = (d, s) => c.nodes[i + d] ? `<a class="toggle" href="#/stages/${c.id}/${c.nodes[i + d].id}">${s}</a>` : "";
   box.innerHTML = `<div class="enkick">${esc(c.label)} · ${ST_KIND[n.kind][1]}</div>
     <h2 class="enname">${esc(n.n)}${n.title ? " · " + esc(n.title) : ""}${n.lv ? `<em>LV ${n.lv}</em>` : ""}</h2>
     <div class="entags">${near(-1, "‹ Previous")}${near(1, "Next ›")}<span class="muted">node ${n.id}${n.stage ? ` · stage ${n.stage}` : ""}${n.turns && n.turns < 99 ? ` · ${n.turns} turns` : ""}</span></div>
-    ${story ? `<div class="ststory">${story[0].parts.map(([id, part]) => `<button class="toggle" data-read="${esc(id)}">❝ ${esc(ST_PART[part] || "Read the story")}</button>`).join("")}<span class="muted small">${esc(story[1].label)} · ${esc(story[0].n)} ${esc(story[0].title)}</span></div>` : ""}
+    ${story ? `<div class="ststory">${story[0].parts.map(([id, part]) => `<button class="toggle" data-read="${esc(id)}">❝ ${esc(stPartName(n, part))}</button>`).join("")}<span class="muted small">${esc(story[1].label)} · ${esc(story[0].n)} ${esc(story[0].title)}</span></div>` : ""}
     ${n.kind === "story" ? `<div class="muted stnote">A story scene: nobody is fought here.</div>`
       : n.kind === "other" ? `<div class="muted stnote">A stage with rules of its own, not a regular fight.</div>`
       : n.kind === "dungeon" ? `<div class="muted stnote">A dungeon with a map of its own: ${fights.length} different fights inside.</div>`
