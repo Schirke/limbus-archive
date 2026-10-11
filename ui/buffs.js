@@ -113,7 +113,7 @@ function drawBuff() {
       `<a href="${link(w)}" title="${esc(w.name)}">${pic(w)}<span>${esc(w.name)}</span></a>`).join("")}</div>` : "";
   };
   box.innerHTML = `<div class="bfhead">${b.icon ? `<img src="${imgThumb(b.icon)}" onerror="this.remove()">` : ""}
-      <div class="grow"><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div><span id="bfsaveall">${bfSaveBtn(b)}</span></div>
+      <div class="grow"><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div>${typeof siteLink === "function" ? siteLink(`buffs/${b.id}`) : ""}<span id="bfsaveall">${bfSaveBtn(b)}</span></div>
     <div class="bfvids">${b.fx.map((n) => `<figure data-fx="${esc(n)}">${bfFig(b, n)}</figure>`).join("")}</div>
     ${b.desc ? `<div class="panel"><div class="kwdesc">${fmtDesc(b.desc)}</div>${b.flavor ? `<div class="kwflavor">${esc(b.flavor)}</div>` : ""}</div>` : ""}
     ${b.who.length ? `<div class="panel">${group("id", "Identities")}${group("ego", "E.G.O")}${group("enemy", "Enemies")}</div>`

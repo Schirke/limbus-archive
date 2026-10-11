@@ -30,6 +30,16 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
 BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners"]
+# a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
+CARD_DIRS = ("db", "enemies", "buffs", "og")
+CARD_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{full}</title>
+{head}
+<script>location.replace({to})</script>
+<style>body{{margin:0;background:#12100e;color:#e9e2d4;font:16px/1.55 system-ui,"Segoe UI",sans-serif}}main{{max-width:860px;margin:0 auto;padding:16px}}a{{color:#e8b33a}}</style>
+</head><body><main><h1>{title}</h1><p>{desc}</p>{body}<p><a href="/#/{route}">Open on Limbus Archive</a></p></main></body></html>
+"""
 # section pages for search engines: route → (name, description)
 SECTIONS = {
     "patches": ("Patch reports", "What every Limbus Company update changed, read from the game's files: new Identities and E.G.O, "
@@ -1116,6 +1126,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             os.makedirs(os.path.dirname(os.path.join(self.out, path)) or self.out, exist_ok=True)
             with open(os.path.join(self.out, path), "w", encoding="utf-8") as f:
                 f.write(self._page(html, pages, route, url))
+        cards = self.card_pages(url)
         # search engines are kept out unless the site's settings say "index": true
         with open(os.path.join(self.out, "robots.txt"), "w") as f:
             f.write(("User-agent: *\nAllow: /\n" + (f"Sitemap: {url}/sitemap.xml\n" if url else "")) if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
@@ -1126,6 +1137,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             with open(sitemap, "w", encoding="utf-8") as f:
                 f.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
                         + "".join(f"<url><loc>{url}/{'' if r == 'home' else r}</loc><lastmod>{day}</lastmod></url>\n" for r in pages)
+                        + "".join(f"<url><loc>{url}/{quote(p)}</loc></url>\n" for p in cards)
                         + "</urlset>\n")
         elif os.path.exists(sitemap):
             os.remove(sitemap)
@@ -1238,6 +1250,140 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         html = re.sub(r"<title>.*?</title>", f"<title>{e(full)}</title>", html, count=1)
         html = html.replace("</head>", "\n".join(head) + "\n</head>", 1)
         return html.replace('<main id="main"></main>', f'<main id="main">{text}</main>', 1)
+
+    # -- a page per card: what Discord & co. show for a link to it (shell)
+    def card_pages(self, url: str) -> list[str]:
+        """<route>/<…>.html for every Identity, E.G.O, enemy and buff: name, text and picture for a link's preview,
+        then the visitor goes on to the card in the site. Returns their paths (no .html)."""
+        for d in CARD_DIRS[:-1]:
+            shutil.rmtree(os.path.join(self.out, d), ignore_errors=True)
+        if not url:
+            return []
+        urls = {}
+        for fn in sorted(os.listdir(os.path.join(self.out, "d", "m"))):
+            if fn.endswith(".json.gz") and not fn.startswith("report-"):
+                for k, rel in self.read_manifest(fn[:-8]).get("urls", {}).items():
+                    if isinstance(rel, str):
+                        urls.setdefault(k, rel)
+
+        def load(key):
+            rel = urls.get(key)
+            try:
+                with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8") as f:
+                    return json.load(f)
+            except (AttributeError, OSError, ValueError):
+                return None
+
+        e, open_, used, out = html_escape, set(self.open_routes()), set(), []
+        units = (load("/api/units") or {}) if "db" in open_ else {}
+        gl, tags = units.get("glossary") or {}, units.get("tags") or {}
+        word = lambda k: tags.get(k) or (gl.get(k) or {}).get("name") or k  # noqa: E731
+
+        def plain(t):
+            t = re.sub(r"\[(\w+)\]", lambda m: word(m.group(1)), t or "")
+            return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", t)).strip()
+
+        def short(t, n=190):
+            return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + "…"
+
+        def skill(s):  # (name, text) at its last uptie
+            up = s.get("up") or {}
+            last = up[max(up, key=int)] if up else {}
+            return last.get("name") or "", plain(last.get("desc"))
+
+        def skills_html(list_, passives=()):
+            rows = list(dict.fromkeys(f"<li><b>{e(n)}</b>{': ' + e(t) if t else ''}</li>" for n, t in (skill(s) for s in list_) if n))
+            rows += [f"<li><b>{e(p.get('name') or '')}</b>: {e(plain(p.get('desc')))}</li>" for p in passives if p.get("name")]
+            return f"<ul>{''.join(rows)}</ul>" if rows else ""
+
+        def card(path, route, title, desc, body, pic, big=True):
+            src = pic and self._og_picture(urls.get(pic), big)
+            if src:
+                used.add(src)
+            here = f"{url}/{quote(path)}"
+            head = [f'<meta name="description" content="{e(desc)}">', f'<link rel="canonical" href="{e(here)}">',
+                    '<meta property="og:type" content="website">', '<meta property="og:site_name" content="Limbus Archive">',
+                    f'<meta property="og:title" content="{e(title)}">', f'<meta property="og:description" content="{e(desc)}">',
+                    f'<meta property="og:url" content="{e(here)}">', '<meta name="theme-color" content="#e8b33a">',
+                    f'<meta name="twitter:card" content="{"summary_large_image" if big and src else "summary"}">']
+            if src:
+                head.append(f'<meta property="og:image" content="{e(url)}/og/{src}">')
+            if not self.cfg.get("index"):
+                head.append('<meta name="robots" content="noindex, nofollow">')
+            full = os.path.join(self.out, *path.split("/")) + ".html"
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(CARD_PAGE.format(full=e(f"{title} · Limbus Company · Limbus Archive"), head="\n".join(head),
+                                         to=json.dumps("/#/" + route), title=e(title), desc=e(desc), body=body, route=e(route)))
+            out.append(path)
+
+        art = lambda p: p and url_key("/api/asset_img", path=p)  # noqa: E731
+        thumb = lambda p: p and url_key("/api/asset_thumb", path=p)  # noqa: E731
+        seasons = units.get("seasons") or {}
+        season = lambda x: (seasons.get(str(x.get("season"))) or {}).get("name") or ""  # noqa: E731
+        for x in units.get("ids") or []:
+            names = [n for n, _ in (skill(s) for s in x.get("skills") or []) if n]
+            desc = " ".join(filter(None, [
+                f"{'0' * (x.get('rank') or 1)} Identity of {x.get('sinnerName')}" + (f" · {season(x)}." if season(x) else "."),
+                f"Keywords: {', '.join(word(k) for k in x.get('statuses') or [])}." if x.get("statuses") else "",
+                f"Skills: {' · '.join(dict.fromkeys(names))}." if names else ""]))
+            card(f"db/id/{x['id']}", f"db/id/{x['id']}", f"{x.get('title')} {x.get('sinnerName')}", short(desc),
+                 skills_html(x.get("skills") or [], x.get("passives") or []), art((x.get("img") or {}).get("art")))
+        for x in units.get("egos") or []:
+            cost = ", ".join(f"{c['sin']} ×{c['n']}" for c in x.get("cost") or [])
+            names = [n for n, _ in (skill(s) for s in x.get("skills") or []) if n]
+            desc = " ".join(filter(None, [
+                f"{x.get('grade')} E.G.O of {x.get('sinnerName')}" + (f" · {season(x)}." if season(x) else "."),
+                f"Cost: {cost}." if cost else "", f"Skills: {' · '.join(dict.fromkeys(names))}." if names else ""]))
+            card(f"db/ego/{x['id']}", f"db/ego/{x['id']}", f"{x.get('name')} · {x.get('sinnerName')} E.G.O", short(desc),
+                 skills_html(x.get("skills") or [], x.get("passives") or []), art((x.get("img") or {}).get("art")))
+        if "enemies" in open_:
+            for x in (load("/api/enemies") or {}).get("list") or []:
+                texts = load(url_key("/api/enemy", id=x["id"])) or {}
+                sk = list((texts.get("skills") or {}).values())
+                names = [n for n, _ in (skill(s or {}) for s in sk) if n]
+                desc = f"{x.get('kind') or 'Enemy'} · {x.get('label')}." + (f" Skills: {' · '.join(dict.fromkeys(names))}." if names else "")
+                pic = next((k for k in (x.get("app") and url_key("/api/enemy_thumb", app=x["app"]), thumb(x.get("pic")), art(x.get("pic")))
+                            if k and k in urls), "")
+                card(f"enemies/{x['id']}", f"enemies/{x['id']}", x.get("name") or str(x["id"]), short(desc),
+                     skills_html([s or {} for s in sk]), pic, big=False)
+        if "buffs" in open_:
+            for x in (load("/api/buffs") or {}).get("list") or []:
+                if not re.fullmatch(r"[\w-]+", x.get("id") or ""):
+                    continue
+                desc = plain(x.get("desc")) or x.get("flavor") or "A Limbus Company status."
+                who = ", ".join(w.get("name") or "" for w in (x.get("who") or [])[:12])
+                body = f"<p>{e(plain(x.get('desc')))}</p>" + (f"<p>Who has it: {e(who)}</p>" if who else "")
+                card(f"buffs/{x['id']}", f"buffs/{x['id']}", f"{x.get('name') or x['id']} · Status", short(desc), body,
+                     thumb(x.get("icon")), big=False)
+        og = os.path.join(self.out, "og")
+        for fn in os.listdir(og) if os.path.isdir(og) else []:
+            if fn not in used:
+                os.remove(os.path.join(og, fn))
+        return out
+
+    def _og_picture(self, rel: str | None, big: bool) -> str:
+        """A card's picture as a JPEG in og/ (link previews can't read the packs); its file name or ""."""
+        if not rel:
+            return ""
+        name = hashlib.sha1(f"{rel}|{big}".encode()).hexdigest()[:16] + ".jpg"
+        dst = os.path.join(self.out, "og", name)
+        if os.path.exists(dst):
+            return name
+        try:
+            from PIL import Image
+            with Image.open(os.path.join(self.out, "d", rel)) as im:
+                im = im.convert("RGBA")
+            back = Image.new("RGBA", im.size, (18, 16, 14, 255))
+            back.alpha_composite(im)
+            im = back.convert("RGB")
+            im.thumbnail((1000, 1000) if big else (400, 400))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            im.save(dst + ".tmp", "JPEG", quality=82, progressive=True, optimize=True)
+            os.replace(dst + ".tmp", dst)
+            return name
+        except Exception:
+            return ""
 
     def index(self):
         names = sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "m")) if fn.endswith(".json.gz"))
@@ -1860,10 +2006,11 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
     for name in os.listdir(dst):
         if name.endswith((".html", ".xml")) and not os.path.exists(os.path.join(src, name)):
             os.remove(os.path.join(dst, name))
-    shutil.rmtree(os.path.join(dst, "games"), ignore_errors=True)
+    for name in ("games",) + CARD_DIRS:
+        shutil.rmtree(os.path.join(dst, name), ignore_errors=True)
     for name in os.listdir(src):
         a, b = os.path.join(src, name), os.path.join(dst, name)
-        if name in ("ui", "games"):
+        if name in ("ui", "games") + CARD_DIRS:
             shutil.copytree(a, b)
         elif os.path.isfile(a):
             shutil.copyfile(a, b)

@@ -17,6 +17,15 @@
   };
   window.addEventListener("hashchange", titled);
   titled();
+  // a card's own address: its page shows the card's picture in a link preview (limbusdm/site.py card_pages)
+  window.siteLink = (path) => `<button class="sitelink" data-link="${esc(path)}" title="Copy a link to this card: Discord and others show its picture">Copy link</button>`;
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest && ev.target.closest("[data-link]");
+    if (!b) return;
+    const url = `${location.origin}/${b.dataset.link}`;
+    navigator.clipboard.writeText(url).then(() => { b.textContent = "Copied"; setTimeout(() => { b.textContent = "Copy link"; }, 1500); },
+      () => prompt("Link to this card:", url));
+  });
   document.querySelector("#top .brand").setAttribute("href", "#/home");
   const HOME_TILES = [
     ["patches", "patches", "Patches", "What every update changed: new units, highlights, texts, pictures, sounds.", "BottomMenu_1_11"],
