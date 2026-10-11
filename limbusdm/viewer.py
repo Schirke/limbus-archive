@@ -24,6 +24,21 @@ WIDTH, HEIGHT = 1920, 1080  # the size of the game's own skill preview videos
 BG = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
 # x264 on 3 of 4 cores
 X264 = ["-c:v", "libx264", "-threads", str(max(2, (os.cpu_count() or 4) * 3 // 4))]
+# an NVIDIA card's own encoder: the CPU stays with the player (renders are CPU-bound)
+NVENC = ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "27", "-b:v", "0", "-pix_fmt", "yuv420p"]
+_NVENC: list[bool] = []
+
+
+def nvenc(ff: str) -> bool:
+    """Whether this PC's ffmpeg can encode on the GPU (tried once)."""
+    if not _NVENC:
+        try:
+            r = subprocess.run([ff, "-v", "error", "-f", "lavfi", "-i", "color=s=256x256:d=0.2", "-c:v", "h264_nvenc", "-f", "null", "-"],
+                               capture_output=True, timeout=30, creationflags=BG)
+            _NVENC.append(r.returncode == 0)
+        except (OSError, subprocess.TimeoutExpired):
+            _NVENC.append(False)
+    return _NVENC[0]
 
 
 def viewer_exe() -> str | None:
@@ -1444,6 +1459,11 @@ def split_hits(ev: dict) -> dict:
     return dict(ev, hits=sorted(hits, key=lambda x: x["t"]))
 
 
+def frame_ext(frames: str) -> str:
+    """A video's numbered frames: ".qoi" from newer players, ".png" from older ones."""
+    return ".qoi" if os.path.exists(os.path.join(frames, "0000.qoi")) else ".png"
+
+
 def _loop_seam(frames: str) -> int:
     """Blend a Versus loop's start into its end; returns the frames the video now starts later (0: not a loop)."""
     try:
@@ -1451,7 +1471,7 @@ def _loop_seam(frames: str) -> int:
             n = int(f.read().strip() or 0)
     except (OSError, ValueError):
         return 0
-    names = sorted(x for x in os.listdir(frames) if re.fullmatch(r"\d{4}\.png", x))
+    names = sorted(x for x in os.listdir(frames) if re.fullmatch(r"\d{4}\.(?:png|qoi)", x))
     if n <= 0 or len(names) < 3 * n:
         return 0
     from PIL import Image
@@ -2745,7 +2765,7 @@ class Renderer:
 
     def _versus_compose(self, exe, ff, spec, group, music, sidx, st, made, cmd, filters, frames, v, a):
         """A Versus video's extras (cut-ins, E.G.O, intro, music) in the fight's own encode; `made`: those taken."""
-        names = sorted(x for x in os.listdir(frames) if re.fullmatch(r"\d{4}\.png", x))
+        names = sorted(x for x in os.listdir(frames) if re.fullmatch(r"\d{4}\.(?:png|qoi)", x))
         end = len(names) / 30
         if not names:
             raise RuntimeError("no frames")
@@ -3220,7 +3240,7 @@ class Renderer:
             if not self._cutin_frames(exe, cid, side, full):
                 return False
             frames, box = [], None
-            for x in sorted(x for x in os.listdir(full) if x.endswith(".png")):
+            for x in sorted(x for x in os.listdir(full) if x.endswith((".png", ".qoi"))):
                 im = Image.open(os.path.join(full, x)).convert("RGBA").resize(size, Image.BILINEAR)
                 b = im.getchannel("A").getbbox()
                 if b:
@@ -3319,7 +3339,7 @@ class Renderer:
                             names = os.listdir(d)
                         except OSError:
                             names = []
-                        n = sum(1 for f in names if f.endswith((".png", ".exr")))
+                        n = sum(1 for f in names if f.endswith((".png", ".qoi", ".exr")))
                         frac = 0.0
                         try:
                             if effects:
@@ -3394,7 +3414,7 @@ class Renderer:
         """_encode; extra(cmd, filters, frames, picture, sound) adds inputs / filters and returns the labels to write."""
         frames = os.path.join(work, group["name"])
         hdr, alpha = "16bit" in flags, "alpha" in flags
-        pattern = os.path.join(frames, "%04d.exr" if hdr else "%04d.png")
+        pattern = os.path.join(frames, "%04d.exr" if hdr else "%04d" + frame_ext(frames))
         # part → its starts in the video (a part may repeat, each with its sounds)
         starts, when = played_clock(os.path.join(frames, "parts.txt"), os.path.join(frames, "timemap.txt"))
         cut_in = group["name"].startswith("SkillViewEGO_")  # ends at its end marker (see the Viewer): later sounds don't play
@@ -3470,7 +3490,7 @@ class Renderer:
         hit = _find_sound(sidx, group["music"]) if group.get("music") else None
         wav = self._wav(hit) if hit and os.path.isfile(hit[0]) else None
         if wav:
-            n_frames = len(glob.glob(os.path.join(frames, "*.exr" if hdr else "*.png"))) - cut
+            n_frames = len(glob.glob(os.path.join(frames, "*.exr" if hdr else "[0-9]*" + frame_ext(frames)))) - cut
             dur = max(1.0, n_frames / 30)
             k = len(inputs) + 1
             mp = os.path.join(frames, "music.wav")
@@ -3520,11 +3540,17 @@ class Renderer:
                 cmd += ["-c:a", "libopus", "-b:a", "160k"]
             cmd.append(base + ".webm")
         else:
-            cmd += X264 + ["-preset", "veryfast", "-crf", "20", "-movflags", "+faststart"]
-            if aout:
-                cmd += ["-c:a", "aac", "-b:a", "160k"]
-            cmd.append(base + ".mp4")
-        subprocess.run(cmd, check=True, creationflags=BG)
+            tail = ["-movflags", "+faststart"] + (["-c:a", "aac", "-b:a", "160k"] if aout else []) + [base + ".mp4"]
+            if nvenc(ff):
+                try:
+                    subprocess.run(cmd + NVENC + tail, check=True, creationflags=BG, capture_output=True)
+                    cmd = None
+                except subprocess.CalledProcessError:  # (the GPU's encoder busy with other videos: the CPU's)
+                    pass
+            if cmd:
+                cmd += X264 + ["-preset", "veryfast", "-crf", "20"] + tail
+        if cmd:
+            subprocess.run(cmd, check=True, creationflags=BG)
         for f in ("parts.txt", "timemap.txt", "cutins.txt"):  # (Versus: where its parts and their moments are in the video)
             if os.path.exists(os.path.join(frames, f)):
                 shutil.copyfile(os.path.join(frames, f), base + "." + f)
