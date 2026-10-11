@@ -4,19 +4,21 @@ Set-Location $PSScriptRoot
 Get-Process LimbusArchive, LimbusDatamine -ErrorAction SilentlyContinue | Stop-Process -Force
 uv sync
 uv run python -c "from limbusdm.icon import save_ico; save_ico('ui/icon.ico')"
-# Versus rules: in the player's repo (unity\LimbusViewer\Versus), shipped compiled (Cython + VS Build Tools C++)
-$pyd = @()
-if (Test-Path "unity\LimbusViewer\Versus") {
-  Remove-Item "build\versus" -Recurse -Force -ErrorAction SilentlyContinue
-  uv run --with cython --with setuptools python scripts\build_versus.py unity\LimbusViewer\Versus build\versus
-  if ($LASTEXITCODE -ne 0) { throw "Versus rules failed to compile" }
-  $pyd = Copy-Item "build\versus\limbusdm\*.pyd" limbusdm -PassThru
+# The player's driver and the Versus rules: in the player's repo (unity\LimbusViewer\Python), shipped compiled (Cython +
+# VS Build Tools C++)
+$pyd = @(); $hidden = @()
+if (Test-Path "unity\LimbusViewer\Python") {
+  Remove-Item "build\private" -Recurse -Force -ErrorAction SilentlyContinue
+  uv run --with cython --with setuptools python scripts\build_private.py unity\LimbusViewer\Python build\private
+  if ($LASTEXITCODE -ne 0) { throw "the private modules failed to compile" }
+  $pyd = Copy-Item "build\private\limbusdm\*.pyd" limbusdm -PassThru
+  $hidden = Get-Content "build\private\hidden.txt" | Where-Object { $_ } | ForEach-Object { "--hidden-import"; $_ }
 } else {
-  Write-Warning "Versus rules not found (unity\LimbusViewer\Versus): Versus will be off"
+  Write-Warning "unity\LimbusViewer\Python not found: renders and Versus will be off"
 }
 try {
   uv run pyinstaller --noconfirm --clean --windowed --name LimbusArchive --icon ui/icon.ico `
-    --distpath . --workpath build `
+    --distpath . --workpath build @hidden `
     --add-data "ui;ui" `
     --collect-all UnityPy --collect-all fmod_toolkit --collect-all pyfmodex `
     --collect-all texture2ddecoder --collect-all etcpak --collect-all astc_encoder --collect-all archspec `

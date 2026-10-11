@@ -33,6 +33,15 @@ def _re_split_stem(name: str) -> str:
     return name[:m.start() + 1] if m else name
 
 
+
+class _NoPlayer:
+    """A copy without the player's code: renders answer that they come with the release build."""
+    def prune(self, *a, **k):
+        pass
+
+    def __getattr__(self, name):
+        raise ImportError("the player comes with the release build only")
+
 class Service:
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
@@ -59,8 +68,11 @@ class Service:
         self._browse_lock = threading.Lock()
         self._cab_lock = threading.Lock()
         self._content_lock = threading.Lock()
-        from .viewer import Renderer
-        self.fx = Renderer(self)  # skill renders with the game's effects (Unity player)
+        try:
+            from .viewer import Renderer
+            self.fx = Renderer(self)  # skill renders with the game's effects (Unity player)
+        except ImportError:
+            self.fx = _NoPlayer()
         from .buffs import BuffFx
         self.buff_fx = BuffFx(self)  # Database → Buff effects: the list and its videos
 

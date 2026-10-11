@@ -1,5 +1,5 @@
-"""Compiles the Versus rules (versus_*.py of a folder) into limbusdm.<name> .pyd files with Cython; needs MSVC.
-Usage: python scripts/build_versus.py <src dir> <out dir>"""
+"""Compiles the private modules (every .py of a folder) into limbusdm.<name> .pyd files with Cython; needs MSVC.
+Usage: python scripts/build_private.py <src dir> <out dir>"""
 import glob
 import os
 import subprocess
@@ -23,10 +23,28 @@ def msvc_env():
     os.environ.update(DISTUTILS_USE_SDK="1", MSSdk="1")
 
 
+def imports(files) -> list[str]:
+    """Absolute imports of these files: PyInstaller can't see a .pyd's, so the build names them (hidden.txt)."""
+    import ast
+    mods = set()
+    for f in files:
+        with open(f, encoding="utf-8") as fh:
+            for n in ast.walk(ast.parse(fh.read())):
+                if isinstance(n, ast.Import):
+                    mods |= {a.name for a in n.names}
+                elif isinstance(n, ast.ImportFrom) and n.level == 0 and n.module and n.module != "__future__":
+                    mods.add(n.module)
+    return sorted(mods)
+
+
 def main(src, out):
     os.makedirs(os.path.join(out, "limbusdm"), exist_ok=True)
+    files = sorted(glob.glob(os.path.join(src, "*.py")))
+    with open(os.path.join(out, "hidden.txt"), "w", encoding="utf-8") as f:
+        names = [f"limbusdm.{os.path.splitext(os.path.basename(x))[0]}" for x in files]  # (some only .pyd import)
+        f.write("\n".join(imports(files) + names) + "\n")
     exts = []
-    for f in sorted(glob.glob(os.path.join(src, "versus_*.py"))):
+    for f in files:
         name = os.path.splitext(os.path.basename(f))[0]
         dst = os.path.join(out, "limbusdm", name + ".py")
         with open(f, "rb") as a, open(dst, "wb") as b:

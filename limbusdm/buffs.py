@@ -8,7 +8,17 @@ import shutil
 import sqlite3
 import threading
 
-from . import units, viewer
+from . import units
+
+
+class _Viewer:
+    """limbusdm.viewer, imported when first used (it comes with the release build)."""
+    def __getattr__(self, name):
+        from . import viewer as v
+        return getattr(v, name)
+
+
+viewer = _Viewer()
 
 VERSION = 1  # bump to remake the list or the videos
 HOST = 10101  # the battle prefab the effects are loaded next to (the player needs one; it is not drawn)
