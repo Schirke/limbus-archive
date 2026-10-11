@@ -4,13 +4,27 @@ Set-Location $PSScriptRoot
 Get-Process LimbusArchive, LimbusDatamine -ErrorAction SilentlyContinue | Stop-Process -Force
 uv sync
 uv run python -c "from limbusdm.icon import save_ico; save_ico('ui/icon.ico')"
-uv run pyinstaller --noconfirm --clean --windowed --name LimbusArchive --icon ui/icon.ico `
-  --distpath . --workpath build `
-  --add-data "ui;ui" `
-  --collect-all UnityPy --collect-all fmod_toolkit --collect-all pyfmodex `
-  --collect-all texture2ddecoder --collect-all etcpak --collect-all astc_encoder --collect-all archspec `
-  --collect-all webview --collect-all clr_loader --collect-all pythonnet --collect-all imageio_ffmpeg `
-  run.py
+# Versus rules: in the player's repo (unity\LimbusViewer\Versus), shipped compiled (Cython + VS Build Tools C++)
+$pyd = @()
+if (Test-Path "unity\LimbusViewer\Versus") {
+  Remove-Item "build\versus" -Recurse -Force -ErrorAction SilentlyContinue
+  uv run --with cython --with setuptools python scripts\build_versus.py unity\LimbusViewer\Versus build\versus
+  if ($LASTEXITCODE -ne 0) { throw "Versus rules failed to compile" }
+  $pyd = Copy-Item "build\versus\limbusdm\*.pyd" limbusdm -PassThru
+} else {
+  Write-Warning "Versus rules not found (unity\LimbusViewer\Versus): Versus will be off"
+}
+try {
+  uv run pyinstaller --noconfirm --clean --windowed --name LimbusArchive --icon ui/icon.ico `
+    --distpath . --workpath build `
+    --add-data "ui;ui" `
+    --collect-all UnityPy --collect-all fmod_toolkit --collect-all pyfmodex `
+    --collect-all texture2ddecoder --collect-all etcpak --collect-all astc_encoder --collect-all archspec `
+    --collect-all webview --collect-all clr_loader --collect-all pythonnet --collect-all imageio_ffmpeg `
+    run.py
+} finally {
+  $pyd | Remove-Item -ErrorAction SilentlyContinue
+}
 Remove-Item LimbusArchive.spec -ErrorAction SilentlyContinue
 
 # Skill renders with the game's effects: the Unity player. Its project is a repository of its own (not public), cloned

@@ -2799,7 +2799,7 @@ async function vsDrawTeamRules() {
   };
   const mark = (key) => (key.split(":")[0] in vs.rules ? ' style="color:var(--gold)"' : "");
   const roles = Object.keys(def.cooldown);
-  box.innerHTML = `<div class="vslbl" style="margin:12px 0 6px" title="The team engine's numbers (limbusdm/versus_team.py TEAM). They apply to the Engine view and the render; gold = changed">Team rules ${Object.keys(vs.rules).length ? `<small class="muted">(${Object.keys(vs.rules).length} changed)</small>` : ""}</div>
+  box.innerHTML = `<div class="vslbl" style="margin:12px 0 6px" title="The team engine's numbers. They apply to the Engine view and the render; gold = changed">Team rules ${Object.keys(vs.rules).length ? `<small class="muted">(${Object.keys(vs.rules).length} changed)</small>` : ""}</div>
     ${VS_RULE_FIELDS.map(([title, fields]) => `<div class="vsrule"><b class="small">${title}</b>${fields.map(([key, label, type, step]) => type === "bool"
       ? `<label class="small"${mark(key)}><input type="checkbox" data-rule="${key}" ${get(key) ? "checked" : ""}> ${label}</label>`
       : `<label class="small"${mark(key)}>${label} <input type="number" step="${step}" data-rule="${key}" value="${get(key)}"></label>`).join("")}</div>`).join("")}

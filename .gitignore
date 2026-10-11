@@ -13,3 +13,4 @@ ui/icon.ico
 HANDOFF.md
 .wrangler/
 unity/
+limbusdm/*.pyd

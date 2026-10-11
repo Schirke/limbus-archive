@@ -219,10 +219,13 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             try:
                 fn()
             except Exception as e:
-                traceback.print_exc()
+                vs = isinstance(e, ImportError) and "versus_" in str(e)  # (a copy without the Versus rules)
+                if not vs:
+                    traceback.print_exc()
                 self.close_connection = True  # (the answer may have been cut half-way)
                 if not self._replied:
-                    self._json({"error": f"{type(e).__name__}: {e}"}, 500)
+                    self._json({"error": "Versus comes with the release build only" if vs else f"{type(e).__name__}: {e}"},
+                               404 if vs else 500)
             if not self._replied:  # nothing was answered: a kept connection would leave the page waiting
                 self.close_connection = True
 
