@@ -652,6 +652,20 @@ def _layered(svc, folder: str, limit: int) -> bytes | None:
     return _disk(svc, "pics", f"{folder}|{'|'.join(str(r[2]) for r in rows)}|{limit}", ".webp", make)
 
 
+UI_SPRITES = {"SettingIcon"}  # (the interface sprites the reader asks for)
+
+
+def ui_sprite(svc, name: str) -> bytes | None:
+    """An interface sprite of the game's UI bundle, by name."""
+    import sqlite3
+    if name not in UI_SPRITES:
+        return None
+    con = sqlite3.connect(svc.ensure_browse())
+    row = con.execute("select bundle, pid from o where type = 'Sprite' and name = ? and bundle like 'dui_resources_default%'", (name,)).fetchone()
+    con.close()
+    return sprite_png(svc, row[0], int(row[1])) if row else None
+
+
 def sprite_png(svc, bundle: str, pid: int) -> bytes | None:
     """One sprite of a layered model, as a kept WebP."""
     from . import extract

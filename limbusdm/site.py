@@ -836,7 +836,7 @@ class Exporter:
         files = list(dict.fromkeys([p[0] for c in chapters for e in c["eps"] for p in e["parts"]]
                                    + [it["story"] for s in idx["ident"] for it in s["items"]]))
         files = [f for f in files if f]
-        lists = ["/api/story"] + [url_key("/api/story_ep", id=f) for f in files]
+        lists = ["/api/story", url_key("/api/ui_sprite", n="SettingIcon")] + [url_key("/api/story_ep", id=f) for f in files]
         thumbs = [url_key("/api/asset_thumb", path=c["pic"]) for c in chapters if c.get("pic")]
         banners = {p[2] for c in chapters for e in c["eps"] for p in e["parts"] if p[2]} | {c["pic"] for c in chapters if c.get("pic")}
         pics = [url_key("/api/story_pic", path=b, m=1280) for b in sorted(banners)]

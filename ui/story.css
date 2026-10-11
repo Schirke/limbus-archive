@@ -155,6 +155,8 @@
 #streader .rhx::before { content: ""; position: absolute; inset: calc(var(--u) * 4px); background: radial-gradient(#3a302a, #1a1512); clip-path: inherit; }
 #streader .rhx > * { position: relative; }
 #streader .rhx svg { width: 46%; height: 46%; fill: currentColor; }
+#streader .rhx i.ico { display: block; width: 50%; height: 50%; background: currentColor; -webkit-mask: center / contain no-repeat; mask: center / contain no-repeat; }
+#streader .rhx i.set { -webkit-mask-image: url(/api/ui_sprite?n=SettingIcon); mask-image: url(/api/ui_sprite?n=SettingIcon); }
 #streader .rhx b { font: calc(var(--u) * 26px) / 1 "LC Bebas", sans-serif; letter-spacing: .02em; }
 #streader .rhx[data-h=auto] b { font-size: calc(var(--u) * 19px); }
 #streader .rhx[data-h=more], #streader .rhex.open .rhx { display: grid; place-items: center; }

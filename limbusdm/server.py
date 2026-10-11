@@ -650,6 +650,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if png is None:
                     return self._send(404, b"no picture", "text/plain")
                 return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
+            if p == "/api/ui_sprite":  # one of the game's interface sprites by name (the reader's buttons)
+                from . import story
+                png = story.ui_sprite(svc, q.get("n", ""))
+                if png is None:
+                    return self._send(404, b"no picture", "text/plain")
+                return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
             if p == "/api/story_pic":  # a story picture as a kept, smaller WebP
                 from . import story
                 path = q.get("path", "")
