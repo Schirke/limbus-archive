@@ -219,7 +219,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             try:
                 fn()
             except Exception as e:
-                vs = isinstance(e, ImportError) and re.search(r"versus_|viewer|battle_ui|release build", str(e))  # (a copy without the player's code)
+                vs = isinstance(e, ImportError) and re.search(r"versus_|viewer|battle_ui|\bstory\b|release build", str(e))  # (a copy without the private code)
                 if not vs:
                     traceback.print_exc()
                 self.close_connection = True  # (the answer may have been cut half-way)
@@ -637,7 +637,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     node = soundlib.find(db, json.loads(q["path"]))
                     return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {}})
                 return self._json(soundlib.outline(db["tree"]))
-            if p == "/api/story":  # Database → Story (limbusdm/story.py): chapters, episodes, Sinners' Identity stories
+            if p == "/api/story":  # Database → Story (story.py, private repo): chapters, episodes, Sinners' Identity stories
                 from . import story
                 lang = q.get("lang", "en")
                 return self._json(story.index(svc, lang if lang in story.LANGS else "en"))
@@ -668,10 +668,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if png is None:
                     return self._send(404, b"no picture", "text/plain")
                 return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
-            if p == "/api/story_pic":  # a story picture as a kept, smaller WebP
-                from . import story
+            if p == "/api/story_pic":  # a story picture as a kept, smaller WebP (the reader's and the Story map's)
+                from . import pictures
                 path = q.get("path", "")
-                png = story.picture(svc, path, int(q.get("m", "1920"))) if path.startswith(("Assets/Resources_moved/Story/", "Assets/Resources_moved/Sprite/StoryTheater/", "Assets/Resources_moved/Sprite/StageMap/", story.UNIT_CG)) else None
+                png = pictures.picture(svc, path, int(q.get("m", "1920"))) if path.startswith(pictures.ROOTS) else None
                 if png is None:
                     return self._send(404, b"no picture", "text/plain")
                 return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})

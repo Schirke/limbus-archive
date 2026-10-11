@@ -833,8 +833,11 @@ class Exporter:
 
     def story(self) -> dict:
         """Story: the list, every story file, its pictures, standing models, sounds and voices."""
-        from . import story
         old = self.read_manifest("story")
+        try:
+            from . import story
+        except ImportError:  # (a copy without the private code: no reader)
+            return old
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)
         try:

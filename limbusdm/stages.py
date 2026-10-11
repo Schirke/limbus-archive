@@ -124,12 +124,12 @@ def node_pic(svc, nid: int) -> bytes | None:
     import io
     import sqlite3
 
-    from . import story
+    from . import pictures
     con = sqlite3.connect(svc.ensure_browse())
     row = con.execute("select c from o where type = 'Texture2D' and c like ? limit 1", (f"{NODE_CG}%/{nid}.png",)).fetchone()
     con.close()
     if row:
-        return story.picture(svc, row[0], 480)
+        return pictures.picture(svc, row[0], 480)
     folder = os.path.join(svc.ui_cache_dir(), "nodecg")
     with _cg_lock:
         if not os.path.exists(os.path.join(folder, ".done")):
@@ -138,7 +138,7 @@ def node_pic(svc, nid: int) -> bytes | None:
     if not os.path.exists(fp):
         return None
     with open(fp, "rb") as f:
-        return story._webp(f.read(), 480)
+        return pictures._webp(f.read(), 480)
 
 
 def _cut_main(game_data: str, folder: str) -> None:
