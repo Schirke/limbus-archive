@@ -175,6 +175,10 @@ function kwPlainOf() {
   kwPlain = { key, rx: names.length ? new RegExp(`(?<![\\w\\[])(${names.join("|")})(?![\\w\\]])`, "g") : null };
   return kwPlain;
 }
+// [Tag] colours the game draws (not in its texts); the rest lime
+const TAG_COLOR = { WhenUse: "#26cfff", WhenUse_Force: "#26cfff", WinDuel: "#ff7e00", DuelCounter: "#ff6000", DefeatDuel: "#e30000",
+  Wide: "#ffe71b", CantIdentify: "#ff0000", CantDuel: "#ff0000", OnSucceedAttackHead: "#c7ff94", OnSucceedAttackTail: "#64ab23",
+  CoinHead: "#ff59c2", EndSkillHead: "#ff59c2", CriticalEndSkill: "#ff59c2", CoinTail: "#cb0080", EndSkillTail: "#cb0080" };
 // skill / passive text like the game: [Keyword] → icon + name with tooltip; plain: also plain-word statuses
 function fmtDesc(text, plain = false) {
   if (!text) return "";
@@ -189,12 +193,22 @@ function fmtDesc(text, plain = false) {
   let s = String(text).replace(/\[TabExplain\]/g, "").replace(/<sprite[^>]*>/g, "")
     .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t.replace(/<[^>]+>/g, "")))
     .replace(/<style="highlight">/g, "\u0006").replace(/<\/style>/g, "\u0007")
+    .replace(/<(color|mark)[= ](?:color=)?"?(#[0-9a-fA-F]{6,8})"?>/g, (_, t, c) => mark(`<span style="${t === "mark" ? "background" : "color"}:${c}">`))
+    .replace(/<b>/g, () => mark(`<span style="font-weight:700">`)).replace(/<\/(color|mark|b)>/g, () => mark("</span>"))
     .replace(/<[^>]+>/g, "");
   const pk = plain && kwPlainOf();
   if (pk && pk.rx) s = s.split(/("[^"\n]*"|“[^”\n]*”|(?<![A-Za-z])'[^'\n]*'(?![A-Za-z]))/)
     .map((part, i) => i % 2 ? part : part.replace(pk.rx, (n) => kwSpan(pk.key[n], n))).join("");
-  s = esc(s).replace(/\[([A-Za-z0-9_]+)\]/g, (m, k) => UNITS.tags[k] ? mark(`<span class="tg">${esc(UNITS.tags[k])}</span>`) : kwSpan(k));
-  return s.replace(/\u0001(\d+)\u0002/g, (_, i) => marks[i]).replace(/\u0006/g, `<span class="hl">`).replace(/\u0007/g, "</span>").replace(/\n/g, "<br>");
+  s = esc(s).replace(/\[([A-Za-z0-9_]+)\]/g, (m, k) => UNITS.tags[k]
+    ? mark(`<span class="tg" style="color:${TAG_COLOR[k] || "#93f13e"}">${esc(UNITS.tags[k].replace(/<[^>]*>/g, ""))}</span>`) : kwSpan(k));
+  // unbalanced spans dropped / closed
+  let open = 0;
+  s = s.replace(/\u0001(\d+)\u0002|[\u0006\u0007]/g, (m, i) => {
+    const h = m === "\u0006" ? `<span class="hl">` : m === "\u0007" ? "</span>" : marks[i];
+    if (h === "</span>") { if (!open) return ""; open--; } else if (h.startsWith("<span style=") || h === `<span class="hl">`) open++;
+    return h;
+  });
+  return s.replace(/\n/g, "<br>") + "</span>".repeat(open);
 }
 // keyword tooltip (click a highlighted status)
 document.addEventListener("click", (e) => {
