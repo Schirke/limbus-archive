@@ -132,10 +132,13 @@ def stop():
     _stop.set()
 
 
-def _buffs(svc, progress) -> dict:
-    """Buff effects' videos (Database → Buff effects): every one not made at this renderer version."""
+def _buffs(svc, ex, progress) -> dict:
+    """Buff effects' videos (Database → Buff effects) the site has none of at this game and renderer version."""
+    from .site import _game, url_key
     bf = svc.buff_fx
-    bf.start(None)
+    site = ex.read_manifest("buffs")
+    on_site = site.get("urls", {}) if _game(site.get("id")) == _game(os.path.basename(bf.folder())) else {}
+    bf.start([n for n in bf.db()["fx"] if url_key("/api/buff_video", name=n) not in on_site])
     total = bf.status()["queue"]
     while True:
         st = bf.status()
@@ -156,10 +159,10 @@ def render_all(svc, base_url: str, progress=None) -> dict:
     from .site import Exporter
     progress = progress or (lambda stage, done, total, msg="": None)
     _stop.clear()
-    buffs = _buffs(svc, progress)  # (first: a few minutes, the skills take hours)
+    ex = Exporter(svc, base_url)
+    buffs = _buffs(svc, ex, progress)  # (first: a few minutes, the skills take hours)
     if _stop.is_set():
         return {"buffs": buffs}
-    ex = Exporter(svc, base_url)
     m = _read(ex)
     before = json.loads(json.dumps(m["have"]))
     todo = []
