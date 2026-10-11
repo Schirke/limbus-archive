@@ -863,6 +863,15 @@ class Exporter:
                     music.append(url_key("/api/story_audio", s=ln["bgm"]))
                 if ln.get("vid"):
                     videos.append(url_key("/api/story_video", name=ln["vid"]))
+        # the Story map's node cards
+        try:
+            from . import stages
+            have_pic = stages.node_pic_ids(self.svc)
+            sdb = json.loads(self._get("/api/stages")[0])
+            thumbs += [url_key("/api/stage_node_pic", id=n["id"]) for c in sdb["chapters"] for n in c["nodes"] if n["id"] in have_pic]
+            pics += [url_key("/api/story_pic", path=p, m=1024) for c in sdb["chapters"] for p in (c.get("tiles") or {}).values()]  # (the map close up)
+        except Exception as e:
+            self.failed.append(("/api/stages", str(e)))
         # (voices in reading order: a pack holds the next lines)
         keys = list(dict.fromkeys(lists + thumbs + pics + models + sprites + sounds + voices + music + videos))
         got = self.fetch_all(keys, {k: f for k, f in have.items() if k != "/api/story"}, "site: Story")

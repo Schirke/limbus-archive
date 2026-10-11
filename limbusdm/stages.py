@@ -2,11 +2,12 @@
 StaticData `part`."""
 from __future__ import annotations
 
+import os
 import re
 
 from . import content, units
 
-VERSION = 1  # bump when the layout changes (cached per snapshot)
+VERSION = 4  # bump when the layout changes (cached per snapshot)
 TILE = 2048
 FIGHT_TABLES = ("battle-story", "battle-ab", "battle-dungeon")  # (an id found in several: the first one wins)
 KINDS = {"NORMAL": "fight", "STORY": "story", "DUNGEON": "dungeon"}
@@ -74,7 +75,7 @@ def build(tables: dict, loc_dir: str, tiles: dict[str, dict[str, str]]) -> dict:
         for i, n in enumerate(nodes_in):
             kind = KINDS.get(n.get("stageNodeType"), "other")
             node = {"id": n.get("nodeId"), "n": f"{number}-{first + i}" if number else str(first + i), "kind": kind,
-                    "title": title(n), "x": n.get("posx"), "y": n.get("posy")}
+                    "title": title(n), "x": n.get("posx"), "y": n.get("posy"), "up": bool(n.get("upper"))}
             st = fights.get(n.get("stageId"))
             if kind == "fight" and st:
                 node.update(_stage(st))
@@ -96,8 +97,81 @@ def build(tables: dict, loc_dir: str, tiles: dict[str, dict[str, str]]) -> dict:
         grid = tiles.get(ill) or {}
         has_map = bool(grid) and all(n["x"] is not None for n in nodes)
         out.append({"id": sid, "label": label + (" · Hard" if hard else ""), "number": number, "hard": hard,
-                    "main": 100 <= sid < 200, "order": ch.get("order", 999),
+                    "main": 100 <= sid < 200, "order": ch.get("order", 999), "time": ch.get("time") or "",
                     "rows": sc.get("mapSizeRow") or 0, "cols": sc.get("mapSizeColoumn") or 0,
                     "tiles": grid if has_map else {}, "nodes": nodes})
-    out.sort(key=lambda c: (not c["main"], c["hard"], c["order"], c["id"]))
+    # side stories as the game lists them: by their date in the City (an undated one takes the one before it by
+    # number), a Hard copy right after its story
+    dated = sorted((c["order"], c["time"]) for c in out if not c["main"] and c["time"])
+    for c in out:
+        if not c["main"] and not c["time"]:
+            c["time"] = max((t for o, t in dated if o <= c["order"]), default="")
+    out.sort(key=lambda c: (not c["main"], c["hard"], "" if c["main"] else c["time"], c["order"], c["id"]))
+    for h in [c for c in out if c["hard"]]:
+        base = next((c for c in out if not c["hard"] and c["label"] == h["label"].replace(" · Hard", "")), None)
+        if base:
+            out.remove(h)
+            out.insert(out.index(base) + 1, h)
     return {"chapters": out, "tile": TILE, "units": sorted(used)}
+
+
+NODE_CG = "Assets/Resources_moved/Sprite/StageNodeCG/"
+_cg_lock = __import__("threading").Lock()
+
+
+def node_pic(svc, nid: int) -> bytes | None:
+    """A map node's card picture: StageNodeCG/…/<node>.png, else (Cantos 1-4) the main build's sprite named so."""
+    import io
+    import sqlite3
+
+    from . import story
+    con = sqlite3.connect(svc.ensure_browse())
+    row = con.execute("select c from o where type = 'Texture2D' and c like ? limit 1", (f"{NODE_CG}%/{nid}.png",)).fetchone()
+    con.close()
+    if row:
+        return story.picture(svc, row[0], 480)
+    folder = os.path.join(svc.ui_cache_dir(), "nodecg")
+    with _cg_lock:
+        if not os.path.exists(os.path.join(folder, ".done")):
+            _cut_main(svc.game.data, folder)
+    fp = os.path.join(folder, f"{nid}.png")
+    if not os.path.exists(fp):
+        return None
+    with open(fp, "rb") as f:
+        return story._webp(f.read(), 480)
+
+
+def _cut_main(game_data: str, folder: str) -> None:
+    import glob
+
+    import UnityPy
+
+    from . import bundles as _bundles  # noqa: F401
+    os.makedirs(folder, exist_ok=True)
+    for fp in [os.path.join(game_data, "resources.assets")] + sorted(glob.glob(os.path.join(game_data, "sharedassets*.assets"))):
+        try:
+            env = UnityPy.load(fp)
+        except Exception:
+            continue
+        for o in env.objects:
+            if o.type.name != "Sprite":
+                continue
+            try:
+                n = o.peek_name()
+                if re.fullmatch(r"\d{5,6}", n) and not os.path.exists(os.path.join(folder, n + ".png")):
+                    o.read().image.save(os.path.join(folder, n + ".png"))
+            except Exception:
+                continue
+    open(os.path.join(folder, ".done"), "w").close()
+
+
+def node_pic_ids(svc) -> set[int]:
+    """Nodes that have a card picture."""
+    import sqlite3
+    con = sqlite3.connect(svc.ensure_browse())
+    ids = {int(c.rsplit("/", 1)[-1][:-4]) for (c,) in con.execute("select distinct c from o where type = 'Texture2D' and c like ?", (NODE_CG + "%",))
+           if c.rsplit("/", 1)[-1][:-4].isdigit()}
+    con.close()
+    node_pic(svc, 0)  # (cuts the main build's ones)
+    folder = os.path.join(svc.ui_cache_dir(), "nodecg")
+    return ids | {int(f[:-4]) for f in os.listdir(folder) if f[:-4].isdigit()} if os.path.isdir(folder) else ids

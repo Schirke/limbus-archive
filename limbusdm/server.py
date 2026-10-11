@@ -653,6 +653,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if png is None:
                     return self._send(404, b"no picture", "text/plain")
                 return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
+            if p == "/api/stage_node_pic":  # a Story map node's card picture
+                from . import stages
+                png = stages.node_pic(svc, int(q.get("id", "0") or 0))
+                if png is None:
+                    return self._send(404, b"no picture", "text/plain")
+                return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})
             if p == "/api/ui_sprite":  # one of the game's interface sprites by name (the reader's buttons)
                 from . import story
                 png = story.ui_sprite(svc, q.get("n", ""))
@@ -662,7 +668,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/story_pic":  # a story picture as a kept, smaller WebP
                 from . import story
                 path = q.get("path", "")
-                png = story.picture(svc, path, int(q.get("m", "1920"))) if path.startswith(("Assets/Resources_moved/Story/", "Assets/Resources_moved/Sprite/StoryTheater/", story.UNIT_CG)) else None
+                png = story.picture(svc, path, int(q.get("m", "1920"))) if path.startswith(("Assets/Resources_moved/Story/", "Assets/Resources_moved/Sprite/StoryTheater/", "Assets/Resources_moved/Sprite/StageMap/", story.UNIT_CG)) else None
                 if png is None:
                     return self._send(404, b"no picture", "text/plain")
                 return self._send(200, png, "image/webp", {"Cache-Control": "max-age=86400"})

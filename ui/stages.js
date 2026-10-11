@@ -2,7 +2,7 @@
 // Database → Story map: chapter nodes on the game's map and what each fight holds (/api/stages).
 let STAGES = null;
 const stv = { ch: 0, node: 0, zoom: 1 };
-const ST_ZOOM = [128, 192, 256, 384];  // a map tile's side on the page (the game's are 2048; the app keeps 384 px previews)
+const ST_ZOOM = [128, 192, 256, 384, 640, 1024];  // a map tile's side on the page (the game's are 2048: up to 384 the kept previews, then 1024 px pictures)
 const ST_KIND = { fight: ["⚔", "Fight"], story: ["❝", "Story"], dungeon: ["◈", "Dungeon"], other: ["◇", "Special stage"] };
 const stChapter = () => STAGES.chapters.find((c) => c.id === stv.ch) || STAGES.chapters[0];
 const stNode = (c) => c.nodes.find((n) => n.id === stv.node);
@@ -51,9 +51,8 @@ function stDraw() {
   }
   $("#stlist").innerHTML = c.nodes.map((n) => `<a href="#/stages/${c.id}/${n.id}" data-n="${n.id}" class="strow ${n.kind}">
       <span>${esc(n.n)}</span><i title="${ST_KIND[n.kind][1]}">${ST_KIND[n.kind][0]}</i><b>${esc(n.title || ST_KIND[n.kind][1])}</b>${n.kind !== "story" && ST_EPS.has(n.id) ? `<em title="Has story scenes">❝</em>` : ""}${n.lv ? `<span class="r">Lv ${n.lv}</span>` : ""}</a>`).join("");
-  // the smallest zoom that fills the page's width
-  const box = $("#stmap");
-  if (box && c.cols) { const i = ST_ZOOM.findIndex((t) => t * c.cols >= box.clientWidth); stv.zoom = i < 0 ? ST_ZOOM.length - 1 : i; }
+  // close up, as the game shows it (the map scrolls to the picked node)
+  stv.zoom = ST_ZOOM.length - 1;
   stMap();
   stMark(true);
   stCard();
@@ -65,14 +64,22 @@ function stMap() {
   const t = ST_ZOOM[stv.zoom], k = t / STAGES.tile, w = c.cols * t, h = c.rows * t;
   // rows and posy count from the bottom, as in Unity
   const at = (n) => [Math.round(n.x * k), Math.round(h - n.y * k)];
+  // a card as wide as the nodes' spacing allows
+  const xs = c.nodes.map((n) => n.x * k).sort((a, b) => a - b), gap = Math.min(...xs.slice(1).map((v, i) => v - xs[i]).filter((v) => v > 8), 9999);
+  const cw = Math.round(Math.max(96, Math.min(t * .2, 260, gap * 1.6)));
   box.innerHTML = `<div class="stcanvas" style="width:${w}px;height:${h}px">
       ${Object.entries(c.tiles).map(([rc, path]) => { const [r, col] = rc.split("_");
-        return `<img loading="lazy" draggable="false" src="${imgThumb(path)}" style="left:${col * t}px;top:${(c.rows - 1 - r) * t}px;width:${t}px;height:${t}px" onerror="this.remove()">`; }).join("")}
+        return `<img loading="lazy" draggable="false" src="${t > 384 ? stFull(path, 1024) : imgThumb(path)}" style="left:${col * t}px;top:${(c.rows - 1 - r) * t}px;width:${t}px;height:${t}px" onerror="this.remove()">`; }).join("")}
       <svg width="${w}" height="${h}"><polyline points="${c.nodes.map((n) => at(n).join(",")).join(" ")}"/></svg>
       ${c.nodes.map((n, i) => { const [x, y] = at(n);
         return `<a class="stnode ${n.kind}" href="#/stages/${c.id}/${n.id}" data-n="${n.id}" style="left:${x}px;top:${y}px" title="${esc(`${n.n} · ${n.title || ST_KIND[n.kind][1]}`)}">${n.kind === "story" ? "" : esc(n.n.split("-").pop())}</a>`; }).join("")}
+      ${c.nodes.map((n) => { const [x, y] = at(n);  // the game's cards over (or under) the nodes
+        return `<a class="stcard ${n.up === false ? "down" : "up"} ${n.kind}" href="#/stages/${c.id}/${n.id}" data-n="${n.id}" style="left:${x}px;top:${y}px;width:${cw}px">
+          <span class="pic"><img loading="lazy" draggable="false" src="/api/stage_node_pic?id=${n.id}" alt="" onerror="this.remove()"></span>
+          <span class="band"><i>${ST_KIND[n.kind][0]}</i><em>${esc(n.n)}</em><b>${esc(n.title || ST_KIND[n.kind][1])}</b></span>${stCardReads(n, c)}</a>`; }).join("")}
     </div>`;
-  box.style.height = Math.min(h, 360) + 18 + "px";
+  box.querySelectorAll(".stcard [data-read]").forEach((b) => b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); const s = ST_EPS.get(+b.dataset.node); if (s) stOpen(b.dataset.read, s[1]); });
+  box.style.height = Math.min(h, 560) + 18 + "px";
   // the map is dragged about like in the game (a click on a node still opens it)
   let drag = null;
   box.onpointerdown = (e) => { drag = { x: e.clientX, y: e.clientY, l: box.scrollLeft, t: box.scrollTop, moved: false }; };
@@ -86,11 +93,17 @@ function stMap() {
 }
 
 function stMark(scroll) {
-  document.querySelectorAll("#stlist [data-n], #stmap [data-n]").forEach((a) => a.classList.toggle("on", +a.dataset.n === stv.node));
+  document.querySelectorAll("#stlist [data-n], #stmap a[data-n]").forEach((a) => a.classList.toggle("on", +a.dataset.n === stv.node));
   if (!scroll) return;
   const box = $("#stmap"), dot = box && box.querySelector(".stnode.on"), row = $("#stlist .on");
   if (dot) box.scrollTo({ left: dot.offsetLeft - box.clientWidth / 2, top: dot.offsetTop - box.clientHeight / 2, behavior: "smooth" });
   if (row) row.parentElement.scrollTop = row.offsetTop - row.parentElement.clientHeight / 2;  // (scrollIntoView would move the page too)
+}
+
+// the story buttons on a map card (shown on the picked node's)
+function stCardReads(n) {
+  const s = ST_EPS.get(n.id);
+  return s ? `<span class="reads">${s[0].parts.map(([id, part]) => `<button type="button" data-read="${esc(id)}" data-node="${n.id}">❝ ${esc(ST_PART[part] || "Story")}</button>`).join("")}</span>` : "";
 }
 
 // a fight (a node's own, or one inside a dungeon): its waves with arena, themes and enemies

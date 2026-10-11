@@ -89,7 +89,7 @@ def bundle_links(path: str) -> dict:
 
 # ------------------------------------------------------------------ chapters and stages
 def load_chapters(loc_dir: str) -> dict[str, dict]:
-    """{chapter key ("105", "9109"…): {"label", "order"}} from EN_StageChapterText*.json."""
+    """{chapter key ("105", "9109"…): {"label", "order", "time"}} from EN_StageChapterText*.json."""
     rows = []
     for fn in sorted(os.listdir(loc_dir)) if os.path.isdir(loc_dir) else []:
         if re.match(r"EN_StageChapterText(-.*)?\.json$", fn):
@@ -113,7 +113,7 @@ def load_chapters(loc_dir: str) -> dict[str, dict]:
         label = (f"Canto {_roman(mc.group(1))}" if mc else f"Walpurgis Night {mw.group(1)}" if mw
                  else "Prologue" if ch == "Prologue" else title)
         if label:
-            out.setdefault(m.group(1), {"label": label, "order": order})
+            out.setdefault(m.group(1), {"label": label, "order": order, "time": str(r.get("timeline") or "").strip()})
     return out
 
 
