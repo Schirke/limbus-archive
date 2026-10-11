@@ -113,6 +113,8 @@
 #streader .rend div { display: flex; gap: calc(var(--u) * 20px); flex-wrap: wrap; justify-content: center; }
 #streader .rend button { background: linear-gradient(#fff, #e9edf2); color: #1b3f78; border: 0; font-size: calc(var(--u) * 30px); font-weight: 700; padding: calc(var(--u) * 12px) calc(var(--u) * 36px); border-radius: 5px; cursor: pointer; }
 /* the alternative look */
+#streader .rlbar { width: min(80%, calc(var(--u) * 640px)); height: 4px; background: rgba(255, 255, 255, .15); }
+#streader .rlbar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width .15s; }
 #streader.alt .rbar, #streader.alt .rinfo { display: block; }
 #streader.alt .rrep { display: block; }
 #streader.alt .rhud button { clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); padding-inline: calc(var(--u) * 56px); }

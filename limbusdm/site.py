@@ -24,7 +24,7 @@ EXT = {"image/png": "png", "image/webp": "webp", "image/jpeg": "jpg", "image/gif
        "audio/ogg": "ogg", "video/mp4": "mp4", "video/webm": "webm", "application/json": "json", "text/plain": "txt",
        "font/otf": "otf", "font/ttf": "ttf"}
 DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "enemies": True, "music": True, "spine": True, "clips": True,
-            "games": True,
+            "games": True, "story": True,
             "project": "", "url": ""}
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
@@ -39,6 +39,7 @@ SECTIONS = {
     "db": ("Identities & E.G.O", "Every Limbus Company Identity and E.G.O: skills, coins, passives, resistances, stats and full art."),
     "enemies": ("Enemies", "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by Canto."),
     "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
+    "story": ("Story", "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by Canto."),
     "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
     "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
     "teams": ("Team builder", "Put a Limbus Company team of Identities and E.G.O together and share it as a link or a team code."),
@@ -820,6 +821,57 @@ class Exporter:
         self.write_manifest("gacha", m)
         return m
 
+    def story(self) -> dict:
+        """Story: the list, every story file, its pictures, standing models, sounds and voices."""
+        from . import story
+        old = self.read_manifest("story")
+        sid = self.svc.latest_snapshot_id()
+        have = self.kept(old)
+        try:
+            idx = json.loads(self._get("/api/story")[0])
+        except Exception as e:
+            self.failed.append(("/api/story", str(e)))
+            return old
+        chapters = idx["main"] + idx["other"]
+        files = list(dict.fromkeys([p[0] for c in chapters for e in c["eps"] for p in e["parts"]]
+                                   + [it["story"] for s in idx["ident"] for it in s["items"]]))
+        files = [f for f in files if f]
+        lists = ["/api/story"] + [url_key("/api/story_ep", id=f) for f in files]
+        thumbs = [url_key("/api/asset_thumb", path=c["pic"]) for c in chapters if c.get("pic")]
+        banners = {p[2] for c in chapters for e in c["eps"] for p in e["parts"] if p[2]} | {c["pic"] for c in chapters if c.get("pic")}
+        pics = [url_key("/api/story_pic", path=b, m=1280) for b in sorted(banners)]
+        models, sprites, sounds, voices, music, videos = [], [], [], [], [], []
+        self.progress("site: Story (reading the scenes)", 0, len(files))
+        for i, f in enumerate(files):
+            ep = story.episode_of(self.svc, f)
+            self.progress("site: Story (reading the scenes)", i + 1, len(files))
+            if not ep:
+                continue
+            pics += [url_key("/api/story_pic", path=v, m=1920) for v in ep["pics"].values()]
+            for m in ep["models"].values():
+                if m.get("img"):
+                    pics.append(url_key("/api/story_pic", path=m["img"], m=2048))
+                if m.get("psb"):
+                    models.append(url_key("/api/story_model", path=m["psb"]))
+                    lay = story.model_layout(self.svc, m["psb"]) or {}
+                    sprites += [url_key("/api/story_sprite", b=lay["bundle"], p=x["s"]) for x in lay.get("layers") or [] if x["n"] != "pivot"]
+            for ln in ep["lines"]:
+                if ln.get("v"):
+                    voices.append(url_key("/api/story_audio", s=ln["v"]))
+                sounds += [url_key("/api/story_audio", s=x) for x in ln.get("sfx") or []]
+                if ln.get("bgm") and not re.fullmatch(r"(?i)off|none|stop", ln["bgm"]):
+                    music.append(url_key("/api/story_audio", s=ln["bgm"]))
+                if ln.get("vid"):
+                    videos.append(url_key("/api/story_video", name=ln["vid"]))
+        # (voices in reading order: a pack holds the next lines)
+        keys = list(dict.fromkeys(lists + thumbs + pics + models + sprites + sounds + voices + music + videos))
+        got = self.fetch_all(keys, {k: f for k, f in have.items() if k != "/api/story"}, "site: Story")
+        urls, groups = _grouped(got, [(lists + models, PACK), (thumbs + sprites, GAME_PACK), (pics, SCENE_PACK),
+                                      (sounds + voices, VOICE_PACK), (music + videos, PACK)])
+        m = {"kind": "story", "id": sid, "urls": urls, "groups": groups}
+        self.write_manifest("story", m)
+        return m
+
     CARDS = 9  # pictures kept for each card of the Games page (it draws three)
 
     def cards(self) -> dict:
@@ -984,6 +1036,8 @@ class Exporter:
             self.enemies()
         if self.cfg["music"]:
             self.music()
+        if self.cfg["story"]:
+            self.story()
 
     # -- the site around the data
     def shell(self):

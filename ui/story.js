@@ -108,7 +108,7 @@ function stPlaylist(file) {
 
 // ------------------------------------------------------------------ the reader
 const R = { el: null, ep: null, i: 0, rate: 1, hold: false, held: 0, auto: false, voiceOn: true, typed: 0, total: 0, spans: [], states: [], done: false,
-  wait: 0, voice: null, voiceEnd: true, bgm: null, bgmName: "", media: new Map(), layouts: new Map(), chars: new Map(), log: [], timer: 0, open: false, ui: stGet("story.ui", "") };
+  wait: 0, voice: null, voiceEnd: true, bgm: null, bgmName: "", media: new Map(), blobs: new Map(), blobsOld: new Map(), layouts: new Map(), chars: new Map(), log: [], timer: 0, open: false, ui: stGet("story.ui", "") };
 const R_STEPS = [[0, 1], [1500, 2], [2100, 4], [2800, 6], [3600, 12]];
 const R_CPS = 52;  // letters a second at x1
 // the game's story stage: 2400 x 1350, slot n at x = (n - 5) * 140 from the middle (200 in the prefab; 140 measured on
@@ -127,7 +127,7 @@ function rEnsure() {
     <div class="rbox" id="rbox"><div class="rplates" id="rplates"><div class="rtitle" id="rtitle"></div><div class="rname" id="rname"></div></div><div class="rwho"><b id="rwho"></b><i id="rrole"></i><button type="button" class="rrep" id="rrep" title="Replay voice">▶ voice</button></div><div class="rtxt" id="rtxt"></div><div class="rnext">▼</div></div>
     <div class="rspeed" id="rspeed"></div><div class="rvid" id="rvid"></div>
     <div class="rlog" id="rlog"><div class="rlogh"><b>Log</b><button type="button" id="rlogx">Close</button></div><div class="rlogb" id="rlogb"></div></div>
-    <div class="rend" id="rend"></div><div class="rend rask" id="rask"></div></div>`;
+    <div class="rend" id="rend"></div><div class="rend rask" id="rask"></div><div class="rend rload" id="rload"><h3>Loading the story</h3><p id="rlnum"></p><div class="rlbar"><i id="rlbar"></i></div><div><button data-a="go">Start now</button></div></div></div>`;
   document.body.append(el);
   R.el = el;
   R.fit = () => {
@@ -138,7 +138,7 @@ function rEnsure() {
   window.addEventListener("resize", R.fit);
   const stage = $("#rstage");
   let t0 = 0, hz = 0, down = false;
-  const skip = (e) => e.target.closest(".rhud, .rhex, .rmenu, .rlog, .rend, .rrep, .rvid, .rask");
+  const skip = (e) => e.target.closest(".rhud, .rhex, .rmenu, .rlog, .rend, .rrep, .rvid, .rask, .rload");
   stage.addEventListener("pointerdown", (e) => {
     if (skip(e)) return;
     if (R.el.classList.contains("noui")) { R.el.classList.remove("noui"); return; }  // (a tap brings the hidden interface back)
@@ -236,9 +236,9 @@ async function rLoad(file, at) {
   const lo = st.list.findIndex((x) => x.id === file);
   R.meta = st.list[lo] || { title: file, n: "" };
   R.pos = lo;
-  // the layered pictures this story uses: asked at once, drawn when they are there
-  Object.values(ep.models).forEach((m) => { if (m.psb) rLayout(m.psb); });
   $("#rend").classList.remove("on"); $("#rask").classList.remove("on");
+  await rPreload(ep, file);
+  if (R.file !== file) return;
   rShow(Math.min(at, Math.max(0, ep.lines.length - 1)));
 }
 // every line's state (what the scene shows) from the changes the lines carry
@@ -253,6 +253,56 @@ function rFold(lines) {
     out.push({ bg: s.bg, cg: s.cg, chars: s.chars.map((x) => x.slice()), feel: Object.assign({}, s.feel), cam: s.cam });
   }
   return out;
+}
+// a story's files are fetched in reading order: it starts once its first lines' are here, the rest come in the
+// background; kept as blob URLs while it is read
+const R_FIRST = 10;  // lines whose files are waited for
+const rAudioUrl = (s) => "/api/story_audio?s=" + encodeURIComponent(s);
+const rSpriteUrl = (lay, x) => `/api/story_sprite?b=${encodeURIComponent(lay.bundle)}&p=${x.s}`;
+const rSrc = (u) => R.blobs.get(u) || u;
+async function rPreload(ep, file) {
+  // (the story before keeps its blobs: its pictures may still be on screen; the one before that is let go)
+  for (const u of R.blobsOld.values()) URL.revokeObjectURL(u);
+  R.blobsOld = R.blobs; R.blobs = new Map();
+  const lays = {};
+  await Promise.all(Object.values(ep.models).filter((m) => m.psb).map(async (m) => { lays[m.psb] = await rLayout(m.psb); }));
+  const urls = new Set();
+  let need = 0;
+  ep.lines.forEach((l, i) => {
+    const st = R.states[i];
+    for (const k of ["bg:" + st.bg, "cg:" + st.cg]) if (ep.pics[k]) urls.add(stFull(ep.pics[k]));
+    for (const [m] of st.chars) {
+      const info = ep.models[m] || {}, lay = lays[info.psb];
+      if (info.img) urls.add(stFull(info.img, 2048));
+      if (lay) lay.layers.forEach((x) => { if (x.n !== "pivot") urls.add(rSpriteUrl(lay, x)); });
+    }
+    if (l.v) urls.add(rAudioUrl(l.v));
+    (l.sfx || []).forEach((x) => urls.add(rAudioUrl(x)));
+    if (l.bgm && !/^(off|none|stop)$/i.test(l.bgm)) urls.add(rAudioUrl(l.bgm));
+    if (i === R_FIRST - 1) need = urls.size;
+  });
+  Object.values(ep.pics).forEach((p) => urls.add(stFull(p)));  // (pictures no line names in order)
+  if (!need) need = urls.size;
+  for (const u of urls) if (R.blobsOld.has(u)) R.blobs.set(u, R.blobsOld.get(u));
+  const list = [...urls].filter((u) => !R.blobs.has(u)), first = list.filter((u) => [...urls].indexOf(u) < need).length;
+  const box = $("#rload"), num = $("#rlnum"), bar = $("#rlbar");
+  let done = 0, next = 0, go;
+  const started = new Promise((res) => { go = res; });
+  const draw = () => { num.textContent = `${Math.min(done, first)} / ${first}`; bar.style.width = (first ? Math.min(done, first) / first * 100 : 100) + "%"; if (done >= first) go(); };
+  box.onclick = (e) => { e.stopPropagation(); if (e.target.dataset?.a === "go") go(); };
+  draw();
+  const shown = setTimeout(() => box.classList.add("on"), 250);  // (no flash when it is all there already)
+  const worker = async () => {
+    while (next < list.length && R.file === file) {
+      const u = list[next++];
+      try { const r = await fetch(u); if (r.ok && R.file === file) R.blobs.set(u, URL.createObjectURL(await r.blob())); } catch { /* drawn from the address then */ }
+      done++; draw();
+    }
+  };
+  for (let k = 0; k < 6; k++) worker();
+  await started;
+  clearTimeout(shown);
+  box.classList.remove("on");
 }
 function rLayout(path) {
   if (!R.layouts.has(path)) R.layouts.set(path, api("/api/story_model?path=" + encodeURIComponent(path)).catch(() => null));
@@ -288,10 +338,10 @@ function rShow(i) {
   $("#rend").classList.remove("on");
   // picture
   const bgp = ep.pics["bg:" + s.bg], cgp = ep.pics["cg:" + s.cg];
-  $("#rbg").style.backgroundImage = bgp ? `url('${stFull(bgp)}')` : "none";
+  $("#rbg").style.backgroundImage = bgp ? `url('${rSrc(stFull(bgp))}')` : "none";
   const cg = $("#rcg");
   cg.style.display = cgp ? "block" : "none";
-  cg.style.backgroundImage = cgp ? `url('${stFull(cgp)}')` : "none";
+  cg.style.backgroundImage = cgp ? `url('${rSrc(stFull(cgp))}')` : "none";
   $("#rchars").style.display = cgp ? "none" : "";
   R.el.classList.toggle("mono", !l.m && !l.who && !s.chars.length && !cgp && (!bgp || /black/i.test(s.bg)));
   rChars(s, l.m);
@@ -329,7 +379,7 @@ function rShow(i) {
 function rAudio(sample) {
   let a = R.media.get(sample);
   if (!a) {
-    a = new Audio("/api/story_audio?s=" + encodeURIComponent(sample));
+    a = new Audio(rSrc(rAudioUrl(sample)));
     a.preload = "auto"; a.dataset.vol = "1";
     a.volume = mediaVol();
     R.media.set(sample, a);
@@ -358,7 +408,7 @@ function rBgm(name) {
   R.bgmName = name;
   R.bgm?.pause();
   if (!name || /^(off|none|stop)$/i.test(name)) { R.bgm = null; return; }
-  const a = new Audio("/api/story_audio?s=" + encodeURIComponent(name));
+  const a = new Audio(rSrc(rAudioUrl(name)));
   a.loop = true; a.dataset.vol = "1"; a.volume = mediaVol() * 0.7;
   a.play().catch(() => {});
   R.bgm = a;
@@ -418,12 +468,12 @@ function rStand(m, info, slot) {
       Object.assign(im.style, { position: "absolute", width: w + "px", height: h + "px", left: -w / 2 + "px", bottom: "0" });
       inner.append(im);
     };
-    im.src = stFull(info.img, 2048);
+    im.src = rSrc(stFull(info.img, 2048));
     return node;
   }
   rLayout(info.psb).then((lay) => {  // a layered model: body + one face, in its own pixels around its origin
     if (!lay || R.chars.get(m) !== node) return;
-    const url = (x) => `/api/story_sprite?b=${encodeURIComponent(lay.bundle)}&p=${x.s}`;
+    const url = (x) => rSrc(rSpriteUrl(lay, x));
     const put = (x, face) => `<img class="rlay" data-n="${esc(x.n)}"${face ? " hidden" : ""} style="left:${x.l}px;bottom:${x.b}px;width:${x.w}px;height:${x.h}px;z-index:${x.o}" src="${url(x)}" alt="">`;
     inner.innerHTML = lay.layers.filter((x) => x.n !== "pivot").map((x) => put(x, x.n.startsWith("face_"))).join("");
     node.faces = Object.fromEntries([...inner.querySelectorAll("img[data-n^=face_]")].map((im) => [im.dataset.n, im]));
