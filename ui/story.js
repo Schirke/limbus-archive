@@ -56,7 +56,7 @@ function storyDraw() {
   const head = !cur ? "" : st.tab === "ident" ? `<h2>${esc(cur.label)}</h2><div class="stsub">${cur.items.length} Identity stories</div>`
     : `<h2>${esc(cur.kind === "mini" ? (cur.title || cur.label) : cur.label + (cur.title ? ": " + cur.title : ""))}</h2>
        <div class="stsub">${sub(cur)}</div>${cur.desc ? `<div class="stdesc">${esc(cur.desc)}</div>` : ""}
-       ${cur.kind === "restored" ? `<div class="strestored"><b>Restored</b> The game removed this story when its event ended. The texts are the game's own; the scenes are put back together, so backgrounds, music and who stands on stage are a best guess.</div>` : ""}`;
+       ${cur.kind === "restored" ? `<div class="strestored"><b>Restored</b> The game removed this story when its event ended. The texts are the game's own and the scenes are put back together as the event showed them; who stands where is a best guess. Face changes and the rest of the story's music were removed from the game: faces stay the same and only Call of Iberia plays.</div>` : ""}`;
   // every story file is one episode, as in the game's Story Theater: a picture, a strip of Ep. 1…N, a panel with Enter
   const eps = !cur ? [] : st.tab === "ident"
     ? cur.items.map((it) => ({ id: it.story, n: "", title: it.name, detail: "", pic: "", icon: `/api/char_icon?id=${it.id}` }))
