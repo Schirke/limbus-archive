@@ -13,8 +13,8 @@ VERSION = 1
 GACHA = "Assets/Resources_moved/Gacha/"
 # sprites of the extraction screens; the menu pieces the app's skin uses
 SKIN = (["MainUI_common_Popup_01_" + n for n in ("23", "26", "27", "37", "btn_t1_normal", "btn_t1_hover")] + ["MainUI_common_Popup_03_23", "MainUI_UserInfo_2_3", "MainUI_UserInfo_2_6",
-         "MainUI_Inventory_1_21", "MainUI_Settings_3_8", "MainUI_Settings_3_10", "MainUI_Settings_3_20", "MainUI_MainStage_2_2"] + [f"New_MainUI_PersonalityList_2_{n}" for n in (2, 19, 26, 27)]
-        + [f"MainUI_BottomMenu_1_{n}" for n in (9, 10, 11, 12, 13, 14, 19, 21)] + [f"MainUI_Lobby_new_1_{n}" for n in (0, 1, 2, 3, 9, 10)])
+         "MainUI_Inventory_1_21", "MainUI_Settings_3_8", "MainUI_Settings_3_10", "MainUI_Settings_3_20", "MainUI_MainStage_2_2", "MainUI_PersonalityStory_8"] + [f"New_MainUI_PersonalityList_2_{n}" for n in (2, 19, 26, 27)]
+        + [f"MainUI_BottomMenu_1_{n}" for n in (9, 10, 11, 12, 13, 14, 19, 21)] + [f"MainUI_PersonalityStory_7_{n}" for n in range(12)] + [f"MainUI_Lobby_new_1_{n}" for n in (0, 1, 2, 3, 9, 10)])
 UI_RE = re.compile(r"^(MainUI_Gacha_\w+|MainUI_Logoicon_filter_\d+|gacharesult_\w+|FX_Tex_UI_Gacha_\w+|icon_lunacy|" + "|".join(SKIN) + r")$")
 # the ones the page draws (ui/games5.js, ui/style.css): what the web copy takes
 UI_USED = (["icon_lunacy", "MainUI_Gacha_5", "MainUI_Gacha_3_4", "MainUI_Gacha_4_Illust_Skip", "MainUI_Gacha_4_Card_EgoRing", "FX_Tex_UI_Gacha_BGSpace_Normal", "FX_Tex_UI_Gacha_Chain2",
@@ -105,7 +105,7 @@ def ui_png(name: str, game_data: str, cache_dir: str) -> tuple[bytes, str] | Non
         return None
     folder = os.path.join(cache_dir, "gacha")
     with _lock:
-        if not os.path.exists(os.path.join(folder, ".done5")):
+        if not os.path.exists(os.path.join(folder, ".done6")):
             _extract(game_data, folder)
     for ext, mime in ((".png", "image/png"), (".jpg", "image/jpeg")):
         fp = os.path.join(folder, name + ext)
@@ -137,11 +137,11 @@ def _extract(game_data: str, folder: str) -> None:
                 continue
             try:
                 img = o.read().image
-                if n.startswith("FX_Tex_UI_Gacha_BGSpace") or n == "MainUI_Settings_3_8":  # the sky behind the orb: 2048 px of noise, a photo's weight as PNG
+                if n.startswith("FX_Tex_UI_Gacha_BGSpace") or n in ("MainUI_Settings_3_8", "MainUI_PersonalityStory_8"):  # the sky behind the orb: 2048 px of noise, a photo's weight as PNG
                     img.convert("RGB").resize((1024, 1024)).save(os.path.join(folder, n + ".jpg"), "JPEG", quality=86)
                 else:
                     img.save(os.path.join(folder, n + ".png"), "PNG")
             except Exception:
                 continue
-    with open(os.path.join(folder, ".done5"), "w") as f:
+    with open(os.path.join(folder, ".done6"), "w") as f:
         f.write("1")

@@ -21,7 +21,9 @@ routes.story = async (args) => {
   }
   if (a === "read") { stRead(b); return; }
   if (a === "interv" || a === "mini" || a === "other") a = "main";
-  if (a === "main" || a === "ident") { st.tab = a; if (b) st.sel[a] = b; }
+  if (a === "ident") { st.tab = a; st.sinner = +b || 0; return stIdentDraw(); }
+  if (a === "main") { st.tab = a; if (b) st.sel[a] = b; }
+  if (st.tab === "ident") return stIdentDraw();
   storyDraw();
 };
 
@@ -90,6 +92,30 @@ function storyDraw() {
   const enter = $(".stenter");
   if (enter) enter.onclick = () => stOpen(enter.dataset.f, cur);
   $(".stbanner")?.addEventListener("click", () => enter?.click());
+}
+
+// Identity Archive as the game has it: the Sinners' badges on a wall, then a Sinner's Identities (their stories)
+const ST_TILT = [-2, 1.5, -1, 2.5, -1.5, 1, 2, -2.5, 1, -1, 2, -1.5];
+async function stIdentDraw() {
+  const tabs = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}</div>`;
+  const list = st.idx.ident, s = list.find((x) => x.sinner === st.sinner);
+  if (!s) {
+    $("#stpage").innerHTML = `${tabs}<div class="stboard">${list.map((x, i) => `<button type="button" class="stbadge" data-s="${x.sinner}" style="--tilt:${ST_TILT[i % 12]}deg">
+        <i class="clip"></i><span class="card"><img src="/api/gacha_ui?n=MainUI_PersonalityStory_7_${x.sinner - 1}" alt="" onerror="this.style.visibility='hidden'"><b>${esc(x.name)}</b></span><em>${x.items.length} stories</em></button>`).join("")}</div>`;
+  } else {
+    $("#stpage").innerHTML = `${tabs}<div class="muted">Loading…</div>`;
+    await units();
+    const byId = new Map(UNITS.ids.map((u) => [u.id, u])), seen = new Map();
+    s.items.forEach((it) => seen.set(it.id, (seen.get(it.id) || 0) + 1));
+    const ids = [...seen.keys()];
+    $("#stpage").innerHTML = `${tabs}<div class="stidhead"><a class="toggle" href="#/story/ident">‹ All Sinners</a><h2>${esc(s.name)}</h2><span class="muted">${s.items.length} Identity stories · pick one to read it</span></div>
+      <div class="ugrid dgrid stidgrid">${ids.map((id) => { const u = byId.get(id), it = s.items.find((x) => x.id === id);
+        return u ? dbCard(u, "").replace('class="ucard', `data-story="${esc(it.story)}" class="ucard`).replace("</div></div>", `${seen.get(id) > 1 ? `<div class="muted small">${seen.get(id)} stories</div>` : ""}</div></div>`)
+          : `<div class="ucard" data-story="${esc(it.story)}"><div class="ucap"><div class="utitle">${esc(it.name)}</div></div></div>`; }).join("")}</div>`;
+    document.querySelectorAll(".stidgrid [data-story]").forEach((c) => c.onclick = () => stOpen(c.dataset.story, { label: s.name, items: s.items }));
+  }
+  document.querySelectorAll(".sttab").forEach((b) => b.onclick = () => { location.hash = "#/story/" + b.dataset.tab; });
+  document.querySelectorAll(".stbadge").forEach((b) => b.onclick = () => { location.hash = "#/story/ident/" + b.dataset.s; });
 }
 
 // a chapter's files in order, so a story goes on

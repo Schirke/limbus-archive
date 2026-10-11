@@ -163,3 +163,19 @@
 #streader .rhex.open .rhx[data-h=more], #streader .rhx.on { background: #d4a72c; color: #f5c84a; }
 #streader .rhx:hover { color: #fff; }
 #streader.noui .rbox, #streader.noui .rfade, #streader.noui .rplace, #streader.noui .rhex, #streader.noui .rhud { display: none; }
+
+/* Identity Archive: the Sinners' badges hung on a wall */
+.stboard { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 34px 22px; padding: 26px 26px 30px; margin-top: 10px; border: 1px solid var(--line);
+  background: #0c0908 url(/api/gacha_ui?n=MainUI_PersonalityStory_8) center / cover; }
+.stbadge { position: relative; padding: 0; border: 0; background: none; cursor: pointer; transform: rotate(var(--tilt)); transition: transform .18s; text-align: center; }
+.stbadge:hover { transform: rotate(0deg) translateY(-6px); }
+.stbadge .clip { position: absolute; left: 50%; top: -26px; width: 22px; height: 40px; margin-left: -11px; z-index: 2; border-radius: 4px; background: linear-gradient(90deg, #4a4a4a, #9a9a9a 45%, #555); box-shadow: 0 2px 4px #000; }
+.stbadge .clip::after { content: ""; position: absolute; left: 6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: #1d1d1d; }
+.stbadge .card { position: relative; display: block; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .7)); }
+.stbadge img { display: block; width: 100%; height: auto; }
+.stbadge b { position: absolute; left: 0; right: 0; bottom: 4.5%; font: 700 clamp(14px, 1.7vw, 26px) / 1 "LC Pretendard", "Segoe UI", sans-serif; color: #f2c500; text-shadow: 0 2px 0 #3a0603, 0 0 6px #000; }
+.stbadge:hover .card { filter: drop-shadow(0 0 10px rgba(248, 180, 0, .7)) drop-shadow(0 6px 10px rgba(0, 0, 0, .7)); }
+.stbadge em { display: block; margin-top: 6px; font-style: normal; font-size: 12px; color: var(--muted); }
+.stidhead { display: flex; align-items: baseline; gap: 14px; margin: 12px 0; flex-wrap: wrap; }
+.stidhead h2 { margin: 0; }
+@media (max-width: 900px) { .stboard { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
