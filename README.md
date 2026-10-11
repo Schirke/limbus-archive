@@ -11,7 +11,6 @@
 <p align="center">
   <a href="https://limbus-archive.com"><img alt="website" src="https://img.shields.io/badge/website-open-c9a227"></a>
   <img alt="version" src="https://img.shields.io/github/v/release/Schirke/limbus-archive">
-  <img alt="downloads" src="https://img.shields.io/github/downloads/Schirke/limbus-archive/total">
   <img alt="platform" src="https://img.shields.io/badge/platform-Windows-blue">
 </p>
 
