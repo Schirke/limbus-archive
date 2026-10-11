@@ -31,7 +31,7 @@ async function api(path, body) {
 // "English text → its text"; the lists the pages ask for get it put over their names and descriptions. The first
 // visit takes the browser's language when there is a translation of it.
 const LANG_KEY = "lang";
-const LANG = { id: "", list: null, tables: {} };
+const LANG = { id: "", list: null, tables: {}, back: new Map() };
 try { LANG.id = localStorage.getItem(LANG_KEY) || ""; } catch {}
 if (LANG.id === "en") LANG.id = "";
 // lists that carry the game's texts
@@ -45,6 +45,8 @@ async function langTable(g) {
   if (!LANG.tables[k]) LANG.tables[k] = fetch(`/api/lang?id=${encodeURIComponent(LANG.id)}&g=${g}`).then((r) => r.ok ? r.json() : {}).catch(() => ({}));
   return LANG.tables[k];
 }
+// a translated text's English (the games take answers typed in either)
+const langEn = (s) => LANG.back.get(s) ?? s;
 async function langApply(path, data) {
   if (!LANG_PAGES.test(path) || /^\/api\/sounds\/?$/.test(path)) return data;  // (the Sounds folders' names are their addresses)
   const ts = [await langTable("core")];
@@ -66,7 +68,11 @@ async function langApply(path, data) {
       if (typeof v === "string") { const x = put(v, named ? "name" : k); if (x !== null) o[k] = x; } else if (v && typeof v === "object") walk(v, k);
     }
   };
-  const put = (s, key) => s.length > 1 && (LANG_FIELDS.has(key) || /\S\s+\S+\s+\S/.test(s)) ? look(s) : null;
+  const put = (s, key) => {
+    const x = s.length > 1 && (LANG_FIELDS.has(key) || /\S\s+\S+\s+\S/.test(s)) ? look(s) : null;
+    if (x !== null && x !== s && x.length < 200) LANG.back.set(x, s);
+    return x;
+  };
   if (data && typeof data === "object") walk(data, "");
   // {name: picture} lists follow translated names
   if (data && data.pics && typeof data.pics === "object" && !Array.isArray(data.pics))

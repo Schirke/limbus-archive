@@ -196,6 +196,20 @@ function gmCopyResult(game, g, share) {
 
 // search without diacritics
 const gmPlain = (s) => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+// an answer's English name when another language is on ("Identity Sinner" names are two texts)
+const gmEn = (x) => {
+  if (!LANG.id) return "";
+  const en = langEn(x.name);
+  if (en !== x.name) return en;
+  if (x.title && x.sub && x.name === x.title + " " + x.sub) return langEn(x.title) + " " + langEn(x.sub);
+  return "";
+};
+// typed-answer suggestions: the shown name or its English; a hit by English only shows the English too
+const gmHits = (q, list) => q.length < 2 ? [] : list.flatMap((x) => {
+  if (gmPlain(x.name).includes(q)) return [x];
+  const en = gmEn(x);
+  return en && gmPlain(en).includes(q) ? [{ ...x, sub: en + (x.sub ? " \u00b7 " + x.sub : "") }] : [];
+});
 const gmShuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(gmRnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 // numbered tracks can't be told apart by ear
 const gmNumbered = (t) => /Battle \d+$|battle theme( \d+)?$/.test(t.name);
@@ -509,8 +523,10 @@ function gmDrawRound() {
   if ($("#gmtype")) {
     const inp = $("#gmtype"), draw = () => {
       const q = gmPlain(inp.value.trim());
-      const hits = q.length < 2 ? [] : g.pool.filter(({ t: o }) => gmPlain(o.name + " " + o.where + " " + o.who.join(" ")).includes(q));
-      $("#gmsugg").innerHTML = hits.map(({ t: o, n }) => `<div data-n="${n}" class="${n === hits[0].n ? "on" : ""}">${esc(o.name)}<i>${esc([o.where, o.fights && o.fights <= 3 ? o.who[0] : ""].filter(Boolean).join(" · "))}</i></div>`).join("");
+      const text = (o) => [o.name, o.where, ...o.who].join(" "), en = (o) => LANG.id ? [o.name, o.where, ...o.who].map(langEn).join(" ") : "";
+      const hits = q.length < 2 ? [] : g.pool.filter(({ t: o }) => gmPlain(text(o)).includes(q) || gmPlain(en(o)).includes(q));
+      const enName = (o) => !gmPlain(text(o)).includes(q) && langEn(o.name) !== o.name ? langEn(o.name) : "";
+      $("#gmsugg").innerHTML = hits.map(({ t: o, n }) => `<div data-n="${n}" class="${n === hits[0].n ? "on" : ""}">${esc(o.name)}<i>${esc([enName(o), o.where, o.fights && o.fights <= 3 ? o.who[0] : ""].filter(Boolean).join(" · "))}</i></div>`).join("");
       $("#gmsugg").querySelectorAll("div").forEach((r) => r.onclick = () => gmAnswer(+r.dataset.n));
     };
     inp.oninput = draw;

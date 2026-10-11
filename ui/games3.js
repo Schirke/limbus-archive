@@ -13,7 +13,7 @@ function gxCopy(text) {
 // a field to type a name into, with the matches under it: arrows move, Enter takes
 function gxType(inp, box, from, pick) {
   inp.oninput = () => {
-    const q = gmPlain(inp.value.trim()), hits = q.length < 2 ? [] : from().filter((x) => gmPlain(x.name).includes(q));
+    const hits = gmHits(gmPlain(inp.value.trim()), from());
     box.innerHTML = hits.map((x, i) => `<div data-k="${esc(x.key)}" class="${i ? "" : "on"}">${esc(x.title || x.name)}<i>${esc(x.sub || "")}</i></div>`).join("");
     box.querySelectorAll("div").forEach((r) => r.onclick = () => pick(r.dataset.k));
   };
