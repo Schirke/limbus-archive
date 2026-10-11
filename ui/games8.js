@@ -1,8 +1,4 @@
-// Games → When was it (an Identity or an E.G.O: put a mark on the game's timeline where it came out — the closer,
-// the more points) and Guess who (for two: each has a hidden Identity out of the same 24; ask about the other's by
-// what it is — the answers are the game's own — and name it first). Guess who is played in a room of the site's
-// server (the live matches' rooms, games6.js) or against the game itself.
-// Shares the styles, the Identities' list (gxIds) and the Daily challenge / duels of games.js / games3.js / games7.js.
+// When was it (place a release on the timeline) and Guess who (for two, in a room or vs the game).
 "use strict";
 
 // ------------------------------------------------------------------ When was it
@@ -128,7 +124,7 @@ const gqTraits = (x) => [["sinner", x.sub], ["season", x.season], ["rank", "0".r
 const gqHas = (x, t) => gqTraits(x).includes(t);
 const gqCards = (seed) => gzMix(gq.ids, gmSeed("who" + seed)).slice(0, GQ_CARDS);
 
-// one player's view: its hidden card, the cards the other's may still be, whose turn it is, what was said
+// one player's view
 function gqSide(id, foe, cards, first, say) {
   return { id, foe, cards, mine: cards[Math.floor(Math.random() * cards.length)], left: new Set(cards.map((x) => x.key)), turn: first, log: [], over: null, theirs: null, say, changed: () => {} };
 }

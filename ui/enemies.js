@@ -1,6 +1,5 @@
 "use strict";
-// Enemy handbook (Database → Enemies): a portrait grid on the left, the picked one's card on the right.
-// Data: /api/enemies (limbusdm/enemies.py) — read from the game's own tables, so it follows every patch.
+// Database → Enemies: portrait grid and the picked one's card (/api/enemies).
 let ENEMIES = null;
 const env = { q: "", sort: "canto", dir: 1, group: "", sel: 0, variant: 0, level: 0, tab: "res" };
 const EN_SORTS = [["canto", "Canto"], ["name", "Name"], ["hp", "HP"], ["speed", "Speed"], ["level", "Level"]];
@@ -12,7 +11,7 @@ const enFirst = (e) => e.variants[0];
 
 routes.enemies = async (args) => {
   const main = $("#main");
-  // (which enemies are Spine-drawn is known only once the app has linked the skeletons, about a minute after its first start)
+  // Spine flags appear once skeletons are linked
   if (ENEMIES && !$("#engrid") && !ENEMIES.list.some((e) => e.spine)) ENEMIES = null;
   if (!ENEMIES) {
     main.innerHTML = `<div class="muted">Loading the handbook…</div>`;
@@ -56,8 +55,7 @@ function drawEnemies() {
   enThumbs();
   enDrawn();
 }
-// sprite enemies without a portrait (the Arknights collab's, …): the app draws their idle pose with the player
-// (a few seconds each, in the background); their tiles fill in as the pictures come
+// sprite enemies without a portrait: idle pose drawn by the player in the background
 async function enDrawn() {
   if (typeof SITE !== "undefined") return;  // (the site's copy of the list never changes)
   while (ENEMIES && ENEMIES.making && location.hash.startsWith("#/enemies") && !enDrawn.busy) {
@@ -107,7 +105,7 @@ function enResists(b) {
 }
 const enStagger = (b, level) => b.stagger.length ? b.stagger.map((p) => `${Math.floor(enHp(b, level) * p / 100)} <small>${p}%</small>`).join(" · ") : "—";
 
-// ---- the Spine idle pose in the card (most enemies are Spine skeletons; the rest are sprites: the game's portrait)
+// Spine idle pose in the card
 const enSpinePick = (list) => (list || []).find((x) => !/destroy|dead|broken|_die/i.test(x.base)) || (list || [])[0];
 let enPlayer = null;
 function enSpineStop() { if (enPlayer) { try { enPlayer.dispose(); } catch (e) { /* already gone */ } enPlayer = null; } }
@@ -120,9 +118,7 @@ async function enSpineStart(x, box) {
   if (!box.isConnected) { if (p) p.dispose(); return; }  // another enemy was picked meanwhile
   enPlayer = p;
 }
-// The grid shows a Spine-drawn enemy as it looks in battle, not by the game's portrait (line art for many, none for
-// the newest chapter's): the page takes a picture of each idle pose, a few at a time, and the app keeps it
-// (data/enemy_thumbs).
+// Spine enemies show their battle look: the page pictures each idle pose, the app keeps it.
 function enNoThumb(e) {
   e.nothumb = true;
   api("/api/enemy_thumb", { app: e.app, none: true }).catch(() => {});

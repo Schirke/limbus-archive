@@ -1,9 +1,4 @@
-"""Patches -> News: the developers' update notices from the game's Steam page, tied to the patches in the archive.
-
-Steam's event list is public (no key). Kept: the weekly "Scheduled Update Notice" (posted on Monday, the patch is on
-Thursday) and the big posts that come with it ("New Content - …", a season guide). Steam has a build field on every
-post, but the developers leave it empty, so a notice finds its patch by the day: the date in its title = the date in a
-snapshot's version (s20261001_…)."""
+"""Patches → News: the developers' Steam update notices, tied to a patch by the date in their title."""
 from __future__ import annotations
 
 import json
@@ -18,7 +13,7 @@ URL = "https://store.steampowered.com/events/ajaxgetpartnereventspageable/?clan_
 IMAGES = "https://clan.akamai.steamstatic.com/images"
 PAGE = "https://store.steampowered.com/news/app/%d/view/%s"
 KEEP = 3600  # seconds the list is served before Steam is asked again
-FIRST = 4  # pages of 100 posts read the first time (about a year and a half); later only the newest page
+FIRST = 4  # pages read the first time; later only the newest
 VERSION = 1
 KST = timezone(timedelta(hours=9))  # the game's dates are Korean time
 NOTICE_RE = re.compile(r"(\d{4})\D{1,3}([A-Za-z]{3})[a-z]*\.?\s*(\d{1,2})\w*\s+Scheduled Update Notice", re.I)
@@ -60,8 +55,7 @@ def _fetch(offset: int) -> list:
 
 
 def posts(data_dir: str, force: bool = False) -> dict:
-    """{"checked", "posts": {gid: post}} from data/news/steam.json, read again from Steam once it is KEEP old.
-    Without a connection the saved list is served as it is."""
+    """Saved posts, refreshed from Steam when KEEP old."""
     path = os.path.join(data_dir, "news", "steam.json")
     try:
         with open(path, encoding="utf-8") as f:
@@ -99,9 +93,7 @@ def _day(version: str) -> str | None:
 
 
 def patches(svc, force: bool = False) -> dict:
-    """The notices grouped by patch day, newest first, each with what the archive has of that patch:
-    {"checked", "error"?, "patches": [{"day", "time", "notice", "extra": [post…], "report", "summary", "snapshot"}]}.
-    "report" is the first report whose newer snapshot carries that day; "snapshot" = one is there, report or not."""
+    """Notices grouped by patch day, newest first, with the archive's report / snapshot of that day."""
     doc = posts(svc.data_dir, force)
     days: dict[str, dict] = {}
     for p in doc.get("posts", {}).values():

@@ -1,5 +1,4 @@
-"""The Community page: who streams the game right now. The list is made on GitHub (scripts/community.py, run by an
-Action with the API keys in the repository's secrets) and read from there — the app holds no keys."""
+"""Community: live streams, listed by a GitHub Action and read from the community-data branch."""
 from __future__ import annotations
 
 import base64
@@ -12,8 +11,7 @@ import urllib.request
 from . import REPO
 
 URL = f"https://raw.githubusercontent.com/{REPO}/community-data/streams.json"
-# (that address answers from a 5 minutes' cache; the same file by its commit is there at once, and the commit the
-# branch is at is asked from the repository itself, as git does — no API, so no hourly limit)
+# raw by branch is cached ~5 min; by commit it is fresh
 REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
 AT = f"https://raw.githubusercontent.com/{REPO}/%s/streams.json"
 KEEP = 50  # seconds a read list is served again
@@ -33,7 +31,7 @@ def _commit() -> str:
 
 
 def streams() -> dict:
-    """{"updated", "en": [...], "ru": [...], "ko": [...], "recommended": [...]}; {} while the list isn't published or the network is down."""
+    """The stream lists; {} while none is published or offline."""
     if time.time() - _cache[0] < KEEP and _cache[1] is not None:
         return _cache[1]
     try:
@@ -48,9 +46,7 @@ def streams() -> dict:
     return doc
 
 
-# The recommended channels (the pictures in the page's corner): links, one a line, in recommended.json on the
-# `community-config` branch. Only the repository's owner can write there — through the GitHub CLI he is logged in
-# with — so the editor (Settings) is for him alone. The script on GitHub reads the list every minute.
+# Recommended channels: recommended.json on `community-config`, saved through gh (owner only).
 REC = f"repos/{REPO}/contents/recommended.json"
 BRANCH = "community-config"
 

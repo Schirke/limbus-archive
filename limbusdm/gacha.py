@@ -1,12 +1,4 @@
-"""Games → Extraction (ui/games5.js): the game's own banners, pools and chances, the lines said on getting a unit,
-the sounds of the extraction and the pictures its screens are made of. Read-only on the game.
-
-- Banners: StaticData gacha/gacha-<id>.json — the featured units, the groups a pull falls into with their shares of
-  10000 (for a plain pull, the tenth of a ten, and the same with every E.G.O of the banner owned), the dates.
-- The art's three passes when a unit is shown: StaticData gacha-panning (only the first Identities have one).
-- Sounds: samples named "0NN_뽑기 연출_…" in the SFX banks, played by /api/quiz_audio like any sample.
-- Pictures: sprites of the main build (resources.assets / sharedassets*), cut once into the UI cache.
-"""
+"""Games → Extraction: banners, pools and chances, acquisition lines, sounds and screen pictures from the game's files."""
 from __future__ import annotations
 
 import datetime
@@ -19,8 +11,7 @@ import threading
 
 VERSION = 1
 GACHA = "Assets/Resources_moved/Gacha/"
-# sprites and textures of the extraction's screens, by their names in the main build
-# the pieces of the game's own menus the app's look is made of (ui/skin.css): frames, plates, the menu's icons
+# sprites of the extraction screens; the menu pieces the app's skin uses
 SKIN = (["MainUI_common_Popup_01_" + n for n in ("23", "26", "27", "37", "btn_t1_normal", "btn_t1_hover")] + ["MainUI_common_Popup_03_23", "MainUI_UserInfo_2_3", "MainUI_UserInfo_2_6",
          "MainUI_Inventory_1_21", "MainUI_Settings_3_8", "MainUI_Settings_3_10", "MainUI_Settings_3_20"] + [f"New_MainUI_PersonalityList_2_{n}" for n in (2, 19, 26, 27)]
         + [f"MainUI_BottomMenu_1_{n}" for n in (9, 10, 11, 12, 13, 14, 19, 21)] + [f"MainUI_Lobby_new_1_{n}" for n in (0, 1, 2, 3, 9, 10)])
@@ -34,8 +25,7 @@ _lock = threading.Lock()
 
 
 def build(svc) -> dict:
-    """{"banners": [{id, pick, tile, typo, illust, end, groups: [{g, ids, occ}]}], "pan": {id: [[x, y, direction] × 3]},
-    "lines": {E.G.O id: [sample, text]}, "snd": {key: sample}, "v"} — banners open today first, the standard one last."""
+    """{banners, pan, lines, snd, v}: open banners first, the standard one last."""
     from .viewer import sound_index
     sid = svc.latest_snapshot_id()
     if not sid:
@@ -57,7 +47,7 @@ def build(svc) -> dict:
             info, folder = b.get("bannerInfo") or {}, ((b.get("bannerInfo") or {}).get("illustList") or [""])[0]
             groups = [{"g": c.get("groupType"), "ids": c.get("elementIdList") or [],
                        "occ": {o["occupancyCase"]: o["occupancy"] for o in c.get("occupancyCaseList") or []}} for c in b.get("contents") or []]
-            # (the guaranteed-000 tickets and the like: no E.G.O and no featured unit — not a banner to pull tens on)
+            # guaranteed tickets and such: not a banner
             if info.get("bannerType") == "PERMANENT" or not groups:
                 continue
             banners.append({"id": b["id"], "kind": info.get("bannerType"), "pick": info.get("pickupIdList") or [], "end": b.get("endDate") or "",
@@ -96,14 +86,13 @@ def build(svc) -> dict:
 
 
 def _archive(svc, banners: list[dict], now: str) -> list[dict]:
-    """The timed banners of this snapshot added to the ones kept from earlier snapshots (data/gacha/archive.json.gz:
-    the game's files describe only the banners of the day), newest first, each with "open"."""
+    """This snapshot's timed banners added to the kept ones (data/gacha/archive.json.gz), newest first."""
     rel = "gacha/archive.json.gz"
     kept = svc.store.read_json(rel) or {}
     old = json.dumps(kept, sort_keys=True)
     for b in banners:
         if b["pick"] and b["kind"] != "DEFAULT":
-            # (a banner's pictures leave the game with it: the paths of the time it was seen are the ones to keep)
+            # keep the pictures' paths of when it was seen
             kept[str(b["id"])] = {**b, **{k: v for k, v in (kept.get(str(b["id"])) or {}).items() if k in ("tile", "typo", "illust") and v and not b[k]}}
     if json.dumps(kept, sort_keys=True) != old:
         svc.store.write_json(rel, kept)
@@ -111,7 +100,7 @@ def _archive(svc, banners: list[dict], now: str) -> list[dict]:
 
 
 def ui_png(name: str, game_data: str, cache_dir: str) -> tuple[bytes, str] | None:
-    """One picture of the extraction's screens → (bytes, mime). All of them are cut on the first call (a few seconds)."""
+    """One picture of the extraction screens → (bytes, mime); all are cut on the first call."""
     if not UI_RE.match(name) or not game_data:
         return None
     folder = os.path.join(cache_dir, "gacha")
@@ -143,7 +132,7 @@ def _extract(game_data: str, folder: str) -> None:
                 n = o.peek_name()
             except Exception:
                 continue
-            # (a sprite sheet's texture has its sprites' names' start: only the effects' textures are taken whole)
+            # sheets' textures are skipped, effect textures taken whole
             if not UI_RE.match(n) or (kind == "Texture2D" and n.startswith("MainUI_")):
                 continue
             try:

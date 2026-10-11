@@ -1,10 +1,5 @@
-"""Does the web copy (limbusdm/site.py) answer what its pages ask for?
-
-The packed site is served from the disk the way its host serves it and every page is opened in a headless browser
-(Edge, which Windows has; Chrome otherwise). The site's service worker notes each request it has no file for
-(ui/site/sw.js, /api/_misses) and the page hands the list over (ui/site/site.js, "?check"). So a page that started
-asking for something new — or a new page — shows up here, not as an error in front of a visitor.
-"""
+"""Checks that the web copy answers what its pages ask: the packed site served locally, every page opened in headless Edge
+/ Chrome, misses reported by the service worker."""
 from __future__ import annotations
 
 import json
@@ -17,7 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 
-# pages that can't work from files (they render with the game's files, or are the app's own controls): never opened
+# pages that can't work from files: never opened
 APP_ONLY = {"versus", "vsroom", "vslive", "browse", "snapshots", "scan", "settings", "sprites"}
 
 
@@ -60,9 +55,7 @@ TABS = 4  # pages looked at at once
 
 
 def check(root: str, routes: list[str] | None = None, progress=None, settle: float = 8.0) -> dict:
-    """{"routes": [every page the UI has], "misses": {page: [requests without a file]}, "error": str | None}.
-    routes: the pages to open (None: all but APP_ONLY). settle: the longest a page is waited for to go quiet (it
-    says so itself: ui/site/site.js)."""
+    """{"routes", "misses": {page: [requests]}, "error"}; settle = longest wait for a page to go quiet."""
     from .site import serve_dir
     out = {"routes": [], "misses": {}, "error": None}
     exe = find_browser()
@@ -91,7 +84,7 @@ def check(root: str, routes: list[str] | None = None, progress=None, settle: flo
         tab.call("Page.enable")
 
         def visit(route: str, n: int, tab=tab) -> dict:
-            # (another "check" value each time: the page loads anew, with the service worker already in charge)
+            # new "check" value: a fresh load with the service worker in charge
             tab.call("Page.navigate", url=f"{base}/?check={n}&settle={int(settle * 1000)}#/{route}")
             end = time.time() + 90
             while time.time() < end:

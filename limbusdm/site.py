@@ -1,17 +1,5 @@
-"""The web copy of the app: patch reports and the Identities & E.G.O database written out as a static site.
-
-The site is the app's own UI (ui/) plus a service worker (ui/site/sw.js) that answers the UI's /api/… requests from
-files. This module makes those files: it asks the app's own server for every URL the pages can request and saves
-the answers under <out>/d/, named by content, with manifests "URL → file". Nothing is rendered twice — the site
-shows exactly what the app shows. The other pages are stubs there (ui/site/site.js).
-
-Layout of <out> (data/site by default):
-  index.html, sw.js, robots.txt, ui/…        the UI
-  d/index.json                               the manifests' names + small answers kept inline (state…)
-  d/m/<name>.json.gz                         URL → file
-  d/tr/<name>.json.gz                        KR/JP line → English, from the app's translation cache
-  d/f/<ab>/<sha1>.<ext>                      the files
-"""
+"""The web copy: the app's UI plus a service worker that answers /api/… from files saved here (<out>/d/, named by content,
+with URL → file manifests)."""
 from __future__ import annotations
 
 import gzip
@@ -38,13 +26,11 @@ EXT = {"image/png": "png", "image/webp": "webp", "image/jpeg": "jpg", "image/gif
 DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "enemies": True, "music": True, "spine": True, "clips": True,
             "games": True,
             "project": "", "url": ""}
-# the site's addresses it has moved from → where it is now (a config still naming the old one is read as the new)
+# old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
-# the pages the site is written for (each has its part in Exporter); any other page of the UI is opened on the site
-# only when the check finds it asking for nothing the site lacks (verify)
+# pages the site is written for; others open only when the check finds nothing missing
 BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners"]
-# the sections' pages for search engines (Exporter.section_pages): route → (name, a line of what is there); the
-# games not named here take their name from the menu
+# section pages for search engines: route → (name, description)
 SECTIONS = {
     "patches": ("Patch reports", "What every Limbus Company update changed, read from the game's files: new Identities and E.G.O, "
                 "changed skills and texts, new pictures, sounds and videos."),
@@ -65,8 +51,7 @@ SECTIONS = {
     "support": ("Support & credits", "Support the Limbus Archive project, and who made it."),
     "home": ("Limbus Archive", "Limbus Company fan archive: patch highlights, Identity and E.G.O database, enemies, animations, music and mini-games."),
 }
-# requests the check never fetches by itself: the app's own state and controls, renders, the game's raw files, and the
-# ones a part of Exporter makes its own way
+# requests the check never fetches by itself
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
                      r"local_video|sprites|browse|tree|types|container|scan|bank|export|open|site_|object|blob|report|characters|"
                      r"music_audio|quiz_audio|community|buff)")  # (community: who is live right now — a copy would only go stale)
@@ -81,13 +66,7 @@ def out_dir(svc) -> str:
 
 
 def config(svc) -> dict:
-    """data/site_config.json: {"contact": "Discord: name", "audio": true, "video": true, "full_images": true,
-    "project": the Cloudflare Worker the site is uploaded to (none: the site is only written to disk), "url": its address,
-    "index": true = search engines may list the site (kept out otherwise), "google_verify": Google Search Console's
-    code for the front page's verification tag, "stats_key": who may open Site stats, "owner_key": who sees the allowance there (the page is opened once as
-    #/community/stats/<key>), "budget": {"day": the day of the month the Cloudflare plan's period starts
-    on, "requests", "objects", "rows": what a period may spend of Worker requests, Durable Object requests and rows
-    written before the count and the live rooms are closed until the next one (ui/site/worker.js)}}."""
+    """data/site_config.json, over DEFAULTS."""
     c = dict(DEFAULTS)
     try:
         with open(os.path.join(svc.data_dir, "site_config.json"), encoding="utf-8") as f:
@@ -99,8 +78,7 @@ def config(svc) -> dict:
 
 
 def build_info(svc) -> dict:
-    """What a copy of the site was made from: the app's version, a hash of its pages (ui/ — they are the site's pages
-    too, so a change there shows even between releases), when, and the game version the data is of."""
+    """What a copy was made from: app version, hash of ui/, time, game version."""
     ui, h = os.path.join(resource_dir(), "ui"), hashlib.sha1()
     for d, dirs, files in os.walk(ui):
         dirs.sort()
@@ -115,10 +93,7 @@ def build_info(svc) -> dict:
 
 
 def worker_config(svc) -> str:
-    """The site's server as wrangler takes it: data/site_worker with the Worker's script (ui/site/worker.js: the files
-    as they are, the rooms of the Games' live matches and the count of the site's visitors — Durable Objects) and its
-    config, written anew each time.
-    -> the config's path."""
+    """Writes data/site_worker (worker.js + wrangler config); returns the config's path."""
     folder = os.path.join(svc.data_dir, "site_worker")
     os.makedirs(folder, exist_ok=True)
     shutil.copyfile(os.path.join(resource_dir(), "ui", "site", "worker.js"), os.path.join(folder, "worker.js"))
@@ -135,7 +110,7 @@ def worker_config(svc) -> str:
         cfg["vars"]["BUDGET"] = json.dumps(config(svc)["budget"])
     if config(svc)["url"]:  # the site's own address: its old one (*.workers.dev) and www. move there (worker.js moved)
         cfg["vars"]["HOME"] = config(svc)["url"].rstrip("/")
-        # (a file is served without the Worker unless asked: the pages go through it, the data and the UI's files don't)
+        # data and UI files skip the Worker
         cfg["assets"]["run_worker_first"] = ["/*", "!/d/*", "!/ui/*", "!/sw.js"]
     path = os.path.join(folder, "wrangler.jsonc")
     with open(path, "w", encoding="utf-8") as f:
@@ -144,7 +119,7 @@ def worker_config(svc) -> str:
 
 
 def deploy_command(svc) -> str:
-    """The upload as a command to run by hand (it sends data/site_packed as it was prepared last)."""
+    """The upload command to run by hand."""
     return f'npx wrangler deploy -c "{worker_config(svc)}"'
 
 
@@ -184,7 +159,7 @@ def _bilibili_live() -> dict:
 
 
 def url_key(path: str, /, **q) -> str:
-    """A request as the service worker names it: the path and its parameters sorted, not encoded."""
+    """A request as the service worker names it (path + sorted params)."""
     parts = sorted(f"{k}={v}" for k, v in q.items() if v is not None)
     return path + ("?" + "&".join(parts) if parts else "")
 
@@ -203,8 +178,7 @@ def js_string(v) -> str:
 
 
 def public(rep: dict) -> dict:
-    """A report without the player's own files. The game's folder in LocalLow holds the account's save
-    (save_slot_<account>.json), logs and analytics next to the game's data; only its notices are the game's."""
+    """A report without the player's own files (LocalLow saves, logs)."""
     own = lambda it: str(it.get("path") or "").startswith("locallow/") and not str(it["path"]).startswith("locallow/notice/")
     rep = dict(rep, sections={k: [it for it in v if not own(it)] for k, v in rep["sections"].items()},
                foreign_only=[f for f in rep.get("foreign_only", []) if not str(f.get("file") or "").startswith("locallow/")])
@@ -215,7 +189,7 @@ def public(rep: dict) -> dict:
 
 # ------------------------------------------------------------------ what a page asks for
 def report_urls(rep: dict, cfg: dict) -> list[str]:
-    """Every request ui/app.js can make while a report is open (the "Other" tab's raw objects aside)."""
+    """Every request the report page can make."""
     S, urls = rep["sections"], []
     obj = lambda it, **x: url_key("/api/object", bundle=it["bundle"], pid=it["pid"], **x)
     urls += [url_key("/api/report", id=rep["id"]), url_key("/api/patchnotes", id=rep["id"])]
@@ -225,7 +199,7 @@ def report_urls(rep: dict, cfg: dict) -> list[str]:
             h = side and (side.get("h") if side.get("type") == "Texture2D" else side.get("tex"))
             if h:
                 urls.append(url_key("/api/thumb", h=h))
-        # the picture itself: every image with a path in the game (the nameless sheet pieces number tens of thousands)
+        # full pictures of every image with a game path
         if n and it.get("path") and cfg["full_images"]:
             urls.append(obj(it))
     for sec in ("texts", "data", "video", "code"):
@@ -272,13 +246,12 @@ def unit_urls(units: dict) -> list[str]:
             (full if key in ("art", "art2") else thumbs).add(o)
     walk(units)
     for u in units.get("ids", []) + units.get("egos", []):
-        # (a skill's picture is named by its `icon` where it has one, and the defense skills have pictures too: the
-        # page and Guess the skill ask for them the same way — ui/db.js, ui/games2.js)
+        # skill pictures by `icon`, defense skills too
         for s in (u.get("skills") or []) + (u.get("defense") or []):
             icon = f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png"
             thumbs.add(icon)
             full.add(icon)  # drawn into its sin frame
-    # (an E.G.O's skills have no pictures of their own: its profile picture goes into their frames — ui/db.js skillView)
+    # E.G.O skills use the E.G.O's picture
     full.update(u["img"]["thumb"] for u in units.get("egos", []) if (u.get("img") or {}).get("thumb"))
     urls += [url_key("/api/asset_thumb", path=p) for p in sorted(thumbs)]
     urls += [url_key("/api/asset_img", path=p) for p in sorted(full)]
@@ -292,7 +265,7 @@ def _ffmpeg() -> str:
 
 
 def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
-    """A smaller form of an answer for the web: PNG → WebP, WAV → Opus. Anything that fails stays as it is."""
+    """Smaller form for the web: PNG → WebP, WAV → Opus; failures stay as they are."""
     spine, music = key.startswith("/spine/"), key.startswith("/api/music_audio")
     try:
         if ctype == "image/png" and len(data) > 20_000:
@@ -317,10 +290,8 @@ def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
 
 
 def _grouped(got: dict, first: list[tuple[list, int]]) -> tuple[dict, list]:
-    """A manifest's files in the order they are packed, and its "groups" [[how many requests, pack size], …]: each of
-    `first` (requests, pack size) is a group of its own, the rest follows in packs of the usual size. The Games ask
-    for one file at random a round, and a pack is fetched whole: what a game needs all of sits together, what it
-    needs one of at a time sits in small packs."""
+    """A manifest's files in pack order, and its "groups" [[count, pack size]]: random-per-round files go in small
+    packs."""
     urls, groups = {}, []
     for keys, size in first:
         n = 0
@@ -383,8 +354,7 @@ class Exporter:
         return self._store(data, ctype, gz=ctype in ("application/json", "text/plain") and len(data) > 4000)
 
     def fetch_all(self, keys: list[str], have: dict, stage: str, sources: dict | None = None) -> dict:
-        """keys → {key: file}; `have` = the manifest written last time, whose files are kept.
-        sources: {key: the request that really gives its content} where the page's own request isn't the one to make."""
+        """keys → {key: file}; `have` = last manifest; sources: the request that really gives a key's content."""
         out, todo, resumed, sources = {}, [], 0, sources or {}
         for k in keys:
             f = have.get(k)
@@ -407,15 +377,13 @@ class Exporter:
                     self._journal_add(k, f)
                 done[0] += 1
                 self.progress(stage, done[0], len(todo), k)
-        # sounds are decoded one at a time by the app (FMOD), pictures come from the bundles a few at once
+        # sounds one at a time (FMOD), pictures a few at once
         with ThreadPoolExecutor(4) as pool:
             list(pool.map(one, todo))
         self.fresh[stage.replace("site: ", "")] = resumed + sum(1 for k in todo if k in out)  # (the rest: the app has nothing there)
         return out
 
-    # -- a send that stops halfway: what it fetched is written down as it comes (d/fetched.txt, not uploaded), so the
-    # next send goes on from there (the manifests are written only at the end of each part). A list asked again every
-    # time (a request without parameters) and the rendered videos (kept by their own rules) are not written down.
+    # a send that stops halfway goes on next time from d/fetched.txt
     def _journal_path(self) -> str:
         return os.path.join(self.out, "d", JOURNAL)
 
@@ -468,9 +436,7 @@ class Exporter:
 
     # -- what a manifest of an earlier send still holds
     def kept(self, old: dict, skip=()) -> dict:
-        """The files of `old` (a manifest written before) that stand for this game version: all of them when it was
-        made from the same game version (the time it was read on a computer doesn't count); after a game update, the
-        ones whose source the update left alone (unchanged()); none when that can't be told."""
+        """Files of an older manifest still valid for this game version."""
         if not old.get("id"):
             return {}
         urls = {k: f for k, f in (old.get("urls") or {}).items() if k not in skip}
@@ -480,8 +446,7 @@ class Exporter:
         return {k: f for k, f in urls.items() if same(k)} if same else {}
 
     def unchanged(self, old_id: str):
-        """→ request -> whether the game version `old_id` answers it as this one does, from the two snapshots (None
-        when this computer has no snapshot of that version)."""
+        """→ whether game version `old_id` answers a request as this one does (None: unknown)."""
         g = _game(old_id)
         if g not in self._same:
             sid = self.svc.latest_snapshot_id()
@@ -494,8 +459,7 @@ class Exporter:
         return self._same[g]
 
     def _text(self, key: str, have: dict) -> str:
-        """An answer that names what else to fetch (a list, an atlas): read back from the file the site keeps for it,
-        asked from the app only when there is none — a second "Send to site" walks the lists without the app."""
+        """An answer naming what to fetch next, read back from the site's own file when it has one."""
         rel = have.get(key) or self.journal.get(key)
         if rel:
             try:
@@ -537,7 +501,7 @@ class Exporter:
         old = self.read_manifest(name)
         keys = report_urls(rep, self.cfg)
         keys.remove(url_key("/api/report", id=rid))  # the site gets the report as cleaned above, not the app's file
-        # a highlighted path opens through the Files page's requests: its folder's listing, then what the path holds
+        # a highlighted path: its folder listing, then its contents
         extra = []
         for k in [k for k in keys if k.startswith("container:")]:
             path = k[10:]
@@ -567,7 +531,7 @@ class Exporter:
         return m
 
     def _translations(self, name: str, rep: dict):
-        """The lines the UI would send to /api/translate, as far as the app has translated them already."""
+        """Lines the UI would translate, as far as already translated."""
         tr = self.svc.translator
         found = {}
 
@@ -603,16 +567,14 @@ class Exporter:
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)  # (another game version: only what it left alone is kept)
         units = self.svc.unit_db()
-        # (the lists are the app's own making: a newer app writes them anew for the same game version)
+        # the app's own lists: asked again every time
         got = self.fetch_all(unit_urls(units), {k: f for k, f in have.items() if k != "/api/units"}, "site: Identities & E.G.O")
-        # the Games draw these at random: every round shows four Identities' faces (all of them in a pack or two of
-        # their own: fetched once, then every round is there) and Guess the skill one skill's picture (small packs)
+        # faces in their own packs, skill pictures in small packs (the games pick at random)
         thumb = lambda p: url_key("/api/asset_thumb", path=p)  # noqa: E731
         ids = units.get("ids", [])
         faces = [thumb(x["img"]["thumb"]) for x in ids if (x.get("img") or {}).get("thumb")]
         icons = [thumb(f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png") for x in ids for s in x.get("skills", []) + x.get("defense", [])]
-        # an Identity's / E.G.O's card: its art and its skills' pictures in a pack of its own (they lay scattered over
-        # packs of the usual size: a megabyte each for a part of one), the second art, shown on a click, in the next
+        # a card's art and skill pictures in a pack of their own, the second art in the next
         img = lambda p: url_key("/api/asset_img", path=p)  # noqa: E731
         cards = []
         for x in ids + units.get("egos", []):
@@ -624,7 +586,7 @@ class Exporter:
             cards.append((own, CARD_PACK))
             if im.get("art2"):
                 cards.append(([img(im["art2"])], CARD_PACK))
-        # the keywords' little pictures (1,500 of them, a card shows about ten): in small packs, by name
+        # keyword icons in small packs, by name
         words = sorted(k for k in got if k.startswith("/api/asset_thumb?") and "/Buf/" in k)
         urls, groups = _grouped(got, [(faces, PACK), (icons, GAME_PACK), (words, WORD_PACK)] + cards)
         m = {"kind": "units", "id": sid, "urls": urls, "groups": groups}
@@ -632,8 +594,7 @@ class Exporter:
         return m
 
     def enemies(self) -> dict:
-        """The enemy handbook (ui/enemies.js): the list, each entry's texts, the grid's pictures, the idle pose's
-        Spine files and the skill icons."""
+        """The enemy handbook: list, texts, pictures, idle-pose Spine files, skill icons."""
         old = self.read_manifest("enemies")
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)
@@ -671,8 +632,7 @@ class Exporter:
                     pass
         keys += [url_key("/api/asset_thumb", path=p) for p in sorted(thumbs)] + [url_key("/api/asset_img", path=p) for p in sorted(full)]
         got = self.fetch_all(list(dict.fromkeys(keys)), have, "site: Enemies")
-        # the grid's pictures in small packs, in the grid's order: a screen of tiles is a few of them, and Guess the
-        # enemy asks for one picture a round (a pack of the usual size each time before)
+        # grid pictures in small packs, in grid order
         tiles = [url_key("/api/enemy_thumb", app=e["app"]) for e in db["list"] if e.get("app")]
         urls, groups = _grouped(got, [(["/api/enemies"], PACK), (tiles, VOICE_PACK)])
         m = {"kind": "enemies", "id": sid, "urls": urls, "groups": groups}
@@ -680,12 +640,11 @@ class Exporter:
         return m
 
     def music(self) -> dict:
-        """The corner player's soundtrack: every track straight from its sound bank as Opus (the app's own answer is
-        AAC made for its player's cache)."""
+        """The soundtrack as Opus straight from the banks."""
         old = self.read_manifest("music")
         tracks = self.svc.music()["tracks"]
         src = {url_key("/api/music_audio", n=n): url_key("/api/bank", path=t["bank"], i=t["i"]) for n, t in enumerate(tracks)}
-        # the player numbers the tracks: a file is kept only while its number still means the same sound
+        # keep a file only while its track number means the same sound
         have = {k: f for k, f in old.get("urls", {}).items() if old.get("src", {}).get(k) == src.get(k)}
         urls = self.fetch_all(list(src), have, "site: Music", src)
         urls["/api/music"] = self.fetch("/api/music") or ""
@@ -694,10 +653,8 @@ class Exporter:
         return m
 
     def anim(self) -> dict:
-        """The Animations page as far as a browser can play it alone: the Spine skeletons (animated art of Identities
-        and E.G.O, enemies, abnormalities, the RPG's people) with the illustration's layers around them, and the
-        Identities' and E.G.O's battle animations (clips() — with them every Identity and E.G.O is in the list;
-        without, only those with a skeleton). Renders with effects need the game's files and the app."""
+        """Animations: Spine skeletons with illustration layers, and battle clips (clips()). Effect renders need the
+        app."""
         old = self.read_manifest("anim")
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)
@@ -761,13 +718,10 @@ class Exporter:
             return json.load(f)
 
     def clips(self, ids: list, have: dict) -> list[str]:
-        """Battle animations of the Identities and E.G.O (ui/app.js loadClip): each one's list of clips, every clip
-        with and without "all animated layers", and the sprites the clips draw. → the requests, lists first; the
-        lists and the clips are fetched here (they name what comes next), the sprites by the caller."""
+        """Battle clips of Identities / E.G.O: lists and clips fetched here, sprites by the caller."""
         lists = [url_key("/api/owner_clips", id=i) for i in ids]
         got = self.fetch_all(lists, have, "site: Animations (clip lists)")
-        # what the lists and the clips named the last time is kept (d/clips.json, not uploaded) and stands while
-        # their files are the same ones: thousands of files aren't read again for a list that didn't change
+        # what lists and clips named last time is kept (d/clips.json) while their files are the same
         sig = lambda keys, files: hashlib.sha1("\n".join(files.get(k) or "" for k in keys).encode()).hexdigest()  # noqa: E731
         kept_path = os.path.join(self.out, "d", "clips.json")
         kept = _read_json(kept_path)
@@ -803,8 +757,7 @@ class Exporter:
         return lists + clips + sprites
 
     def quiz(self) -> dict:
-        """Games → Guess the Identity (ui/games2.js): the voice lines' list and every line as sound. (Guess the skill
-        plays with the Identities' data, Guess the track with the music.)"""
+        """Guess the Identity: the voice line list and every line's sound."""
         old = self.read_manifest("quiz")
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)
@@ -816,16 +769,14 @@ class Exporter:
         keys += [url_key("/api/asset_thumb", path=p) for p in sorted({c.get("pic") for c in q.get("chars") or []} - {None, ""})]
         # (the list is the app's own making: a newer app has more in it for the same game version)
         got = self.fetch_all(keys, {k: f for k, f in have.items() if k != "/api/quiz"}, "site: Games (voice lines)")
-        # a round plays one line out of thousands: the lines sit in small packs (a pack is fetched whole)
+        # lines in small packs
         urls, groups = _grouped(got, [(keys[:1], PACK), ([k for k in keys if k.startswith("/api/quiz_audio")], VOICE_PACK)])
         m = {"kind": "quiz", "id": sid, "urls": urls, "groups": groups}
         self.write_manifest("quiz", m)
         return m
 
     def scenes(self) -> dict:
-        """Games → Guess the Canto (ui/games3.js): the story's backgrounds, full size (a round zooms into one) and
-        their previews (the result's table). The list names them from the folder on, so the check takes none of
-        them by itself."""
+        """Guess the Canto: story backgrounds full size and their previews."""
         old = self.read_manifest("scenes")
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)
@@ -839,11 +790,11 @@ class Exporter:
         thumbs = [url_key("/api/asset_thumb", path=p) for p in paths]
         got = self.fetch_all(["/api/game_pics"] + full + thumbs, {k: f for k, f in have.items() if k != "/api/game_pics"},
                              "site: Games (story backgrounds)")
-        # a round shows one background out of hundreds: a pack each, or nearly (a pack is fetched whole)
+        # a background a pack, or nearly
         urls, groups = _grouped(got, [(["/api/game_pics"], PACK), (full, SCENE_PACK), (thumbs, GAME_PACK)])
         m = {"kind": "scenes", "id": sid, "urls": urls, "groups": groups}
         self.write_manifest("scenes", m)
-        # (the check fetched the list by itself before this part existed, without the backgrounds: that copy would win)
+        # drop the old auto-fetched copy
         extra = self.read_manifest("extra")
         if "/api/game_pics" in extra.get("urls", {}):
             del extra["urls"]["/api/game_pics"]
@@ -851,15 +802,14 @@ class Exporter:
         return m
 
     def gacha(self) -> dict:
-        """Games → Extraction (ui/games5.js): the banners' list, their pictures, the extraction's own pictures and
-        sounds, the lines E.G.O say. (The Identities' lines are among the quiz's, the art among the units'.)"""
+        """Extraction: banners, their pictures, screen pictures and sounds, E.G.O lines."""
         from . import gacha
         old = self.read_manifest("gacha")
         sid = self.svc.latest_snapshot_id()
         have = self.kept(old)
         g = gacha.build(self.svc)
         keys = ["/api/gacha"] + [url_key("/api/gacha_ui", n=n) for n in gacha.UI_USED]
-        # (the archive's banners too: Extraction → Banner archive shows their tiles, and "Pull" opens one of them)
+        # archive banners too
         keys += [url_key("/api/asset_img", path=b[k]) for b in g["banners"] + g.get("archive", []) for k in ("tile", "typo", "illust") if b.get(k)]
         keys = list(dict.fromkeys(keys))
         sounds = [url_key("/api/quiz_audio", s=s) for s in sorted(set(g["snd"].values()))]
@@ -873,9 +823,7 @@ class Exporter:
     CARDS = 9  # pictures kept for each card of the Games page (it draws three)
 
     def cards(self) -> dict:
-        """The Games page's cards (ui/games.js gmHubPics): the app picks random pictures each time; the site keeps one
-        handful per game, picked once per game version, under requests of their own ("hub=1") — so they sit together
-        in a pack or two instead of one pack each. The list itself is answered from index.json."""
+        """Games page cards under "hub=1" requests, so they sit in a pack or two."""
         from urllib.parse import parse_qsl, urlsplit
         old = self.read_manifest("cards")
         sid = self.svc.latest_snapshot_id()
@@ -884,7 +832,7 @@ class Exporter:
         except Exception as e:
             self.failed.append(("/api/game_cards", str(e)))
             picked = {}
-        # the app's answer is a preset (server.CARD_PRESET): the same as last time unless the preset was changed
+        # the preset: same as last time unless changed
         kept = bool(old.get("id")) and (old.get("cards") or {}) == picked
         if kept:
             picked = old["cards"]  # the same pictures as last time: nothing is uploaded again
@@ -896,8 +844,8 @@ class Exporter:
         return m
 
     def extra(self, keys: list[str]) -> int:
-        """Requests the check found unanswered, fetched as they are (manifest "extra"); a list that comes back is read
-        for the game's picture paths, whose previews and pictures are fetched too. Returns how many got a file."""
+        """Requests the check found unanswered (manifest "extra") plus the pictures their lists name; returns how many got
+        a file."""
         old = self.read_manifest("extra")
         sid = self.svc.latest_snapshot_id()
         urls = self.kept(old)
@@ -926,9 +874,7 @@ class Exporter:
         return len(got)
 
     def buffs(self) -> dict:
-        """Database → Buff effects (ui/buffs.js): the list and the effects' videos the app has made by now (they are
-        drawn by the Unity player on this computer: the page's "Make all videos"). The site's list says of every
-        other effect that it has no video, and that nothing can be made there."""
+        """Buff effects: the list and the videos made so far (none can be made on the site)."""
         from .viewer import _safe_name
         old = self.read_manifest("buffs")
         fx = self.svc.buff_fx
@@ -937,7 +883,7 @@ class Exporter:
         st = {"list": fx.db()["list"], **fx.status()}
         names = list(dict.fromkeys(n for b in st["list"] for n in b.get("fx") or []))
         ready = set(st["have"])
-        # (and the ones the site keeps already: made on another computer, taken from the site by pull)
+        # and those the site has already
         keys = [url_key("/api/buff_video", name=n) for n in names if _safe_name(n) in ready or url_key("/api/buff_video", name=n) in have]
         urls = self.fetch_all(keys, have, "site: Buff effects")
         on_site = {n for n in names if url_key("/api/buff_video", name=n) in urls}
@@ -946,7 +892,7 @@ class Exporter:
         urls["/api/buffs"] = self._store(json.dumps(st, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
         m = {"kind": "buffs", "id": made, "urls": urls}
         self.write_manifest("buffs", m)
-        # (the check fetched the list by itself before this part existed: that copy would win over this one)
+        # drop the old auto-fetched copy
         extra = self.read_manifest("extra")
         if any(k.startswith("/api/buff") for k in extra.get("urls", {})):
             extra["urls"] = {k: f for k, f in extra["urls"].items() if not k.startswith("/api/buff")}
@@ -954,10 +900,7 @@ class Exporter:
         return m
 
     def tools(self) -> dict:
-        """Tools → Mirror Dungeon planner (ui/mirror.js) and Patches → Change history (ui/history.js): their lists and
-        the pictures they name — the gifts and packs, the changed cards and skills. The lists are the app's own
-        work (not a snapshot's), so they are asked again every time; the pictures are kept while the game version
-        is the same."""
+        """Mirror planner and Change history: lists (asked every time) and the pictures they name."""
         old = self.read_manifest("tools")
         sid = self.svc.latest_snapshot_id()
         lists = ["/api/mirror", "/api/history"]
@@ -987,9 +930,7 @@ class Exporter:
         return m
 
     def langs(self) -> dict:
-        """The game's texts in other languages (limbusdm/langs.py): each language's tables and the list of them. A
-        table is kept while its texts are the same (`src`: the table file it was made from). A computer with no
-        players' translations of its own leaves the ones taken from the site as they are (pull)."""
+        """Language tables and their list; a table is kept while its source is the same."""
         from . import langs
         old = self.read_manifest("langs")
         if old and not langs.own(self.svc):
@@ -1011,8 +952,7 @@ class Exporter:
         return m
 
     def small(self) -> dict:
-        """Pages that are one list each, asked again every time: News (the developers' notices from Steam, as they
-        are when the site is sent)."""
+        """One-list pages asked every time: News."""
         urls = self.fetch_all(["/api/news"], {}, "site: News")
         m = {"kind": "small", "id": self.svc.latest_snapshot_id(), "urls": urls}
         self.write_manifest("small", m)
@@ -1045,13 +985,13 @@ class Exporter:
 
     # -- the site around the data
     def shell(self):
-        """index.html, the UI's files and the service worker; d/index.json from the manifests that are there."""
+        """index.html, UI files, service worker, d/index.json."""
         ui = os.path.join(resource_dir(), "ui")
         shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico"))
         shutil.copyfile(os.path.join(ui, "site", "sw.js"), os.path.join(self.out, "sw.js"))
         with open(os.path.join(ui, "index.html"), encoding="utf-8") as f:
             html = f.read()
-        # the UI's scripts start asking /api at once: they are loaded only when the service worker is in charge
+        # scripts load only once the service worker is in charge
         scripts = re.findall(r'<script src="([^"]+)"></script>\s*', html)
         html = re.sub(r'<script src="[^"]+"></script>\s*', "", html)
         stamp = str(int(time.time()))
@@ -1092,9 +1032,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 """
         html = html.replace("</head>", f'<link rel="stylesheet" href="/ui/site/site.css?{stamp}">\n</head>')
         html = html.replace("</body>", boot + "</body>")
-        # every section has a page of its own (/db, /enemies…): its title, description and a text of what is there —
-        # the app's pages live after "#", which a search engine takes for the front page. A visitor gets the app
-        # opened on that section (ui/site/site.js)
+        # a page per section for search engines; visitors get the app on that section
         for fn in os.listdir(self.out):
             if fn.endswith(".html") and fn != "index.html":
                 os.remove(os.path.join(self.out, fn))
@@ -1122,7 +1060,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
     # -- the sections' own pages, for search engines (shell)
     def _answer(self, key: str):
-        """What the site answers to `key` (an /api/… list), read back from its own files; None when it has none."""
+        """What the site answers to `key`, from its own files; None when it has none."""
         for fn in sorted(os.listdir(os.path.join(self.out, "d", "m"))):
             if fn.startswith("report-") or not fn.endswith(".json.gz"):
                 continue
@@ -1136,8 +1074,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         return None
 
     def section_pages(self, html: str) -> dict:
-        """{route: (title, description, the page's text)} for every section the site opens, the front page ("home")
-        first. The games' names come from the menu (ui/index.html), the lists from what the site holds."""
+        """{route: (title, description, text)} for every open section, "home" first."""
         names = {}
         for route, attrs, label in re.findall(r'<a href="#/([\w/]+)"([^>]*)>(.*?)</a>', html):
             t = re.search(r'title="([^"]+)"', attrs)
@@ -1155,7 +1092,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         return pages
 
     def _section_text(self, route: str) -> str:
-        """The lists a section shows, as plain text a search engine reads (the app draws the page over it)."""
+        """A section's lists as plain text for search engines."""
         e = lambda v: html_escape(str(v or ""))  # noqa: E731
         out = []
 
@@ -1240,8 +1177,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         state = {"game": {"ok": True, "dir": "", "catalog": ""}, "snapshots": used, "reports": reports, "job": None,
                  "watch": {"state": "", "last_check": ""}, "settings": {}, "data_dir": "", "update": None,
                  "version": __import__("limbusdm").__version__, "site": True}
-        # the app's own "what's new" (the releases' notes from GitHub), as they read now: the site shows them to who
-        # has an older copy open (ui/site/site.js). Not read this time -> the ones sent before stay
+        # the app's release notes, shown to visitors with an older copy open; kept when not read
         path = os.path.join(self.out, "d", "index.json")
         from . import appnotes
         notes = appnotes.history()
@@ -1250,8 +1186,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         idx = {"v": VERSION, "stamp": int(time.time()), "build": build_info(self.svc), "manifests": [n for n in names if ms[n]],
                "tr": sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "tr")) if fn.endswith(".json.gz"))
                if os.path.isdir(os.path.join(self.out, "d", "tr")) else [],
-               # answered from the net by the visitor's browser itself: the list of live streams, made on GitHub
-               # and Bilibili's videos (scripts/bilibili.py writes them there: a browser can't ask Bilibili)
+               # read by the visitor's browser: live streams and Bilibili lists on GitHub
                "live": {"/api/community": __import__("limbusdm.community", fromlist=["URL"]).URL, **_bilibili_live()},
                "inline": {"/api/state": state, "/api/marks": {}, "/api/appnotes": {}, "/api/appnotes?all=1": notes, "/api/mods_owned": [],
                           "/api/patchnotes?new=1": {"id": None}, "/api/game_cards": (ms.get("cards") or {}).get("cards") or {}}}
@@ -1284,7 +1219,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 
 PULL_STAGE = "site: taking from the site"
-# what pull() takes of the site's parts (not the reports, the rendered videos or News: those have rules of their own)
+# parts pull() takes from the site
 TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "cards", "tools", "extra", "music")
 PULL_THREADS, PULL_TRIES = 10, 3
 PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
@@ -1296,8 +1231,7 @@ def pack_index_path(svc) -> str:
 
 
 class PackIndex:
-    """{pack: {offset: file}} of the packs this computer made or took from the site. A pack is named by the files in it,
-    so what it holds never changes: pull() takes a pack from the site only when a file of it is missing here."""
+    """{pack: {offset: file}} of packs made or taken; a pack never changes, pull takes one only when a file is missing."""
 
     def __init__(self, path: str):
         self.path, self.lock, self.today, self.saved = path, threading.Lock(), int(time.time() // 86400), time.time()
@@ -1319,7 +1253,7 @@ class PackIndex:
             p["f"][str(off)] = rel
 
     def save(self, every: float = 0):
-        """Written now, or when `every` seconds went by since the last time (a pull that is cancelled keeps the rest)."""
+        """Write now, or once `every` seconds passed."""
         with self.lock:
             if time.time() - self.saved < every:
                 return
@@ -1331,15 +1265,12 @@ class PackIndex:
 
 
 def _game(made: str) -> str:
-    """A snapshot's (or a renders folder's) name without the time it was read on this computer: the same game version
-    on two computers."""
+    """Snapshot / renders folder name without its local read time."""
     return re.sub(r"_\d{8}-\d{6}", "", made or "")
 
 
 def _unchanged(a: dict, b: dict):
-    """→ request -> whether its answer is the same in the game version of snapshot b as in a's: what it is read from —
-    a bundle, a sound bank — is the same file in both (by its hash). Requests read from anything else (the game's
-    lists, its main build, pictures the app draws) say no and are asked again."""
+    """→ whether a request answers the same in snapshots a and b (its source file has the same hash)."""
     ba, bb = a.get("bundles") or {}, b.get("bundles") or {}
     aa, ab = a.get("assets") or {}, b.get("assets") or {}
     fa, fb = a.get("files") or {}, b.get("files") or {}
@@ -1372,9 +1303,7 @@ def _unchanged(a: dict, b: dict):
 
 
 class Puller:
-    """What the site has and this computer's site files lack, taken back from the site: the reports and the rendered
-    videos sent from another computer, so a "Send to site" from here keeps them. The files come back as they were
-    written (named by their content), out of the packs and parts pack() made of them."""
+    """Takes back from the site what this computer lacks (reports, videos sent from elsewhere), out of the packs."""
 
     def __init__(self, ex: Exporter, url: str):
         self.ex, self.url = ex, url.rstrip("/")
@@ -1409,7 +1338,7 @@ class Puller:
             self.taken += 1
 
     def file(self, where) -> str:
-        """One file of a manifest as the site has it → its name in the site's files (written here when missing)."""
+        """One manifest file as the site has it → its local file name (written when missing)."""
         if isinstance(where, str):  # on its own
             if not os.path.exists(os.path.join(self.ex.out, "d", where)):
                 self._put(where, self.get(where))
@@ -1440,8 +1369,7 @@ class Puller:
         return rel
 
     def files(self, urls: dict) -> dict:
-        """{request: where on the site} → {request: file}; a pack is fetched once for all it holds. Raises when a file
-        could not be taken (the upload would take it off the site)."""
+        """{request: where on the site} → {request: file}; a pack is fetched once. Raises when a file can't be taken."""
         by_pack: dict = {}
         for k, w in urls.items():
             by_pack.setdefault(w[0] if isinstance(w, list) else None, []).append(k)
@@ -1480,13 +1408,8 @@ class Puller:
 
 
 def pull(ex: Exporter, url: str) -> dict:
-    """Before a "Send to site": the upload replaces the whole site with this computer's files, so what was sent from
-    another computer is taken from the site first — the reports this computer has no files of, and the rendered
-    videos (Animations → With effects, Buff effects) of this game version it lacks. A report taken off the site after
-    this computer sent it is taken off here too. Refuses when the site shows a newer game version than this app has
-    read: the upload would put the older data back.
-    The parts made from the game's files are taken too where this computer has none to go on from.
-    → {"reports": taken, "removed": taken off here, "videos": taken, "parts": taken, "files": files written}"""
+    """Before a send: take from the site what another computer sent (reports, videos, parts), so the upload keeps them.
+    Refuses when the site has a newer game version."""
     svc = ex.svc
     p = Puller(ex, url)
     ex.progress(PULL_STAGE, 0, 0)
@@ -1564,9 +1487,7 @@ def pull(ex: Exporter, url: str) -> dict:
                     mine_v[v] = list(dict.fromkeys(mine_v.get(v, []) + ok))
             local["none"] = list(dict.fromkeys((local.get("none") or []) + (site.get("none") or [])))
         ex.write_manifest(name, local)
-    # the parts made from the game's files, where this computer has none to go on from: never sent from here, or sent
-    # from a game version it has no snapshot of any more (with one, Exporter.kept() keeps what the patch left alone).
-    # The site's part of the same game version comes whole; of an older one, as far as the patch left it alone.
+    # game-file parts this computer can't go on from: taken from the site
     for name in TAKEN_PARTS:
         local = ex.read_manifest(name)
         if name not in names or (local.get("id") and ex.unchanged(local["id"])):
@@ -1579,7 +1500,7 @@ def pull(ex: Exporter, url: str) -> dict:
         site["urls"] = p.files(site.get("urls") or {})
         ex.write_manifest(name, site)
         out["parts"] += 1
-    # the languages, on a computer with no players' translations of its own: the site's stay (Exporter.langs)
+    # languages: the site's stay on a computer without its own
     from . import langs
     if "langs" in names and not langs.own(svc):
         site = p.json("m/langs.json.gz")
@@ -1587,7 +1508,7 @@ def pull(ex: Exporter, url: str) -> dict:
             site["urls"] = p.files(site.get("urls") or {})
             ex.write_manifest("langs", site)
             out["parts"] += 1
-    # the game versions the taken reports are between: the site's state lists them, this app may not have them
+    # game versions of the taken reports
     snaps = {s["id"]: s for s in ((idx.get("inline") or {}).get("/api/state") or {}).get("snapshots") or []}
     if snaps:
         path = os.path.join(ex.out, "d", "snapshots.json")
@@ -1600,7 +1521,7 @@ def pull(ex: Exporter, url: str) -> dict:
 
 
 def export(svc, base_url: str, reports: list[str] | None = None, units=True, progress=None) -> dict:
-    """Write the site: the given reports (all of them when None) and the Identities & E.G.O database."""
+    """Write the site: given reports (None = all) and the database."""
     ex = Exporter(svc, base_url, progress=progress)
     for rid in reports if reports is not None else [r["id"] for r in svc.reports()]:
         ex.report(rid)
@@ -1612,13 +1533,12 @@ def export(svc, base_url: str, reports: list[str] | None = None, units=True, pro
 
 
 def deploy(svc, progress=None) -> str:
-    """Upload data/site_packed with Cloudflare's wrangler (needs Node.js and `npx wrangler login` done once on this
-    computer); only the files the host doesn't have yet go up. Returns the site's address."""
+    """Upload data/site_packed with wrangler (only new files go up); returns the site's address."""
     cfg = config(svc)
     npx = shutil.which("npx")
     if not npx:
         raise RuntimeError("Node.js isn't installed — the upload runs Cloudflare's wrangler through npx")
-    # run from the data folder: wrangler keeps its own files next to where it runs and reads a config it finds there
+    # run from the data folder: wrangler keeps its files there
     conf = worker_config(svc)
     p = subprocess.Popen([npx, "--yes", "wrangler@4", "deploy", "-c", conf], cwd=os.path.dirname(conf), stdin=subprocess.DEVNULL,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
@@ -1644,9 +1564,8 @@ def deploy(svc, progress=None) -> str:
 
 
 def verify(ex: "Exporter", progress=None) -> dict:
-    """Open every page of the packed site in a headless browser (limbusdm/sitecheck.py); fetch what a page asked for
-    and the site lacked where that is a plain request; decide which pages the site opens. Leaves data/site_packed
-    ready to upload. → {"checked", "opened": pages opened beyond BASE_OPEN, "healed", "misses": {page: [requests]}, "error"}"""
+    """Open every page of the packed site headless, fetch what was missing, decide which pages open; leaves
+    data/site_packed ready."""
     from . import sitecheck
     packed = packed_dir(ex.svc)
     res = sitecheck.check(packed, progress=progress)
@@ -1672,8 +1591,7 @@ def verify(ex: "Exporter", progress=None) -> dict:
 
 
 def _listing(root: str) -> dict:
-    """{file: what tells its content} of the packed site. A pack and a file on its own are named by their content, so
-    their size is enough; the pages and the lists are compared by a hash."""
+    """{file: what tells its content} of the packed site (size for packs, hash for pages and lists)."""
     out = {}
     for d, _, files in os.walk(root):
         for fn in files:
@@ -1702,8 +1620,7 @@ def _log_send(svc, entry: dict):
 
 
 def publish(svc, base_url: str, report: str | None = None, progress=None) -> dict:
-    """The app's "Send to site" with its outcome written down: done or failed, at which step and why (Settings ->
-    Website shows the list)."""
+    """"Send to site" with its outcome logged (shown in Settings → Website)."""
     progress = progress or (lambda stage, done, total, msg="": None)
     at, t0 = ["starting"], time.time()
 
@@ -1724,16 +1641,14 @@ def publish(svc, base_url: str, report: str | None = None, progress=None) -> dic
 
 
 def _publish(svc, base_url: str, report: str | None, progress) -> dict:
-    """This report (with the ones sent before) and the Identities & E.G.O database written out, packed and
-    uploaded."""
+    """This report (and earlier ones) plus the database: written, packed, uploaded."""
     ex = Exporter(svc, base_url, progress=progress)
     cfg = config(svc)
     if cfg["project"] and cfg["url"]:  # what was sent from another computer stays (pull)
         pull(ex, cfg["url"])
     if report:
         ex.report(report)
-    # a report made since the newest one on the site goes up as well: Settings -> Website sends without naming one
-    # (an older one that is not there was taken off, and stays off)
+    # reports newer than the site's newest go up too
     def taken(r):
         return r["new"].rsplit("_", 1)[-1]
 
@@ -1752,7 +1667,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     if not cfg["project"]:
         ex.forget()
         return {"site": "", "dir": packed_dir(svc), "check": chk, **size}
-    # what this upload changes on the site: the packed folder's files next to the ones sent the last time
+    # what this upload changes: packed files vs the last sent
     sent_path = os.path.join(svc.data_dir, "site_sent.json")
     before, root = _read_json(sent_path).get("files") or {}, packed_dir(svc)
     now = _listing(root)
@@ -1780,12 +1695,10 @@ def size_of(root: str) -> dict:
     return {"files": n, "bytes": total}
 
 
-PACK = 1 << 20  # a pack is fetched whole (hosts of static files don't all answer byte ranges), so it stays small
-# what the Games ask for one at a time, at random (a manifest's "groups", see _grouped): smaller packs — less to fetch
-# for one file, more files on the host
-HOST_MAX = 24 << 20  # the host takes no file above 25 MiB: a bigger one goes up in parts the service worker joins
-# A video is cut into parts as well: the host sends a file whole or not at all, so a player waited for all of it (18 s
-# for the biggest) before the first frame; from parts the worker answers the piece a player asks for.
+PACK = 1 << 20  # packs are fetched whole: keep them small
+# smaller packs for what the Games fetch one at a time
+HOST_MAX = 24 << 20  # host limit 25 MiB: bigger files go up in parts
+# videos in parts too, so the worker can answer the range a player asks for
 VIDEO_WHOLE = 4 << 20  # (a smaller one comes whole: about a second)
 VIDEO_PART = 2 << 20
 CARD_PACK = 2 << 20  # one Identity's / E.G.O's art and skill pictures: its card in one fetch
@@ -1800,14 +1713,8 @@ def packed_dir(svc) -> str:
 
 
 def pack(src: str, dst: str, index: str | None = None) -> dict:
-    """The site as it goes up: a manifest's thousands of small files glued into packs (a host counts files).
-
-    A manifest then names a small file as [pack, offset, length, extension]; the service worker fetches the pack
-    once, keeps it and cuts the file out. Files go into packs in the order the page lists them, so one screen of
-    pictures is a pack or two; a manifest's "groups" [[how many requests, pack size], …] start a pack anew and set
-    its size for a run of them (_grouped). Packs are named by what is in them: a report that didn't change gives the same packs
-    again and nothing of it is uploaded twice. Files of PACK size and up (music, video, big art) stay on their own.
-    `index`: the PackIndex file that learns what each pack holds."""
+    """The site as it goes up: small files glued into content-named packs ([pack, offset, length, ext] in the manifest), in
+    page order; big files stay alone."""
     idx = PackIndex(index) if index else None
     shutil.rmtree(os.path.join(dst, "ui"), ignore_errors=True)
     os.makedirs(dst, exist_ok=True)
@@ -1921,7 +1828,7 @@ def preview(root: str, port: int = 47890):
 
 
 def serve_dir(root: str, port: int = 0):
-    """A static file server on 127.0.0.1 (a free port when 0), byte ranges too; runs in its own thread."""
+    """A static file server on 127.0.0.1 (byte ranges), in its own thread."""
     import functools
     from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 

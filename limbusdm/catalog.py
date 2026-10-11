@@ -1,8 +1,4 @@
-"""Reader for the Unity Addressables 2.x binary catalog (catalog.bin).
-
-Port of the read side of BinaryStorageBuffer.Reader + ContentCatalogData.ResourceLocator
-from com.unity.addressables 2.x. Read-only; never touches the game.
-"""
+"""Read-only reader for the Addressables 2.x catalog.bin (port of BinaryStorageBuffer.Reader)."""
 from __future__ import annotations
 
 import struct

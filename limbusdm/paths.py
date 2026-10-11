@@ -50,7 +50,7 @@ def app_dir() -> str:
 
 
 def data_dir() -> str:
-    """Our data folder: next to the exe/repo; a built exe in <repo>\\LimbusArchive\\ uses the repo's data\\."""
+    """Data folder next to the exe / repo; a built exe in <repo>\\LimbusArchive uses the repo's data."""
     base = app_dir()
     parent = os.path.dirname(base)
     if (getattr(sys, "frozen", False) and not os.path.isdir(os.path.join(base, "data"))
@@ -79,7 +79,7 @@ class GamePaths:
         return bool(self.game and os.path.isdir(self.data))
 
     def catalog_path(self) -> str | None:
-        """The catalog the game actually uses: the downloaded one, else the one shipped with the install."""
+        """The catalog the game uses: the downloaded one, else the install's."""
         for p in (os.path.join(self.locallow, "com.unity.addressables", "catalog_S1.bin"),
                   os.path.join(self.streaming or "", "aa", "catalog.bin")):
             if os.path.exists(p):

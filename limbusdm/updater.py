@@ -1,5 +1,4 @@
-"""Self-update from GitHub releases: check the latest release, download LimbusArchive.zip, swap the files
-after the app has quit (a small PowerShell script waits for the process, copies, restarts), keep data/."""
+"""Self-update from GitHub releases: download the zip, swap files after the app quits (PowerShell script), keep data/."""
 from __future__ import annotations
 
 import os
@@ -22,8 +21,7 @@ def _ver(s: str) -> tuple:
 
 
 def _key(tag: str) -> tuple:
-    """Order of releases: version, then a test build of that version over the stable one, then its number
-    (v0.10.32 < v0.10.32-versus-test < v0.10.32-versus-test2)."""
+    """Release order: version, then test builds over stable, then their number."""
     m = re.match(r"v?(\d+\.\d+\.\d+)(?:-(.*?)(\d*))?$", tag)
     if not m:
         return (_ver(tag), 0, 0)
@@ -31,10 +29,7 @@ def _key(tag: str) -> tuple:
 
 
 def _latest_tag() -> tuple[str, str]:
-    """(tag, page) of the newest release this build follows. Stable builds: github.com/<repo>/releases/latest, which
-    redirects to /releases/tag/<tag> and never names a pre-release. A test build (TEST_BUILD) also reads the releases
-    feed for pre-releases tagged v<ver>-<TEST_BUILD>[n] and takes the newest of those and the stable one.
-    Neither has api.github.com's 60-requests-per-hour limit."""
+    """(tag, page) of the newest release this build follows (releases/latest; test builds also read the feed)."""
     req = urllib.request.Request(f"https://github.com/{REPO}/releases/latest", headers={"User-Agent": UA["User-Agent"]})
     with urllib.request.urlopen(req, timeout=15) as r:
         page = r.geturl()
@@ -69,7 +64,7 @@ def check() -> dict:
 
 
 def install(data_dir: str, progress=None, info: dict | None = None) -> str:
-    """Download + unpack the release, start the swap script and return; the caller must quit the app."""
+    """Download, unpack, start the swap script; the caller quits."""
     if not getattr(sys, "frozen", False):
         raise RuntimeError("Running from source — update with git pull instead")
     info = info if info and info.get("url") else check()
@@ -105,7 +100,7 @@ def install(data_dir: str, progress=None, info: dict | None = None) -> str:
     if not src:
         raise RuntimeError(f"{APP_EXE} not found in the downloaded release")
     app = os.path.dirname(sys.executable)
-    # after the rename (LimbusDatamine → LimbusArchive) the old exe would be left behind: delete it
+    # delete the pre-rename exe
     cleanup = f'Remove-Item -LiteralPath "{os.path.join(app, OLD_EXE)}" -Force -ErrorAction SilentlyContinue\n' \
         if exe != OLD_EXE else ""
     script = os.path.join(work, "apply.ps1")
@@ -123,7 +118,7 @@ Stop-Transcript | Out-Null
     if progress:
         progress("installing", 1, 1, f"restarting into {info['latest']}")
     cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script]
-    # the script must outlive the app: own process group, no console, and out of any job object the app runs in
+    # the script must outlive the app
     base = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
     try:
         subprocess.Popen(cmd, creationflags=base | 0x01000000, close_fds=True)  # | CREATE_BREAKAWAY_FROM_JOB
@@ -133,8 +128,7 @@ Stop-Transcript | Out-Null
 
 
 def clean_leftovers(data_dir: str):
-    """The downloaded release once the swap is over (the script copies it before it starts the app again);
-    update.log stays."""
+    """Delete the downloaded release after the swap."""
     import shutil
     work = os.path.join(data_dir, "update")
     shutil.rmtree(os.path.join(work, "new"), ignore_errors=True)

@@ -1,10 +1,5 @@
-"""The story map (Database → Story map): every chapter's stage nodes where the game draws them on its map, and what a
-fight node holds — the waves' enemies, arena and battle themes.
-
-StaticData `part` lists each chapter's nodes with their place on the map (posx / posy in the map's pixels, y down;
-the map is `mapSizeRow` × `mapSizeColoumn` tiles of 2048 px, Sprite/StageMap/<illust>/<illust>_<row>_<col>.png) and the
-stage a node starts. A fight's stage is a record of battle-story / battle-ab / battle-dungeon; a dungeon node is a
-dungeonMap whose encounters are such stages."""
+"""Database → Story map: each chapter's nodes on the game's map and what a fight holds (enemies, arena, music), from
+StaticData `part`."""
 from __future__ import annotations
 
 import re
@@ -39,7 +34,7 @@ def _stage(st: dict) -> dict:
 
 
 def build(tables: dict, loc_dir: str, tiles: dict[str, dict[str, str]]) -> dict:
-    """tables: part, dungeonMap and FIGHT_TABLES; tiles: {illust id: {"row_col": the tile's path}}."""
+    """tables: part, dungeonMap, FIGHT_TABLES; tiles: {illust: {"row_col": path}}."""
     chapters, names = content.load_chapters(loc_dir), units._load(loc_dir, r"EN_StageNode.*\.json$")
     fights: dict[int, dict] = {}
     for table in FIGHT_TABLES:

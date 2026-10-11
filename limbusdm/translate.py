@@ -1,4 +1,4 @@
-"""KR/JP → English via Google's free translate endpoint, batched, throttled and cached on disk."""
+"""KR/JP → English via Google's free endpoint, batched, throttled, cached."""
 from __future__ import annotations
 
 import hashlib

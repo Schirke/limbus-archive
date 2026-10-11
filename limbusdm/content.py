@@ -1,8 +1,4 @@
-"""Which chapter or mode each enemy / abnormality skeleton comes from, read from the game's own tables.
-
-Spine atlas ← SkeletonDataAsset ← Spine component inside an "…Appearance" prefab ← unit (StaticData enemy /
-abnormality-unit: "appearance") ← stage wave lists (battle-story, battle-ab, …) ← chapter (EN_StageChapterText).
-"""
+"""Which chapter / mode each enemy skeleton comes from: atlas ← prefab ← unit ← stage waves ← chapter."""
 from __future__ import annotations
 
 import json
@@ -28,7 +24,7 @@ def _roman(s: str) -> int:
 
 # ------------------------------------------------------------------ bundles: Spine skeleton ↔ appearance prefab
 def bundle_links(path: str) -> dict:
-    """{"sd": {SkeletonDataAsset pid: [atlas TextAsset pids]}, "uses": [[prefab root name, cab or "", sd pid]]}."""
+    """{"sd": {SkeletonDataAsset pid: [atlas pids]}, "uses": [[prefab, cab, sd pid]]}"""
     with open(path, "rb") as f:
         env = UnityPy.load(f.read())
     names, father, go_of_tr, tr_of_go = {}, {}, {}, {}
@@ -134,7 +130,7 @@ def stage_chapter(stage_id: int) -> str | None:
 
 
 def stage_label(table: str, fname: str, stage_id: int, chapters: dict) -> tuple[int, float, str] | None:
-    """(priority, order, label) of a stage: story first, then Railway, then everything repeatable."""
+    """(priority, order, label) of a stage: story, Railway, then the rest."""
     f = fname.lower()
     if table == "battle-railway-dungeon":
         m = re.search(r"dungeon-0*(\d+)", f)
@@ -176,8 +172,7 @@ def load_unit_names(loc_dir: str) -> dict[int, str]:
 
 
 def appearance_content(tables: dict[str, dict[str, object]], chapters: dict, names: dict[int, str]) -> dict[str, dict]:
-    """{appearance prefab name: {"label", "prio", "order", "kind", "name"}} — the earliest story content a unit
-    with that look appears in (Railway / Mirror Dungeon only when it never shows up in the story)."""
+    """{appearance prefab: {label, prio, order, kind, name}}: the earliest content a look appears in."""
     best: dict[int, tuple] = {}
     for table in STAGE_TABLES:
         for fname, data in (tables.get(table) or {}).items():

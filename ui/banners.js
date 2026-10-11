@@ -1,7 +1,5 @@
 "use strict";
-// Extraction → Banner archive: the timed banners the app has seen, with the game's own pools and chances. The game's
-// files describe only the banners of the day, so the app keeps each one it reads and the list grows patch by patch.
-// "Pull" opens a banner in Extraction — an ended one too. Data: /api/gacha "archive" (limbusdm/gacha.py).
+// Extraction → Banner archive: every timed banner the app has seen; "Pull" opens it in Extraction.
 routes.banners = async () => {
   const main = $("#main");
   main.innerHTML = `<h1>Banner archive</h1><div class="muted">Reading the game's files…</div>`;

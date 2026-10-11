@@ -1,7 +1,5 @@
 "use strict";
-// Buff effects (Database → Buff effects): the buffs and debuffs that have an effect of their own in the game's data,
-// a video of each effect (drawn alone by the Unity player, made on request and kept) and who gives or gets the buff.
-// Data: /api/buffs (limbusdm/buffs.py).
+// Database → Buff effects: buffs with an effect of their own, a video of each, and who gives / gets them.
 let BUFFS = null;
 const bfv = { q: "", type: "", who: "", sort: "name", sel: "" };
 const BF_TYPES = [["", "All"], ["pos", "Buffs"], ["neg", "Debuffs"], ["neu", "Neutral"]];
@@ -83,7 +81,7 @@ function bfProgress() {
   btn.textContent = BUFFS.busy ? `Making videos… ${left} left` : `Make all videos (${left} left)`;
 }
 
-// a made video's Save (WebM with a transparent background) and GIF (under 10 MB, for Discord); app only (the site hides them)
+// Save (WebM) and GIF; app only
 const bfFile = (b, n) => `${bfName(b)} - ${n}`;
 function bfFig(b, n) {
   const btns = bfHas(n) ? `<span class="grow"></span><button data-bsave="${esc(n)}">Save</button><button data-bgif="${esc(n)}" title="a looping GIF under 10 MB, to post in Discord">GIF</button>` : "";
@@ -106,7 +104,7 @@ function drawBuff() {
   if (!box || !b) { if (box) box.innerHTML = ""; return; }
   const same = BUFFS.list.filter((x) => x !== b && x.fx.some((n) => b.fx.includes(n)));
   const link = (w) => w.k === "enemy" ? `#/enemies/${w.id}` : `#/db/${w.k === "ego" ? "ego" : "id"}/${w.id}`;
-  // (an enemy by its battle look, as the handbook shows it, when the app has that picture; else the game's portrait)
+  // enemy by its handbook picture, else portrait
   const pic = (w) => { const p = w.pic ? imgThumb(w.pic) : "", t = w.app ? `/api/enemy_thumb?app=${encodeURIComponent(w.app)}` : "";
     return t || p ? `<img loading="lazy" src="${t || p}" data-alt="${t ? p : ""}" onerror="if (this.dataset.alt) { this.src = this.dataset.alt; this.dataset.alt = ''; } else this.remove()">` : ""; };
   const group = (k, title) => {
@@ -136,7 +134,7 @@ function drawBuff() {
   }
 }
 
-// while videos are being made: the status every 2 s; a finished one appears in the open card and on its tile
+// status every 2 s while videos are made
 function bfPoll() {
   if (bfPoll.t || !BUFFS || !BUFFS.busy) return;
   bfPoll.t = setTimeout(async () => {

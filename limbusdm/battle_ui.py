@@ -1,8 +1,5 @@
-"""The game's own battle HUD pieces for the Versus player (Viewer.cs ViewerHud.cs), read out of the game's main build
-once into data/battle_ui/v<VERSION>/ (never shipped with the app): the unit HP shape and the boss HP bar, the enemy
-info panel (the boss's code), the clash count's ink blot and brush digits (ParryingFont: '0'-'9', 'X' = 합), and the
-HUD's two fonts — ExcelsiorSans for numbers, BebasKai for text — drawn into glyph sheets (the player can't open a font
-file), described in hud.json."""
+"""The game's battle HUD pieces for the Versus player (HP bars, boss panel, clash digits, two fonts as glyph sheets), cut
+once into data/battle_ui."""
 from __future__ import annotations
 
 import glob
@@ -13,14 +10,13 @@ import threading
 
 VERSION = 2
 _lock = threading.Lock()
-# the font sheets: the characters drawn (anything else is left out of a name), the size they are drawn at
+# font sheets: the characters drawn and their size
 CHARS = "".join(chr(c) for c in range(32, 127)) + "".join(chr(c) for c in range(160, 256)) + "‘’“”–—…•№"
 SIZE = 96
 
 
 def folder(svc) -> str:
-    """data/battle_ui/v<VERSION> with everything in it (made the first time, a few seconds), or "" when the game's
-    files don't have the pieces."""
+    """data/battle_ui/v<VERSION> (made the first time), "" when the game lacks the pieces."""
     out = os.path.join(svc.data_dir, "battle_ui", f"v{VERSION}")
     if os.path.exists(os.path.join(out, "hud.json")):
         return out
@@ -101,9 +97,7 @@ def _make(game_data: str, out: str) -> None:
 
 
 def _sheet(ttf: bytes, path: str) -> dict:
-    """the font's characters (CHARS) drawn white into one sheet: {"size", "cap" (a capital's height), "line", "chars",
-    "boxes": [x, y, w, h, left, top, advance] for each of chars} in pixels (y down in the sheet), left / top from the
-    pen on the baseline (top up). (Flat lists: the player's JSON reader takes no maps.)"""
+    """The font's CHARS drawn into one sheet + their boxes (flat lists: the player's JSON reader takes no maps)."""
     from PIL import Image, ImageDraw, ImageFont
     font = ImageFont.truetype(io.BytesIO(ttf), SIZE)
     pad = 4

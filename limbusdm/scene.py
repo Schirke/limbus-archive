@@ -1,11 +1,5 @@
-"""Full illustrations around a Spine skeleton (Uptie 3 / awakening art): the uGUI prefab that holds the
-SkeletonGraphic also holds the background and effect layers as sibling Images (BG, Mist, Lightning, Front, …),
-drawn in sibling order. Effect layers use Fx_Team/FX_Grp_SpineIllustShader_*: the sprite distorted by a scrolling
-noise texture and faded by a scrolling dissolve texture; the UI replays that from the material's values.
-
-Coordinates: uGUI, y up; the layers' parent is a plain Transform (a zero-size rect), so a layer's anchored position
-is its pivot's position. SkeletonGraphic draws skeleton units as canvas pixels (scale 0.01 × 100 px per unit) with
-the skeleton origin at its own pivot."""
+"""Full illustrations around a Spine skeleton: the uGUI prefab's sibling Image layers (BG, Mist, Front…) in order; effect
+layers' shader replayed from the material."""
 from __future__ import annotations
 
 from .extract import _env, _lock, on_drop
@@ -51,10 +45,7 @@ def _material(objs, pid) -> dict | None:
 
 
 def art_scenes(bundle_path: str) -> dict[int, dict]:
-    """{atlas TextAsset pid: scene} for every SkeletonGraphic that has sibling Image layers.
-    scene = {"w", "h", "layers": [{"kind": "image", "name", "sprite", "x", "y", "w", "h", "color", "material"}
-    | {"kind": "spine", "atlas", "ox", "oy", "scale", "skin", "anim", "flip"}]} — boxes in frame pixels, y down,
-    frame = union of the images. Every skeleton of the prefab is a layer (some illustrations are cut into several)."""
+    """{atlas pid: scene} for every SkeletonGraphic with sibling Image layers; boxes in frame pixels, y down."""
     if bundle_path in _cache:
         return _cache[bundle_path]
     env = _env(bundle_path)
@@ -99,8 +90,7 @@ def art_scenes(bundle_path: str) -> dict[int, dict]:
             return left, top, w, h, sc
 
         def wrapper(rt):
-            """A plain Transform (no graphic) that only groups skeletons, e.g. Blade of the House of Spiders'
-            "…_Spineani" between the background layers: its skeletons count as layers of its parent."""
+            """A plain Transform grouping skeletons: they count as layers of its parent."""
             return ("m_AnchoredPosition" not in rt and graphics.get(rt["m_GameObject"]["m_PathID"]) is None
                     and any("skeletonDataAsset" in (graphics.get((rts.get(_pp(c)) or {}).get("m_GameObject", {}).get("m_PathID")) or {})
                             for c in rt.get("m_Children") or []))
@@ -174,7 +164,7 @@ def art_scenes(bundle_path: str) -> dict[int, dict]:
 
 
 def full_sprite(bundle_path: str, pid: int) -> bytes:
-    """A sprite as a PNG of its whole rect: packed sprites are trimmed, the trimmed part goes back to its offset."""
+    """A sprite as a PNG of its whole rect (trimmed part put back)."""
     import io
     from PIL import Image
     env = _env(bundle_path)

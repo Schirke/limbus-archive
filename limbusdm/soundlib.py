@@ -1,10 +1,4 @@
-"""Database → Sounds: every sound of the game's FMOD banks, sorted into four folders:
-Sound Effects, Story, Voicefiles, Soundtracks — with who says a line and its text where the game's files tell.
-
-A story line's sample is named by the story's own files (Story/Effect rows: `voice` of the line with the same id in
-Localize StoryData); an Identity's / E.G.O's / announcer's line is its sample's name in PersonalityVoiceDlg /
-EGOVoiceDig / BattleAnnouncerDlg; a soundtrack's official name comes from the corner player's list (music.build).
-Everything else is listed by its sample name."""
+"""Database → Sounds: every bank sound in four folders, with speaker and text where the game's files tell."""
 from __future__ import annotations
 
 import json
@@ -36,11 +30,7 @@ def _sinner_of(uid: int) -> str:
 
 def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], egos: list[dict], music: dict,
           portraits: dict | None = None) -> dict:
-    """samples: (bank path as the snapshot names it, index, name, ms) of every bank; loc_root: …/Localize;
-    story: {story file stem: Story/Effect rows with a voice}; ids / egos: unit_db's; music: {(bank path, sample name
-    lower case): corner player track}; portraits: {story speaker: asset path of their picture in the story's log}.
-    -> {"v", "banks": [bank path], "tree": {"name", "kids": [...]} | {"name", "items": [[bank, i, name, ms, title, sub, text]]}}
-    (+ a folder's "sinner" (1-12, its emblem), "img" (an Identity's / E.G.O's picture), "pics" ({speaker: picture}))"""
+    """Build the sound tree {"v", "banks", "tree"} from the bank samples and texts."""
     en = os.path.join(loc_root, "en")
     banks, bank_n = [], {}
     tree = {"name": "", "kids": []}
@@ -206,7 +196,7 @@ def items(db: dict, node: dict) -> list:
 
 
 def search(db: dict, q: str, limit: int = 300) -> list:
-    """[[folder path, bank, i, name, ms, title, sub, text, picture]] whose name, speaker or text has every word of q."""
+    """Sounds whose name, speaker or text has every word of q."""
     words, out = q.lower().split(), []
 
     def walk(node, path):

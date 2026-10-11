@@ -1,5 +1,4 @@
-"""What's new in Limbus Archive itself: after the app updates, the notes of the releases since the version seen last,
-read once from GitHub (the API is asked only when the version changes — it allows 60 calls an hour)."""
+"""What's new in the app: release notes since the version seen last (GitHub API once per version)."""
 import json, os, time, urllib.request
 
 from . import REPO, __version__
@@ -40,8 +39,7 @@ def _releases() -> list:
 
 
 def _feed() -> list:
-    """The last ten releases from github.com/<repo>/releases.atom, shaped like the API's answer; the notes come as
-    HTML there and are turned back into the few marks the page reads ("## ", "- ", "**")."""
+    """The last ten releases from releases.atom, shaped like the API's answer (HTML turned back into "## ", "- ", "**")."""
     import html, re
     import xml.etree.ElementTree as ET
     req = urllib.request.Request(f"https://github.com/{REPO}/releases.atom", headers={"User-Agent": UA["User-Agent"]})
@@ -61,7 +59,7 @@ def _feed() -> list:
 
 
 def history(count: int = 20) -> dict:
-    """The notes of the last releases up to this version, the newest first (the status box's "What's new")."""
+    """Notes of the last releases up to this version, newest first."""
     hi = _ver(__version__)
     notes = [{"tag": x["tag_name"].lstrip("v"), "body": x.get("body") or "", "date": (x.get("published_at") or "")[:10]}
              for x in _releases() if _ver(x["tag_name"]) <= hi and (x.get("body") or "").strip()]
@@ -70,8 +68,7 @@ def history(count: int = 20) -> dict:
 
 
 def pending(data_dir: str) -> dict:
-    """{"version", "notes": [{"tag", "body"}…]} when this version's notes weren't shown yet, else {}.
-    The first start with this feature shows only the current version's notes."""
+    """This version's unseen notes {"version", "notes"}, else {}."""
     last = _seen(data_dir)
     if last == __version__:
         return {}

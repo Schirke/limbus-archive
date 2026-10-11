@@ -1,7 +1,4 @@
-"""A short "what's new" of a report, to paste into Discord or Telegram (both take **bold** from a pasted text).
-
-Built from the report's English localization records (new Identities / E.G.O, enemies, stages, keywords, cosmetics,
-changed skill texts), its new music and videos and the Highlights. Cached next to the report (<id>.notes.json)."""
+"""A short "what's new" of a report for Discord / Telegram; cached as <id>.notes.json."""
 import gzip, json, os, re
 
 VERSION = 1
@@ -68,7 +65,7 @@ def build(svc, rid: str) -> str:
     add("New Identities", _list(ids, 8))
     egos = [who(r["id"]) for r in added.get("Egos", []) if isinstance(r.get("id"), int)]
     add("New E.G.O", _list(egos, 8))
-    # a changed skill text: the skill id is the owner's id + two digits (Identity 1010101 -> 10101)
+    # skill id = owner id + two digits
     owners = []
     for r in changed.get("Skills", []):
         sid = r.get("id")
@@ -135,7 +132,7 @@ def notes(svc, rid: str) -> dict:
 
 
 def _seen(svc) -> set:
-    """Reports whose notes popped up already. The first time: every report there is, so only new patches pop up."""
+    """Reports whose notes were shown (first time: all of them)."""
     path = os.path.join(svc.data_dir, "reports", _SEEN)
     try:
         with open(path, encoding="utf-8") as f:

@@ -1,16 +1,5 @@
-"""The game's texts in other languages: the game's own Korean and Japanese, and the players' translations — packs
-laid out as the game reads them from its Lang folder (the English files' names without "EN_"), put in the data
-folder's lang folder (each with a pack.json: name, version, authors, link). Only those: a pack in the game's own Lang
-folder isn't taken, what is shown is chosen.
-
-A language is a table "English text → its text", made from the files side by side (the same file, the same id, the
-same field). The pages put it over the English the app answers with (ui/app.js langApply), so nothing else of the
-app is made twice. Two parts: "core" (names, skills, passives, statuses…) and "story" (story, voice lines), the
-second asked for only by the pages that show lines.
-
-Made tables can also be published (the `lang-data` branch of the app's repository: index.json + the tables): every
-app then lists those languages too and takes a table from there instead of making it — a few MB, no half a minute
-over the game's files. A computer's own pack or own Korean / Japanese stays first while its table is made."""
+"""The game's texts in other languages (the game's KR / JP, players' packs in data/lang) as "English → text" tables the
+pages apply. Made tables can be published on the `lang-data` branch; apps download them instead of making them."""
 from __future__ import annotations
 
 import collections
@@ -27,17 +16,17 @@ from . import REPO
 
 VERSION = 4
 PUB_BRANCH = "lang-data"
-# (the branch's commit is asked from the repository as git does — no API, no hourly limit — and its files by that commit)
+# branch commit via info/refs (no API limit), files by commit
 PUB_REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
 PUB_RAW = f"https://raw.githubusercontent.com/{REPO}/%s/%s"
 PUB_KEEP = 600  # seconds the published list is used before it is asked again
 SAFE = re.compile(r"^[\w.-]+$")
 GROUPS = ("core", "story")
 STORY = re.compile(r"(^|/)(storydata|personalityvoicedlg|egovoicedig|battleannouncerdlg|bgmlyrics)/|dlg|voice", re.I)
-# letters a pack draws with its own font only (the private use area): such a text stays English on the pages
+# private-use glyphs (a pack's own font): such texts stay English
 OWN_GLYPHS = re.compile("[-]")
 OFFICIAL = (("kr", "KR_", "ko"), ("jp", "JP_", "ja"))
-# a pack's language by the start of its name (the packs' list names them so: "ru-mtl", "hant-LTM", "ptbr-CLT"…)
+# a pack's language by its id's start
 BY_ID = (("ru", "ru"), ("es", "es"), ("zh-cn", "zh-Hans"), ("hans", "zh-Hans"), ("hant", "zh-Hant"), ("ptbr", "pt-BR"),
          ("pt", "pt-BR"), ("th", "th"), ("it", "it"), ("vn", "vi"), ("vi", "vi"), ("de", "de"), ("fr", "fr"),
          ("pl", "pl"), ("tr", "tr"), ("id", "id"), ("uk", "uk"), ("ko", "ko"), ("ja", "ja"))
@@ -72,7 +61,7 @@ def _files(root: str, prefix: str = "") -> dict[str, str]:
 
 
 def _listed(root: str, prefix: str = "", rel: str = "") -> dict[str, tuple]:
-    """_files with each file's size and time (read with the folder's listing: one look per folder, not per file)"""
+    """_files with each file's size and time"""
     out = {}
     try:
         entries = list(os.scandir(os.path.join(root, rel) if rel else root))
@@ -114,8 +103,7 @@ def _pub_read(svc):
 
 
 def published(svc) -> dict:
-    """The published languages {"sha", "langs": [{id, name, lang, version, authors, link, cover, sig, files}]}, {} when
-    none. The first time it is asked at once; later the last list answers and a new one is read in the background."""
+    """The published languages {"sha", "langs"}, {} when none; refreshed in the background."""
     if _pub["doc"] is None:
         try:
             with open(os.path.join(_cache_dir(svc), "published.json"), encoding="utf-8") as f:
@@ -140,8 +128,7 @@ def forget_published(svc):
 
 
 def sources(svc) -> list[dict]:
-    """The languages there are: [{id, name, lang, label, dir, prefix, version, authors, link, pub}] — dir None = only
-    published; pub = the published copy of it, if any"""
+    """The languages there are; dir None = published only, pub = its published copy."""
     out, seen = [], set()
     loc = _loc(svc)
     for code, prefix, lang in OFFICIAL:
@@ -191,7 +178,7 @@ def _sig(files: dict[str, tuple]) -> str:
 
 
 def _read(path: str) -> dict:
-    """{id: record} of a texts file; a file with a slip in it (a comma too many) is read past it, a broken one is skipped"""
+    """{id: record} of a texts file (a trailing comma is forgiven)."""
     try:
         with open(path, encoding="utf-8-sig") as f:
             raw = f.read()
@@ -270,8 +257,7 @@ READ = {"link", "style", "sprite", "color", "u", "b", "i", "s"}  # marks the pag
 
 
 def _own_tags(en: str, x: str) -> str:
-    """the game's text marks a translation adds for its own look (<cspace=-2px>, <nobr>, <size>…) are left out: the
-    pages draw only the marks they read and the ones the English text has"""
+    """Drops look-only tags a translation adds (<cspace>, <nobr>…)."""
     keep = READ | {m.group(1).lower() for m in TAG.finditer(en)}
     return TAG.sub(lambda m: m.group(0) if m.group(1).lower() in keep else "", x)
 
@@ -283,8 +269,7 @@ def _paths(svc, src: dict, en_sig: str) -> tuple[str, dict]:
 
 
 def source_key(svc, src: dict) -> str:
-    """what a language's tables on this computer are made of (the name its files start with): the published copy says
-    the same when it was made of the same files"""
+    """Name of what a local table is made of (same as the published copy's when equal)."""
     return os.path.basename(_paths(svc, src, _en_sig(svc))[0])
 
 
@@ -335,9 +320,7 @@ def _remember(svc, lid: str):
 
 
 def table_file(svc, lid: str, group: str, local: bool = False) -> str | None:
-    """The table of a language's part, as a gzip'd JSON file. This computer's own one when it is made; else the
-    published one (for a pack: only when made of the same files); else made here and kept until the texts change.
-    local: always this computer's own (what is published is made so)."""
+    """A language part's table file: own one, else the published one, else made here. local: always own."""
     src = next((s for s in sources(svc) if s["id"] == lid), None)
     if not src or group not in GROUPS:
         return None
@@ -368,7 +351,7 @@ def table_file(svc, lid: str, group: str, local: bool = False) -> str | None:
 
 
 def warm(svc):
-    """At the start: the language asked for last is made ready (downloaded or made) before a page asks for it."""
+    """At start: make the last asked language ready."""
     try:
         with open(os.path.join(_cache_dir(svc), "last.txt"), encoding="utf-8") as f:
             lid = f.read().strip()
@@ -383,7 +366,7 @@ def warm(svc):
 
 
 def listing(svc) -> dict:
-    """The languages for the pages' language menu, with how much of the game's text each one has (once made)."""
+    """The language menu's list with coverage."""
     out, en_sig = [], _en_sig(svc)
     for s in sources(svc):
         cover = None
@@ -401,5 +384,5 @@ def listing(svc) -> dict:
 
 
 def own(svc) -> bool:
-    """Whether this computer has players' translations (its own packs or published ones), not only the game's own languages."""
+    """Whether there are players' translations (own or published)."""
     return any(s["id"] not in {o[0] for o in OFFICIAL} for s in sources(svc))

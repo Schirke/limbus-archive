@@ -1,9 +1,5 @@
-"""The Community page's Bilibili tab for the website: the app asks Bilibili itself (limbusdm/bilibili.py), a browser
-can't, so the same lists are written next to streams.json on the community-data branch — one file for each
-period and order, bilibili_<period>_<sort>.json, as /api/bilibili answers. Run by .github/workflows/community.yml.
-
-    python scripts/bilibili.py <folder> [<file the translations are kept in>]
-"""
+"""Writes the Bilibili lists (bilibili_<period>_<sort>.json) to community-data for the website. Usage: python
+scripts/bilibili.py <folder> [<translations file>]"""
 import json
 import os
 import sys

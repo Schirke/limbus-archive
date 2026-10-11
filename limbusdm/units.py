@@ -1,5 +1,4 @@
-"""Identity / E.G.O database built from the game's own tables (StaticData) and English localization,
-so it follows every patch by itself."""
+"""Identity / E.G.O database from StaticData and English localization."""
 from __future__ import annotations
 
 import json
@@ -76,7 +75,7 @@ def _text_levels(loc: dict | None) -> dict[int, dict]:
 
 
 def coin_kind(c: dict) -> str:
-    """'super' = Unbreakable Coin (SuperCoin script), 'purple' / 'green' = the game's coloured coins, '' = plain."""
+    """'super' = Unbreakable, 'purple' / 'green', '' = plain."""
     if any((a or {}).get("scriptName") == "SuperCoin" for a in c.get("abilityScriptList") or []):
         return "super"
     col = (c.get("color") or "").lower()
@@ -125,16 +124,14 @@ def passive_info(pid: int, passives: dict, loc_passives: dict, kind: str) -> dic
 
 
 def _upgrade(got: dict, info: dict) -> None:
-    """A passive listed again (same name) at a higher Uptie / Threadspin is its upgraded version: the page shows
-    the earlier one ("prev", a chain) below that level."""
+    """A passive repeated at a higher Uptie / Threadspin is its upgrade; the earlier one goes to "prev"."""
     old = got.get(info["name"])
     if old:
         info["prev"] = old.get("prev") if old["id"] == info["id"] else old
 
 
 def threadspin(require: list | None) -> list[int]:
-    """[from, to] Threadspin levels from the game's conditions: CheckAwakenLevel2 → [2, 0] (0 = and up),
-    CheckAwakenLevelBetween_2_4 → [2, 4]."""
+    """[from, to] Threadspin levels from the game's conditions (0 = and up)."""
     for c in require or []:
         m = re.fullmatch(r"CheckAwakenLevel(?:Between_)?(\d+)(?:_(\d+))?", str(c))
         if m:
@@ -143,8 +140,7 @@ def threadspin(require: list | None) -> list[int]:
 
 
 def _trait_name(unit_kw: dict, code: str) -> str:
-    """The game's text as it is (a red struck-out one marks a title the character lost): the pages take the tags off,
-    and a language's table (langs.py) finds it by this very text."""
+    """The game's text as it is (language tables match on it)."""
     return str((unit_kw.get(f"UnitKeyword_{code}") or {}).get("content") or "")
 
 
@@ -171,7 +167,7 @@ def build(tables: dict, loc_dir: str) -> dict:
     keywords = _load(loc_dir, r"EN_BattleKeywords.*\.json$")
     tags = _load(loc_dir, r"EN_SkillTag.*\.json$")
     assoc = _load(loc_dir, r"EN_AssociationName.*\.json$")
-    # the game names both associations and unit keywords with UnitKeyword_<code>; codes it never names stay hidden in game
+    # associations and unit keywords share UnitKeyword_<code>
     unit_kw = _load(loc_dir, r"EN_UnitKeyword.*\.json$")
     skills = _records(tables, "skill")
     passives = _records(tables, "passive")
@@ -191,7 +187,7 @@ def build(tables: dict, loc_dir: str) -> dict:
         pp = id_passives.get(pid) or {}
         pas = []
         for key, kind in (("battlePassiveList", "battle"), ("supporterPassiveList", "support")):
-            # a passive listed again at a higher uptie is its upgraded version: keep the last one per name
+            # keep the last passive per name
             got: dict[str, dict] = {}
             for g in sorted(pp.get(key) or [], key=lambda g: g.get("level", 0)):
                 for p in g.get("passiveIDList") or []:
@@ -230,8 +226,7 @@ def build(tables: dict, loc_dir: str) -> dict:
             continue
         loc = loc_egos[eid]
         sinner = int(str(eid)[1:3])
-        # some E.G.O have more skills in additionalList (Hollow: Le Trou → Boucher un trou): "Awakening 2", …
-        # in the game's order; a skill listed again (the shared Corrosion) is shown once
+        # extra E.G.O skills from additionalList, each once
         sets = [r] + [a for g in r.get("additionalList") or [] for a in g.get("additionalList") or []]
         sk = []
         for key, label in (("awakeningSkillId", "Awakening"), ("corrosionSkillId", "Corrosion")):
@@ -240,8 +235,7 @@ def build(tables: dict, loc_dir: str) -> dict:
                 if s:
                     s["label"] = label if not i else f"{label} {i + 1}"
                     sk.append(s)
-        # the passive unlocks at Threadspin 2; some E.G.O have a second, upgraded one for a higher Threadspin
-        # (Threadspin II–IV, then V+ on E.G.O with a 5th Threadspin): one passive per name, earlier versions in "prev"
+        # one passive per name, earlier versions in "prev"
         got = {}
         for p in r.get("awakeningPassiveList") or []:
             if p not in loc_ego_passives:
@@ -266,7 +260,7 @@ def build(tables: dict, loc_dir: str) -> dict:
     used = {k for x in ids for k in x["keywords"]} | set(STATUSES)
     kw = {k: _one_line((keywords.get(k) or {}).get("name")) or k for k in used}
     tag_names = {k: _one_line(v.get("name")) for k, v in tags.items() if v.get("name")}
-    # names, descriptions, flavor text, buff / debuff and icon for the [Keyword] tokens used in descriptions
+    # [Keyword] tokens: name, description, kind, icon
     buffs = _records(tables, "buff")
     kinds = {"Positive": "pos", "Negative": "neg"}
     glossary = {}

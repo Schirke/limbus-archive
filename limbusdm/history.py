@@ -1,14 +1,4 @@
-"""Patches → Change history (ui/history.js): what each patch changed in an Identity, an E.G.O, an enemy or a status —
-the numbers and the wording — read back from the reports the app already keeps (so only as far back as they go).
-
-A report's `records.changed[]` gives a record's old and new fields. Which card a record belongs to:
-- a skill / passive number listed by an Identity or an E.G.O (the unit list) or by an enemy (the handbook);
-  an enemy's skill the handbook doesn't list goes by its number without the last two digits (151706 → unit 1517);
-- a status (EN_BattleKeywords / EN_Bufs / buff tables) is a card of its own, and also shown under the cards whose
-  changed texts name it.
-A text whose only change is the game's highlight markup, and every field without a name of its own here, is "technical":
-kept, shown on request.
-"""
+"""Patches → Change history: what each kept report changed in an Identity, E.G.O, enemy or status."""
 from __future__ import annotations
 
 import gzip
@@ -256,8 +246,7 @@ def _patch(report: dict, own: _Owners, glossary: dict, icons: dict) -> dict:
 
 
 def build(reports: list[dict], load, units: dict, enemies: dict, icons: dict) -> dict:
-    """{"patches": [{id, day, taken, cards: {key: {real, groups: [{kind, rows}]}}}] newest first, "cards": {key: {…}}}.
-    reports: Service.reports(); load(report id) → the report; icons: {skill picture's name: asset path}."""
+    """{"patches": [...], "cards": {...}}, newest first."""
     own, glossary = _Owners(units, enemies), units.get("glossary") or {}
     patches, used = [], {}
     for rp in reports:

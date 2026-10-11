@@ -1,8 +1,4 @@
-"""Index the objects inside one asset bundle: type, name, container path, content hash.
-
-Text assets are stored as blobs, textures get a thumbnail, so later versions can be compared
-even after the game has deleted the old bundle from its cache.
-"""
+"""Index the objects of one bundle (type, name, path, hash); texts kept as blobs, textures as thumbnails."""
 from __future__ import annotations
 
 import hashlib
@@ -21,9 +17,7 @@ IMAGE_TYPES = {"Texture2D"}
 
 
 def lean_loading() -> None:
-    """Make UnityPy read a bundle in about half the memory (snapshot workers only; one Canto bundle peaked at
-    ~5 GB). UnityPy keeps every decompressed block in a list, joins them into one copy and then copies each file
-    out of that again; here the blocks go straight into one buffer and the files are views into it."""
+    """Makes UnityPy read a bundle in about half the memory (blocks go straight into one buffer)."""
     import importlib
     import struct
 
@@ -89,9 +83,7 @@ def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
     with open(path, "rb") as f:  # read from the file as needed: the compressed bundle isn't kept in memory too
         env = UnityPy.load(f)
     containers: dict[int, str] = {}
-    # path → object straight from the AssetBundle's m_Container. (env.container would also walk the preload
-    # table and look up every reference into other bundles across the whole cache folder: 315 of 333 s on a
-    # big bundle, for nothing we use.)
+    # path → object from m_Container only (env.container walks the whole cache: very slow)
     for obj in env.objects:
         if obj.type.name == "AssetBundle":
             try:

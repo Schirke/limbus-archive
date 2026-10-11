@@ -1,18 +1,5 @@
-"""Mods of skill renders: own textures in place of the game's and a colour shift of the effects, applied by the Unity
-player in memory while it renders. The game's files are never written; a mod is a folder of its own:
-
-    data/mods/<id>/<name>/mod.json        {"hue": -180…180, "sat": 0…2, "bright": 0…2}
-    data/mods/<id>/<name>/tex/<texture>.png   replaces the texture of that name (same layout as the original)
-    data/mods/<id>/<name>/frames/<hash>.png + frames.json   one sprite frame replaced by an image of any size, placed
-        by its pivot (the feet); everywhere, or in one skill only ("scope")
-    mod.json "timing": [{"group", "at", "dur", "speed"}]   a freeze (speed 0: hold `dur` seconds of video) or a slow /
-        fast stretch (`dur` seconds of the original) at `at` seconds of a skill's original video
-    mod.json "vfx": [{"effect", "file", "group", "fps", "scale", "blend", "loop", "offset", "intensity"}]   an effect object
-        of the skills (its name, or the end of its path) drawn as own frames instead (no scale / offset: as big as and
-        where the game's effect draws): "file" under the mod's folder, a
-        GIF / APNG / WebP, one PNG or a folder of PNGs (decoded here: the player only reads PNGs; see vfx_frames)
-
-Its renders are kept next to the original's under a variant of their own ("…_m-<name>", see viewer.variant)."""
+"""Mods of skill renders (own textures, frames, timing, effects, colour shift) applied by the player in memory; a mod is a
+folder under data/mods/<id>/<name>."""
 from __future__ import annotations
 
 import glob
@@ -42,7 +29,7 @@ def mod_dir(svc, cid, name: str) -> str:
 
 
 def _tex_file(svc, cid, name: str, tex: str) -> str:
-    """tex/<hash>.png; the texture's own name (game names have "|" and such) is in tex/names.json."""
+    """tex/<hash>.png; the real name is in tex/names.json."""
     import hashlib
     if not tex or len(tex) > 300:
         raise ValueError("bad texture name")
@@ -84,8 +71,7 @@ def load(svc, cid, name: str) -> dict | None:
 
 
 def vfx_frames(src: str, cache: str) -> tuple[list[str], float]:
-    """An animation as PNG files (made once, kept while the source is unchanged) and its own fps (24 when it has none):
-    a GIF / APNG / WebP frame by frame (Pillow puts each together as shown), a PNG, or a folder of PNGs in name order."""
+    """An animation as PNG frames (made once) and its fps."""
     import hashlib
     from PIL import Image, ImageSequence
     if os.path.isdir(src):
@@ -153,8 +139,7 @@ def delete(svc, cid, name: str):
 
 
 def put_texture(svc, cid, name: str, tex: str, png: bytes | None, size: tuple[int, int] | None = None) -> str:
-    """Store (or with png=None remove) a replacement. Any image is taken and saved as PNG; a different size than the
-    original's is scaled to it (the sprites are cut from fixed places of the texture)."""
+    """Store or remove (png=None) a replacement texture, scaled to the original's size."""
     p = _tex_file(svc, cid, name, tex)
     d = mod_dir(svc, cid, name)
     files = _names(d)
@@ -193,12 +178,7 @@ HIERARCHY = {"GameObject", "Transform", "RectTransform"}
 
 
 def _used_textures(bundle_path: str, cid) -> set[int] | None:
-    """Texture2D path ids a bundle's prefabs really use — every root object (the character, its cut-ins, the effect
-    prefabs its skills spawn) except other characters' "<id>_…Appearance", through their components and every asset
-    reachable from them (materials, sprites and their atlases, Animator controllers and clips, timelines, Spine data).
-    Bundles also hold things the character never shows: other characters' disabled stand-ins under a cut-in's
-    targets (90120_Maid_1Appearance in Hollow's), shared bundles the other Identities, and atlases nothing references
-    (8171_Nelly_SDAtlas). None = can't tell."""
+    """Texture path ids the bundle's prefabs really use (not stand-ins of other characters); None = can't tell."""
     from .extract import _env, _lock
     try:
         env = _env(bundle_path)
@@ -272,8 +252,7 @@ def _used_textures(bundle_path: str, cid) -> set[int] | None:
 
 
 def textures(svc, cid) -> list[dict]:
-    """The textures a mod can replace: those of the character's own bundles (its sprites, its own effects, an E.G.O's
-    cut-in and background), biggest first. Shared effect textures of other bundles aren't listed."""
+    """Textures a mod can replace: the character's own bundles, biggest first."""
     import sqlite3
     from .viewer import _prefabs, _skill_view_rows
     bundles = {b for b, _n in _prefabs(svc, cid) if "produce" not in b}
@@ -286,7 +265,7 @@ def textures(svc, cid) -> list[dict]:
             rows += db.execute("select bundle, pid, name, w, hgt from o where bundle = ? and type = 'Texture2D'", (b,)).fetchall()
     finally:
         db.close()
-    # only what the character uses (shared bundles also hold stand-ins, other Identities and leftovers)
+    # only what the character uses
     keep = {}
     for b in bundles:
         path = svc.object_file(b)
@@ -320,9 +299,7 @@ def vfx_frame_file(svc, cid, name: str, effect: str, i: int) -> str | None:
 
 def put_vfx(svc, cid, name: str, effect: str, data: bytes | None = None, filename: str = "", params: dict | None = None,
             source: dict | None = None, remove: bool = False) -> None:
-    """An effect of the skills drawn as own frames (see vfx_frames). `data`: the file (GIF / APNG / WebP / PNG, or a zip
-    of PNGs); `source` {"cid", "effect"}: another character's effect, taken from its rendered Effects videos; neither: only
-    the settings change; remove: the game's effect again. `params`: group, fps, scale, blend, loop, offset, intensity."""
+    """Set an effect's own frames: a file, another character's effect, or removal."""
     import hashlib
     import zipfile
     if not effect or len(effect) > 200:
@@ -382,8 +359,7 @@ def put_vfx(svc, cid, name: str, effect: str, data: bytes | None = None, filenam
 
 
 def _vfx_from_render(svc, d: str, rel: str, src_cid, src_effect: str):
-    """Frames of another character's effect: its rendered Effects video (transparent WebM, made in the Effects tab), cut
-    into PNGs, cropped to what the effect draws, half size, the faintest alpha cut."""
+    """Another character's effect frames, cut from its rendered Effects video."""
     import subprocess
     import tempfile
     from PIL import Image
@@ -416,8 +392,7 @@ def _vfx_from_render(svc, d: str, rel: str, src_cid, src_effect: str):
 
 
 def put_frame(svc, cid, name: str, sprite: str, image: bytes | None, scope: str = "", source: dict | None = None) -> None:
-    """Replace one sprite frame (image=None and no source: back to the game's). `image`: a PNG of any size, placed
-    by frames.placement; `source`: {"cid", "sprite"} — another character's frame, as that character has it."""
+    """Replace one sprite frame (image or another character's sprite; neither = back to the game's)."""
     import hashlib
     from PIL import Image
     from . import frames
@@ -454,7 +429,7 @@ def put_frame(svc, cid, name: str, sprite: str, image: bytes | None, scope: str 
 
 
 def put_frames_zip(svc, cid, name: str, data: bytes, scope: str = "") -> int:
-    """The edited frames of an exported zip (or any zip of "<sprite>.png"): each one replaces its frame."""
+    """Each edited frame of a zip replaces its frame."""
     import zipfile
     from . import frames
     known = {frames.safe_file(f["name"]) + ".png": f["name"] for g in frames.character_frames(svc, cid)["groups"] for f in g["frames"]}

@@ -1,5 +1,4 @@
-"""The game's own UI icons (sins, resistances, damage types, statuses, ranks…) cut from the main build
-(resources.assets / sharedassets*.assets) on first use and kept as PNG in data/ui_icons. Read-only on the game."""
+"""The game's UI icons cut from the main build on first use, kept in data/ui_icons."""
 from __future__ import annotations
 
 import glob
@@ -9,8 +8,7 @@ import threading
 from . import bundles as _bundles  # noqa: F401  (sets the Unity fallback version)
 
 PL = "MainUI_PersonalityList_"
-# icon key -> sprite name. The Identity screen's atlas slices have generic names; if a patch renames them the
-# key just 404s and the page falls back to text.
+# icon key → sprite name (a renamed sprite just 404s)
 ICONS = {
     **{f"sin_{s}": f"{PL}4_{i}" for i, s in enumerate(["Wrath", "Lust", "Sloth", "Gluttony", "Gloom", "Pride", "Envy"])},
     "hp": f"{PL}4_22", "def": f"{PL}4_23",
@@ -22,7 +20,7 @@ ICONS = {
     "up_1": f"{PL}4_18", "up_2": f"{PL}4_17", "up_3": f"{PL}4_16", "up_4": f"{PL}4_37", "up_5": f"{PL}4_40",
     "grade_ZAYIN": f"{PL}3_27", "grade_TETH": f"{PL}3_28", "grade_HE": f"{PL}3_38", "grade_WAW": f"{PL}3_39",
     "grade_ALEPH": f"{PL}3_29",
-    # skill coins as the battle UI draws them: plain bronze, Unbreakable (red), the purple / green special coins
+    # skill coins: plain, Unbreakable, purple / green
     "coin": "BattleUI_NewCoin_0", "coin_super": "BattleUI_NewCoin_3", "coin_purple": "BattleUI_NewCoin_14",
     "coin_green": "BattleUI_NewCoin_11",
 }
@@ -31,7 +29,7 @@ _lock = threading.Lock()
 
 
 def _extract_all(game_data: str, cache_dir: str) -> None:
-    """One pass over the main build: every icon in ICONS saved as a small PNG (a few seconds, once)."""
+    """One pass over the main build: every ICONS icon saved as PNG."""
     import io
     import UnityPy
     os.makedirs(cache_dir, exist_ok=True)
@@ -69,7 +67,7 @@ def _extract_all(game_data: str, cache_dir: str) -> None:
 
 
 def _done(cache_dir: str) -> bool:
-    """Extraction ran for the current ICONS (a newer app version can add keys: look for those once more)."""
+    """Whether extraction ran for the current ICONS."""
     try:
         with open(os.path.join(cache_dir, ".done")) as f:
             lines = f.read().split("\n")
@@ -78,13 +76,13 @@ def _done(cache_dir: str) -> bool:
     return len(lines) > 1 and set(ICONS) <= set(lines[0].split())
 
 
-# the fonts the game draws its UI with (embedded in the main build), by the name the page asks for
+# the game's UI fonts
 FONTS = ("BebasKai", "Mikodacs", "ExcelsiorSans", "Pretendard-Regular")
 SEASON_TAGS = "IntColorPairs_UnitInfoSeasonTag"  # the season label's colour on the Identity screen, per season id
 
 
 def _extract_extras(game_data: str, cache_dir: str) -> None:
-    """One more pass over the main build: the UI fonts and the season colours (seasons.json: {season id: "#rrggbb"})."""
+    """UI fonts and season colours from the main build."""
     import json
     import struct
     import UnityPy
@@ -109,8 +107,7 @@ def _extract_extras(game_data: str, cache_dir: str) -> None:
                             f.write(data)
                         left.discard(d.m_Name)
                 elif o.type.name == "MonoBehaviour" and not seasons and o.byte_size < 4096:
-                    # no type tree in the main build: m_GameObject (12) m_Enabled (4) m_Script (12), the name, some
-                    # other fields, then the list as a count and (int season, 4 float colour) entries up to the end
+                    # no type tree: read the raw layout up to the list
                     raw = o.get_raw_data()
                     n = struct.unpack_from("<i", raw, 28)[0]
                     if n != len(SEASON_TAGS) or raw[32:32 + n] != SEASON_TAGS.encode():

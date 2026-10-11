@@ -1,16 +1,15 @@
 "use strict";
-// The web copy's stand-in for the app's server: the UI's /api/… requests are answered from the files that
-// limbusdm/site.py wrote (d/index.json → manifests "request → file"). Anything else exists only in the app.
+// The web copy's stand-in for the app's server: /api/… answered from the files site.py wrote.
 const DATA = "/d/";
 const TYPES = { ogg: "audio/ogg", wav: "audio/wav", mp4: "video/mp4", webm: "video/webm", json: "application/json; charset=utf-8", txt: "text/plain; charset=utf-8", png: "image/png", webp: "image/webp",
   jpg: "image/jpeg", gif: "image/gif", otf: "font/otf", ttf: "font/ttf" };
 const MEDIA = /\.(mp4|webm|ogg|wav|mp3)$/;
 const ONLY_APP = "Only in the desktop app";
 let site = null, loading = null, loaded = 0, tr = null;
-// what each page asked for and the site has no file for (the app's check reads it: limbusdm/sitecheck.py)
+// requests with no file, per page
 const misses = new Map();
 const NOT_NEWS = new Set();  // asked by every page on load, only the app answers
-// …and what it asked for at all, with how many answers are still on their way: the check waits for a page to go quiet
+// requests per page and how many are in flight
 const asked = new Map();
 function work(id) {
   if (!asked.has(id)) asked.set(id, { keys: new Set(), busy: 0 });
@@ -42,13 +41,13 @@ async function load() {
   return site;
 }
 function ready(force) {
-  // a new patch on the site shows up without reinstalling the worker: the index is looked at again every few minutes
+  // re-read the index every few minutes
   if (!loading || force) loading = load().catch((e) => { loading = null; if (!site) throw e; });
   else if (site && Date.now() - loaded > 300e3) { loaded = Date.now(); load().catch(() => {}); }
   return loading.then(() => site);
 }
 const json = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { "Content-Type": TYPES.json } });
-// a request's name in the manifests: the path and its parameters sorted ("t" only busts caches)
+// request key: path + sorted params ("t" ignored)
 function keyOf(u) {
   const q = [...u.searchParams].filter(([k]) => k !== "t" && k !== "refresh" && k !== "force").map(([k, v]) => `${k}=${v}`).sort();
   let path = u.pathname;
@@ -86,10 +85,9 @@ async function answer(req, u, e) {
   const file = s.urls.get(k);
   if (!file) { miss(e, k); return json({ error: ONLY_APP }, 404); }
   if (Array.isArray(file)) return packed(req, file);
-  // a file that lies on the host in parts (limbusdm/site.py pack: a video, or anything above what the host takes)
+  // a file stored in parts
   if (file.parts) return parted(req, file);
-  // a sound / video on its own: fetched whole first — the host can't send a part of a file, and a player that
-  // seeks asks for parts
+  // media fetched whole first
   if (MEDIA.test(file)) {
     const ext = file.split(".").pop();
     try { const blob = await kept(file); return part(req, blob, 0, blob.size, TYPES[ext]); }
@@ -100,8 +98,7 @@ async function answer(req, u, e) {
   const gz = file.endsWith(".gz"), ext = file.replace(/\.gz$/, "").split(".").pop();
   return new Response((gz ? gunzip(r) : r).body, { headers: { "Content-Type": TYPES[ext] || "application/octet-stream", "Cache-Control": "max-age=3600" } });
 }
-// a small file inside a pack (the site as it is uploaded: limbusdm/site.py pack): [pack, offset, length, extension].
-// The pack is fetched whole once and kept (its name is its content), the file is cut out of it.
+// a small file inside a pack: the pack fetched once and kept, the file cut out
 const packs = new Map();
 function kept(path) {
   let p = packs.get(path);
@@ -130,9 +127,7 @@ function part(req, blob, off, len, type) {
   if (m) headers["Content-Range"] = `bytes ${a}-${b}/${len}`;
   return new Response(blob.slice(off + a, off + b + 1, type), { status: m ? 206 : 200, headers });
 }
-// A file in parts. A player asks for a piece ("Range"): it gets the part that piece starts in, no more — a player takes
-// what it is given and asks on from there, so a video starts after its first part, and a jump fetches the part jumped
-// to. The next part is fetched meanwhile. Asked for whole (no Range), the parts are joined.
+// A file in parts: a Range request gets the part it starts in (next one prefetched); no Range: parts joined.
 async function parted(req, file) {
   const type = TYPES[file.ext || file.parts[0].split(".").slice(-2)[0]] || "application/octet-stream";
   const m = /bytes=(\d+)-(\d*)/.exec(req.headers.get("Range") || ""), step = file.part, size = file.size;

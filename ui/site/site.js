@@ -1,17 +1,12 @@
 "use strict";
-// The web copy (limbusdm/site.py): loaded after the app's own scripts. Pages that need the game on the visitor's
-// computer are stubs here, the app's own controls are hidden, and the footer names who to write to.
+// The web copy's tweaks over the app's scripts: stubs for app-only pages, hidden controls, the footer.
 (() => {
   // the pages the site has data for: decided when the site is made (limbusdm/site.py verify)
   const repo = "https://github.com/Schirke/limbus-archive";
   const OPEN = new Set(SITE.open || ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "community", "support"]);
-  // "?check": the app looking at its own site (limbusdm/sitecheck.py) — every page runs for real and, once it has
-  // settled, leaves what it asked for in vain where the app reads it
-  // The front page, here only (the app opens on Patches: who has it knows where they are): what the site is in a
-  // line, the art of the newest Identities taking turns behind it, the latest patch, the sections and the newest
-  // Identities. Somebody sent the bare link lands here.
+  // "?check": the app checking its site. The front page (site only): latest Identities' art, latest patch, sections
   OPEN.add("home");
-  // a section's own page (/db, /enemies…: limbusdm/site.py, written for search engines) opens the app on it
+  // a section page opens the app on it
   if (location.hash.length < 3) {
     const page = location.pathname.replace(/^\/+|\/+$|\.html$/g, "");
     history.replaceState(null, "", "/" + location.search + "#/" + (page && page !== "index" ? page : "home"));
@@ -34,7 +29,7 @@
     ["community", "community", "Community", "Who streams Limbus right now, channels worth a look.", "BottomMenu_1_13"],
   ];
   let homeTimer = 0;
-  // (a report's counts as its row has them, without the kinds that say little to a visitor: code, new paths, other)
+  // report counts without code / paths / other
   const homeChips = (sum) => `<div class="chips">${SUMMARY_LABELS.filter(([k]) => sum && sum[k] && !/^(code|catalog_added|other)$/.test(k)).map(([k, l]) =>
     `<span class="chip ${k === "leaks" || k === "foreign_only" ? "leak" : ""}"><b>${sum[k]}</b> ${l}</span>`).join("") || `<span class="chip">no content changes</span>`}</div>`;
   routes.home = async () => {
@@ -46,7 +41,7 @@
     const ids = typeof UNITS !== "undefined" && UNITS && UNITS.ids || [];
     const byDate = [...ids].sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.id - a.id);
     const newest = byDate.length ? byDate[0].date || "" : "";
-    // the banner: the Identities of the latest date (one banner brings several: they take turns)
+    // banner: the newest Identities in turn
     const slides = byDate.filter((x) => x.date === newest && x.img && x.img.art).slice(0, 6);
     const games = document.querySelectorAll("#subnav a[data-game]").length;
     const day = (r) => { const m = /^build (\d\d\.\d\d)\.(\d{4}) · taken (.+)$/.exec(fmtSnap(r.new)); return m ? { d: m[1], y: m[2], taken: m[3] } : { d: fmtSnap(r.new), y: "", taken: "" }; };
@@ -101,7 +96,7 @@
   if (checking.has("check")) {
     const all = Object.keys(routes);
     for (const name of all) OPEN.add(name);
-    // settled = nothing new asked and nothing on its way for a second and a half ("settle" is the longest wait)
+    // settled: nothing asked for 1.5 s
     const most = +checking.get("settle") || 6000, t0 = Date.now();
     let last = -1, since = t0;
     const tick = setInterval(async () => {
@@ -116,11 +111,7 @@
       document.head.appendChild(el);
     }, 300);
   }
-  // The site's own count of its visitors (worker.js Stats): a page tells what was opened in it — at once when it is
-  // opened, then every ten minutes ("still here" too) and when it is put away: few requests however many pages a
-  // visitor goes through. 410 = the count is closed for the month (worker.js, the allowance). Nothing is kept in the
-  // browser. The Site stats tab of Community shows the sums — to everybody, or (SITE.stats "key") to who opened it
-  // once as #/community/stats/<key>.
+  // Visitor count: a page reports what it opened, at once, every 10 min and when hidden. Nothing kept in the browser.
   if (!checking.has("check")) {
     let opened = [], shut = false;
     const here = () => [location.hash.split("/")[1] || "home", ""];
@@ -132,7 +123,7 @@
     };
     window.addEventListener("hashchange", () => { if (opened.length < 50) opened.push(here()); });
     opened.push(here());
-    // an Identity's or E.G.O's card: opened by a click in the list (the link stays) or by a link — both come here
+    // a card opened by click or by link
     if (typeof openUnit === "function") {
       const open = openUnit;
       window.openUnit = function (id) { if (/^\d{5}$/.test(String(id)) && opened.length < 50) opened.push(["db", String(id), 1]); return open.apply(this, arguments); };
@@ -163,7 +154,7 @@
     const country = (cc) => { try { return (cc !== "??" && region && region.of(cc)) || "Unknown"; } catch (e) { return "Unknown"; } };
     const unit = (id) => { const x = typeof unitById === "function" && unitById(+id); return x ? (x.title ? `${x.title} ${x.sinnerName || ""}`.trim() : x.name) : id; };
     const part = (set, pre, name, most) => Object.entries(set).filter(([k]) => k.startsWith(pre)).map(([k, n]) => [name(k.slice(pre.length)), n]).sort((a, b) => b[1] - a[1]).slice(0, most);
-    // what the plan's period has spent of what the site's settings allow it (worker.js: the count's own sums)
+    // spent this period (owner view)
     const spent = () => {
       const u = d.spent, m = u && u.most;
       if (!m) return "";
@@ -203,25 +194,21 @@
     };
     draw();
   };
-  // Animations: the site has the Spine skeletons and the battle animations — an Identity or E.G.O opens on its Spine
-  // tab, or on the battle one when it has no skeleton (the tabs that need the game's files are hidden in site.css),
-  // without asking for its videos and skill numbers
-  // "With effects": the skills rendered by the app's Unity player, for those whose videos were sent here — with the
-  // target, and with the character's buffs (limbusdm/sitefx.py); the other options and rendering stay in the app
+  // Animations on the site: Spine and battle tabs; "With effects" for videos sent here
   let FXS = {};
   const fxList = fetch("/api/site_fx").then((r) => (r.ok ? r.json() : {})).then((j) => { FXS = j || {}; }).catch(() => {});
   const fxHas = (id, v) => (FXS[id] || []).includes(v);
   if (typeof openAnimEntry === "function") {
     const open = openAnimEntry;
     window.openAnimEntry = async (sel) => {
-      anim.sel = sel;  // (before the wait: the list on the left is drawn right after the click, with this one marked)
+      anim.sel = sel;  // draw the list before waiting
       await fxList;
       const mine = sel && sel.cid != null && !sel.enemy && !sel.spine;
       if (mine) {
         sel.videos = sel.videos || [];
         if (!FXS[sel.cid]) sel.slots = sel.slots || {};  // (the skills' names are here only with the videos)
         const c = findChar(sel.cid);
-        // (the app's first tab is Skills: here that is the videos sent to the site, else the Spine art, else the clips)
+        // first tab: sent videos, else Spine, else clips
         if (!/^(battle$|spine)/.test(anim.tab || "") && !(anim.tab === "fx" && FXS[sel.cid])) anim.tab = FXS[sel.cid] ? "fx" : c && c.spine.length ? "spine0" : "battle";
       }
       const show = () => { const b = document.querySelector('#aview .an-tabs [data-t="fx"]'); if (b) b.classList.toggle("onsite", !!(mine && FXS[sel.cid])); };
@@ -235,7 +222,7 @@
     const fx = openFx;
     window.openFx = async (c, body) => {
       anim.fxSolo = false; anim.fxLevel = 0; anim.fxMod = "";
-      // (with its buffs when that is the only set here; the buffs' list first: the tab draws its switches once)
+      // buffs on when that's the only set
       anim.fxOpt = { buffs: fxHas(c.id, "buffs") && (!!(anim.fxOpt && anim.fxOpt.buffs) || !fxHas(c.id, "")) };
       anim.fxBuffs = anim.fxBuffs || {};
       if (!anim.fxBuffs[c.id]) anim.fxBuffs[c.id] = await fetch(`/api/fx_buffs?id=${encodeURIComponent(c.id)}`).then((r) => r.json()).catch(() => ({ levels: [], notes: {}, own: [] }));
@@ -251,7 +238,7 @@
   }
   // mods are made and kept in the app: no list of them is asked for here
   if (typeof animMods === "function") window.animMods = async () => ({ mods: [] });
-  // the app takes pictures of the enemies' idle poses for the grid and keeps them; the site has the ones it was given
+  // no idle-pose pictures on the site
   if (typeof enThumbs === "function") window.enThumbs = async () => {};
   const stub = () => {
     $("#main").innerHTML = `<div class="empty"><h2 style="margin-top:0">Only in the app</h2>
@@ -270,8 +257,7 @@
     if (name && !OPEN.has(name)) a.classList.add("apponly");
   });
   document.body.classList.add("site");
-  // an invite opened here (a duel, a live room, a Versus room): who has the desktop app can go on there — the app
-  // makes limbusarchive: links its own (limbusdm/app.py)
+  // an invite: offer to open it in the app
   const appBar = () => {
     const h = location.hash, on = /^#\/(game\w+|games\/track)\/duel\/[\w.%-]+$|^#\/(live|vsroom|gamewho)\/[a-z0-9]{4,10}$/i.test(h);
     let el = $("#appbar");
@@ -282,10 +268,8 @@
   };
   window.addEventListener("hashchange", appBar);
   appBar();
-  // A copy of the site left open learns that a newer one was sent (the app's "Send to site"): the site's index is
-  // looked at every two minutes and a plate offers the notes and a reload — nothing reloads by itself, a game may be
-  // on. The notes are the app's own (the releases', limbusdm/site.py index); after the reload, or on the next visit,
-  // the ones since the version seen last pop up once, as in the app.
+  // An open copy checks the index every 2 min and offers the notes and a reload; notes since the last seen version pop
+  // up once.
   const mine = SITE.build || {};
   const ver = (v) => String(v || "").split(".").map((x) => parseInt(x, 10) || 0);
   const newer = (a, b) => { const x = ver(a), y = ver(b); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
@@ -342,7 +326,7 @@
     ${SITE.contact ? `<span>Contact: <b>${esc(SITE.contact)}</b></span>` : ""}
     <span>Made with <a href="https://claude.com/claude-code" target="_blank" rel="noopener">Claude Code</a></span>
     <span><a href="#" id="sitenotes">What's new</a> · <a href="#/support">Support · Credits</a></span>`;
-  // at the end of the page's scroll, not on the screen all the time: a page that draws itself anew puts it back last
+  // footer kept last in the scroll
   const main = $("#main"), last = () => { if (main.lastElementChild !== foot) main.appendChild(foot); };
   new MutationObserver(last).observe(main, { childList: true });
   last();

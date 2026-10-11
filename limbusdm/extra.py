@@ -1,6 +1,5 @@
-"""Pictures the current game files lack, shipped with the app in ui/extra/ under catalog-like paths
-(Assets/Resources_moved/<path under ui/extra>): the Arknights collab's enemies (Pilgrimage of Compassion), whose portraits
-and skill icons the game no longer carries. Used only where the game has no file of that name."""
+"""Pictures the game no longer has (Pilgrimage of Compassion enemies), shipped in ui/extra; used only when the game lacks
+the file."""
 from __future__ import annotations
 
 import os

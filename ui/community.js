@@ -1,9 +1,5 @@
-// Community: who streams the game right now — the live streams on Twitch and YouTube: everything together
-// ("Popular") or English, Russian, Korean; sorted by viewers or by when they started, one site or both.
-// (/api/community: a list made on GitHub every minute, see scripts/community.py. The menu item shows up
-// once there is such a list.) While somebody big is live — a stream with at least `cm.big` viewers — the menu item
-// turns into a live mark with the streamer's picture, name and viewers (cmTab; the list is read anew every minute).
-// The page says when the list was made (cmStamp): green while fresh, gold after 20 minutes, red after an hour.
+// Community: live Twitch / YouTube streams by language, sortable; a big live stream turns the menu item into a live
+// mark; the list's age is shown.
 "use strict";
 
 const CM_LANGS = [["all", "Popular"], ["en", "English"], ["ru", "Русский"], ["ko", "한국어"]];
@@ -40,8 +36,7 @@ cmRead();
 setInterval(cmRead, 60000);
 setInterval(() => { const el = $(".cmstamp"); if (el) el.outerHTML = cmStamp(el.dataset.at); }, 30000);
 
-// The recommended channels in the page's corner (the owner's list, see the end of the file): round pictures that open
-// the channel; who is live right now comes first, in a red ring.
+// Recommended channels in the corner; live ones first.
 const cmInit = (name) => [...String(name).replace(/[^\p{L}\p{N}]/gu, "")].slice(0, 2).join("").toUpperCase();
 function cmRec(d) {
   const list = [...((d || cm.last || {}).recommended || [])].sort((a, b) => !!b.live - !!a.live);
@@ -50,7 +45,7 @@ function cmRec(d) {
 }
 const cmHead = (sub, d) => `<div class="cmhead"><div><h1>Community</h1><div class="sub">${sub}</div></div>${cmRec(d)}</div>`;
 
-// The page's tabs: the live streams, the videos on Bilibili, and — on the website — who visits it (ui/site/site.js).
+// Tabs: streams, Bilibili, and site stats on the website.
 const cmTabs = (on) => `<div class="cmtabs">${[["", "Live streams"], ["bilibili", "Bilibili"], ...(window.siteStatsTab && siteStatsTab() ? [["stats", "Site stats"]] : [])].map(([k, n]) => `<a class="${on === k ? "on" : ""}" href="#/community${k ? "/" + k : ""}">${n}</a>`).join("")}</div>`;
 
 routes.community = async (args) => {
@@ -92,9 +87,7 @@ routes.community = async (args) => {
   cm.fresh = (doc) => { if (location.hash.split("/")[1] !== "community" || location.hash.split("/")[2]) return void (cm.fresh = null); if (doc && doc.updated && doc.updated !== d.updated) { const y = $("#main").scrollTop; take(doc); draw(); $("#main").scrollTop = y; } };
 };
 
-// Bilibili: the game's videos there (/api/bilibili: Bilibili's own search by the game's Chinese name, asked by the app,
-// kept 10 minutes) — of the last day, the last week or of all time, the most watched first or the newest first.
-// A title is shown as it is, with its English translation under it.
+// Bilibili: the game's videos by period, most watched or newest, with English titles.
 const CB_PERIODS = [["day", "Last 24 hours"], ["week", "Last week"], ["all", "All time"]];
 const CB_SORTS = [["views", "Most watched"], ["new", "Newest"]];
 const cb = { period: "week", sort: "views", ...(() => { try { return JSON.parse(localStorage.getItem("community_bili") || "{}"); } catch { return {}; } })() };
@@ -130,8 +123,7 @@ async function cmBili() {
   wire();
 }
 
-// Settings, for the owner alone (where the web copy is set up): the recommended channels — links, one a line, kept on
-// GitHub (/api/community_rec); the list made there every minute then carries their names, pictures and who is live.
+// Settings (owner only): the recommended channels list, kept on GitHub.
 {
   const settings = routes.settings;
   routes.settings = async () => {

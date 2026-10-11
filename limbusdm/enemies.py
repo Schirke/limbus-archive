@@ -1,9 +1,4 @@
-"""Enemy handbook built from the game's own tables: every enemy, boss and abnormality with its HP, speed, stagger
-thresholds, resistances (per part for the multi-part ones), skills, passives and the stages it is fought in.
-
-StaticData enemy / abnormality-unit (+ abnormality-part) ← stage wave lists (see content.py) and English localization.
-One entry per look and name; the same enemy with other numbers (a later chapter, Mirror Dungeon…) is a variant of it.
-"""
+"""Enemy handbook from the game's tables: stats, resistances, skills, passives, stages; one entry per look and name."""
 from __future__ import annotations
 
 import json
@@ -133,8 +128,7 @@ def build(tables: dict, loc_dir: str) -> dict:
     for table, recs in (("enemy", enemies), ("abnormality-unit", abnos)):
         for uid, raw in recs.items():
             u = _resolve(raw, enemies, abnos)
-            # the abnormality-unit table holds every unit built of parts: a plain enemy remade that way says so, and of
-            # the rest the ones with sanity are people (bosses), the ones without are abnormalities
+            # Enemy / Boss (has sanity) / Abnormality
             kind = ("Enemy" if table == "enemy" or _true(u.get("isOriginNormalEnemy"))
                     else "Boss" if _true(u.get("hasMp")) else "Abnormality")
             app = u.get("appearance") or ""
@@ -205,7 +199,7 @@ def build(tables: dict, loc_dir: str) -> dict:
         prio, order, label = variants[0]["first"]
         for v in variants:
             v["label"] = v.pop("first")[2]
-        # one that is a boss or an abnormality anywhere is listed as one (as the earliest such look of it)
+        # listed by its first non-Enemy kind
         kind = next((v["kind"] for v in variants if v["kind"] != "Enemy"), "Enemy")
         out.append({"id": variants[0]["ids"][0], "name": g["name"], "app": g["app"], "kind": kind, "label": label,
                     "group": label.split(" · ")[0], "prio": prio, "order": order, "portrait": g["portrait"],

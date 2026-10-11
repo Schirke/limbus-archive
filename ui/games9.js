@@ -1,7 +1,4 @@
-// Games → Spot the difference: an Identity's art twice, the right one with a few changes the page makes itself (a
-// spot mirrored, its colours turned, or painted over with what lies next to it) — find them all before the time is up.
-// Nothing new is asked of the game's files: the art is the one Guess the art and Jigsaw show.
-// Shares the styles and the Daily challenge / duels of games.js / games7.js.
+// Spot the difference: the art twice, the right one changed in a few spots.
 "use strict";
 
 const GF_ROUNDS = 5, GF_WORTH = 2000, GF_MISS = 100, GF_W = 960, GF_H = 540, GF_SPOTS = [5, 7], GF_TIME = [75, 100];  // (Easy, Hard)
@@ -51,15 +48,14 @@ function gfNew(daily) {
   gfRound();
 }
 
-// The changes: `n` round spots that don't touch, each changed in one of three ways, with a soft edge. A change that
-// can hardly be seen (a flat patch of sky mirrored) is not made: another spot is tried. → {spots, pic: the changed picture}
+// Make `n` visible changes in non-touching spots → {spots, pic}.
 function gfMake(base, n, hard, rnd) {
   const W = base.width, H = base.height, src = base.data, out = new Uint8ClampedArray(src), spots = [];
   for (let k = 0; k < 600 && spots.length < n; k++) {
     const r = Math.round((hard ? 24 : 34) + rnd() * (hard ? 16 : 24)), x = Math.round(r + 10 + rnd() * (W - 2 * r - 20)), y = Math.round(r + 10 + rnd() * (H - 2 * r - 20));
     const how = Math.floor(rnd() * 3), side = rnd() < 0.5 ? -1 : 1, up = rnd() < 0.5 ? -1 : 1;
     if (spots.some((s) => Math.hypot(s.x - x, s.y - y) < s.r + r + 40)) continue;
-    // (painted over with the spot two radii to the side, or above / below when that falls off the picture)
+    // painted over from the spot beside it
     let ox = Math.round(2.1 * r) * side, oy = 0;
     if (x + ox - r < 0 || x + ox + r >= W) ox = -ox;
     if (x + ox - r < 0 || x + ox + r >= W) { ox = 0; oy = Math.round(2.1 * r) * up; if (y + oy - r < 0 || y + oy + r >= H) oy = -oy; }
@@ -90,7 +86,7 @@ function gfRound() {
   if (++g.round >= g.of) return gfResult();
   const ans = g.list[g.round], n = GF_SPOTS[g.hard ? 1 : 0];
   Object.assign(g, { ans, n, spots: null, base: null, pic: null, miss: 0, t0: 0, sec: 0, time: GF_TIME[g.hard ? 1 : 0], done: null, bad: null });
-  const drop = () => {  // a picture the game's files don't give, or one too plain to change: another takes the round
+  const drop = () => {  // missing or too plain: another picture
     if (gf.game !== g || g.ans !== ans) return;
     if ((g.fails = (g.fails || 0) + 1) > 3 || g.list.length <= g.of) { gfLeave(); gfDrawStart(); return toast("The pictures could not be read from the game's files."); }
     g.list.splice(g.round--, 1);

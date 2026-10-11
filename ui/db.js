@@ -1,5 +1,4 @@
-// Identity / E.G.O database and the team builder.
-// Everything comes from the game's own tables (/api/units), so it follows every patch by itself.
+// Identity / E.G.O database and team builder, from /api/units.
 
 const SIN_COLORS = { Wrath: "#d94a3a", Lust: "#e8862f", Sloth: "#e3c43a", Gluttony: "#8fc34a", Gloom: "#43b4d6", Pride: "#3e62d6", Envy: "#9b5bd0", None: "#888" };
 const RANKS = { 1: "0", 2: "00", 3: "000" };
@@ -13,8 +12,7 @@ const unitById = (id) => UNITS && (UNITS.ids.find((x) => x.id === id) || UNITS.e
 const statusName = (k) => (UNITS && UNITS.keywords[k]) || k;
 const imgThumb = (path) => `/api/asset_thumb?path=${encodeURIComponent(path)}`;
 const imgFull = (path) => `/api/asset_img?path=${encodeURIComponent(path)}`;
-// Skill icons in their sin frames (ui/frames: the layers of the community PSD templates, one per sin and tier, and
-// Defense): the frame's shadow, the skill's picture inside the frame's opening, the frame. Click one to save it.
+// Skill icons in their sin frames (community PSD layers); click to save.
 let FRAMES = null;
 const frameImgs = {};
 const loadImg = (src) => frameImgs[src] || (frameImgs[src] = new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; }));
@@ -37,7 +35,7 @@ new MutationObserver(() => document.querySelectorAll("img[data-frame]:not([data-
   im.dataset.done = "1";
   // the framed one shows straight away; the round icon only if it can't be made
   const round = () => { im.parentElement.classList.remove("framed"); im.src = im.dataset.src; im.style.visibility = ""; };
-  // (no picture of its own — an E.G.O's skill, some enemies': the fallback picture goes into the frame)
+  // no own picture: the fallback goes in the frame
   framedIcon(im.dataset.art, im.dataset.frame).catch(() => im.dataset.art2 ? framedIcon(im.dataset.art2, im.dataset.frame) : null)
     .then((u) => { if (!u) return round(); im.src = u; im.style.visibility = ""; }).catch(round);
 })).observe(document.documentElement, { childList: true, subtree: true });
@@ -50,7 +48,7 @@ const sinDot = (sin, title) => `<span class="sindot" style="background:${SIN_COL
 // chips are multi-select: statuses / sins / attack types must ALL be there, ranks / grades match ANY of the picked ones
 const DB_MULTI = ["rank", "grade", "sin", "atk", "status", "season"];
 const dbv = { tab: "ids", q: "", sinner: 0, rank: [], grade: [], sin: [], atk: [], status: [], season: [], assoc: "", sort: "new", shown: 120 };
-// seasons as the game tags them: none for the standard ones, one entry (9100) for every Walpurgis Night (9101, 9102…)
+// season key; 9100 = every Walpurgis Night
 const seasonKey = (s) => !s ? "0" : s > 9100 && s < 9200 ? "9100" : String(s);
 const seasonInfo = (s) => (UNITS.seasons || {})[seasonKey(s)];
 const lightColor = (hex) => { const n = parseInt(hex.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000 > 140; };
@@ -74,7 +72,7 @@ function drawDb() {
   const isId = dbv.tab === "ids";
   const assocs = [...new Set(UNITS.ids.flatMap((x) => x.assoc))].sort();
   const chip = (key, val, label, on, title = "") => `<button class="toggle ${on ? "on" : ""}" data-f="${key}" data-v="${esc(val)}" title="${esc(title)}">${label}</button>`;
-  // the seasons this tab has, in the game's order: the numbered ones, Walpurgis Night, collaborations
+  // this tab's seasons in the game's order
   const have = new Set((isId ? UNITS.ids : UNITS.egos).map((x) => seasonKey(x.season)));
   const seasons = Object.keys(UNITS.seasons || {}).filter((k) => have.has(k)).sort((a, b) => a - b);
   const seasonChip = (k) => { const d = UNITS.seasons[k], on = dbv.season.includes(k);
@@ -145,7 +143,7 @@ function dbFiltered() {
   };
   return arr.sort(by[dbv.sort] || by.new);
 }
-// the game's own UI icons (/api/ui_icon cuts them from the game build); text when a patch renamed one
+// the game's UI icons; text when missing
 function icoFail(img) { const s = document.createElement("span"); s.className = "icofb"; s.textContent = img.alt; img.replaceWith(s); }
 const ico = (key, cls = "", title = "", fallback = "") =>
   `<img class="ico ${cls}" src="/api/ui_icon?k=${encodeURIComponent(key)}" title="${esc(title)}" alt="${esc(fallback)}" onerror="icoFail(this)">`;
@@ -157,8 +155,7 @@ const MAX_LEVEL = 65;  // the current level cap: HP = base + per level × level,
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII", "XIII", "XIV", "XV"];
 const SPEED_SVG = `<svg class="ico s28" viewBox="0 0 32 32"><path fill="#b4774a" stroke="#3a2418" stroke-width="1.5" d="M10 3h9l-1 12 9 5c3 2 3 6 0 7H6c-2 0-3-2-2-4l3-6z"/><path fill="#3a2418" d="M6 26h22v2H6z"/></svg>`;
 
-// many texts name a status in plain words ("Inflict 2 Bleed": enemies, older Identities / E.G.O): those are marked too.
-// A name several keywords share goes to the one the Identities' texts use most (Bleed → Laceration, not Bleeding)
+// plain-word statuses are marked too; shared names go to the most used keyword
 let kwPlain = null;
 function kwPlainOf() {
   if (kwPlain) return kwPlain;
@@ -178,8 +175,7 @@ function kwPlainOf() {
   kwPlain = { key, rx: names.length ? new RegExp(`(?<![\\w\\[])(${names.join("|")})(?![\\w\\]])`, "g") : null };
   return kwPlain;
 }
-// skill / passive text like the game: [Keyword] → icon + name coloured by buff / debuff, clickable for a tooltip;
-// plain: also status names written as plain words (not in quotes: those name skills)
+// skill / passive text like the game: [Keyword] → icon + name with tooltip; plain: also plain-word statuses
 function fmtDesc(text, plain = false) {
   if (!text) return "";
   const marks = [];
@@ -189,7 +185,7 @@ function fmtDesc(text, plain = false) {
     if (!g) return mark(`<span class="kw neu">${esc(label || k)}</span>`);
     return mark(`<span class="kw ${g.type}" data-kw="${esc(k)}">${g.icon ? `<img class="kwico" src="${imgThumb(g.icon)}" onerror="this.remove()">` : ""}${esc(label || g.name)}</span>`);
   };
-  // [TabExplain] marks where the game may wrap a long name ("Dawn Office[TabExplain] Fixer"): not a keyword
+  // [TabExplain] is a wrap mark, not a keyword
   let s = String(text).replace(/\[TabExplain\]/g, "").replace(/<sprite[^>]*>/g, "")
     .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t.replace(/<[^>]+>/g, "")))
     .replace(/<style="highlight">/g, "\u0006").replace(/<\/style>/g, "\u0007")
@@ -226,12 +222,12 @@ function unitCard(x, extra = "") {
       <div class="utitle">${esc(isId ? x.title : x.name)}</div><div class="muted small">${esc(x.sinnerName)}</div>
       ${isId && x.statuses.length ? `<div class="usins">${x.statuses.map((k) => statusIcon(k, "s20")).join("")}</div>` : ""}</div></div>`;
 }
-// the database's own card: what the Identity is built around (its statuses by name) and its season, as the game tags it
+// database card: statuses and season
 function dbCard(x, newest) {
   const isId = !!x.title;
   const line = isId ? x.statuses.map((k) => `<span class="arch">${statusIcon(k, "s18")}${esc(statusName(k))}</span>`).join("")
     : (x.cost || []).map((c) => `<span class="arch">${sinIcon(c.sin, "s18")}${c.n}</span>`).join("");
-  // (the tile: the art with the Sinner's emblem, the rank and the season's plate on it; under it who, the title, the archetype)
+  // tile: art, emblem, rank, season; who, title, archetype
   const sid = Math.floor(x.id / 100) % 100;
   return `<div class="ucard dcard d2" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">
       <span class="uem">${ico(`sinner_${sid}`, "s36", x.sinnerName, "")}</span>
@@ -254,10 +250,10 @@ function drawDbGrid() {
 // ---------- detail, laid out like the game's Identity screen
 // the game's words: Fatal ×2, Weak ×1.5, Normal ×1, Endure ×0.75, Ineff. ×0.5
 const RESIST = (v) => v >= 2 ? ["Fatal", "rfatal"] : v > 1 ? ["Weak", "rweak"] : v === 1 ? ["Normal", "rnorm"] : v >= 0.75 ? ["Endure", "rend"] : ["Ineff.", "rineff"];
-// the battle UI's own coins (plain / Unbreakable / purple / green); a drawn coin if the icon can't be cut
+// battle UI coins; drawn fallback
 const coinIcon = (kind) => `<img class="ico coin" src="/api/ui_icon?k=coin${kind ? `_${kind}` : ""}" title="${kind === "super" ? "Unbreakable Coin" : "Coin"}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'), { className: 'coinico' }))">`;
 function skillView(s, up, level, label, fallbackImg, plain = false) {
-  // a level the skill has no entry for: the nearest lower one; a skill not there yet at this Uptie (Skill 3 from Uptie III) shows its first level, marked
+  // missing level: nearest lower; not unlocked yet: first level, marked
   const ks = Object.keys(s.up).map(Number), low = ks.filter((k) => k <= up), lockAt = s.up[up] || low.length ? 0 : Math.min(...ks);
   const u = s.up[up] || s.up[low.length ? Math.max(...low) : lockAt];
   const color = SIN_COLORS[u.sin] || "#777";
@@ -294,7 +290,7 @@ function openUnit(id) {
   if (!x) return;
   const isId = !!x.title;
   let up = x.maxUp || 4, art2 = false, tab = 0, level = MAX_LEVEL;
-  // Skill 1-3 (+ the 0-copy skills that replace / follow them, shown under the same tier), Defense
+  // Skills 1-3 with their copies, Defense
   const main = x.skills.filter((s) => !isId || s.copies), extra = isId ? x.skills.filter((s) => !s.copies) : [];
   const lone = extra.filter((e) => !main.some((m) => m.tier === e.tier));
   const tabs = isId
@@ -377,10 +373,8 @@ async function myTeam() {
   return MY;
 }
 
-// The game's team code (Sinner menu → the two-papers icon → Copy / Load team code): base64 of gzip of base64 of a bit
-// string, high bit first, Sinner 1 to 12, 46 bits each — the Identity (8 bits: the number after 1SS, 10114 → 14), the
-// deployment order (4, 0 = not deployed), E.G.O ZAYIN, TETH, HE, WAW (7 each: the number after 2SS, 0 = empty) and
-// ALEPH (6; none exist yet), then a zero byte. Worked out from a code the game made.
+// Game team code: base64(gzip(base64(bits))), 46 bits per Sinner 1-12 (Identity 8, order 4, E.G.O 7 x4 + 6), then a
+// zero byte.
 const TC_EGO = [7, 7, 7, 7, 6];
 const tcBytes = (s) => Uint8Array.from(atob(s.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
 const tcB64 = (bytes) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""));
@@ -417,7 +411,7 @@ async function teamCodeMake(team) {
   const gz = await new Response(new Blob([tcB64(bytes)]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer();
   return tcB64(new Uint8Array(gz));
 }
-// a pasted code becomes the team (Identities, order, E.G.O); the number of Identities this game data lacks
+// load a pasted code; returns how many Identities are unknown
 async function teamCodeLoad(code) {
   const t = await teamCodeRead(code);
   const lost = Object.values(t.slots).filter((id) => !unitById(id)).length;

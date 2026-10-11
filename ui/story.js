@@ -1,7 +1,5 @@
-// Database → Story: every story the game's Story Theater lists, read like in the game (limbusdm/story.py). The list has the
-// Main Story's Cantos, Detour Tales (Intervallos, Walpurgis Nights, Dante's notes) and the Identity Archive; the reader plays
-// a story file scene by scene: background, speakers' standing pictures, voice, sounds and music. Hold the mouse on the scene
-// to read faster (x2 after 1.5 s, then x4, x6, x12).
+// Database → Story: Story Theater stories played scene by scene (backgrounds, standing pictures, voices, music). Hold
+// the mouse to read faster.
 "use strict";
 
 const st = { idx: null, tab: "main", sel: {}, ep: null, list: [], i: 0 };
@@ -77,7 +75,7 @@ function storyDraw() {
   });
 }
 
-// the playlist of a chapter: every file of its episodes in order, so a story goes on into the next one
+// a chapter's files in order, so a story goes on
 function stOpen(file, chapter) {
   st.back = location.hash;
   st.chapter = chapter;
@@ -219,7 +217,7 @@ function rLayout(path) {
   return R.layouts.get(path);
 }
 
-// text -> letters that appear one by one; only the game's own tags are kept (color, b, i), the rest is shown as it is
+// typed letters; only color / b / i tags kept
 function rHtml(text) {
   text = text.replace(/�/g, "’");
   const letters = (t) => [...t].map((ch) => `<span class="rc">${esc(ch)}</span>`).join("");

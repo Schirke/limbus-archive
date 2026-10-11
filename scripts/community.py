@@ -1,18 +1,5 @@
-"""Who streams Limbus Company right now: the live streams on Twitch and YouTube (the 30 busiest of a language), in English, Russian and Korean,
-written to streams.json. Run by .github/workflows/community.yml on a timer; the app reads the file from the
-`community-data` branch (limbusdm/community.py). The API keys come from the repository's secrets, never from the repo.
-
-    TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET   an app registered at dev.twitch.tv
-    YOUTUBE_API_KEY                          a key with "YouTube Data API v3" at console.cloud.google.com
-
-Either service is skipped without its key. The script runs every minute: Twitch is asked each time. YouTube lets a
-key spend 10,000 units a day and a search costs 100 (one per language each time), so new streams are looked for once
-an hour; in between, every 2 minutes, the streams already found are asked how many watch them now (1 unit) and the
-ones that ended are dropped.
-
-The recommended channels (the pictures in the page's corner) are the links in recommended.json on the
-`community-config` branch, written by the owner's app (limbusdm/community.py): each gets its name and picture, and
-whether it is live right now — with any game, not this one alone."""
+"""Live Limbus Company streams on Twitch and YouTube (EN / RU / KO, top 30 each) and the recommended channels, written to
+streams.json. Run by .github/workflows/community.yml; keys come from the repository's secrets."""
 import datetime
 import json
 import os
@@ -23,7 +10,7 @@ import urllib.request
 
 GAME, TOP, LANGS = "Limbus Company", 30, ("en", "ru", "ko")  # TOP: streams kept per language
 YOUTUBE_EVERY = 60 * 60  # seconds between YouTube searches
-YOUTUBE_SEEN = 110  # seconds between YouTube's cheap questions (the found streams' viewers, the recommended channels)
+YOUTUBE_SEEN = 110  # seconds between YouTube's cheap checks
 KEPT = os.environ.get("COMMUNITY_KEPT") or ""  # a file for Twitch's token between the runs of one job (never published)
 LETTERS = (("ru", "[а-яё]"), ("ko", "[가-힣]"))  # a language told by its letters
 OUT = sys.argv[1] if len(sys.argv) > 1 else "streams.json"
@@ -100,7 +87,7 @@ def youtube(key):
             sn, live = v["snippet"], v.get("liveStreamingDetails") or {}
             if "concurrentViewers" not in live or GAME.lower() not in (sn["title"] + " " + sn.get("description", "")[:300]).lower():
                 continue
-            # the search only leans towards a language: a stream's own is what it says of itself, else told by its letters
+            # a stream's language: its own tag, else its letters
             said = (sn.get("defaultAudioLanguage") or sn.get("defaultLanguage") or "").lower()[:2]
             words = (sn["title"] + sn["channelTitle"]).lower()
             mine = said or next((code for code, letters in LETTERS if re.search(letters, words)), "en")
@@ -159,8 +146,7 @@ def page(url):
 
 
 def recommended(old, now, yt):
-    """The recommended channels in the owner's order: {"src", "on", "name", "url", "avatar", "live"}, live = None or
-    {"title", "viewers", "url"}. `old` = this part as written the last time: what can't be asked now stays as it was."""
+    """Recommended channels in order with live info; what can't be asked now stays as before."""
     was = {r["src"]: r for r in old.get("list") or []}
     who, rows = dict(old.get("who") or {}), []
     want = wanted()
@@ -186,7 +172,7 @@ def recommended(old, now, yt):
                 print("recommended:", src, problem(e))
         if not w:
             continue
-        # what may be on air: the channel's newest videos (its feed: no key spent) and what its /live page shows
+        # possible live videos: feed + /live page
         ids = []
         try:
             ids = re.findall(r"<yt:videoId>([\w-]{11})<", page("https://www.youtube.com/feeds/videos.xml?channel_id=" + w["id"]))[:4]

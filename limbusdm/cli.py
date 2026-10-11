@@ -31,7 +31,7 @@ def main(argv=None):
         from .diff import diff_snapshots
         rep = diff_snapshots(store, argv[1], argv[2])
         print({k: len(v) if isinstance(v, list) else v for k, v in rep["summary"].items()})
-    elif cmd == "site":  # site [serve | <report id>…]: write the web copy into data/site (limbusdm/site.py), or look at it
+    elif cmd == "site":  # site [serve | <report id>…]: write or serve the web copy
         from . import site
         from .server import serve
         from .service import Service

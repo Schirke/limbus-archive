@@ -27,7 +27,7 @@ DEFAULT_SETTINGS = {
 
 
 def _re_split_stem(name: str) -> str:
-    """"DonQuixote_NCorp_S2_Timeline_1" → "DonQuixote_NCorp_" (the character part of a timeline name)."""
+    """Character part of a timeline name ("DonQuixote_NCorp_S2_Timeline_1" → "DonQuixote_NCorp_")."""
     import re
     m = re.search(r"_(S\d+|Parrying)_Timeline", name, re.I)
     return name[:m.start() + 1] if m else name
@@ -99,7 +99,7 @@ class Service:
         return s[-1]["id"] if s else None
 
     def load_snapshot(self, sid):
-        """A snapshot (read once and kept while its file is unchanged: object_file and others ask for it a lot)."""
+        """A snapshot, kept in memory while its file is unchanged."""
         rel = f"snapshots/{sid}.json.gz"
         try:
             mtime = os.path.getmtime(os.path.join(self.store.root, rel))
@@ -186,8 +186,7 @@ class Service:
                 progress("report", 0, 1, "comparing with " + prev_id)
                 rep = diff_snapshots(self.store, prev_id, snap["id"])
                 if not any(rep["summary"].values()):
-                    # nothing changed: no duplicate snapshot, but keep any data the new one has on top
-                    # (e.g. after an app update) under the old id
+                    # nothing changed: keep the old id, with the new data on top
                     self._delete_report(rep["id"])
                     os.remove(os.path.join(self.data_dir, "snapshots", snap["id"] + ".json.gz"))
                     self.store.write_json(f"snapshots/{prev_id}.json.gz", {**snap, "id": prev_id, "created": prev["created"]})
@@ -251,8 +250,8 @@ class Service:
 
     # ------------------------------------------------------------ new game version
     def check_version(self, start: bool = True) -> str:
-        """Compare the game's catalog with the latest snapshot; if the game has fully downloaded a new
-        version, take a snapshot + report (when `start`). Data comes only from what the game downloaded."""
+        """Compare the game's catalog with the latest snapshot; take a snapshot + report when a new version is fully
+        downloaded."""
         self.watch["last_check"] = datetime.now().isoformat(timespec="seconds")
         state = self._version_state()
         self.watch["state"] = state
@@ -361,7 +360,7 @@ class Service:
         return rows
 
     def object_file(self, logical: str):
-        """Path of the bundle file in the game's cache for the latest snapshot's version of `logical`."""
+        """Cache path of `logical`'s bundle in the latest snapshot."""
         snap = self.load_snapshot(self.latest_snapshot_id())
         b = snap["bundles"].get(logical) if snap else None
         if not b:
@@ -418,7 +417,7 @@ class Service:
         return dict(r, pid=str(r["pid"])) if r else None
 
     def spine_list(self) -> list[dict]:
-        """Spine skeletons (atlas TextAsset + skeleton TextAsset with the same base name) of the latest snapshot."""
+        """Spine skeletons (atlas + skeleton TextAssets) of the latest snapshot."""
         import re
         db_path = self.ensure_browse()
         if not db_path:
@@ -464,7 +463,7 @@ class Service:
         return self._names_obj
 
     def characters(self) -> dict:
-        """{"sinners": [{sid, name, ids: [...], egos: [...], other: [spine]}], "spine_other": {content: [spine]}}"""
+        """{"sinners": [...], "spine_other": {...}}"""
         import re
         from .characters import bundle_date, owner_bundles, season_label, tag_label
         sid = self.latest_snapshot_id()
@@ -492,8 +491,7 @@ class Service:
                 bs = self.appearance_bundles(cid)
             return {"id": cid, "title": title, "bundles": bs, "spine": spine_by_owner.get(cid, [])}
 
-        # every playable Identity / E.G.O is listed, files found or not, so none goes missing whatever its bundles
-        # are called (early ones: shared Sinner bundles, E.G.O effect bundles named after their skills)
+        # every playable Identity / E.G.O is listed, files found or not
         try:
             db = self.unit_db()
             playable = {x["id"] for x in db["ids"] + db["egos"]}
@@ -515,8 +513,7 @@ class Service:
                 sinners.setdefault(nm.sinner_of(cid), {"ids": [], "egos": []})["egos"].append(e)
         out_sinners = [{"sid": s, "name": nm.sinner_name(s), **v} for s, v in sorted(sinners.items()) if 1 <= s <= 12]
 
-        # everything else: enemies, abnormalities, RPG, story… grouped by the content they came with — the bundle's
-        # name when it says so, else the chapter the game's stage tables put that enemy in, else the update date
+        # the rest grouped by content: bundle name, else the enemy's chapter, else the update date
         cmap = self.enemy_content(build=False)
         if cmap is None:
             self._content_bg()
@@ -543,7 +540,7 @@ class Service:
             g = groups.setdefault(label, {"label": label, "date": date, "order": order, "kinds": {}})
             g["date"], g["order"] = min(filter(None, (g["date"], date)), default=None), max(g["order"], order)
             g["kinds"].setdefault(x["kind"], []).append(x)
-        # battle prefabs (the skill renderer's), grouped the same way: by the content their look first appears in
+        # battle prefabs grouped the same way
         apps = self.enemy_apps() if cmap else {}
         for x in self.battle_prefabs():
             b, info = x["bundle"], apps.get(x["app"])
@@ -575,7 +572,7 @@ class Service:
         return out
 
     def _content_bg(self):
-        """Build the enemy → chapter map in the background (the Animations page refreshes when it's ready)."""
+        """Build the enemy → chapter map in the background."""
         if getattr(self, "_content_bg_on", False):
             return
         self._content_bg_on = True
@@ -592,7 +589,7 @@ class Service:
 
     # ------------------------------------------------------------ cross-bundle references
     def cab_index(self) -> dict[str, str]:
-        """{"cab-<hash>": bundle} for the latest snapshot (built once, ~2 min on the first run, then from disk)."""
+        """{"cab-<hash>": bundle} for the latest snapshot (~2 min the first time, then from disk)."""
         sid = self.latest_snapshot_id()
         cached = getattr(self, "_cabs", None)
         if cached and cached[0] == sid:
@@ -624,7 +621,7 @@ class Service:
             return idx
 
     def resolver(self):
-        """resolve(assets_file, file_id, path_id) -> (bundle, object) for references into other bundles."""
+        """resolve(assets_file, file_id, path_id) → (bundle, object) across bundles."""
         import re
         from .extract import _env
         idx = self.cab_index()
@@ -648,7 +645,7 @@ class Service:
 
     # ------------------------------------------------------------ enemies → chapters
     def static_tables(self, folders) -> dict[str, dict[str, object]]:
-        """{folder: {file name: parsed JSON}} from StaticData/static-data/<folder>/ of the latest snapshot."""
+        """{folder: {file: JSON}} from StaticData of the latest snapshot."""
         db_path = self.ensure_browse()
         out: dict[str, dict[str, object]] = {}
         if not db_path:
@@ -668,8 +665,7 @@ class Service:
         return out
 
     def enemy_content(self, build: bool = True) -> dict | None:
-        """{"<bundle>|<atlas pid>": {"label", "kind", "name", "prio", "order"}}: the chapter / mode each enemy and
-        abnormality skeleton first appears in. ~1 min on the first run (per-bundle results are kept by hash)."""
+        """{"<bundle>|<atlas pid>": {label, kind, name, prio, order}}; ~1 min the first time."""
         import re
         from . import content
         sid = self.latest_snapshot_id()
@@ -714,7 +710,7 @@ class Service:
             return result
 
     def _appearance_links(self, snap: dict) -> dict:
-        """{bundle: content.bundle_links} for every bundle with battle prefabs or Spine skeletons (kept per bundle hash)."""
+        """{bundle: content.bundle_links}, kept per bundle hash."""
         import re
         from . import content
         db = sqlite3.connect(self.ensure_browse())
@@ -739,9 +735,7 @@ class Service:
         return links
 
     def enemy_spines(self) -> dict:
-        """{appearance prefab name: [{"bundle", "atlas", "base"}]}: the Spine skeletons a battle prefab is drawn with
-        (most enemies are sprites and have none). Empty until enemy_content has been built once (it reads the same
-        per-bundle links, ~1 min the first time, in the background on start)."""
+        """{appearance prefab: [Spine skeletons]}; empty until enemy_content was built once."""
         sid = self.latest_snapshot_id()
         cached = getattr(self, "_app_spines", None)
         if cached and cached[0] == sid:
@@ -762,7 +756,7 @@ class Service:
         return out
 
     def enemy_apps(self) -> dict:
-        """{appearance prefab name: {"label", "kind", "name", "prio", "order"}} (see content.appearance_content)."""
+        """{appearance prefab: content} (see content.appearance_content)."""
         from . import content
         sid = self.latest_snapshot_id()
         cached = getattr(self, "_apps", None)
@@ -779,8 +773,7 @@ class Service:
         return apps
 
     def battle_prefabs(self) -> list[dict]:
-        """Enemies', abnormalities' and others' battle prefabs ("…Appearance"), one entry per name: what the skill
-        renderer plays. Many of them are drawn with sprites and have no Spine skeleton to list them by."""
+        """Battle prefabs ("…Appearance") of enemies and others, one per name."""
         import re
         db_path = self.ensure_browse()
         if not db_path:
@@ -800,9 +793,7 @@ class Service:
         return list(out.values())
 
     def skill_slots(self, cid) -> dict[int, dict]:
-        """An Identity's skill animations (<Char>_S<n>: skill id = id * 100 + n) as the game shows the skills:
-        {n: {"slot": "Skill 3.2" | "Defense", "name"}} — n isn't the tier: Le Noir Footwear Hall Ryoshu's S4 is her
-        Defense and S5 her second Skill 3. A tier with one skill is just "Skill 2"."""
+        """An Identity's skill videos as the game names them: {n: {slot, name}} (n is not the tier)."""
         if not isinstance(cid, int) or not str(cid).startswith("1"):
             return {}
         u = next((x for x in self.unit_db().get("ids", []) if x.get("id") == cid), None)
@@ -826,7 +817,7 @@ class Service:
 
     # ------------------------------------------------------------ Identity / E.G.O database, the user's team
     def unit_db(self) -> dict:
-        """Identities and E.G.O of the latest snapshot, from the game's tables (rebuilt after every patch)."""
+        """Identities and E.G.O of the latest snapshot."""
         from . import units
         sid = self.latest_snapshot_id()
         if not sid:
@@ -840,7 +831,7 @@ class Service:
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
             db = units.build(self.static_tables(["personality", "skill", "ego", "personality-passive", "passive", "buff"]), loc)
             db["v"] = units.VERSION
-            # pictures by file name: newer ones sit in episode subfolders (EgoCG_Ep7/…) or lack a CG thumbnail
+            # pictures by file name (newer ones in episode subfolders)
             by_name: dict[str, list[str]] = {}
             for path in self.load_snapshot(sid)["assets"]:
                 if path.startswith(units.ASSET + "Unit") and path.endswith(".png"):
@@ -850,7 +841,7 @@ class Service:
                 return next((q for q in by_name.get(name, []) if f"/{folder}/" in q or f"/{folder}" in q), None)
             for x in db["ids"]:
                 i, img = x["id"], x["img"]
-                # the full CG first: the game's own CG thumbnail is only 256x144 (blurry once a card stretches it)
+                # full CG first: the game's thumbnail is only 256x144
                 img["thumb"] = (find(f"{i}_normal.png", "Unit/CG") or find(f"{i}_normal.png", "UnitCgThumbnail")
                                 or find(f"{i}_normal_profile.png", "Profile") or img["thumb"])
                 img["art"] = find(f"{i}_normal.png", "Unit/CG") or img["thumb"]
@@ -870,8 +861,7 @@ class Service:
         return db
 
     def music(self) -> dict:
-        """The game's soundtrack for the corner player (see music.build): official names, the bank sample of each
-        track and where the battle themes play."""
+        """The soundtrack for the corner player (see music.build)."""
         from . import content, music
         sid = self.latest_snapshot_id()
         if not sid:
@@ -929,7 +919,7 @@ class Service:
         return db
 
     def sound_lib(self) -> dict:
-        """Database → Sounds: every sound of the latest snapshot's banks in folders (see soundlib.build)."""
+        """Database → Sounds (see soundlib.build)."""
         import struct
 
         from . import soundlib
@@ -977,7 +967,7 @@ class Service:
         return db
 
     def stage_db(self) -> dict:
-        """The story map of the latest snapshot (see stages.build): chapters, their nodes on the map and the fights."""
+        """The story map (see stages.build)."""
         import re
 
         from . import stages
@@ -1008,7 +998,7 @@ class Service:
         return db
 
     def mirror_db(self) -> dict:
-        """The Mirror Dungeon planner's lists of the latest snapshot (see mirror.build): packs, gifts, fusions."""
+        """Mirror Dungeon planner lists (see mirror.build)."""
         from . import mirror
         sid = self.latest_snapshot_id()
         if not sid:
@@ -1037,7 +1027,7 @@ class Service:
         return db
 
     def history_db(self) -> dict:
-        """What each kept report changed in the cards (see history.build). Made anew when a report comes or goes."""
+        """Change history of the cards (see history.build), remade when reports change."""
         from . import history
         reports = self.reports()
         stamp = [history.VERSION, self.latest_snapshot_id(), [r["id"] for r in reports]]
@@ -1065,8 +1055,7 @@ class Service:
         return db
 
     def enemy_db(self) -> dict:
-        """The enemy handbook of the latest snapshot (see enemies.build), with each entry's portrait path and
-        whether the skill renderer has its battle prefab."""
+        """The enemy handbook (see enemies.build) with portraits."""
         from . import content, enemies
         from .viewer import enemy_portraits
         sid = self.latest_snapshot_id()
@@ -1091,7 +1080,7 @@ class Service:
                 if "/SkillIcon/" in e["pic"]:  # (a Versus pick falls back to a skill's icon: not a portrait)
                     e["pic"] = ""
                 e["anim"] = e["app"] in battle
-            # newer story enemies' skill pictures sit in subfolders (SkillIcon/Ep9_2/132508.png): the page asks by path
+            # newer skill pictures sit in subfolders
             root, sub = "Assets/Resources_moved/Sprite/SkillIcon/", {}
             if self.ensure_browse():
                 con = sqlite3.connect(self.ensure_browse())
@@ -1113,14 +1102,13 @@ class Service:
         return db
 
     def ui_cache_dir(self) -> str:
-        """Where the bits cut from the game's main build are kept: a new game build gets a new folder."""
+        """Folder for bits cut from the game's main build, one per build."""
         res = os.path.join(self.game.data or "", "resources.assets")
         stamp = str(int(os.path.getmtime(res))) if os.path.exists(res) else "none"
         return os.path.join(self.data_dir, "ui_icons", stamp)
 
     def seasons(self) -> dict:
-        """{season id: {"name", "title", "color"}} as the game labels its Identities: "Season 7" / "Kumo no ito…" in
-        the colour of the Identity screen's tag. 9100 stands for every Walpurgis Night (9101, 9102…)."""
+        """{season id: {name, title, color}}; 9100 = every Walpurgis Night."""
         import json
         from .uiicons import season_colors
         colors = season_colors(self.game.data, self.ui_cache_dir())
@@ -1158,8 +1146,7 @@ class Service:
         return p
 
     def owner_videos(self, cid: int) -> list[dict]:
-        """Videos rendered by the game itself (acquisition cinematics, skill previews) and the user's own recordings
-        from data/videos whose file name matches this Identity / E.G.O."""
+        """Game-rendered videos and the user's recordings (data/videos) of this Identity / E.G.O."""
         import re
         out = []
         snap = self.load_snapshot(self.latest_snapshot_id())
@@ -1178,7 +1165,7 @@ class Service:
         return out
 
     def _local_videos(self, cid: int) -> list[dict]:
-        """Match the user's recordings by file name: Identity title + Sinner name (+ "Skill 1a" → skill 1)."""
+        """Match recordings by file name (title + Sinner, "Skill 1a" → skill 1)."""
         import re
         from urllib.parse import quote
         nm = self.names()
@@ -1204,7 +1191,7 @@ class Service:
         return out
 
     def appearance_bundles(self, cid: int) -> list[str]:
-        """Bundles holding the "<id>_…Appearance" prefab — early Identities keep it in shared bundles (sd_p3…)."""
+        """Bundles holding the "<id>_…Appearance" prefab."""
         db_path = self.ensure_browse()
         if not db_path:
             return []
@@ -1222,7 +1209,7 @@ class Service:
         return sorted(cached[1].get(cid, set()))
 
     def owner_clips(self, cid: int) -> list[dict]:
-        """Battle animation clips of an Identity / E.G.O: own clips first (skills, then poses), then extras."""
+        """Battle clips of an Identity / E.G.O: own first (skills, poses), then extras."""
         from .characters import owner_bundles
         from .clips import clip_kind, list_clips
         snap = self.load_snapshot(self.latest_snapshot_id())
@@ -1230,10 +1217,7 @@ class Service:
         out = []
         mine = owner_bundles(list(snap["bundles"]), cid)
         shared = [b for b in self.appearance_bundles(cid) if b not in mine]  # early IDs: sd_p3_assets_all, …
-        # A story chapter's bundle can hold a copy of the character (10501: s8_a1c10p3_produce_assets_all, 327 MB, next
-        # to its own 8 MB sd_p5_assets_all). Opening it takes 5 GB at its peak (2.5 GB once loaded), so such copies are
-        # used only when the character has no bundle of its own with clips. A clip found again in a later bundle is not
-        # listed twice, and each bundle's listing is kept on disk (per file version): a visit opens no bundle to list.
+        # story bundles with a copy of the character are huge: used only when it has no own clips; listings kept on disk
         bundles = [b for b in mine + shared if "_produce_" not in b]
         story = [b for b in mine + shared if "_produce_" in b]
         names_seen = set()
@@ -1268,7 +1252,7 @@ class Service:
         if not out and story:  # nothing of its own: the story copies are all there is
             bundles += story
             add_clips(story)
-        # a few Identities play their skills through Timelines (…_S2_Timeline_1, …) instead of …_S2 clips
+        # some Identities play skills through Timelines
         from .clips import list_timelines
         from .extract import _env, _lock
         have = {c["n"] for c in out if c["kind"] == "skill"}
@@ -1305,7 +1289,7 @@ class Service:
         if out and not any(c["own"] for c in out):
             for c in out:
                 c["own"] = True
-        # short labels: "Meursault_LeiHeng_Default_Off" → "Default Off", "Ryoshu_Nebulizer_Animator_Parrying" → "Parrying"
+        # short labels ("Ryoshu_Nebulizer_Animator_Parrying" → "Parrying")
         import re as _re
         from collections import Counter
         from .clips import POSE_ORDER

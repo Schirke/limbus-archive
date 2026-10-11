@@ -1,7 +1,4 @@
-// Games → Limbus Grid: a 3 × 3 grid, a condition on every row and column — name an Identity for each cell that meets
-// both. Nine tries; the fewer Identities fit a cell, the more it is worth.
-// Games → Odd one out: four Identities, three with something in common — find the fourth.
-// Shares the styles, the Identities' list (gxIds) and the Daily challenge / duels of games.js / games3.js.
+// Limbus Grid (3 × 3 conditions, rarer answers worth more) and Odd one out.
 "use strict";
 
 // ------------------------------------------------------------------ Limbus Grid
@@ -17,7 +14,7 @@ routes.gamegrid = async (args = []) => {
   $("#main").innerHTML = `<h1>Limbus Grid</h1><div class="sub">Reading the game's files…</div>`;
   gg.ids = await gxIds();
   if (!location.hash.startsWith("#/gamegrid")) return;
-  // every condition a row or a column can carry, with the Identities that meet it (the ones met by six or more)
+  // row / column conditions met by 6+ Identities
   const by = {}, put = (kind, name, x) => { if (name && name !== "—") (by[kind + "|" + name] = by[kind + "|" + name] || { kind, name, has: new Set() }).has.add(x.key); };
   for (const x of gg.ids) {
     put("sinner", x.sub, x);
@@ -47,8 +44,7 @@ function ggDrawStart() {
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gmDailyDone("grid") == null ? ggNew(true) : toast("Today's Daily is done — a new one comes with the daily reset.");
 }
 
-// a grid: three conditions for the rows, three for the columns (two of a kind at most, three Sinners), at least two
-// Identities in every cell, and nine different ones to fill it with
+// a grid with 2+ Identities per cell and nine distinct answers
 function ggMake(rnd) {
   const mix = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const both = (a, b) => [...a.has].filter((k) => b.has.has(k));
@@ -166,8 +162,7 @@ function goDrawStart() {
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gmDailyDone("odd") == null ? goNew(true) : toast("Today's Daily is done — a new one comes with the daily reset.");
 }
 
-// a round: three of one group and one from outside it, such that no other three of the four share a group;
-// with three more groups to offer as what the three have in common (ones some of the three belong to, if there are)
+// an odd-one-out round with a unique answer
 function goMake(rnd) {
   const pick = (a) => a[Math.floor(rnd() * a.length)], mix = (a) => a.map((x) => [rnd(), x]).sort((p, q) => p[0] - q[0]).map((p) => p[1]);
   const big = go.cats.filter((c) => c.has.size >= 3);

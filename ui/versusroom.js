@@ -1,12 +1,5 @@
-// Versus → Online room ("pick and fight"): a room on the site's server (ui/site/worker.js, the Games' live matches'
-// rooms) for a Versus fight between two players. The host fights on the left, a player the host names on the right;
-// each picks a fighter and its last skill in secret and says "ready". At the host's Start both picks are told, the
-// host draws the fight's seed, and everybody's own app plays the same fight in Versus Live (the engine decides a
-// fight by its seed, so it is the same on every screen). The others in the room watch, and may bet lunacy on a side.
-// Only in the app: a fight is played from the game's files by the Unity player.
-//   the room's state (the host sets it): {kind: "versus", status: "pick" | "reveal" | "fight", n: the fight's
-//     number, right: the right fighter's player, fight: {n, spec, lp, rp, …}, last: the fight before's result}
-//   messages: {k: "ready", n, on} · {k: "bet", n, side, amt} · {k: "pick", n, id, skill, name} (at "reveal" only)
+// Versus → Online room: two players pick in secret, the host starts, every app plays the same seeded fight in Versus
+// Live; watchers may bet lunacy. App only.
 "use strict";
 
 const VR_BETS = [130, 650, 1300], VR_WIN = 200;
@@ -20,7 +13,7 @@ const vrHost = () => !!vr.room && vr.room.host === gl.id;
 const vrName = (id) => ((vr.room ? vr.room.players : []).find((p) => p.id === id) || {}).name || "—";
 // what a fight's number has heard so far: who is ready, the bets, the picks
 const vrF = (n) => vr.fs[n] || (vr.fs[n] = { n, ready: {}, bets: {}, picks: {}, sent: false });
-// who fights: the host on the left; on the right the player the host named, else whoever came in first
+// host left; right: the named player or the first in
 function vrSides() {
   const r = vr.room, others = r.players.filter((p) => p.id !== r.host);
   return { left: r.host, right: (others.find((p) => p.id === r.state.right) || others[0] || {}).id || "" };
@@ -118,8 +111,7 @@ function vrGot(m) {
   vrDraw();
 }
 
-// the host, with both picks told: the fight itself — the host's own Versus settings (stage, music, what is shown),
-// the two picks and a seed
+// host: build the fight spec
 function vrStart() {
   const s = vr.room.state, f = vrF(s.n), { left, right } = vrSides(), a = f.picks[left], b = f.picks[right];
   if (!a || !b || !vsChar(a.id) || !vsChar(b.id)) return;
@@ -144,7 +136,7 @@ async function vrPoll(n) {
   if (vrBusy()) setTimeout(() => vrPoll(n), 1000); else vrLiveEnd();
   vrDraw();
 }
-// my fight is over: the host's result is the room's (a fight stopped half way or failed has none)
+// the host's result is the room's
 function vrLiveEnd() {
   const st = vr.live, s = vr.room && vr.room.state;
   if (s && vrHost() && s.status === "fight" && s.fight && s.fight.n === st.n) vrOver(st.state === "done" && !st.stopped && st.winner != null ? +st.winner : null, st.state === "error" ? st.msg : "");
@@ -192,7 +184,7 @@ function vrDraw() {
   const head = `<h1>Versus · online room</h1><div class="glroom"><span class="gmscore">ROOM <b>${esc(code.toUpperCase())}</b></span>
     <button class="toggle" id="vrcopy">${GM_SWORDS}Copy the invite</button><span class="muted small">The link opens the room in a friend's app (or: Versus → Online room → the code).</span></div>`;
   const invite = () => { if ($("#vrcopy")) $("#vrcopy").onclick = () => gmCopy(`Limbus Archive · a Versus room — pick a fighter and fight me:\n${GM_SITE}/#/vsroom/${code}\n(the page has a button that opens the app; or in the app: Versus → Online room → code ${code.toUpperCase()})`); };
-  if (!gl.nick || !vr.ws) {  // who are you: asked on the way in, kept for the next time (the Games' live matches' nickname)
+  if (!gl.nick || !vr.ws) {  // nickname, kept
     vr.sig = "";
     $("#main").innerHTML = `${head}${vr.error ? `<p class="glerr">${esc(vr.error)}</p>` : ""}
       <div class="gmstart"><span class="muted">Your nickname:</span><input id="vrnick" class="dbq glin" maxlength="20" value="${esc(gl.nick)}" placeholder="nickname" autocomplete="off"><button class="gmbtn" id="vrjoin">Come in</button></div>`;

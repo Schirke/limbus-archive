@@ -1,8 +1,5 @@
-"""Voice lines for Games → Guess the Identity: every voiced line of an Identity with its text and when it is said
-(Localize PersonalityVoiceDlg; a line's id is its sample's name in the voice banks), and the voiced battle lines of
-bosses. Nothing in the game's tables ties a battle line to who says it (the game's code does), so a boss is found by
-what the line's own note says: a skill id of his, or his Korean name / the developers' nickname for him; the bark
-samples numbered after a unit's look ("battle_s3_8105_2") come without text."""
+"""Voice lines for the guessing games: Identities' lines (PersonalityVoiceDlg) and bosses' battle lines, matched by the
+line's note."""
 from __future__ import annotations
 
 import collections
@@ -13,7 +10,7 @@ import re
 VERSION = 8
 CHAR_LINES, CHAR_MIN = 40, 5  # lines kept of a story character (spread over the story), fewest to be asked about
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"]
-# the developers' notes call some bosses by a short name: note's word -> the start of the English name
+# developers' nicknames for bosses → English name start
 NICK = {"붉은 신": "The Crimson God", "바퀴황제": "The Roach Emperor", "검지 아비": "The Index Nursefather",
         "엄지 아비": "The Thumb Nursefather", "소지 아비": "The Pinky Nursefather", "중지 제자": "The Middle Apprentice",
         "검지 제자": "The Index Apprentice", "엄지 제자": "The Thumb Apprentice", "소지 제자": "The Pinky Apprentice",
@@ -39,9 +36,8 @@ def _text(s) -> str:
 
 
 def _where(stem: str) -> tuple[float, str]:
-    """(order, label) of a story file by its name: "S1040B" = Canto 10 (S + the Canto + two digits; S0.. = the
-    Prologue, "S9991B" = Canto 9's last pages), "3D309A" = Canto 3's dungeon (the Canto comes FIRST there), "E614A" = an
-    Intervallo after Canto 6, "E0..X" / "ES…" = the events, "P10102" = an Identity's own story."""
+    """(order, label) of a story file by its name (S1040B = Canto 10, 3D309A = Canto 3 dungeon, E… = Intervallo / event, P…
+    = Identity story)."""
     m, d = re.match(r"T?S(\d{3,4})", stem), re.match(r"(\d+)D\d{3}", stem)
     if m or d:
         n = int(d.group(1)) if d else int(m.group(1)[:-2])
@@ -57,11 +53,7 @@ def _where(stem: str) -> tuple[float, str]:
 
 
 def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], portraits: dict | None = None) -> list[dict]:
-    """Who speaks in the story, with their voiced lines. story: {file stem: Story/Effect rows} — a row there names
-    the voice file of the line with the same id in Localize StoryData, whose `teller` (or `model`, through
-    EN_ScenarioModelCodes) is who says it.
-    portraits: {model: asset path of its picture in the story's log} (StaticData scenario-asset names it per model).
-    -> [{"name", "role", "where", "order", "pic", "sinner" (1-12) | "boss" (handbook entry id), "lines": [[sample, text, where]]}]"""
+    """Story speakers with their voiced lines (Story/Effect rows joined with StoryData by id) and their log portrait."""
     en = os.path.join(loc_root, "en")
     codes = {str(r["id"]): r for r in _rows(en, r"EN_ScenarioModelCodes.*\.json$")}
     found: dict[str, dict] = {}
@@ -84,7 +76,7 @@ def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], po
             c["roles"][_text(t.get("title") or code.get("nickName"))] += 1
             c["lines"].append([sample, text, label])
     exact, names = {}, {}
-    for e in enemies:  # a handbook entry by the name the story uses: "Kromer" (the first of its looks), "… - Rien", "Dongrang, Who …"
+    for e in enemies:  # handbook entry by the story's name for it
         exact.setdefault(e["name"].lower(), e["id"])
         for key in {e["name"].rsplit(" - ", 1)[-1], e["name"].split(",")[0]} - {e["name"]}:
             names.setdefault(key.lower(), set()).add(e["name"])
@@ -95,7 +87,7 @@ def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], po
             continue
         step = max(1, len(c["lines"]) // CHAR_LINES)
         role = next((r for r, _ in c.pop("roles").most_common() if r.strip("?") and r != c["name"]), "")
-        # the look most of his lines are said in (a character changes clothes, and so models, over the story)
+        # the look most of the lines are said in
         c.update(lines=c["lines"][::step][:CHAR_LINES], role=role, pic=next((p for p, _ in c.pop("pics").most_common() if p), ""))
         if c["name"] in SINNERS:
             c["sinner"] = SINNERS.index(c["name"]) + 1
@@ -109,8 +101,7 @@ def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], po
 
 def build(loc_root: str, sounds: dict, identities: set[int], enemies: list[dict], story: dict | None = None,
           portraits: dict | None = None) -> dict:
-    """loc_root: …/Localize; sounds: viewer.sound_index; enemies: the handbook's list; story: see characters().
-    -> {"ids": [[sample, Identity id, when, text]], "bosses": [[sample, handbook entry id, text]], "chars": [...]}"""
+    """{"ids", "bosses", "chars"}"""
     ids, have = [], set()  # (a line once: some Identities' rows come twice)
     for r in _rows(os.path.join(loc_root, "en", "PersonalityVoiceDlg"), r"EN_Voice_.*\.json$"):
         m = re.search(r"_(\d{5})_\d+$", str(r["id"]))

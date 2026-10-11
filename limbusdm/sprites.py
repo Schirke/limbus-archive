@@ -1,7 +1,5 @@
-"""Sprite workshop: a frames zip (Animations -> Edit -> Frames, or any zip of PNGs) laid out as one sheet to edit by
-hand. The zip is unpacked once into data/sprite_work/<zip's name>; the PNGs there are the ones to draw over in any
-editor — the page shows them as they are on the disk, marks the ones that differ from the zip, and loads those into a
-mod. The zip itself is never written to: it stays the "original" to compare with and to go back to."""
+"""Sprite workshop: a frames zip unpacked into data/sprite_work/<name> to edit by hand; changed frames load into a mod; the
+zip stays the original."""
 import base64, glob, io, json, os, re, zipfile, zlib
 
 
@@ -18,7 +16,7 @@ def _zip_path(svc, name: str) -> str:
 
 
 def _pngs(z: zipfile.ZipFile) -> dict:
-    """File name -> the zip's entry (a zip made elsewhere may keep its PNGs in folders; a name met twice counts once)."""
+    """File name → zip entry."""
     out = {}
     for i in z.infolist():
         base = os.path.basename(i.filename)
@@ -65,8 +63,7 @@ def _file(svc, name: str, frame: str) -> str:
 
 
 def _look(path: str, seen: dict) -> list:
-    """[mtime_ns, size, crc, w, h, box of what is drawn] of a frame's file; `seen` (kept next to the folder) has it
-    from the last time, so a file is read again only when it was saved again."""
+    """[mtime, size, crc, w, h, box] of a frame, reread only when saved again."""
     from PIL import Image
     st = os.stat(path)
     base = os.path.basename(path)
@@ -86,7 +83,7 @@ def _look(path: str, seen: dict) -> list:
 
 
 def sheet(svc, name: str) -> dict:
-    """The zip's frames as they are in its work folder now (unpacked at the first ask; a file deleted there comes back)."""
+    """The zip's frames as they are in the work folder now."""
     src = _zip_path(svc, name)
     d = folder(svc, name)
     os.makedirs(d, exist_ok=True)
@@ -120,7 +117,7 @@ def sheet(svc, name: str) -> dict:
 
 
 def png(svc, name: str, frame: str, orig: bool = False, size: int = 0) -> bytes:
-    """One frame: the work folder's (orig: the zip's), whole; `size`: cropped to what is drawn and made that small."""
+    """One frame (orig: the zip's); `size`: cropped thumbnail."""
     frame = os.path.basename(frame)
     if orig:
         with zipfile.ZipFile(_zip_path(svc, name)) as z:
@@ -142,7 +139,7 @@ def png(svc, name: str, frame: str, orig: bool = False, size: int = 0) -> bytes:
 
 
 def put(svc, name: str, frame: str, data: str) -> None:
-    """A picture dropped on a frame: it becomes that frame's file (saved as PNG whatever it was)."""
+    """A dropped picture becomes that frame's PNG."""
     from PIL import Image
     frame = os.path.basename(frame)
     with zipfile.ZipFile(_zip_path(svc, name)) as z:
@@ -194,7 +191,7 @@ def _changed_zip(svc, name: str, everything: bool = False) -> tuple[bytes, int]:
 
 
 def pack(svc, name: str) -> dict:
-    """The work folder as a zip of its own next to the source one: every frame, the edited ones as edited."""
+    """The work folder as a new zip next to the source."""
     data, n = _changed_zip(svc, name, True)
     stem = re.sub(r"\.zip$", "", os.path.basename(name), flags=re.I)
     dst = os.path.join(_exports(svc), f"{stem} [edited].zip")
@@ -204,7 +201,7 @@ def pack(svc, name: str) -> dict:
 
 
 def load(svc, name: str, cid, mod: str) -> int:
-    """The changed frames into a mod of that character (frames the character doesn't have are passed by)."""
+    """Changed frames into a mod of that character."""
     from . import mods
     data, n = _changed_zip(svc, name)
     if not n:

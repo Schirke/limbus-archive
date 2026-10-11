@@ -1,8 +1,4 @@
-// Games → Guess the enemy (a silhouette or a picture in big pixels that opens in steps; "Pixel art" = the same over
-// Identities), Guess the Canto (a piece of a story background that zooms out), Guess the art (the same over the
-// Identities' and E.G.O's art), In pieces (an Identity's animated art as the game keeps it: cut into parts), Limbus Wordle (name the Identity by
-// what each try has in common with it) and Connections (16 Identities, four groups of four).
-// Shares the styles and the Daily challenge of games.js / games2.js.
+// Picture games: Guess the enemy, Guess the Canto, Guess the art, In pieces, Limbus Wordle, Connections.
 "use strict";
 
 // ------------------------------------------------------------------ shared
@@ -59,7 +55,7 @@ const gp = { page: "enemy", who: "enemy", look: "sil", what: "id", hard: false, 
 const gpKeep = () => { try { localStorage.setItem(GP_KEEP, JSON.stringify({ who: gp.who, look: gp.look, what: gp.what, hard: gp.hard, best: gp.best })); } catch {} };
 const gpCanto = () => gp.page === "canto";
 const gpSplash = () => gp.page === "splash", gpAtlas = () => gp.page === "atlas";
-// the answer is an Identity (or an E.G.O): the wrong ones are the same Sinner's, the hint is the season
+// answer is an Identity / E.G.O
 const gpOfId = () => gpSplash() || gpAtlas() || (gp.page === "enemy" && gp.who === "id");
 const gpTitle = () => ({ canto: "Guess the Canto", splash: "Guess the art", atlas: "In pieces" })[gp.page] || "Guess the enemy";
 const gpPix = () => gp.page === "enemy" && (gp.who === "id" || gp.look === "pix");
@@ -67,7 +63,7 @@ const gpMode = () => gpCanto() ? "canto" : gpSplash() ? "splash" + gp.what + (gp
   : gp.who + (gp.who === "id" ? "" : gp.look) + (gp.hard ? "h" : "e");
 const gpPool = () => gpCanto() ? gp.data.scenes : gpSplash() ? (gp.what === "ego" ? gp.data.egos : gp.data.arts) : gpAtlas() ? gp.data.atlas
   : gp.who === "id" ? gp.data.ids : gp.data.enemies;
-// the parts an atlas page is cut into ("name" lines, each followed by "bounds: x, y, w, h"; a turned part lies on its side)
+// parts an atlas page is cut into
 function gpParts(text) {
   const lines = text.split(/\r?\n/), parts = [];
   let i = lines.findIndex((l) => /\.png$/i.test(l.trim())), cur = null;
@@ -98,8 +94,7 @@ async function gpOpen(page, daily) {
   $("#main").innerHTML = `<h1>${gpTitle()}</h1><div class="sub">Reading the game's files…</div>`;
   if (!gp.data) {
     const [units, en, pics] = await Promise.all([api("/api/units"), api("/api/enemies"), api("/api/game_pics")].map((p) => p.catch(() => null)));
-    // enemies by the handbook's picture of their battle look (it has no background, so it makes a silhouette); one per name
-    // and one per picture (the same look under another name, or one drawn just like an earlier one: the server's twins)
+    // enemies by their handbook picture, one per name and per look
     const thumbs = new Set((en || {}).thumbs || []), twins = new Set((en || {}).twins || []), seen = new Set();
     const enemies = ((en || {}).list || []).filter((e) => thumbs.has(e.app) && !twins.has(e.app) && !/^\?+$/.test(e.name)
       && !seen.has(e.name) && !seen.has(e.app) && seen.add(e.name).add(e.app))
@@ -150,7 +145,7 @@ function gpDrawStart() {
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gpNew(true);
 }
 
-// a daily game runs on fixed settings (enemies, silhouette / Identities' art, Easy); the player's own come back after it
+// restore the player's settings after a Daily
 function gpDailyEnd() {
   if (gp.mine) Object.assign(gp, gp.mine);
   gp.mine = null;
@@ -175,14 +170,14 @@ function gpRound() {
   let ans;
   for (let k = 0; k < 30 && (!ans || g.asked.has(ans.key)); k++) ans = giPick(g.pool);
   g.asked.add(ans.key);
-  // wrong answers: enemies next to this one in the handbook's order, the same Sinner's other Identities
+  // wrong answers: neighbours
   const all = gpPool(), at = all.indexOf(ans);
   let near = gpCanto() ? [] : gpOfId() ? all.filter((x) => x !== ans && x.sinner === ans.sinner)
     : all.filter((x) => x !== ans).sort((a, b) => Math.abs(all.indexOf(a) - at) - Math.abs(all.indexOf(b) - at)).slice(0, 8);
-  // (the spot a Canto's picture is zoomed into is drawn here, so a daily game shows the same piece to everybody)
+  // zoom spot drawn here, so a Daily is the same for all
   Object.assign(g, { ans, opts: gmShuffle([ans, ...gmShuffle(near).slice(0, 3)]), step: 0, hints: {}, done: null, img: null, fx: 0.2 + gmRnd() * 0.6, fy: 0.2 + gmRnd() * 0.6 });
   const im = new Image();
-  // a picture the game's files don't give, or a scene that is all but black or mostly one flat colour: another one takes the round
+  // missing or too plain a picture: another takes the round
   const drop = () => { if (gp.game !== g || g.ans !== ans) return; g.pool = g.pool.filter((x) => x !== ans); g.round--;
     g.pool.length < 8 ? (gp.game = null, gpDailyEnd(), gpDrawStart(), toast("The pictures could not be read from the game's files.")) : gpRound(); };
   im.onload = () => {
@@ -207,9 +202,7 @@ function gpRound() {
   gpDraw();
 }
 
-// Guess the Canto: where the round's first piece of a scene goes — null for a scene that is all but black, or whose
-// first pieces (gpPaint's widest zoom, at 7 × 7 spots) are mostly one flat colour (a white glow, an empty room);
-// a flat spot moves to the nearest one with something in it
+// Guess the Canto: where the first zoomed piece goes; null for a black or flat scene
 function gpSceneSpot(im, fx, fy) {
   const SW = 128, SH = 72, c = document.createElement("canvas"), x = c.getContext("2d");
   c.width = SW;
@@ -366,7 +359,7 @@ function gwNew(daily) {
   gwDraw();
 }
 
-// what a try has in common with the hidden Identity: a cell per column, [text, "ok" | "part" | ""]
+// a try's cells vs the hidden Identity
 function gwCells(x, a) {
   const set = (p, q) => { const same = p.length === q.length && p.every((v) => q.includes(v));
     return [p.join(", ") || "—", same ? "ok" : p.some((v) => q.includes(v)) ? "part" : ""]; };
@@ -429,7 +422,7 @@ routes.gameconn = async (args = []) => {
   $("#main").innerHTML = `<h1>Connections</h1><div class="sub">Reading the game's files…</div>`;
   gc.ids = await gxIds();
   if (!location.hash.startsWith("#/gameconn")) return;
-  // every group an Identity can belong to: its Sinner, archetypes, season, factions (the ones with four members or more)
+  // groups an Identity belongs to (4+ members)
   const by = {}, put = (kind, name, x) => { if (name && name !== "—") (by[kind + "|" + name] = by[kind + "|" + name] || { kind, name, has: new Set() }).has.add(x.key); };
   for (const x of gc.ids) {
     put("sinner", x.sub, x);
@@ -456,8 +449,7 @@ function gcDrawStart() {
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gmDailyDone("conn") == null ? gcNew(true) : toast("Today's Daily is done — a new one comes with the daily reset.");
 }
 
-// a puzzle: four groups (no more than two of a kind) with four members each, and a single way to split the sixteen;
-// of a few such, the one where the most Identities fit a group that isn't theirs
+// a puzzle with exactly one split of the sixteen; the trickiest of a few
 function gcMake(rnd) {
   const mix = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   const byKey = new Map(gc.ids.map((x) => [x.key, x]));

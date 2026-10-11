@@ -1,4 +1,4 @@
-"""App icon: ui/icon.png is the picture itself (the page's logo and favicon); the .ico for the exe is made from it."""
+"""App icon: ui/icon.png, and the exe's .ico made from it."""
 from __future__ import annotations
 
 import os

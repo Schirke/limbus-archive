@@ -1,6 +1,5 @@
-// Games: the page with a card per game (gmHub), and the line under the menu inside a game (gmCrumb).
-// Games → Guess the track: a piece of the game's soundtrack (the corner player's list, music.js) from a random spot;
-// it opens in steps (1, 3, 7, 15 s) and the sooner it is named the more it is worth.
+// Games: the hub page (gmHub) and the in-game line (gmCrumb). Guess the track: a piece opening in steps; sooner = more
+// points.
 "use strict";
 
 const GM_KEEP = "games", GM_STEPS = [1, 3, 7, 15], GM_WORTH = [1000, 750, 500, 250], GM_ROUNDS = 10;
@@ -8,16 +7,15 @@ const gm = { battle: true, hard: false, group: "", how: "", best: {},
   ...(() => { try { return JSON.parse(localStorage.getItem(GM_KEEP) || "{}"); } catch { return {}; } })(), game: null };
 const gmAudio = new Audio();
 const gmKeep = () => { try { localStorage.setItem(GM_KEEP, JSON.stringify({ battle: gm.battle, hard: gm.hard, group: gm.group, how: gm.how, best: gm.best, vol: gm.vol })); } catch {} };
-// how loud the games by ear play (the track, the Identity, the character): a slider under the disc (the corner player's volume until it is moved)
+// volume of the ear games
 const gmVol = () => gm.vol != null ? +gm.vol : (typeof mu !== "undefined" && mu.vol) || 0.6;
 const gmGroup = (t) => /^Canto \d+$/.test(t.where) ? t.where : "Other";
 const gmPool = () => mu.tracks.map((t, n) => ({ t, n })).filter(({ t }) => t.ms > 40000 && (!gm.battle || t.battle) && (!gm.group || gmGroup(t) === gm.group));
 const gmSub = (t) => t.where || t.by || "";
 const gmMode = () => (gm.battle ? "b" : "a") + (gm.hard ? "h" : "e") + gm.how + gm.group;
-// how the piece is played (gm.how): as it is, backwards, sped up, or with another track over it
+// how the piece plays
 const GM_HOW = [["", "As it is"], ["rev", "Backwards"], ["fast", "Sped up"], ["two", "Two at once"]], GM_FAST = 1.6;
-// the piece of a round for "Backwards" / "Two at once": the longest step's worth of the track cut out (turned
-// around, or mixed with the same of another track) as a sound file of its own -> its object URL, null when it failed
+// a reversed / mixed piece as its own sound → object URL, null on failure
 let gmCtx = null;
 async function gmClip(url, start, rev, url2, start2) {
   try {
@@ -38,9 +36,7 @@ async function gmClip(url, start, rev, url2, start2) {
     return URL.createObjectURL(new Blob([h, out], { type: "audio/wav" }));
   } catch { return null; }
 }
-// Daily challenge: the same ten rounds for everybody until the game's daily reset (21:00 UTC) — every draw of a game
-// goes through gmRnd, which a daily game seeds with the day; its first score of the day is kept, and the result can
-// be copied as a line of squares.
+// Daily: the same rounds for everybody until the daily reset (all draws via gmRnd); first score kept, result copyable.
 let gmRnd = Math.random;
 const gmDay = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
 function gmSeed(text) {
@@ -61,11 +57,11 @@ function gmDailyKeep(game, score) {
 const gmDailyBtn = (game, off) => { const done = gmDailyDone(game);
   return `<button class="toggle gmdaily" id="gmdaily" ${off ? "disabled" : ""} title="The same ten rounds for everybody today, on fixed settings">Daily challenge${done == null ? "" : ` · done: ${done}`}</button>`
     + gmDuelBtns(game, "gmdaily"); };
-// a duel is played by a link (each in their own time) or live (a room, everybody at once: games6.js)
+// duel by link or live
 const gmDuelBtns = (game, cls = "") => `<a class="toggle ${cls}" href="${GM_GAMES.find(([k]) => k === game)[1]}/duel" title="${GM_DUEL}">${GM_SWORDS}Duel · by link</a>`
   + `<a class="toggle ${cls}" href="#/live/new/${game}" title="A room for two to eight: everybody plays the same rounds at the same time">${GM_SWORDS}Duel · live</a>`;
 const GM_DUEL = "A game to send to a friend: play it, then copy the link with your result — the link opens the same rounds";
-// log: [{ok, clean}] — a square per round: right at once, right with hints or more of the piece, missed
+// a square per round
 function gmShare(title, score, log) {
   const text = `Limbus Archive · ${title} · Daily ${gmDay()}\n${score} pts · ${log.filter((r) => r.ok).length}/${log.length}\n${log.map((r) => r.ok ? (r.clean ? "🟩" : "🟨") : "⬛").join("")}`;
   gmCopy(text);
@@ -76,11 +72,10 @@ function gmCopy(text) {
   navigator.clipboard?.writeText ? navigator.clipboard.writeText(text).then(done, old) : old();
 }
 
-// A duel: a Daily challenge drawn from a seed of its own instead of the day — the same rounds for whoever opens the
-// link "<game>/duel/<seed>.<the sender's result>". Played on the Daily's fixed settings; it leaves today's Daily alone.
+// Duel: a Daily from its own seed ("<game>/duel/<seed>.<result>"), on the Daily's settings.
 const GM_SITE = "https://limbus-archive.com";
 let gmDuelNext = null;
-// what a game's page was opened for (the part of the address after the game): true = start the challenge at once
+// what the page was opened for; true = start at once
 function gmAuto(game, args) {
   gmDuelNext = null;
   if (args[0] !== "duel") return args[0] === "daily" && gmDailyDone(game) == null;
@@ -91,9 +86,7 @@ function gmAuto(game, args) {
 }
 const gmDuelTake = (game) => { const d = gmDuelNext && gmDuelNext.game === game ? gmDuelNext : null; gmDuelNext = null; if (d) setTimeout(() => gmDuelBar(game, d)); return d; };
 const gmDuelLink = (game, d, mine) => `${GM_SITE}/${GM_GAMES.find(([k]) => k === game)[1]}/duel/${d.seed}${mine == null ? "" : "." + String(mine).replace(/ /g, "_").replace(/\//g, "-")}`;
-// A duel by link has its invite from the first round on, next to the game's name: the link opens the same rounds, so
-// it can be sent before the game is finished (the result page's link carries the result too). Not for a live match,
-// which has its panel instead. It stays over the game's redraws and goes when the page is left.
+// A link duel's invite bar next to the game's name from the first round.
 function gmDuelBar(game, d) {
   $("#gmduelbar") && $("#gmduelbar").remove();
   const h1 = $("#main h1");
@@ -108,19 +101,16 @@ function gmDuelBar(game, d) {
 }
 window.addEventListener("hashchange", () => { if (!location.hash.includes("/duel")) $("#gmduelbar") && $("#gmduelbar").remove(); });
 const gmDaySeed = (game, duel) => gmSeed((duel ? "duel" + duel.seed : gmDay()) + game);
-// the end of a daily game (g.daily; g.duel when it is a duel): its result is kept, shown and copied
+// end of a daily game: keep and show the result
 function gmDailyOver(game, g, score) { if (g.duel) g.duel.mine = score; else gmDailyKeep(game, score); }
 
-// Lunacy: what the games pay and Extraction spends (kept in the browser, like the scores). A finished game pays by
-// how well it went; a Daily pays a pull's worth, the first one of a day adds for the days in a row, all of a day's
-// add a ten; a duel won and the achievements (GM_ACH, once each) pay too.
+// Lunacy: earned by games, Dailies, duels and achievements; spent in Extraction (browser storage).
 const GM_PULL = 130, GM_WALLET = "games_wallet";
 const gmW = { lunacy: 10 * GM_PULL, streak: 0, day: "", ach: {}, played: {}, pulls: 0, r3: 0, ego: 0, feat: 0,
   ...(() => { try { return JSON.parse(localStorage.getItem(GM_WALLET) || "{}"); } catch { return {}; } })() };
-// the lunacy as the game shows it: its own icon (cut from the game's files, /api/gacha_ui) and its red
+// lunacy icon
 const GM_LUNIMG = `<img class="lunicon" src="/api/gacha_ui?n=icon_lunacy" alt="lunacy" onerror="this.remove()">`;
-// (the count next to Extraction in the top menu)
-// (the top menu has little room: 5,230 is shown as 5.2k, rounded down; the exact count is in the hint)
+// short count for the menu (5.2k)
 const gmLunShort = (n) => n < 1000 ? String(n) : n < 1e6 ? (Math.floor(n / 100) / 10) + "k" : (Math.floor(n / 1e5) / 10) + "m";
 const gmLunDraw = () => { const el = document.querySelector("#navlun"); if (el) el.innerHTML = `${GM_LUNIMG}<b title="${gmW.lunacy.toLocaleString("en")} lunacy">${gmLunShort(gmW.lunacy)}</b>`; };
 const gmWKeep = () => { try { localStorage.setItem(GM_WALLET, JSON.stringify(gmW)); } catch {} gmLunDraw(); };
@@ -134,7 +124,7 @@ const GM_ACH = [["first", "First steps", "Finish any game", 130], ["daily", "Dai
   ["gridfull", "Nine of nine", "A full Limbus Grid", 650], ["oddp", "Sharp eye", "10,000 in Odd one out", 650], ["duel", "Duelist", "Beat a friend's result in a duel", 390],
   ["every", "Jack of all trades", "Play every game once", 1300], ["r3", "Gold", "Extract a 000", 130], ["feat", "The one I wanted", "Extract the featured 000", 650],
   ["ego10", "Collector", "Extract ten E.G.O", 650], ["pulls100", "Just one more ten", "A hundred pulls", 1300]];
-// pays for what happened; `got`: [lunacy, why] lines, achievements by key — one message for all of it
+// pay lunacy, one message
 function gmPay(got, ach = []) {
   for (const k of ach) { const a = GM_ACH.find((x) => x[0] === k); if (a && !gmW.ach[k]) { gmW.ach[k] = gmDay(); got.push([a[3], `★ ${a[1]}`]); } }
   got = got.filter(([n]) => n > 0);
@@ -143,9 +133,7 @@ function gmPay(got, ach = []) {
   gmWKeep();
   toast(got.map(([n, why]) => `<b>+${n}</b> lunacy · ${esc(why)}`).join("<br>") + `<br><span class="small">You have ${gmW.lunacy.toLocaleString("en")} — <a href="#/gamegacha">Extraction</a></span>`, 7000);
 }
-// The grade a finished game gets, by its share of the most it could have scored (Vlad's names and steps: of 10,000 —
-// up to 3,000 LARP, 4,000-5,000 Tourist, 6,000-8,000 Limbus enjoyer, 9,000 and more Dantehhh; a Hard game counts
-// of 20,000, the puzzles by their own measure)
+// result grade by share of the max score
 const GM_GRADES = [[0.9, "Dantehhh"], [0.6, "Limbus enjoyer"], [0.4, "Tourist"], [0, "LARP"]];
 function gmGrade(q) {
   const at = GM_GRADES.findIndex(([from]) => q >= from);
@@ -198,7 +186,7 @@ function gmDayTag(g) {
   return `${GM_SWORDS} DUEL${d.their == null ? "" : ` · THEIRS <i>${esc(d.their)}</i>${a == null || b == null ? "" : a > b ? " · <b>YOU WIN</b>" : a < b ? " · <b>THEY WIN</b>" : " · <b>A DRAW</b>"}`}`;
 }
 const GM_SWORDS = `<svg class="gmswords" viewBox="0 0 24 24"><path d="M4 3l10.5 10.5M4 3v3.2M4 3h3.2M12 16l3-3M13.2 17.8l4.6-4.6M16.5 16.5L20.5 20.5"/><path d="M20 3L9.5 13.5M20 3v3.2M20 3h-3.2M12 16l-3-3M10.8 17.8l-4.6-4.6M7.5 16.5L3.5 20.5"/></svg>`;
-// (a duel's result is only worth something sent: its button is the one to see — every result page marks it by this text)
+// duel copy button label
 const gmCopyLabel = (g) => g.duel ? `${GM_SWORDS}<span class="gmduelcopy">Copy the duel link — send it to a friend</span>` : "Copy the result";
 function gmCopyResult(game, g, share) {
   if (!g.duel) return share();
@@ -206,21 +194,19 @@ function gmCopyResult(game, g, share) {
   gmCopy(`Limbus Archive · ${name} · Duel\nMy result: ${g.duel.mine} — can you beat it?\n${gmDuelLink(game, g.duel, g.duel.mine)}`);
 }
 
-// a name as it is searched: without the marks over its letters ("Ryōshū" is found by "ryo", "Öufi" by "oufi")
+// search without diacritics
 const gmPlain = (s) => String(s).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const gmShuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(gmRnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-// a track with a number for a name ("Canto VIII Battle 16") can't be told from its neighbours by ear alone
+// numbered tracks can't be told apart by ear
 const gmNumbered = (t) => /Battle \d+$|battle theme( \d+)?$/.test(t.name);
-// "SAIKAI (instrumental)" is the same piece as "SAIKAI": either answer names it, and they are never offered together
+// instrumental = the same song
 const gmSong = (t) => t.name.replace(/ \(instrumental\)$/, "");
 
 // what a right answer is worth now: less with every step of the piece and every hint opened
 const GM_HINT = 250;
 const gmWorth = () => Math.max(100, GM_WORTH[gm.game.step] - GM_HINT * Object.keys(gm.game.hints).length) * (gm.hard ? 2 : 1);
 
-// The rounds of a game are drawn at its start, so the tracks of the next ones are fetched while the current one is
-// played and a round starts at once (the app makes a track's file at its first request, the site downloads it
-// whole). gmWarm: a track's number -> a promise of its object URL (null when it could not be fetched).
+// Next rounds' tracks prefetched while one plays (gmWarm: number → object URL promise).
 const GM_AHEAD = 2, gmWarm = new Map();
 function gmFetch(n) {
   if (!gmWarm.has(n)) gmWarm.set(n, fetch("/api/music_audio?n=" + n).then((r) => r.ok ? r.blob() : null).then((b) => b && URL.createObjectURL(b)).catch(() => null));
@@ -239,10 +225,10 @@ function gmStop() {
   gmAudio.pause();
   document.body.classList.remove("quiz");
 }
-// (only when this game was on: the page a click leads to may have started its own game already, with its own seed)
+// only when this game was on
 window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/games/track") && (gm.game || gm.mine)) { gmStop(); gmWarmDrop(); gm.game = null; gmDailyEnd(); } });
 
-// [game (the key of its Daily challenge), page, name, what it is, picture, a toy: no score, no Daily]
+// [game, page, name, about, picture, toy]
 const gmIcon = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
 const GM_GAMES = [
   ["track", "#/games/track", "Guess the track", "A piece of the game's soundtrack from a random spot — name it.",
@@ -291,8 +277,7 @@ const GM_GAMES = [
 const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
 // the games' page: the columns its tiles stand in
 const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff", "diff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig", "when"]], ["Toys", ["dare", "who"]]];
-// Mode of the day: the game shown big on the games' page — another one after every daily reset, never a toy; each
-// comes once before any comes again (the order is drawn anew for every round of them)
+// Mode of the day: a scored game, each once per cycle
 function gmOfDay() {
   const n = Math.floor((Date.now() + 3 * 3600e3) / 864e5), len = GM_SCORED.length, round = Math.floor(n / len);
   const order = (r) => { const rnd = gmSeed("mode" + r); return GM_SCORED.map((g) => [rnd(), g]).sort((a, b) => a[0] - b[0]).map((p) => p[1]); };
@@ -302,7 +287,7 @@ function gmOfDay() {
 }
 document.querySelectorAll("#subnav [data-game]").forEach((a) => { a.innerHTML = GM_GAMES.find(([k]) => k === a.dataset.game)[4]; });
 
-// the line under the menu inside a game: back to the games' page, the game's name, the other games by their pictures
+// in-game line: back, name, other games
 function gmCrumb(game) {
   $("#gmcrumb").textContent = GM_GAMES.find(([k]) => k === game)[2];
   document.querySelectorAll("#subnav [data-game]").forEach((a) => a.classList.toggle("active", a.dataset.game === game));
@@ -344,10 +329,7 @@ function gmHub() {
   gmHubPics();
 }
 
-// the games' pictures: three of the game's own for each game, the same ones for everybody (the preset of
-// /api/game_cards, server.py CARD_PRESET; the web copy keeps them in a pack of its own). The mode of the day gets
-// the first three that load, in the list's order, a tile the first one; the drawn icon stays until then (and where
-// there are none).
+// card pictures from /api/game_cards (preset); the drawn icon until they load
 function gmHubPics() {
   const some = (a) => a.slice(0, 6);
   const put = async (game, urls) => {
@@ -400,7 +382,7 @@ function gmDrawStart() {
   if ($("#gmdaily")) $("#gmdaily").onclick = () => gmNew(true);
 }
 
-// a daily game runs on fixed settings (battle themes, Easy, everything); the player's own come back after it
+// restore the player's settings after a Daily
 function gmDailyEnd() {
   if (gm.mine) Object.assign(gm, gm.mine);
   gm.mine = null;
@@ -428,13 +410,12 @@ function gmRound() {
   document.body.classList.add("quiz");
   if (++g.round >= g.order.length) return gmResult();
   const at = g.order[g.round], ans = g.pool[at];
-  // wrong answers: the nearest tracks in the game's own order (the same Canto, as a rule), each name once
+  // wrong answers: nearest tracks
   const near = g.pool.map((p, i) => ({ p, d: Math.abs(i - at) })).filter((x) => x.d && gmSong(x.p.t) !== gmSong(ans.t)).sort((a, b) => a.d - b.d).slice(0, 10);
   const wrong = [];
   for (const x of gmShuffle(near)) if (wrong.length < 3 && !wrong.some((w) => gmSong(w.t) === gmSong(x.p.t))) wrong.push(x.p);
   const len = ans.t.ms / 1000;
-  // a numbered track in Easy is asked by its Canto: four "Battle 0N" of one Canto would be a guess by number
-  // (the wrong ones: three of the six chapters next to it in the game's order)
+  // numbered tracks in Easy are asked by Canto
   const far = new Map();
   g.pool.forEach((p, i) => { const w = p.t.where; if (w && w !== ans.t.where) far.set(w, Math.min(far.get(w) ?? 1e9, Math.abs(i - at))); });
   const places = gmShuffle([...far].sort((x, y) => x[1] - y[1]).slice(0, 6).map((x) => x[0])).slice(0, 3);
@@ -492,7 +473,7 @@ function gmRing() {
 
 function gmDrawRound() {
   const g = gm.game, t = g.ans.t, d = g.done, worth = gmWorth();
-  // hints for points: the Canto (where it isn't the question or on the answers already), who is fought, the author
+  // paid hints
   const hints = [gm.hard && t.where ? ["canto", "CANTO", t.where] : 0, t.fights && t.fights <= 3 && t.who.length ? ["who", "FOUGHT", t.who.slice(0, 2).join(", ")] : 0,
     t.by ? ["by", "AUTHOR", t.by] : 0].filter(Boolean);
   const hint = ([k, label, val]) => g.hints[k] || d ? `<div class="gihint open"><small>${label}</small><b>${esc(val)}</b></div>`

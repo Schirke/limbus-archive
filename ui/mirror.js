@@ -1,7 +1,5 @@
 "use strict";
-// Tools → Mirror Dungeon planner: pick the E.G.O gifts you want, get the theme packs to take and the floors to take them
-// on. A gift can be tied to certain packs, a pack to certain floors — the planner seats the packs so the most of the
-// build is reachable. Data: /api/mirror (limbusdm/mirror.py). The build is kept in localStorage "mirror".
+// Tools → Mirror Dungeon planner: pick gifts, get packs and floors (/api/mirror); build kept in localStorage.
 let MIRROR = null;
 const MP_KEEP = "mirror";
 const MP_MODES = [["Normal", 5, "0"], ["Hard", 5, "1"], ["Hard", 10, "2"], ["Hard", 15, "3"]];  // (name, floors, the game's typeIndex)
@@ -11,7 +9,7 @@ const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode
 const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, pic: "", kw: "", tier: 0, desc: "" };
 const mpGi = (id, cls = "") => (mpG(id).pic ? `<img class="mpgi ${cls}" data-g="${id}" src="${imgThumb(mpG(id).pic)}" loading="lazy">` : `<i class="mpgi ${cls}" data-g="${id}"></i>`);
 const mpKw = (k) => ((UNITS.glossary || {})[k] || {}).name || statusName(k);
-// which list of a pack's floors a floor reads: Normal → 0; Hard → 1 on floors 1-5, 2 on 6-10, 3 on 11-15 (pools: any of the five)
+// which floor list of a pack a floor reads
 const mpSpec = (f) => (mp.mode === 0 ? ["0", f] : f < 5 ? ["1", f] : f < 10 ? ["2", -1] : ["3", -1]);
 const mpAllowed = (p, f) => { const [d, lf] = mpSpec(f), fl = p.floors[d]; return !!fl && (lf < 0 || fl.includes(lf)); };
 const mpFloor = (f) => (f < 5 ? "Floor " + (f + 1) : f < 10 ? "Floors 6–10" : "Floors 11–15");
@@ -30,9 +28,7 @@ routes.mirror = async () => {
   mpDraw();
 };
 
-// The route for the picked gifts. A visit to a pack is counted for at most `cap` of them (nobody leaves a pack with
-// everything it can drop), the pack-only and the rarest first; packs are added by how much they bring while all of
-// them still find floors they may stand on.
+// Route for the picked gifts: at most `cap` gifts per pack visit, packs added by gain while they all find floors.
 function mpPlan() {
   const N = MP_MODES[mp.mode][1], floors = [...Array(N).keys()], packs = MIRROR.packs.filter((p) => floors.some((f) => mpAllowed(p, f)));
   const need = new Set(), fus = [];
@@ -47,7 +43,7 @@ function mpPlan() {
   const gain = (p, got) => take(p, got).reduce((s, g) => s + (only.has(g) ? 100 : 1), 0);
   const got = new Set(), used = new Set(), mine = new Map(), pinned = {};
   for (const [f, id] of Object.entries(mp.lock)) { const p = packs.find((x) => x.id === id); if (p && +f < N && mpAllowed(p, +f) && !Object.values(pinned).includes(p)) pinned[f] = p; else delete mp.lock[f]; }
-  // floors for a set of packs, each on a floor it may stand on (pinned ones stay): augmenting paths, null when they don't all fit
+  // seat packs on allowed floors (augmenting paths); null if they don't fit
   const seat = (list) => {
     const at = Array(N).fill(null);
     for (const [f, p] of Object.entries(pinned)) at[f] = p;
@@ -80,7 +76,7 @@ function mpPlan() {
     t.forEach((g) => (src[g] = { f, p, only: only.has(g) }));
     return { f, p, take: t, extra: gives(p).filter((g) => !t.includes(g)), cands, lock: mp.lock[f] === p.id };
   });
-  // a gift no visit was counted for, but a pack of the route can drop it: luck — worth a warning only for a pack's own gift
+  // gifts left to luck
   for (const x of rows) for (const g of x.extra) if (!src[g]) src[g] = { f: x.f, p: x.p, only: only.has(g), luck: only.has(g) };
   return { N, packs, rows, raw, only, fus, nowhere, src, gives, missed: raw.filter((g) => !src[g] && !nowhere.includes(g)) };
 }
@@ -172,7 +168,7 @@ function mpDraw() {
   page.onmouseleave = () => mpTip(null);
 }
 
-// a gift's card under the pointer: what it does, what it is fused from, the packs it is tied to
+// gift tooltip
 function mpTip(el, e) {
   let tip = $("#mptip");
   if (!el) { if (tip) tip.style.display = "none"; return; }

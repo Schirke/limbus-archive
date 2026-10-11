@@ -1,15 +1,4 @@
-"""Tools → Mirror Dungeon planner (ui/mirror.js): the theme packs, the E.G.O gifts each can drop and the fusion recipes.
-
-All of it is in StaticData:
-- `mirrordungeon-theme-floor`: a pack's `egoGiftPool` (what drops in it), `specificEgoGiftPool` (the gifts found in this
-  pack and its copies only) and `exceptionConditions` — the modes it appears in: dungeonIdx 0 = Normal and 1 = Hard with
-  `selectableFloors` (0-based, floors 1-5), 2 = the pool of floors 6-10, 3 = the pool of floors 11-15 (no floors named:
-  any of the five).
-- `ego-gift`, `ego-gift-mirrordungeon`: keyword, tier (tag TIER_n), the icon's number (`iconId`, else the gift's own)
-  and the number its name is filed under (`upgradeDataList[0].localizeID`).
-- `mirror-dungeon-common-data` `egoGiftCombineFixedTable`: what is fused from what (several recipes per result).
-- `mirrordungeon`: the modes themselves (typeIndex → how many floors).
-"""
+"""Tools → Mirror Dungeon planner: theme packs, their E.G.O gifts and fusion recipes, from StaticData."""
 from __future__ import annotations
 
 import re
@@ -21,9 +10,7 @@ SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gl
 
 
 def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
-    """{"packs": [{id, name, floors: {dungeonIdx: [floor, …]}, pool, excl, hard, pic}], "gifts": {id: {name, kw, tier,
-    sin, desc, pic}}, "fus": {result id: [[ingredient ids], …]}, "modes": {typeIndex: floors}}.
-    gift_pics / pack_pics: {texture name: asset path} of Sprite/EgoGiftIcon and of the packs' cards."""
+    """{packs, gifts, fus, modes}"""
     gname, pname = _load(loc_dir, r"EN_EGOgift.*\.json$"), _load(loc_dir, r"EN_MirrorDungeonTheme.*\.json$")
     gdata = {}
     for fold in ("ego-gift", "ego-gift-mirrordungeon"):

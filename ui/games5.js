@@ -1,6 +1,4 @@
-// Games → the two toys (no score, no Daily):
-// Extraction — the game's own extraction with its banners, pictures and sounds, paid with the lunacy the games give;
-// Challenge roulette — a random team and a rule to play it by.
+// Toys: Extraction (the game's banners, paid with lunacy) and Challenge roulette.
 "use strict";
 
 // ------------------------------------------------------------------ Extraction
@@ -62,13 +60,13 @@ routes.gamegacha = async (args = []) => {
     for (const e of (u || {}).egos || []) if (e.img && e.img.thumb) units.set(e.id, { id: e.id, title: e.name, who: e.sinnerName, sinner: e.sinner, ego: e.grade, season: giSeason(u, e.season),
       tint: ((u.seasons || {})[e.season == null ? "8000" : e.season > 9100 && e.season < 9200 ? "9100" : String(e.season)] || {}).color || "",
       thumb: giThumb(e.img.thumb), art: gaFull(e.img.art), line: ((g || {}).lines || {})[e.id] || ["", ""], pan: [] });
-    // (a banner names units by number: the ones this snapshot has no picture of are left out of its groups)
+    // units without a picture left out
     const fit = (b) => ({ ...b, pick: b.pick.filter((i) => units.has(i)), groups: b.groups.map((gr) => ({ ...gr, ids: gr.ids.filter((i) => units.has(i)) })).filter((gr) => gr.ids.length) });
     const banners = ((g || {}).banners || []).map(fit).filter((b) => b.groups.length);
     ga.data = { banners, archive: ((g || {}).archive || []).map(fit).filter((b) => b.groups.length), units, snd: (g || {}).snd || {} };
   }
   if (!location.hash.startsWith("#/gamegacha")) return;
-  // "#/gamegacha/<banner>" (Banner archive → Pull): an ended banner joins the tiles, and stays the picked one afterwards
+  // an archived banner opened by link joins the tiles
   for (const id of [+args[0], ga.st.banner]) {
     const b = id && !ga.data.banners.some((x) => x.id === id) && ga.data.archive.find((x) => x.id === id);
     if (b) ga.data.banners.unshift(b);
@@ -91,8 +89,7 @@ routes.gamegacha = async (args = []) => {
 
 const gaShow = (id) => { document.querySelectorAll("#gestage .gescr").forEach((d) => d.classList.toggle("on", d.id === id)); $("#geskip").hidden = id === "gehome" || id === "geres"; };
 
-// one pull by the banner's own table: a group by its share of 10000 (the tenth of a ten has shares of its own; so
-// has a banner whose every E.G.O is owned), then any unit of the group — an E.G.O never twice
+// one pull by the banner's own shares
 function gaRoll(tenth) {
   const b = ga.banner, st = ga.st, ego = (g) => String(g.g).startsWith("EGO");
   const left = b.groups.some((g) => ego(g) && g.ids.some((i) => !st.got[i]));
@@ -118,7 +115,7 @@ function gaHome() {
   const rate = (g) => { const all = b.groups.reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) || 1;
     return (100 * b.groups.filter((x) => x.g === g || x.g === g + "_pickup").reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) / all).toFixed(1) + "%"; };
   const up = b.groups.filter((x) => String(x.g).endsWith("_pickup")).flatMap((x) => x.ids).map(gaU);
-  // TEMPORARY (Vlad, 2026-10-08: "to test with, we'll take it out later"): the "+1300" button gives lunacy for nothing
+  // TEMPORARY test button (+1300 lunacy)
   $("#gehome").innerHTML = `<div class="gewallet">${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b><button id="getest" title="For testing: lunacy for nothing. To be removed.">+ 1300 · test</button></div>
     <div class="getiles">${ga.data.banners.map((x) => `<img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">`).join("")}</div>
     <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.illust ? gaFull(b.illust) : ""}')"></div>${b.typo ? `<img class="getypo" src="${gaFull(b.typo)}">` : ""}
@@ -171,7 +168,7 @@ async function gaPull(n) {
   gaResult(got);
 }
 
-// ---- the orb in chains: a chain runs out to a crack for every pull, and each crack lights up in its unit's colour
+// the orb in chains
 function gaSky(ctx, t, hot) {
   const sky = gaPic("FX_Tex_UI_Gacha_BGSpace_Normal");
   ctx.fillStyle = "#050303";
@@ -185,7 +182,7 @@ function gaSky(ctx, t, hot) {
     ctx.beginPath(); ctx.arc(x, y, 1 + (i % 4) * (hot ? 1.3 : 0.7), 0, 7); ctx.fill();
   }
 }
-// a cell of the cracks' sheet (2 × 2, white on black) in a colour, ready to be added to the picture
+// a coloured crack sprite
 function gaCrack(sheet, cell, rgb) {
   const key = sheet + cell + rgb, im = gaPic(sheet);
   if (ga.pics[key]) return ga.pics[key];
@@ -241,7 +238,7 @@ function gaOrb(got, alive) {
   });
 }
 
-// ---- one 000 / E.G.O: the Sinner's emblem, its line, the art in three passes, the flash, the name plate
+// one 000 / E.G.O reveal
 function gaReveal(id, alive) {
   return new Promise(async (done) => {
     const u = gaU(id), el = $("#gerev"), part = (c) => el.querySelector(c);
@@ -359,7 +356,7 @@ routes.gamedare = async () => {
 };
 
 const gdPick = (a) => a[Math.floor(Math.random() * a.length)];
-// a Sinner's draw: an Identity (of the team's status when there is one and the Sinner has such) and an E.G.O
+// a Sinner's random Identity and E.G.O
 function gdSlot(sinner) {
   const d = gd.data, mine = d.ids.filter((x) => x.sinner === sinner && (gd.how !== "low" || x.rank < 3)), fit = mine.filter((x) => x.kw.includes(gd.around));
   return { sinner, id: gdPick(fit.length ? fit : mine), ego: gd.ego ? gdPick(d.egos.filter((e) => e.sinner === sinner)) : null };

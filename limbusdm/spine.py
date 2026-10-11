@@ -1,7 +1,4 @@
-"""Spine skeletons inside a bundle, linked the way spine-unity links them:
-SkeletonDataAsset → skeletonJSON (TextAsset) + atlasAssets → AtlasAsset → atlasFile (TextAsset) + materials → _MainTex.
-Names are not unique (many skeletons are called "imported"), so everything goes by path id.
-"""
+"""Spine skeletons of a bundle, linked as spine-unity does, by path id (names repeat)."""
 from __future__ import annotations
 
 import hashlib
@@ -34,7 +31,7 @@ def _main_tex(mat: dict) -> int | None:
 
 
 def atlas_pages(text: str) -> list[str]:
-    """Page image names of a Spine 4.x atlas, in order (a page starts after a blank line or at the top)."""
+    """Page image names of a Spine 4.x atlas, in order."""
     pages, new_block = [], True
     for line in text.splitlines():
         s = line.strip()
@@ -48,7 +45,7 @@ def atlas_pages(text: str) -> list[str]:
 
 
 def page_sizes(text: str) -> dict[str, tuple[int, int]]:
-    """{page image name: (width, height)} from the "size:" line after each page of a Spine 4.x atlas."""
+    """{page: (width, height)} from a Spine 4.x atlas."""
     out, page, new_block = {}, None, True
     for line in text.splitlines():
         s = line.strip()
@@ -67,9 +64,7 @@ def page_sizes(text: str) -> dict[str, tuple[int, int]]:
 
 
 def fit_page(im, size: tuple[int, int] | None) -> bytes:
-    """Unity resizes atlas pages to powers of two on import (678×812 → 512×1024). Spine meshes compute their UVs
-    from the real image size, so a stretched page shifts and cuts them: scale it back to the size in the atlas.
-    `im`: the page (PIL image) → PNG, written fast (it is kept on disk: cached())."""
+    """Scales a page Unity resized to a power of two back to the atlas size (meshes use the real size); → PNG."""
     import io
     from PIL import Image
     if size and im.size != tuple(size):
@@ -79,18 +74,14 @@ def fit_page(im, size: tuple[int, int] | None) -> bytes:
     return buf.getvalue()
 
 
-# The files of a skeleton as the page gets them (pages fitted, the illustration's scene), kept on disk: an open
-# skeleton otherwise loads its bundle again (bundles leave memory after a minute, extract.IDLE_S) and fits its pages
-# again — a second or more each time. Named by the bundle file (path, size, time) and the request: a game update
-# makes new ones, and what was not asked for in CACHE_DAYS goes.
+# skeleton files kept on disk, named by bundle file and request; unused for CACHE_DAYS → deleted
 CACHE_DIR = "spine_cache"
 CACHE_DAYS = 30
 _pruned: set[str] = set()
 
 
 def cached(data_dir: str, bundle_path: str, key: str, make, keep: bool = True) -> bytes:
-    """make() → bytes, kept in <data>/spine_cache under `key` of this bundle file (`keep` False: read if there, not
-    written — the site's export asks for every skeleton once and keeps its own copies)."""
+    """make() → bytes, kept in spine_cache under `key` (keep False: read only)."""
     d = os.path.join(data_dir, CACHE_DIR)
     try:
         st = os.stat(bundle_path)
@@ -134,7 +125,7 @@ def _prune(d: str):
 
 
 def spine_map(bundle_path: str) -> dict[int, dict]:
-    """{atlas TextAsset pid: {"skel": pid, "pages": {page name: texture pid}, "name": skeleton asset name}}."""
+    """{atlas pid: {skel, pages, name}}"""
     with _cache_lock:
         if bundle_path in _cache:
             return _cache[bundle_path]

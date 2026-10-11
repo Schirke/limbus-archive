@@ -1,6 +1,4 @@
-"""The Community page's Bilibili tab: the game's videos on bilibili.com — the most watched of the last day / week / of
-all time, or the newest. Asked from Bilibili's own search (the one its site uses: no key, only the visitor cookie the
-front page hands out), by the game's Chinese name."""
+"""Community → Bilibili: the game's most watched / newest videos, from Bilibili's own search (no key)."""
 from __future__ import annotations
 
 import html
@@ -62,8 +60,7 @@ def _length(text: str) -> str:
 
 
 def videos(period: str = "week", sort: str = "views", translator=None) -> dict:
-    """{"updated", "period", "sort", "videos": [{id, url, title, en, name, avatar, thumb, views, likes, comments,
-    length, at, kind}]} or {"error"}. `en` = the title in English when a translator is given and answers."""
+    """{"updated", "period", "sort", "videos"} or {"error"}; `en` = English title when translated."""
     period = period if period in PERIODS else "week"
     sort = sort if sort in SORTS else "views"
     with _lock:

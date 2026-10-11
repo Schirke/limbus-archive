@@ -1,6 +1,4 @@
-// Games → Guess the Identity: a voice line of an Identity (or, as an extra, a boss's battle line) by ear or by its
-// text — name whose it is. When it is said is always shown; the other hints cost points. (/api/quiz, games.js styles)
-// Games → Guess the skill is the same game over skill icons (gi.page "skill"): whose skill is it.
+// Guess the Identity: a voice line (or a boss line) by ear or by text. Guess the skill: same game over skill icons.
 "use strict";
 
 const GI_KEEP = "games_id", GI_ROUNDS = 10, GI_HINT = 250;
@@ -12,7 +10,7 @@ const giSkill = () => gi.page === "skill";
 const giChar = () => gi.page === "char";  // Guess the character: who speaks in the story (bosses and everybody else)
 const giTitle = () => giSkill() ? "Guess the skill" : giChar() ? "Guess the character" : "Guess the Identity";
 const giMode = () => giChar() ? "c" + (gi.text ? "t" : "v") + (gi.hard ? "h" : "e") : giSkill() ? "s" + (gi.hard ? "h" : "e") + gi.sinner : gi.who + (gi.text ? "t" : "v") + (gi.hard ? "h" : "e") + (gi.who === "bosses" ? "" : gi.sinner);
-// a season as the game tags it: one name for every Walpurgis Night, none for the standard ones (0), collaborations have no number
+// season label
 const giSeason = (units, s) => ((units.seasons || {})[s == null ? "8000" : s > 9100 && s < 9200 ? "9100" : String(s)] || {}).name || (s ? "" : "Standard");
 const giPick = (a) => a[Math.floor(gmRnd() * a.length)];
 const giGame = () => giSkill() ? "skill" : giChar() ? "char" : "id";
@@ -27,7 +25,7 @@ window.addEventListener("hashchange", () => { if (!/^#\/game(id|skill|char)/.tes
 routes.gameid = (args = []) => giOpen("id", gmAuto("id", args));
 routes.gameskill = (args = []) => giOpen("skill", gmAuto("skill", args));
 routes.gamechar = (args = []) => giOpen("char", gmAuto("char", args));
-async function giOpen(page, daily) {  // daily: opened by the "Daily" / "Duel" button of the games' page — the challenge starts at once
+async function giOpen(page, daily) {  // daily: start at once
   giStop();
   gi.page = page;
   gi.game = null;
@@ -37,7 +35,7 @@ async function giOpen(page, daily) {  // daily: opened by the "Daily" / "Duel" b
     const [q, units, en] = await Promise.all([api("/api/quiz"), api("/api/units"), api("/api/enemies")].map((p) => p.catch(() => null)));
     const ids = new Map(((units || {}).ids || []).map((x) => [x.id, { key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName,
       sinner: x.sinner, season: giSeason(units, x.season), pic: giThumb(x.img.thumb), lines: [],
-      // its skills by their pictures: the name as of the last uptie; what is free to see = sin, damage type, which skill
+      // skills by picture; free hints: sin, damage type, slot
       skills: (x.skills || []).concat(x.defense || []).map((s) => { const u = s.up[Math.max(...Object.keys(s.up).map(Number))] || {};
         return { s: String(s.id), pic: giThumb(`Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`), text: u.name || "",
           when: [u.sin, u.atk, s.type === "SKILL" ? "Skill " + s.tier : u.def || "Defense"].filter(Boolean).join(" · ") }; }).filter((s) => s.text) }]));
@@ -46,8 +44,7 @@ async function giOpen(page, daily) {  // daily: opened by the "Daily" / "Duel" b
       pic: thumbs.has(e.app) && (e.spine || !e.pic) ? `/api/enemy_thumb?app=${encodeURIComponent(e.app)}` : e.pic ? giThumb(e.pic) : "", lines: [] }]));
     for (const [s, id, when, text] of (q || {}).ids || []) ids.get(id)?.lines.push({ s, when, text });
     for (const [s, id, text] of (q || {}).bosses || []) bosses.get(id)?.lines.push({ s, when: "", text });
-    // the story's characters by their picture in the story's log; without one a boss has the handbook's, a Sinner his base Identity's
-    // (one picture for two speakers: only the one the server kept, with the other's lines too)
+    // story characters by their log picture (fallbacks: handbook / base Identity)
     const chars = ((q || {}).chars || []).map((c, i) => { const b = c.boss && bosses.get(c.boss), s = c.sinner && ids.get(10001 + c.sinner * 100);
       return { key: "c" + i, id: c.boss || 0, name: c.name, title: c.name, sub: c.where, role: c.role, boss: !!c.boss, char: true, order: c.order, twin: c.twin != null,
         pic: c.pic ? giThumb(c.pic) : b ? b.pic : s ? s.pic : "", lines: c.lines.map(([sm, text, where]) => ({ s: sm, when: where, text })) }; }).filter((c) => !c.twin && c.pic);  // (without any picture: left out)
@@ -100,7 +97,7 @@ function giDrawStart() {
   if ($("#gmdaily")) $("#gmdaily").onclick = () => giNew(true);
 }
 
-// a daily game runs on fixed settings (Identities, by voice, Easy, every Sinner); the player's own come back after it
+// restore the player's settings after a Daily
 function giDailyEnd() {
   if (gi.mine) Object.assign(gi, gi.mine);
   gi.mine = null;
@@ -129,7 +126,7 @@ function giRound() {
   for (let k = 0; k < 30 && (!ans || g.asked.has(ans.key)); k++) ans = giPick(g.pool);
   g.asked.add(ans.key);
   const line = giSkill() ? giPick(ans.skills) : giPick(ans.lines.filter((l) => !gi.text || l.text));
-  // wrong answers: the same Sinner's other Identities; for a boss, other bosses (the next ones in the handbook's order)
+  // wrong answers: same Sinner's Identities; for bosses, nearby bosses
   const all = ans.char ? gi.data.chars : ans.boss ? gi.data.bosses : giSkill() ? gi.data.all : gi.data.ids;
   let near = ans.char || ans.boss ? all.filter((x) => x !== ans).sort((a, b) => Math.abs(all.indexOf(a) - all.indexOf(ans)) - Math.abs(all.indexOf(b) - all.indexOf(ans))).slice(0, 8)
     : all.filter((x) => x !== ans && x.sinner === ans.sinner);

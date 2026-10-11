@@ -20,9 +20,7 @@ def fsb_from_bank(data: bytes) -> bytes | None:
 
 
 def _fsbs(f) -> list[tuple[int, int, int]]:
-    """Every FSB5 container in an open .bank file: (offset, length, length of its headers and names) — a bank can
-    hold several (one per "SND " chunk: Voice_Default_S5_3.assets.bank has 9 sounds in its first and 508 in its
-    second). Walks the file's RIFF chunks, reading only their headers."""
+    """Every FSB5 container in a .bank file: (offset, length, header length); a bank can hold several."""
     f.seek(0, 2)
     end = f.tell()
     out = []
@@ -98,8 +96,8 @@ def list_sounds(path: str) -> list[dict]:
     return out
 
 
-_layouts: dict = {}  # bank path → (size, mtime, [(offset, length, sounds in it)]): the walk and the headers are read once
-_blobs: list = []    # the last few containers read, newest last: [(path, offset, bytes, names)] (a fight's sounds share a few banks)
+_layouts: dict = {}  # bank path → (size, mtime, containers), read once
+_blobs: list = []    # last containers read, newest last
 _BLOB_MAX, _BLOB_KEEP = 48 << 20, 4
 
 

@@ -1,11 +1,5 @@
-"""The game's music for the corner player: the official track list of its own jukebox (StaticData lobby-bgm +
-EN_LobbyBGM names / authors) tied to the samples in the BGM banks, and where each battle theme plays (stage waves'
-bgmList → Canto and the enemies fought there).
-
-A table names an FMOD event ("event:/BGM/Battle/Battle_Cp1_Ally_2"), a bank holds samples under their file names
-("LC_1장_아군전투_중반부_BGM_(완성본_LOOP)"), and the banks' event data has no names at all. So an event finds its
-sample by name where they agree, else by the length the jukebox table gives it (to the millisecond), told apart by
-the chapter / side in the sample's name when several are as long."""
+"""The game's music for the corner player: jukebox tracks matched to bank samples (by name, else by length) and where
+battle themes play."""
 from __future__ import annotations
 
 import collections
@@ -19,7 +13,7 @@ NEAR = 60  # ms an event's length may differ from its sample's
 BOSS_FIGHTS = 3  # a theme heard in so few story fights is somebody's own: named after who is fought there
 STORY_TABLES = ("battle-story", "battle-ab", "battle-dungeon")
 PHASES = ["초반부", "전반부", "중반부", "후반부"]  # early, early, middle, late (the first Cantos' tracks are named in Korean)
-# events whose jukebox version is cut from several samples (so no sample is as long): the one to play
+# events cut from several samples: the one to play
 ALIAS = {"LimbusCompany_BGM_PV": "BGM_PV", "Battle_Cp2_Rodion_Lobby": "Battle_Cp2_Rodion",
          "Battle_Cp3_BetweenTwoWorlds_Lobby": "Between Two Worlds_Master [Game Loop Part1]",
          "Battle_Cp4_FlyMyWings_Lobby": "Fly, My Wings_Main -13LUFS_Master_동랑 에고 보스전",
@@ -32,7 +26,7 @@ ALIAS = {"LimbusCompany_BGM_PV": "BGM_PV", "Battle_Cp2_Rodion_Lobby": "Battle_Cp
          "Battle_Cp9_Boss_10": "Battle_Cp9_Boss_10_AR", "Battle_Cp9_Boss_10_Mirror": "Battle_Cp9_Boss_10_MR",
          "Battle_AhabBossBattle_Mirror": "Battle_Cp5_AhabBossBattle_MR",
          "Battle_Cp3_Cromer_p1": "크로머1페이즈BGM", "Battle_Cp3_Cromer_p2": "Lyric_Cromer_p2"}
-# fight-only events that play a jukebox song without its vocals: named after the song, not after where they play
+# fight-only instrumentals: named after the song
 INSTRUMENTAL = {"Battle_AhabBossBattle_Mirror": "Battle_Cp5_Compass_Lobby", "Battle_Cp9_Boss_10_Mirror": "Battle_Cp9_Saikai_Lobby"}
 
 
@@ -41,7 +35,7 @@ def _norm(s: str) -> str:
 
 
 def _hints(event: str, sample: str) -> int:
-    """How well a sample's name fits an event: its chapter ("Cp4_5" ~ "LC_4.5", "Cp3" ~ "3장") and side."""
+    """How well a sample's name fits an event (chapter, side)."""
     s, score = sample.lower(), 0
     m = re.search(r"cp(\d+)(_5)?", event.lower())
     if m:
@@ -59,7 +53,7 @@ def _phase(sample: str) -> int:
 
 
 def _resolve(events: dict[str, int | None], samples: list[tuple]) -> dict[str, tuple]:
-    """{event: sample (name, ms, bank, index)}; events = {name: length in ms, None when unknown}."""
+    """{event: sample}"""
     by_name = {}
     for s in samples:
         by_name.setdefault(_norm(s[0]), s)
@@ -87,7 +81,7 @@ def _resolve(events: dict[str, int | None], samples: list[tuple]) -> dict[str, t
 
 
 def _where(tables: dict, chapters: dict, names: dict[int, str], bosses: set[int]) -> dict[str, dict]:
-    """{event: {"label": the earliest story chapter it plays in, "order", "who": [enemy names, the most fought first]}}."""
+    """{event: {label, order, who}}"""
     out: dict[str, dict] = {}
     for table in content.STAGE_TABLES:
         for fname, data in (tables.get(table) or {}).items():
@@ -116,7 +110,7 @@ def _where(tables: dict, chapters: dict, names: dict[int, str], bosses: set[int]
 
 
 def build(tables: dict, loc_dir: str, samples: list[tuple]) -> dict:
-    """tables: StaticData lobby-bgm, enemy tables and the stage tables; samples: (name, ms, bank path, index) of the BGM banks."""
+    """Build the track list from the tables and bank samples."""
     loc = units._load(loc_dir, r"EN_LobbyBGM(-\d+)?\.json$")
     rows = [r for d in (tables.get("lobby-bgm") or {}).values() for r in (d.get("dataList") or []) if isinstance(d, dict)]
     rows = sorted((r for r in rows if isinstance(r, dict) and r.get("fileName")), key=lambda r: r.get("id") or 0)
@@ -174,8 +168,7 @@ KEEP = 40  # tracks kept converted in data/music_cache (about 4 MB each)
 
 
 def audio_file(svc, track: dict) -> tuple[str, str]:
-    """(file, content type) of a track to play: its bank sample decoded by FMOD and packed as AAC once, so that the
-    player can seek in it and a three-minute track isn't 35 MB of WAV on every request."""
+    """(file, type) of a track: decoded once and packed as AAC."""
     import hashlib
     import subprocess
 

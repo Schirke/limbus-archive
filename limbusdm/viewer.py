@@ -1,10 +1,5 @@
-"""Skill renders with the game's own effects: a small Unity player (unity/LimbusViewer) loads the game's bundles
-(read-only, from its cache) and plays an Identity's skill timelines; this module prepares its job, mixes the skill's
-sounds from the FMOD banks and encodes an MP4.
-
-The game's scripts are encrypted, but its timelines keep their field names (type trees), so what they do is read
-here: dashes to the target, camera zoom / shake, sounds. Effects are switched on by the player itself (stand-in
-classes with the game's class names receive the timeline data)."""
+"""Skill renders with the game's effects: the Unity player (unity/LimbusViewer) plays a unit's timelines from the game's
+bundles; this module builds its job, mixes the FMOD sounds and encodes the video."""
 from __future__ import annotations
 
 import functools
@@ -25,15 +20,14 @@ _lock = threading.Lock()
 VERSION = 22  # bump to re-render cached videos
 KEEP_SECONDS = 3600  # a render is deleted an hour after it was last watched (see Renderer.prune)
 WIDTH, HEIGHT = 1920, 1080  # the size of the game's own skill preview videos
-# the helper processes (the batch player, ffmpeg) below normal priority: a render that takes every core leaves the PC
-# usable (it still runs at full speed when nothing else wants the CPU); the Live player's own window keeps normal
+# helper processes below normal priority
 BG = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0)
-# x264 takes 1.5 threads per core by default (24 on 16 cores): 3 of 4 cores leaves the PC some, ~10 % slower
+# x264 on 3 of 4 cores
 X264 = ["-c:v", "libx264", "-threads", str(max(2, (os.cpu_count() or 4) * 3 // 4))]
 
 
 def viewer_exe() -> str | None:
-    """LimbusViewer.exe: next to the app when frozen, the Unity build output when run from source."""
+    """LimbusViewer.exe: next to the app, or the Unity build when run from source."""
     here = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else os.path.abspath(__file__))
     for p in (os.path.join(here, "LimbusViewer", "LimbusViewer.exe"),
               os.path.join(here, "..", "unity", "LimbusViewer", "Build", "LimbusViewer.exe")):
@@ -43,7 +37,7 @@ def viewer_exe() -> str | None:
 
 
 def tools(ff: bool = True) -> tuple:
-    """(LimbusViewer.exe, ffmpeg or None when not `ff`), or a RuntimeError naming which is missing and what to do."""
+    """(LimbusViewer.exe, ffmpeg) or RuntimeError naming what's missing."""
     exe, f = viewer_exe(), ffmpeg_exe() if ff else None
     gone = ([] if exe else ["LimbusViewer.exe (the LimbusViewer folder next to LimbusArchive.exe)"]) + \
            (["ffmpeg (_internal\\imageio_ffmpeg\\binaries)"] if ff and not f else [])
@@ -66,8 +60,7 @@ DISCORD_MAX = 10 * 1000 * 1000  # Discord's upload limit without Nitro
 
 
 def discord_gif(src: str, out: str) -> str:
-    """A render as a looping GIF that Discord takes (under 10 MB): smaller and choppier steps until it fits.
-    A transparent WebM stays transparent (one palette entry kept for it)."""
+    """A render as a Discord-size GIF (under 10 MB), transparency kept."""
     ff = ffmpeg_exe()
     if not ff:
         tools()
@@ -150,7 +143,7 @@ def _curve(c) -> list:
     return [x for k in (c or {}).get("m_Curve") or [] for x in (k["time"], k["value"], k["inSlope"], k["outSlope"])]
 
 
-# Group tracks that are alternatives of each other; the game's script plays one of them. (kept, dropped) by name.
+# tracks that are alternatives: (kept, dropped)
 VARIANT_PAIRS = [("normal", "upgrade"), ("nonebuff", "buff"), ("win", "lose"),
                  ("cartridge", "iserode")]
 
@@ -171,12 +164,8 @@ def _live(objs: dict, ref: dict) -> bool:
 
 
 def variant_mutes(objs: dict, tl: dict, scripts: dict, tails: bool = False, unmute: dict | None = None) -> dict[int, str]:
-    """Group tracks to switch off so only one version of a skill plays: front / back (the coin's heads / tails), the
-    first of numbered variants (0, 1, 2…), and the plain version where there is an upgraded one (Upgrade, buff…). Groups the
-    timeline itself has muted stay as they are, but for an E.G.O cut-in's promotion_After / promotion_Before: the game picks
-    one when it plays (the data leaves either muted), and promotion_After is the look of the trailers: 20310's map walls
-    stand through its cut-in there, promotion_Before keeps them off. promotion_After goes into unmute when the data has it
-    muted. {track path id: name}."""
+    """Group tracks to mute so one version of a skill plays (heads / tails, numbered variants, plain vs upgraded); {track
+    pid: name}."""
     out: dict[int, str] = {}
 
     def groups(refs):
@@ -235,8 +224,7 @@ def _timeline_events(objs: dict, tl: dict, scripts: dict, muted: dict | None = N
     ev = {"moves": [], "zooms": [], "rotates": [], "shakes": [], "hits": [], "sounds": [], "fx": [], "sturns": []}
 
     def sturn(si: dict) -> dict:
-        """How the game moves the one hit (sturnInfo): forcePower (below 0: pulled towards the attacker), type 3 launches
-        it at airborneAngle, isRotateTarget tips it over by targetRotateAngle."""
+        """How the game moves the one hit (sturnInfo)."""
         return {"force": float(si.get("forcePower") or 0), "stun": int(si.get("sturnType") or 0),
                 "angle": float(si.get("airborneAngle") or 90),
                 "rot": float(si.get("targetRotateAngle") or 0) if si.get("isRotateTarget") else 0.0}
@@ -282,9 +270,7 @@ def _timeline_events(objs: dict, tl: dict, scripts: dict, muted: dict | None = N
                         mv["pos"] = [wide.get("x", 0.0), wide.get("y", 0.0), wide.get("z", 0.0)]
                     ev["moves"].append(mv)
                 elif mc and mc.startswith("SkillGiveTiming_GiveDamage"):
-                    # (sturnInfo: how the game knocks the one hit back — forcePower 0-18, type 3 launches it at airborneAngle;
-                    # info.multiHit: the damage comes in that many ticks over multiHitDuration, a saw's buzz; ratios: its
-                    # share of the coin's damage)
+                    # knockback and multi-hit ticks of a hit
                     si, inf = md.get("sturnInfo") or {}, md.get("info") or {}
                     ev["hits"].append(dict(sturn(si), t=at, last=bool(inf.get("isLastAttack")), multi=int(inf.get("multiHit") or 1),
                                            span=float(inf.get("multiHitDuration") or -1), ratio=float(md.get("ratios") or 1)))
@@ -346,9 +332,7 @@ def _timeline_events(objs: dict, tl: dict, scripts: dict, muted: dict | None = N
 
 
 def skill_timeline(svc, cid, group: str) -> dict:
-    """What happens when in one skill's video (the Edit mod's Timing): its parts, and the effects coming on, hits,
-    voice lines and other sounds, camera shakes and moves, as seconds of the video. With the skill rendered the
-    parts' starts are the player's (parts.txt), else the parts are laid one after another by their length."""
+    """What happens when in one skill's video (parts, effects, hits, sounds, camera) for the Timing editor."""
     job = make_job(svc, cid)
     g = next((x for x in job_groups(job) if x["name"] == group), None)
     if g is None:
@@ -380,8 +364,7 @@ def skill_timeline(svc, cid, group: str) -> dict:
 
 
 def effect_still(svc, cid, name: str, v: str) -> str | None:
-    """One picture that shows what a rendered effect is (the frame that draws the most, cropped to it), kept next to its
-    video as "<name>.still.png"; None when the effect isn't rendered."""
+    """A still of a rendered effect (its fullest frame, cropped); None when not rendered."""
     video = svc.fx.video(cid, name, v)
     if not video:
         return None
@@ -420,8 +403,7 @@ def effect_still(svc, cid, name: str, v: str) -> str | None:
 
 
 def _prefabs(svc, cid: int | str) -> list[tuple[str, str]]:
-    """(bundle, GameObject name) of the battle prefab: "<id>_…Appearance" for Identities, the corrosion form
-    "ErosionAppearance_<id>NN" for E.G.O; for an enemy / abnormality its appearance prefab's own name."""
+    """(bundle, GameObject) of the battle prefab ("<id>_…Appearance", E.G.O: "ErosionAppearance_<id>NN")."""
     import sqlite3
     db = sqlite3.connect(svc.ensure_browse())
     try:
@@ -436,14 +418,13 @@ def _prefabs(svc, cid: int | str) -> list[tuple[str, str]]:
     return sorted(set(rows))
 
 
-# track classes the player has (Unity's Timeline package + its stand-ins); the game's own ones load as nothing there
+# track classes the player knows
 KNOWN_TRACKS = {"AnimationTrack", "GroupTrack", "ActivationTrack", "ControlTrack", "AudioTrack", "SignalTrack",
                 "PlayableTrack", "EffectActivateTimelineTrack"}
 
 
 def _sig(objs: dict, tl: dict, scripts: dict) -> list[int]:
-    """[tracks, clips] of a timeline counted over the track classes the player knows — tells same-named timelines
-    of different Identities (shared bundles) apart there."""
+    """[tracks, clips] counts, to tell same-named timelines apart."""
     tracks = clips = 0
     todo = list(tl.get("m_Tracks") or [])
     while todo:
@@ -467,8 +448,7 @@ TIMELINE_NAME = re.compile(r"Time?line", re.I)  # "Timline" in Faust's first Ide
 
 
 def _draws_sprites(objs: dict, tl: dict) -> bool:
-    """Whether the timeline's animation clips swap sprites (the character is drawn frame by frame then; otherwise a
-    game script plays its Spine skeleton)."""
+    """Whether the timeline swaps sprites (else Spine plays)."""
     todo = list(tl.get("m_Tracks") or [])
     while todo:
         r = todo.pop()
@@ -502,8 +482,7 @@ DAMAGE_RE = re.compile(r"dmg|damage", re.I)
 
 
 def _target_tracks(objs: dict, tl: dict) -> list[str]:
-    """Animation tracks the game binds to the target at runtime: their clips only show damage sprites (in the prefab
-    they point at the character itself, whose skill pose they would then cover)."""
+    """Animation tracks bound to the target at runtime."""
     out = []
     todo = list(tl.get("m_Tracks") or [])
     while todo:
@@ -557,22 +536,14 @@ _SINNER_KEYS = ("yisang", "faust", "donquixote", "ryoshu", "meursault", "honglu"
 
 
 def _words(name: str) -> set[str]:
-    """Words of an object name, without vowels (the game spells them loosely: LeNoir / LaNoir / Lanoir → lnr; Philip /
-    Pilip → plp)."""
+    """Vowel-less words of a name (LeNoir / LaNoir → lnr)."""
     parts = re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+", re.sub(r"[^A-Za-z0-9]+", " ", name))
     return {re.sub(r"[aeiouy]", "", p.lower().replace("ph", "p")) for p in parts if len(p) >= 3}
 
 
 def battle_effects(svc, cid: int, prefab: str) -> list[dict]:
-    """The buff, aura and field effects the game plays for a character out of other bundles: static-data/battle-effect
-    maps a keyword (which one plays when is up to the game's encrypted scripts) to an effect prefab. Taken here: those
-    whose prefab shares a word with the character's battle prefab name besides the Sinner's, e.g. 10315
-    "10315_Donquixote_LeNoir_CaptainAppearance" → "Fx_PC_Cp10_Donquixote_LanoirCaptain_BG_Team_1" (its field effect),
-    10416 "10416_Ryoshu_LeNoirAppearance" → "Fx_Mon_Cp10_LaNoir_Realisation" (the Le Noir aura); not those named after
-    another Sinner, nor story-mode (RPG) ones. A boss's effect (Fx_Mon_…) only when the character's own skills or
-    passives give the buff it is played for: 10416 has the Le Noir boss's Realisation and NoirSuit, while the boss's
-    NoirShield / field effects (named LanoirCaptain, like 10315's) are no Sinner's. An effect played for a buff of its
-    own is taken whatever its name. [{"name", "asset", "bundle", "keyword"}], the asset as the bundle addresses it."""
+    """Buff / aura / field effects the game plays for a character from other bundles (battle-effect keywords, matched by
+    name words or by its own buffs)."""
     import sqlite3
     if not isinstance(cid, int) or not 10000 <= cid < 30000:
         return []
@@ -600,9 +571,7 @@ def battle_effects(svc, cid: int, prefab: str) -> list[dict]:
 
     entries = [e for doc in svc.static_tables(["battle-effect"]).get("battle-effect", {}).values()
                for e in (doc.get("list") if isinstance(doc, dict) else doc) or [] if isinstance(e, dict)]
-    # a boss effect played for one of the character's buffs brings the rest of its set (same name but the last word):
-    # 10416's Realisation and NoirSuit (Fx_Mon_Cp10_LaNoir_Realisation / _Shield) bring _ShieldAlly, which the game
-    # shows on it too (its keyword LanoirAllyShieldEffect is up to the scripts)
+    # a boss effect brings the rest of its set
     families = {n.rsplit("_", 1)[0] for e in entries if (e.get("keyword") or "") in buffs
                 for n in [(e.get("address") or "").rsplit("/", 1)[-1].rsplit(".", 1)[0]] if re.match(r"(?i)fx_mon_", n)}
     db = sqlite3.connect(db_path)
@@ -612,24 +581,20 @@ def battle_effects(svc, cid: int, prefab: str) -> list[dict]:
             name = addr.rsplit("/", 1)[-1].rsplit(".", 1)[0]
             if not ours(name, addr, e.get("keyword") or "") and not (name not in seen and name.rsplit("_", 1)[0] in families):
                 continue
-            # (the table's path may leave out a folder the bundle has: …/Cp10/LaNoir_Fanatic/ vs …/Cp10/Cp10_1/LaNoir_Fanatic/)
+            # the table's path may skip a folder
             row = db.execute("select bundle, c from o where lower(c) = lower(?) limit 1", (addr,)).fetchone() \
                 or db.execute("select bundle, c from o where lower(c) like ? limit 1", (f"%/{name.lower()}.prefab",)).fetchone()
             if row:
                 seen.add(name)
                 out.append({"name": name, "asset": row[1], "bundle": row[0], "keyword": e.get("keyword", "")})
-        # effect prefabs of the buff / battle-effect bundles the table doesn't list (10416's own
-        # Fx_PC_Cp10_Ryoshu_LaNoirContemporary_Realisation)
+        # unlisted effect prefabs of those bundles
         for bundle, c in db.execute("select distinct bundle, c from o where c like 'Assets/Prefab/Effect/%.prefab' "
                                     "and (bundle like '%battleeffect%' or bundle like '%\\_buf\\_%' escape '\\' or bundle like '%buff%')"):
             name = c.rsplit("/", 1)[-1].rsplit(".", 1)[0]
             if ours(name, c):
                 seen.add(name)
                 out.append({"name": name, "asset": c, "bundle": bundle, "keyword": ""})
-        # effects only an effect list (a ScriptableObject of a bundle) names, by label: a buff's key (the game's
-        # ActivateBuffEffect* abilities show the effect labelled with the buff's id) or ability (ShinEffect, an
-        # ActivateBuffEffectSkin, shows the one labelled "Shin"), or an object named after the character like the ones above (two words in
-        # common: one alone, "Ring" or "Disciple", is shared with other factions' effects)
+        # effects named only by effect lists: by buff key / ability, or by the character's name
         keys = buffs | buff_abilities(svc, buffs)
         for label, name, bundle, pid in effect_lists(svc):
             if name in seen or name == "?":
@@ -654,8 +619,7 @@ def buff_abilities(svc, ids) -> set[str]:
 
 
 def effect_lists(svc) -> list[tuple]:
-    """(label, prefab name, bundle, path id) of every effect list (EffectList_*.asset): the game's buff-effect labels for
-    prefabs the bundles keep without an address of their own."""
+    """(label, prefab, bundle, pid) of every EffectList_*.asset."""
     sid = svc.latest_snapshot_id()
     cached = getattr(svc, "_effect_lists", None)
     if cached and cached[0] == sid:
@@ -701,8 +665,7 @@ def effect_lists(svc) -> list[tuple]:
 
 
 def addressed_bundle(svc, logical: str, items: list[tuple[int, str]]) -> str:
-    """A copy of a bundle (in data/fx_patched) whose container also lists prefabs the bundle keeps without an address of
-    its own (only an effect list refers to them), so the player can load them by their (pid, address). Made once."""
+    """A bundle copy (data/fx_patched) whose container lists prefabs it keeps without an address. Made once."""
     import hashlib
     src = svc.object_file(logical)
     d = os.path.join(svc.data_dir, "fx_patched")
@@ -734,11 +697,9 @@ def patched_bundles(svc, extra: list[dict]) -> dict[str, str]:
 
 
 def own_buffs(svc, cid: int) -> set[str]:
-    """The buffs a character's own skills and passives give or check (static data), and those these lead to:
-    10416 → Realisation, NoirSuit, Charge, …"""
+    """Buffs a character's skills and passives give or check, and those they lead to."""
     t = svc.static_tables(["skill", "passive", "personality-passive", "buff"])
-    # a buff the descriptions name in brackets ("gain [ObsessionAndGreedRodion]") counts too: the tables of some Identities
-    # (the Nursefathers) don't give it
+    # buffs named in descriptions count too
     try:
         unit = next((u for u in svc.unit_db()["ids"] if u["id"] == cid), None)
     except Exception:
@@ -808,7 +769,7 @@ def bundle_closure(svc, roots: list[str]) -> list[str]:
 
 
 def make_job(svc, cid: int, tails: bool = False, view: str | None = None) -> dict:
-    """make_job_uncached, kept on disk per snapshot / Identity / coin side / cut-in (it reads a lot of bundles)."""
+    """make_job_uncached, kept on disk."""
     p = os.path.join(svc.store.root, "fx_jobs", f"{svc.latest_snapshot_id()}_v{VERSION}",
                      f"{view or cid}{'_tails' if tails else ''}.json")
     try:
@@ -850,7 +811,7 @@ MAP_DIR = "/BattleMapPresets/BattleMapPreset_"
 
 
 def battle_maps(svc) -> list[dict]:
-    """The stages battles are fought on (Versus backgrounds): [{"name": "Cp9_Thumbfinger", "bundle", "prefab"}…]."""
+    """Battle stages for Versus backgrounds."""
     import sqlite3
     path = svc.ensure_browse()
     if not path:
@@ -870,11 +831,9 @@ def battle_maps(svc) -> list[dict]:
 
 
 def make_job_uncached(svc, cid: int, tails: bool = False, view: str | None = None) -> dict:
-    """Bundles (the battle prefab's and every bundle it references, current versions only), the prefab's path and
-    the skill timelines its components point at, with their events. `view`: an E.G.O cut-in prefab instead (see
-    skill_views), whose timelines are played in the order its script lists them."""
+    """The player's job: bundles, prefab, skill timelines with events. `view`: an E.G.O cut-in prefab instead."""
     found = _prefabs(svc, cid) if not view else [r for r in _skill_view_rows(svc, cid) if r[1] == view]
-    # the battle prefab is addressable in its own bundle; story-scene bundles (…_produce_…) keep copies that aren't
+    # own bundle first; story-scene copies aren't addressable
     found.sort(key=lambda r: ("produce" in r[0], r[0]))
     root_lg = go_name = prefab = None
     for lg, name in found:
@@ -895,8 +854,7 @@ def make_job_uncached(svc, cid: int, tails: bool = False, view: str | None = Non
     scripts = _scripts(svc)
     env = _env(svc.object_file(root_lg))
     objs = {o.path_id: o for o in env.objects}
-    # the prefab's GameObjects → every object their components point at (the game's appearance script lists the
-    # character's timelines; shared bundles of early Identities hold other characters' timelines too)
+    # prefab objects → everything their components point at
     root = next((o for o in objs.values() if o.type.name == "GameObject" and o.peek_name() == go_name), None)
     gos, stack = set(), []
     if root is not None:
@@ -913,7 +871,7 @@ def make_job_uncached(svc, cid: int, tails: bool = False, view: str | None = Non
                         go = objs.get(tr.read().m_GameObject.path_id)
                         if go is not None:
                             stack.append(go.read())
-    # the pose between a skill's clips (the Animator's default state): the "…_Default" clip of its controller
+    # the pose between clips: the "…_Default" clip
     default_clip = ""
     if root is not None:
         for c in root.read().m_Components:
@@ -943,7 +901,7 @@ def make_job_uncached(svc, cid: int, tails: bool = False, view: str | None = Non
             name = o.peek_name() or ""
         except Exception:
             continue
-        # a TimelineAsset by its fields, not its name: the game also names them "…Timline…" or "…_Parrying_1"
+        # TimelineAsset by its fields (names vary)
         try:
             node = o.serialized_type.node if o.serialized_type else None
         except Exception:
@@ -1012,23 +970,18 @@ def _skill_view_rows(svc, cid: int) -> list[tuple[str, str]]:
 
 
 def skill_views(svc, cid: int) -> list[str]:
-    """An E.G.O's cut-ins: SkillViewEGO_<id>11 its use, …21 the corroded one (each a scene of its own, see the Viewer)."""
+    """An E.G.O's cut-ins: …11 use, …21 corroded."""
     # (story scenes keep copies in their own bundles, which can't be loaded by name)
     return sorted({n for b, n in _skill_view_rows(svc, cid) if re.fullmatch(rf"SkillViewEGO_{cid}\d\d", n) and "produce" not in b})
 
 
-# (the game also spells it "Timline", and some Identities have no word at all: Faust Index "…_S1_1", "…_S1_2")
+# "Timline" typos and no-word names too
 SKILL_RE = re.compile(r"^(.*_S(\d+))(?:_Time?line[ _]?|_(?=\d))(\d+(?:_\d+)?)?_?$")
 
 
 def buff_states(objs: dict, root, scripts: dict) -> dict:
-    """What the character's buffs change on it in battle, for the player to show one level of: the root's
-    CharacterAppearanceUpdateBuffState components (UB_<id>, ShaderLevelBuffState…) list ranks, each a buff and the count
-    it needs, the objects it switches on (by child-index path from the root: names repeat) and, for a
-    ShaderLevelBuffState, the material keyword (_LEVEL_LV_1…) it sets; the attack effects with a
-    CharacterAttackEffectUpdateBuffState hold a version per level (children r_1, r_2…). {"buffStates": […],
-    "buffLevels": the number of levels} or {} when there are none. 11216 → Stigma Workshop Hand stacks 10 / 20 / 30
-    (Stig_1 / Stig_2 / Stig_Max), its sword's shader levels 1–3 and its slashes' r_1–r_3."""
+    """What buff levels change on the character (objects, shader keywords, attack effect versions): {"buffStates",
+    "buffLevels"} or {}."""
     paths, parent_of = {}, {}
 
     def walk(g, path):
@@ -1072,7 +1025,7 @@ def buff_states(objs: dict, root, scripts: dict) -> dict:
         states.append({"script": name, "ranks": ranks, "levelProperty": lv.get("levelPropertyName") or "",
                        "levelKeywords": list(lv.get("levelKeywords") or [])})
         levels = max(levels, len(ranks))
-    # the attack effects' versions per level: r_<n> under an object holding a CharacterAttackEffectUpdateBuffState
+    # attack effect versions per level (r_<n>)
     holders = {g for g, n in scripts_on.items() if "CharacterAttackEffectUpdateBuffState" in n}
     variants = 0
     for g in paths:
@@ -1087,8 +1040,7 @@ def buff_states(objs: dict, root, scripts: dict) -> dict:
 
 
 def buff_levels(svc, cid) -> dict:
-    """The buff levels a character's renders can show (see buff_states), for the app: {"levels": [what each shows…],
-    "notes": {effect: the buff that switches it on}}; {"levels": []} for one without."""
+    """Buff levels a character's renders can show."""
     sid = svc.latest_snapshot_id()
     memo = svc.__dict__.setdefault("_buff_levels", {})
     if (sid, cid) in memo:
@@ -1136,7 +1088,7 @@ def buff_levels(svc, cid) -> dict:
 
 
 def job_groups(job: dict) -> list[dict]:
-    """The videos a job makes: a cut-in is one (its timelines in its script's order), a battle prefab one per skill."""
+    """Videos a job makes: one for a cut-in, one per skill otherwise."""
     if job.get("view"):
         by = {t["name"]: t for t in job["timelines"]}
         parts = [by[n] for n in job.get("sequence") or [] if n in by]
@@ -1148,9 +1100,7 @@ def job_groups(job: dict) -> list[dict]:
 
 
 MAX_ROUNDS = 99  # clashes in one Versus video
-# a clash timeline: "…_Parrying_Timeline_2", also "Parrying_0" (early Identities), "…_Parrying_Timeline 1",
-# "…_Parrying_Range_Timeline", "…_Parry_TimeLine" and the typos "Parrrying" / "Parryng" / "Parriyng";
-# not a lost or won clash, nor an effect
+# clash timeline names (with typos), not won / lost / effects
 PARRY_RE = re.compile(r"Parr+i?y", re.I)
 PARRY_NOT = re.compile(r"Lose|Win|Complete|Effect|Default", re.I)
 
@@ -1159,25 +1109,18 @@ def is_clash(name: str) -> bool:
     return bool(PARRY_RE.search(name or "")) and not PARRY_NOT.search(name or "")
 
 
-# the base of a clash fight (Versus mode "clash"): unless the spec says otherwise (the Versus page's Debug row sends only
-# what was changed), guards and evades, counters, whole skills up to 5 s, both fighting with their skills' coins as well as
-# clash animations ("Skills instead of clash animations"), knockback 2x, the game's UI sounds and cinematic bars, hit
-# effects (camera push-in, flash, slow motion at the impact, hit-stop, the last blow in slow motion), wind-ups cut,
-# leftover effects cut off at each round (not faded: a series has no stand-offs to fade in)
+# clash fight defaults (the spec overrides)
 CLASH_BASE = dict(defend=True, counter=True, bursts=True, burstMax=5, lskills=True, rskills=True, kbscale=2, uisfx=True, bars=True,
                   trim=True, clean=True, punch=True, flash=True, ramp=True, hitstop=True, slowmo=True, fade=False)
 
 
 def clash_base(spec: dict) -> dict:
-    """The spec of a clash fight with its base switches (CLASH_BASE) as defaults: whatever the spec sets wins."""
+    """A clash spec with CLASH_BASE defaults."""
     return dict(CLASH_BASE, **spec) if spec.get("mode") == "clash" else spec
 
 
 def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
-    """Two characters on one stage (the Versus page). spec: {"left", "right": id or enemy prefab name, "skill": the
-    left one's skill (a job_groups name), "mode": "target" (the right one takes the hits, with its own idle and hit
-    poses) or "clash" (`rounds` clashes, both playing their clash timelines at once, then the `winner`'s skill —
-    "rskill" for the right one — on the other)}. One video, "Versus"."""
+    """Two characters on one stage (Versus): "target" or "clash" mode; one video."""
     spec = clash_base(spec)
     if spec.get("team"):
         return versus_team_job(svc, spec)
@@ -1191,17 +1134,14 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     rnd = random.Random(int(spec.get("seed") or 0))
     w = int(spec.get("winner") or 0)
     winner = (rnd.randrange(2) if w == 2 else 1 if w == 1 else 0) if spec.get("mode") == "clash" else 0
-    # every clash fight is the fight engine's (limbusdm/versus_engine.py): it decides the whole fight, the player acts
-    # its script out. "pace" (Exchanges): exchanges of clashes, then a skill lands or both spring apart; else a series
-    # of clash rounds, then the winner's last skill. "loop": the video's last frame leads into its first (Exchanges)
+    # the fight engine decides every clash fight; the player acts it out
     loop = spec.get("mode") == "clash" and bool(spec.get("loop"))
     pace = spec.get("mode") == "clash"
     scripted = None
     if pace:
         from . import versus_engine as E
         if spec.get("mirror"):
-            # (Versus → Mirror: the run's boss fight — real HP carried over, the build's gifts, statuses; the same
-            # fight the page's "Result now" gets, see versus_mirror.fight_of)
+            # Versus → Mirror: the run's boss fight
             from . import versus_mirror as M, versus_mirror2 as M2
             fight = (M2 if spec["mirror"].get("v") == 2 else M).fight_of(svc, spec["mirror"])
             fa, fb = fight["fighters"]
@@ -1243,14 +1183,13 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
                opponent={"prefab": R["prefab"], "defaultClip": R["defaultClip"]})
     if spec.get("mode") == "clash":
         job["clashSpeed"] = clash_speed(spec)
-    # the Versus extras, each its own switch (see VS_EXTRAS); "intro" also puts WIN over the winner at the end
+    # Versus extras, each a switch (VS_EXTRAS)
     job.update({k: bool(spec.get(k)) for k in VS_EXTRAS if k not in ("dash", "music", "intro", "ego", "uisfx", "randskill", "deck", "notes",
                                                                     "buff", "buffboth", "buffmany", "buffown", "buffshort",
                                                                     "debuff", "debuffboth", "debuffmany", "debuffown", "debuffshort")})
     job.update(pace=pace, loop=loop, directed=scripted is not None)
     if spec.get("buff") or spec.get("debuff"):
-        # the Buffs / Debuffs switches: effects out of the Buff effects list shown on the two (buffs.versus_effects says
-        # which, on whom and for how long; when they come on is the player's, ViewerBuffs.cs)
+        # Buffs / Debuffs switches
         from . import buffs
         picks = buffs.versus_effects(svc, spec, (job_groups(L), job_groups(R)))
         if picks:
@@ -1261,7 +1200,7 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
         job.update(wall=E.RULES["wall"], loserPush=E.RULES["loser_push"])
     job["kbScale"] = kb_scale(spec)
     if spec.get("uisfx"):
-        # each clash round: the game's clash sound at its blow (and a guard's / dodge's sound when one doesn't strike back)
+        # clash sound at each round's blow
         k = 0
         for e in entries:
             if not e.get("clash"):
@@ -1281,8 +1220,7 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     job["hud"] = [fighter_hud(svc, c, n, f and f["hp"]) for c, n, f in
                   ((left, spec.get("lname") or "", fa if pace else None), (right, spec.get("rname") or "", fb if pace else None))]
     if spec.get("mirror"):
-        # (Mirror) real HP: the bars count the fight's own numbers, the player starts with what the last boss left;
-        # the statuses' icons (each part's `st` names them by their number here)
+        # (Mirror) real HP and status icons
         from . import versus_mirror as M, versus_mirror2 as M2
         from .uiicons import icon_png
         for h, m in zip(job["hud"], fight["hpMax"]):
@@ -1312,17 +1250,13 @@ def versus_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     music = spec.get("music") if spec.get("music") in bgm_tracks(svc) else None
     ego = versus_ego_pick(svc, spec["right"] if winner == 1 else spec["left"], rnd) if spec.get("ego") else None
     if ego:
-        # the lead-in before it: the camera closes in on the winner, the screen darkens, the E.G.O's name shows
+        # lead-in: close-up, darken, E.G.O name
         job.update(egoStart=True, egoName="")
     return job, [{"name": "Versus", "parts": entries, "music": music, "ego": ego}]
 
 
 def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
-    """A team fight (spec "team"): "lefts" / "rights" (ids or enemy prefab names), "flow" ("" exchanges, one at a time),
-    "lanes", "seed", "winner" (0 / 1, 2 random), "rounds", "bossPower" (else limbusdm/versus_team.py fair_boss's), the
-    stage and switches as a clash fight's. The engine decides it, versus_team.script turns it into the player's parts;
-    job.cast lists everyone (prefab, default clip, side, start place in body heights, cooldowns on the engine's clock),
-    job.teamFrame the stretch of stage the fight goes over (the fixed wide shot). One video, "Versus"."""
+    """A team fight (spec "team"): versus_team decides it and scripts the player's parts; one video."""
     from . import versus_engine as E
     from . import versus_team as T
     ids = lambda xs: [int(x) if str(x).isdigit() else x for x in (xs.split(",") if isinstance(xs, str) else xs or []) if str(x)]
@@ -1330,8 +1264,7 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     w = int(spec.get("winner") or 0) if spec.get("winner") is not None else 2
     opts = dict(rounds=max(1, min(MAX_ROUNDS, int(spec.get("rounds") or 20))), defend=spec.get("defend"), counter=spec.get("counter"),
                 kbscale=kb_scale(spec), winner=None if w == 2 else w, pace=True, flow=spec.get("flow") or "",
-                # (the same options as /api/versus_plan's, so the render plays the fight the engine view showed; engagements
-                # at once: lanes, or all of them with allAtOnce; a fatal blow stops the rest)
+                # same options as /api/versus_plan
                 lanes=int(spec.get("lanes") or 1), allAtOnce=bool(spec.get("allAtOnce")), randskill=True)
     if spec.get("bossPower"):
         opts["bossPower"] = float(spec["bossPower"])
@@ -1377,20 +1310,19 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
              "x": fight["home"][i][0], "z": fight["home"][i][1], "boss": i == fight["boss"],
              "wall": fight["walls"][i],
              "cds": [v for c in fight["cds"][i] for v in c]} for i, f in enumerate(F)]
-    # the stretch of stage the fight goes over (everyone alive, every beat), for the fixed wide shot
+    # the stage stretch for the wide shot
     xs = [p[0] for s in fight["steps"] for i, p in enumerate(s["x"]) if s["hp"][i] > 0] + [p[0] for p in fight["home"]]
     zs = [p[1] for s in fight["steps"] for p in s["x"]] + [p[1] for p in fight["home"]]
     job = dict(L, bundles=bundles, partners=partners, opponent={"prefab": R["prefab"], "defaultClip": R["defaultClip"]},
                cast=cast, teamFrame=[min(xs), max(xs), min(zs), max(zs)], bossPower=fight.get("bossPower", 1.0), teamBg=bg,
-               # (not duels: knockbacks along the line between the two, depth too, and part of the way towards the
-               # other one's depth — versus_team.Battle.knock; skill moves keep the mover's own depth)
+               # knockback geometry as versus_team.Battle.knock
                teamRadial=fight["flow"] != "duels", teamDepth=fight["depth"], rowPull=T.TEAM["row_pull"],
                teamIds=[[f["cid"] for i, f in enumerate(F) if side[i] == s] for s in (0, 1)],
                teamNames=[[T.short_names(F)[i] for i in range(len(F)) if side[i] == s] for s in (0, 1)])
     job["clashSpeed"] = clash_speed(spec)
     job.update({k: bool(spec.get(k)) for k in VS_EXTRAS if k not in ("dash", "music", "intro", "ego", "uisfx", "randskill", "deck", "notes") and not k.startswith(("buff", "debuff"))})
     job.update(pace=True, loop=False, directed=True, wall=fight["wall"], loserPush=E.RULES["loser_push"], kbScale=kb_scale(spec))
-    # (the wide shot follows everyone, led this much by the pair's own camera: 0 = one fixed shot; ViewerTeam.cs TeamShow)
+    # wide shot follow amount (0 = fixed)
     job["camFollow"] = max(0.0, min(1.0, float(spec.get("camFollow", 0.5))))
     winner = fight["winner"]
     if spec.get("uisfx"):
@@ -1409,7 +1341,7 @@ def versus_team_job(svc, spec: dict) -> tuple[dict, list[dict]]:
     final = [e for e in entries if e.get("final")]
     job.update(win=bool(spec.get("intro")), seed=int(spec.get("seed") or 0), winner=winner,
                finalHits=sum(len(t["events"].get("hits") or []) for t in final))
-    # (the boss's HP as the engine made it stronger: x sqrt(bossPower), see versus_team.Battle.boss_mult)
+    # boss HP x sqrt(bossPower)
     job["hud"] = [fighter_hud(svc, f["cid"], f["name"], f["hp"] * (math.sqrt(fight.get("bossPower") or 1) if i == fight["boss"] else 1),
                               boss=i == fight["boss"]) for i, f in enumerate(F)]
     from . import battle_ui
@@ -1433,10 +1365,7 @@ def abno_codes(svc) -> dict:
 
 
 def fighter_hud(svc, cid, name: str = "", hp=None, boss=None) -> dict:
-    """What the player's battle HUD shows for one fighter (Viewer.cs FighterHud): its name, an enemy's risk level (ZAYIN
-    … ALEPH, empty for the rest), boss (a team fight: its boss block under it — code, HP, risk level, name; a 1v1 fight
-    shows both in the top corners anyway: a team fight's boss, else a Boss / Abnormality enemy), its max HP (what the
-    numbers count) and code (an Abnormality's, as O-01-73; "??-??-??-??" for the rest, as the game shows them)."""
+    """One fighter's battle HUD: name, risk level, boss block, max HP, code."""
     from . import versus_engine as E
     kind, cls, code = "", "", ""
     if isinstance(cid, int):
@@ -1459,8 +1388,7 @@ def fighter_hud(svc, cid, name: str = "", hp=None, boss=None) -> dict:
 
 
 def versus_ego_pick(svc, cid, rnd) -> dict | None:
-    """One of the Sinner's own E.G.O with an awakening cut-in, for the Versus winner `cid` (an Identity; enemies have
-    none): {"id", "view", "title"}."""
+    """One of the Sinner's E.G.O with an awakening cut-in, for the winner."""
     sinner = next((s for s in svc.characters()["sinners"] if any(x["id"] == cid for x in s["ids"])), None)
     if not sinner:
         return None
@@ -1469,15 +1397,14 @@ def versus_ego_pick(svc, cid, rnd) -> dict | None:
     for e in egos:
         views = [v for v in skill_views(svc, e["id"]) if re.fullmatch(rf"SkillViewEGO_{e['id']}1\d", v)]
         if views:
-            # (the player's font has Latin letters only: "Great Trichiliocosm [三千大世界]" -> "Great Trichiliocosm")
+            # the player's font is Latin only
             title = re.sub(r"\s*\[[^\]]*\]", "", re.sub(r"<[^>]+>", "", e["title"])).strip()
             return {"id": e["id"], "view": views[0], "title": title}
     return None
 
 
 def quiet_clashes(svc, entries: list[dict]):
-    """In a clash nobody speaks a whole line (sighs and shouts are fine): voice lines over 0.9 s (the sound's own length;
-    the timeline clip's when the sound isn't found) are for landing a blow, taken out of the clash rounds."""
+    """Voice lines over 0.9 s are kept out of clash rounds."""
     lens = {}
 
     def long_line(x) -> bool:
@@ -1501,9 +1428,7 @@ def quiet_clashes(svc, entries: list[dict]):
 
 
 def split_hits(ev: dict) -> dict:
-    """A timeline's hits with the game's multi-hits split into their ticks: `multi` of them over `span` seconds (Don
-    Quixote's lantern saw: one coin, one blow, four ticks of damage), each with its share of the damage; the knockback
-    and "last" go with the last tick, the others are marked "tick" (damage only, not a blow of their own)."""
+    """A timeline's hits with multi-hits split into damage ticks."""
     if not any((h.get("multi") or 1) > 1 for h in ev.get("hits") or []):
         return ev
     hits = []
@@ -1520,9 +1445,7 @@ def split_hits(ev: dict) -> dict:
 
 
 def _loop_seam(frames: str) -> int:
-    """A Versus loop (the player's loop.txt: how many frames the opening stand-off has): its frames are blended over
-    the last ones, more and more towards the end, so the video's last frame leads into the frame after them. Returns
-    how many frames the video then starts later (0: not a loop)."""
+    """Blend a Versus loop's start into its end; returns the frames the video now starts later (0: not a loop)."""
     try:
         with open(os.path.join(frames, "loop.txt"), encoding="utf-8") as f:
             n = int(f.read().strip() or 0)
@@ -1548,7 +1471,7 @@ def kb_scale(spec: dict) -> float:
 
 
 def clash_pause(spec: dict) -> float:
-    """Seconds between a clash's blow and the next run in; -1 (unset): as long as the clash animation lasts."""
+    """Seconds from a clash's blow to the next run-in; -1: the animation's length."""
     try:
         p = spec.get("pause")
         return -1.0 if p is None or float(p) < 0 else min(3.0, float(p))
@@ -1556,23 +1479,19 @@ def clash_pause(spec: dict) -> float:
         return -1.0
 
 
-# Versus switches: hit-stop, cutting wind-ups, clearing effects left over, pushing apart overlaps, clash numbers,
-# slow motion on the last blow, Index dashes, music (a BGM track's name)…; and the game's story-fight feel: exchanges
-# from a stand-off (or a skill landing), a speed ramp around blows, thrown far back by a blow that lands, the camera
-# pushing in on blows, effects fading out in a stand-off, a seamless loop, a white flash on every blow
+# Versus switches
 VS_EXTRAS = ("hitstop", "trim", "clean", "spread", "numbers", "slowmo", "dash", "music", "hp", "death", "intro", "ego",
              "bars", "uisfx", "pace", "ramp", "throw", "punch", "fade", "loop", "flash", "randskill", "deck", "notes",
              "buff", "buffboth", "buffmany", "buffown", "buffshort",
              "debuff", "debuffboth", "debuffmany", "debuffown", "debuffshort")
-# the game's battle UI sounds (SFX_1 bank): a clash's blow, guarding, dodging, the E.G.O cut-in starting, winning
+# battle UI sounds
 UI_SFX = {"duel": ["038_battleui_duel1_a_v1", "039_battleui_duel2_a_v1", "040_battleui_duel3_a_v1"],
           "Guard": "048_battleui_defense_guard_a_v1", "Evade": "049_battleui_defense_evasion_a_v1",
           "ego": "051_battleui_cutscene_ego1_a_v1", "win": "059_battleui_end_win_a_v1"}
 
 
 def _clash_blow(ev: dict) -> float:
-    """When a clash round's blow lands in a timeline: its first hit, else its spark (an effect coming on early, as the
-    player's SparkAt), else the end of its dashes, else just after it starts."""
+    """When a clash round's blow lands: first hit, else spark, else dash end, else start."""
     if ev.get("hits"):
         return min(h["t"] for h in ev["hits"])
     early = [x["t"] for x in ev.get("fx") or [] if x["t"] <= 0.3]
@@ -1583,9 +1502,7 @@ def _clash_blow(ev: dict) -> float:
 
 
 def _round_blow(ev: dict, pev: dict | None) -> float:
-    """A clash round's blow as the player times it (Viewer.cs: blows / blowAt), with its partner's timeline `pev`:
-    the leader's first hit; else, when either one moves, where the leader's first dash at the other one ends (or the
-    last move of the two); else the earliest spark of the two."""
+    """A clash round's blow as the player times it (Viewer.cs blowAt)."""
     if ev.get("hits"):
         return min(h["t"] for h in ev["hits"])
     moves = list(ev.get("moves") or []) + list((pev or {}).get("moves") or [])
@@ -1624,11 +1541,8 @@ def _video_seconds(ff: str, path: str) -> float:
 
 
 def _ego_card(svc, ego: int, still: str | None, out: str, seconds: float = 1.2, size: tuple | None = None) -> int:
-    """Frames (out/000.png…) of the game's E.G.O start over the battle's last frame `still`: it darkens, purple streaks
-    run along two corners, the E.G.O's art slides in on a slanted panel with ragged purple edges, and golden hexagons
-    break out of it at the end. Returns the number of frames. No `still` (Versus Live, which holds its own last frame
-    under it): transparent RGBA frames of everything but the darkening (each drawn on black and on white, the
-    alpha from the difference), `size` the frames' size (Live's picture is smaller than a render's)."""
+    """Frames of the game's E.G.O start over the last frame `still`; without `still`: transparent frames for Live. Returns
+    the frame count."""
     import math, random
     from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageMath
     rnd = random.Random(ego)
@@ -1700,7 +1614,7 @@ def _ego_card(svc, ego: int, still: str | None, out: str, seconds: float = 1.2, 
         if len(drawn) == 2:
             cb, cw = (x.resize(size or (WIDTH, HEIGHT)) for x in drawn)
             drawn = []
-            # (coverage = 1 - what white shows more than black; the colour drawn on black is coverage x colour)
+            # alpha from black vs white renders
             a = ImageChops.invert(ImageChops.subtract(cw, cb).convert("L"))
             af = a.point(lambda v: max(v, 1)).convert("F")
             col = [ImageMath.lambda_eval(lambda x: x["c"] * 255 / x["a"], c=ch.convert("F"), a=af).convert("L") for ch in cb.split()]
@@ -1708,14 +1622,14 @@ def _ego_card(svc, ego: int, still: str | None, out: str, seconds: float = 1.2, 
     return n
 
 
-# a character cut-in over a skill (see skill_cutins, _cutin_card, Renderer._versus_cutins; Live: ViewerLive.cs)
-CUTIN_MIN = 4.0      # (a team fight) a whole skill whose timelines run longer than this together (part_length summed) gets one
+# character cut-ins over skills
+CUTIN_MIN = 4.0      # (team fight) skills longer than this get one
 CUTIN_SECONDS = 1.1  # the panel on screen: slides in, holds, slides back out
 CUTIN_LEAD = 0.8     # it comes this long before the skill's strongest moment and slides away just after it
 
 
 def _occurrences(entries: list[dict]) -> list[int]:
-    """Each entry's k: the k-th time its part is played (parts.txt / timemap.txt count them by name)."""
+    """Each entry's k: the k-th play of its part."""
     seen, out = {}, []
     for e in entries:
         out.append(seen.get(e["name"], 0))
@@ -1724,10 +1638,7 @@ def _occurrences(entries: list[dict]) -> list[int]:
 
 
 def skill_cutins(entries: list[dict], kills: bool = False, zoomed: bool = False, team_kills: bool = False) -> list[dict]:
-    """The whole skills of a Versus video that get a cut-in of their character: kills, only the fatal one (the `final`
-    parts), whatever its length; else each landing of the fight engine (its parts share `land`) and the last skill,
-    when their timelines run over CUTIN_MIN seconds together (a team fight).
-    [{"who": 0 left / 1 right, "parts": [indices into entries], "final": bool}], in order."""
+    """Skills of a Versus video that get a cut-in: the fatal one, plus long landings in team fights."""
     groups, cur = [], None
     for i, e in enumerate(entries):
         key = "final" if e.get("final") else e.get("land")
@@ -1738,9 +1649,9 @@ def skill_cutins(entries: list[dict], kills: bool = False, zoomed: bool = False,
             cur = {"key": key, "who": int(e.get("who") or 0), "parts": [], "final": key == "final", "cid": e.get("cid"), "side": e.get("cside")}
             groups.append(cur)
         cur["parts"].append(i)
-    if team_kills:  # (a team fight: every fatal blow, the camera zooms in on those — `kill` on its parts, see versus_team)
+    if team_kills:  # team fight: every fatal blow
         return [g for g in groups if g["final"] or any(entries[i].get("kill") for i in g["parts"])]
-    if zoomed:  # (a 1v1 render: every skill our camera closes in on, tilted — `closeup`, see versus_engine — and the fatal one)
+    if zoomed:  # 1v1: close-ups and the fatal one
         return [g for g in groups if g["final"] or any(entries[i].get("closeup") for i in g["parts"])]
     if kills:
         return [g for g in groups if g["final"]]
@@ -1748,9 +1659,7 @@ def skill_cutins(entries: list[dict], kills: bool = False, zoomed: bool = False,
 
 
 def cutin_moments(entries: list[dict], parts: list[int]) -> list[tuple[int, float]]:
-    """A skill's moments a cut-in can lead into, strongest first: (entry index, timeline time). Its blows — a multi-hit
-    with all its ticks — by their share of the damage and their knockback, a later one first when as strong; a skill
-    without hits: its deepest camera zoom-in."""
+    """Moments a cut-in can lead into, strongest first."""
     blows, order = [], 0
     for i in parts:
         ev = entries[i]["events"]
@@ -1772,15 +1681,12 @@ def cutin_moments(entries: list[dict], parts: list[int]) -> list[tuple[int, floa
 
 
 def cutin_after(g: dict, ego) -> float:
-    """How long after its skill starts a cut-in may come at the earliest: the fatal skill's, when the winner's E.G.O
-    cut-in comes before it, 1 s (not right where that one ends)."""
+    """Earliest cut-in time after its skill starts."""
     return 1.0 if g["final"] and ego else 0.0
 
 
 def cutin_art(img, sprite: bool = False):
-    """The picture for a cut-in's panel (PIL RGBA) and (x, y) of its head, the height and width of its head and torso,
-    as fractions of it: an Identity's art as it is (head and torso already); a battle sprite (transparent around it) cut
-    to its upper part, the soft glow of an aura around it dropped."""
+    """The cut-in panel's picture and head / torso box: Identity art, or a cropped battle sprite."""
     if not sprite:
         return img, (0.5, 0.0, 1.0, 1.0)
     alpha = img.getchannel("A").point(lambda v: max(0, min(255, (v - 110) * 255 // 90)))
@@ -1800,7 +1706,7 @@ def cutin_art(img, sprite: bool = False):
     tight = crop.getchannel("A").getbbox() or (0, 0, crop.width, crop.height)  # (sideways: only as wide as it draws)
     crop = crop.crop((tight[0], 0, tight[2], crop.height))
     left = region[0] + tight[0]
-    # (head and torso: the top 0.63 of its height, so wide; below that, more of it to fill the panel's bottom)
+    # head and torso: top 0.63
     band = min(1.0, h * 0.63 / crop.height)
     bw = crop.getchannel("A").crop((0, 0, crop.width, int(crop.height * band))).getbbox()
     return crop, ((cx - left) / crop.width, (y0 + h * 0.15 - region[1]) / crop.height, band,
@@ -1808,20 +1714,16 @@ def cutin_art(img, sprite: bool = False):
 
 
 def _cutin_card(art, sprite: bool, side: int, out: str, seconds: float = CUTIN_SECONDS, label: str = "") -> int:
-    """Frames (out/000.png…, transparent around it) of a character cut-in laid over a running skill, the way the
-    E.G.O start draws its panel (_ego_card): a slanted panel with ragged purple edges and the character's art slides in
-    from its side of the screen (side 1: mirrored, from the right), golden hexagons open around it, then it slides
-    back out, fading, with `label` ("P1" / "P2") written at the panel's foot. Soft: no flash, the picture behind only a
-    little darker on that side. Returns the frame count."""
+    """Frames of a character cut-in panel sliding over a running skill (as _ego_card draws it); returns the frame count."""
     import math, random
     from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
     rnd = random.Random(7)
     W, H = WIDTH, HEIGHT
     n = int(round(seconds * 30))
     pw, slant, pad = int(W * 0.18), int(H * 0.26), 24
-    x_in = W * 0.135 - slant / 2  # where its bottom edge's middle comes to rest (its middle at half height: 13.5 % in, by the edge)
+    x_in = W * 0.135 - slant / 2  # where its bottom edge rests
     ch, cw = H + 40, pw + slant + 2 * pad
-    # the panel itself, drawn once: a dark purple backdrop and the art, clipped to the parallelogram
+    # the panel, drawn once
     poly = [(pad, ch), (pad + pw, ch), (pad + pw + slant, 0), (pad + slant, 0)]
     grad = Image.linear_gradient("L").resize((cw, ch))
     card = Image.composite(Image.new("RGBA", (cw, ch), (16, 9, 24, 255)), Image.new("RGBA", (cw, ch), (58, 20, 74, 255)), grad)
@@ -1834,7 +1736,7 @@ def _cutin_card(art, sprite: bool, side: int, out: str, seconds: float = CUTIN_S
             scale = max(ch * 1.02 / img.height, (pw + slant) * 1.02 / img.width)
         a = img.resize((max(1, int(img.width * scale)), max(1, int(img.height * scale))), Image.LANCZOS)
         top = int(ch * 0.04) if sprite else 0
-        # (the head on the panel's middle at its height: the panel leans, its middle further right higher up)
+        # head on the panel's middle
         hy = min(ch * 0.8, top + fy * a.height) if sprite else ch * 0.25
         mid = pad + pw / 2 + slant * (1 - hy / ch)
         if sprite:
@@ -1908,7 +1810,7 @@ def _cutin_card(art, sprite: bool, side: int, out: str, seconds: float = CUTIN_S
         if side == 1:
             im = im.transpose(Image.FLIP_LEFT_RIGHT)
         if label and vis > 0:
-            # (after the mirroring, so the letters read the right way round: under the panel's foot, on its side)
+            # after mirroring, so text reads right
             lx = x + slant * 0.05 + 4
             lx = W - lx if side == 1 else lx
             lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -1928,9 +1830,7 @@ def _has_audio(ff: str, path: str) -> bool:
 
 
 def enemy_portraits(svc) -> dict[str, str]:
-    """{appearance prefab name: its portrait's catalog path}: the enemy / abnormality data name each look's portrait
-    (sdPortrait, else the unit's own number); the picture is "<that>_portrait" in a chapter's folder under
-    Sprite/Unit/Portrait/. Kept per snapshot."""
+    """{appearance prefab: portrait path}, per snapshot."""
     import sqlite3
     from . import content
     sid = svc.latest_snapshot_id()
@@ -1984,15 +1884,14 @@ def enemy_portraits(svc) -> dict[str, str]:
 
 
 def enemy_portrait(svc, app: str) -> str:
-    """A Versus pick's picture path: its portrait by its data, else by the number its name starts with (allies and
-    NPCs aren't in the enemy tables), else its first skill's icon; "" when there is none."""
+    """A Versus pick's picture path; "" when none."""
     m = enemy_portraits(svc)
     num = app.split("_", 1)[0]
     return m.get(app) or m.get("#pics", {}).get(num) or m.get("#icons", {}).get(num + "01") or ""
 
 
 def char_art(svc, cid):
-    """A big picture of a Versus pick (PIL image) or None: an Identity's / E.G.O's info art, an enemy's portrait."""
+    """A big picture of a Versus pick, or None."""
     import io
     from PIL import Image
     from .extract import extract
@@ -2017,9 +1916,7 @@ def char_art(svc, cid):
 
 
 def _burn_notes(ff: str, video: str, parts: list[dict]):
-    """("notes", for testing) the fight engine's beats written over the video, each from where its part starts
-    (Versus.parts.txt: the parts the player played, in order) to the next one: who did what, the clash powers and
-    coins left, the range, the result."""
+    """("notes", testing) the engine's beats written over the video."""
     try:
         with open(os.path.join(os.path.dirname(video), "Versus.parts.txt"), encoding="utf-8") as f:
             played = [(n, float(t)) for n, _, t in (x.rstrip("\n").rpartition("\t") for x in f if x.strip())]
@@ -2119,7 +2016,7 @@ def _intro_card(svc, spec):
 
 
 def _versus_intro(svc, ff, spec, video, seconds: float = 2.0):
-    """An "A vs B" card before the fight: both pictures, their names, VS between them; faded into the video."""
+    """An "A vs B" intro card faded into the video."""
     png = video + ".intro.png"
     _intro_card(svc, spec).save(png)
     tmp = video + ".intro.mp4"
@@ -2137,9 +2034,7 @@ def _versus_intro(svc, ff, spec, video, seconds: float = 2.0):
 
 
 def _ego_filters(e: dict, v: str, a: str, k: int):
-    """The winner's E.G.O cut-in (Renderer._ego_plan's `e`) spliced into a fight's picture `v` and sound `a` (filter
-    labels) at its last skill: the card fades in over the fight, the cut-in and the fight's rest come through white
-    flashes. Returns its ffmpeg inputs (numbered from `k`), its filters and the new (picture, sound) labels."""
+    """Splice the winner's E.G.O cut-in into a fight's ffmpeg graph; returns inputs, filters and new labels."""
     at, d, x, cd = e["at"], e["d"], e["x"], e["cd"]
     ins = ["-i", e["clip"], "-framerate", "30", "-i", e["card"]]
     ins += ["-i", e["start"]] if e["start"] else ["-f", "lavfi", "-t", f"{cd + 1:.2f}", "-i", "anullsrc=r=48000:cl=stereo"]
@@ -2160,7 +2055,7 @@ def _ego_filters(e: dict, v: str, a: str, k: int):
 
 
 def bgm_tracks(svc) -> list[str]:
-    """The game's battle music (BGM bank samples named as battle / boss / enemy / ally tracks), for under a Versus video."""
+    """Battle music samples for Versus."""
     return sorted(n for n, v in sound_index(svc).items()
                   if os.path.basename(v[0]).lower().startswith("bgm") and BATTLE_BGM.search(n)
                   and not re.search("승리|victory", n, re.I))  # (not the short win jingle)
@@ -2178,10 +2073,7 @@ def bgm_label(name: str) -> str:
 
 
 def played_clock(parts_path: str, timemap_path: str):
-    """When the player showed what: (starts, when). starts {part: [its starts in the video, s]} (parts.txt: a part can
-    be played more than once — clash rounds repeat the clash timelines); when(part, t, k, voice=False): the video time
-    of timeline time `t` of the k-th time `part` was played (timemap.txt: the timeline time of each frame — trimmed
-    wind-ups, slow motion, hit-stop), None when that moment was cut off."""
+    """When the player showed what: (starts, when) from parts.txt / timemap.txt."""
     starts: dict[str, list[float]] = {}
     try:
         with open(parts_path, encoding="utf-8") as f:
@@ -2190,7 +2082,7 @@ def played_clock(parts_path: str, timemap_path: str):
                 starts.setdefault(name, []).append(float(at))
     except (OSError, ValueError):
         pass
-    # (one run of frames per time the part is played: a new run where the timeline time goes back)
+    # a new run where timeline time goes back
     tmap: dict[str, list[list[tuple[float, float]]]] = {}
     try:
         with open(timemap_path, encoding="utf-8") as f:
@@ -2241,9 +2133,7 @@ def clash_speed(spec: dict) -> float:
 
 
 def group_timelines(timelines: list[dict]) -> list[dict]:
-    """One video per skill: the game splits a skill into one timeline per coin (…_S1_Timeline_1, _2, _3; Pinky
-    Father uses _11, _22, _33) and plays them back to back. Alternatives stay on their own: a different last coin
-    (…_S3_Timeline_3_1), versions next to a given Identity (…_S5_Timeline_10115), clashes, Duel Win…"""
+    """One video per skill: coin timelines played back to back; alternatives stay separate."""
     by, groups = {}, []
     for t in timelines:
         m = SKILL_RE.match(t["name"])
@@ -2272,10 +2162,7 @@ def group_timelines(timelines: list[dict]) -> list[dict]:
 
 # ------------------------------------------------------------------ sounds
 def sound_index(svc) -> dict[str, tuple[str, int]]:
-    """Sample name (lower case) → (bank path, index): the latest snapshot's banks, listed again from the files on disk
-    (their headers only: a fraction of a second) — the indexes must match the files export_wav reads, and listings
-    made before banks.py read every FSB5 container of a bank miss the sounds past its first (newer Identities' voice
-    lines); the snapshot's listing when a bank can't be read."""
+    """Sample name → (bank, index), listed from the bank files on disk."""
     sid = svc.latest_snapshot_id()
     cached = getattr(svc, "_sound_idx", None)
     if cached and cached[0] == sid:
@@ -2323,8 +2210,7 @@ FLAGS = ("solo", "alpha", "static", "16bit", "tails", "nobg", "novoice", "subs",
 
 
 def variant(v) -> str:
-    """Normalized options key from "alpha_solo", ["solo", "alpha"]… (unknown flags dropped, fixed order); a buff level
-    ("lv<n>", see buff_states; level 0, the plain one, has no flag) and a mod ("m-<name>", see mods.py) go last."""
+    """Normalized options key (known flags in fixed order, then buff level and mod)."""
     got = set(re.split(r"[_,+ ]", v) if isinstance(v, str) else v or [])
     lv = next((g for g in sorted(got) if re.fullmatch(r"lv[1-9]", g)), None)
     mod = next((g for g in sorted(got) if re.fullmatch(r"m-[A-Za-z0-9-]{1,32}", g)), None)
@@ -2335,7 +2221,7 @@ def _safe_name(name: str) -> str:
     return re.sub(r"[^\w.-]", "_", name)
 
 
-LINE_AT = 0.2  # when an E.G.O's line starts in its cut-in (seconds; the game's script plays it as the cut-in opens)
+LINE_AT = 0.2  # when an E.G.O line starts in its cut-in
 _LINES: dict = {}
 
 
@@ -2366,7 +2252,7 @@ def _wav_seconds(wav: bytes) -> float:
 
 
 def _subtitle_png(text: str, w: int, h: int, path: str):
-    """The line as a subtitle: white text with a dark outline, centred near the bottom of a transparent frame."""
+    """A subtitle frame: outlined white text near the bottom."""
     from PIL import Image, ImageDraw, ImageFont
     im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     size = max(18, h // 24)
@@ -2393,18 +2279,17 @@ STAGE_PIC_CID = 10101  # the character a stage picture is framed for (hidden in 
 
 
 def stage_pic_dir(svc) -> str:
-    """The stage pictures of the Versus page's stage list (<name>.jpg), made by the player on demand."""
+    """Versus stage pictures, made on demand."""
     return os.path.join(svc.data_dir, "stage_thumbs")
 
 
 def fighter_pic_dir(svc) -> str:
-    """The Versus fighters standing in their idle pose (<id>.png, transparent, cut to the body), made by the player on demand."""
+    """Versus fighters' idle pictures, made on demand."""
     return os.path.join(svc.data_dir, "fighter_pics")
 
 
 class PicQueue:
-    """Pictures the player makes in the background, one batch per run: `run(names)` makes them and returns those it
-    made; a name it couldn't make is not tried again (until the app starts again)."""
+    """Pictures the player makes in background batches; failed names aren't retried until restart."""
 
     def __init__(self, folder, ext, run, batch, key=lambda n: n):
         self.folder, self.ext, self.run, self.batch, self.key = folder, ext, run, batch, key
@@ -2412,7 +2297,7 @@ class PicQueue:
         self.lock = threading.Lock()
 
     def status(self, names: list[str] | None = None, known=None) -> dict:
-        """The pictures there are, how many are being made; `names`: queued (those without one; `known` filters)."""
+        """Pictures there are and how many are queued."""
         d = self.folder()
         have = sorted(fn[:-len(self.ext)] for fn in os.listdir(d) if fn.endswith(self.ext)) if os.path.isdir(d) else []
         with self.lock:
@@ -2456,7 +2341,7 @@ def _player_run(work: str, job: dict, timeout: float):
 
 
 def make_stage_pics(svc, names: list[str]) -> set[str]:
-    """One player run: a picture of each stage alone, as a Versus fight's camera sees it at the start."""
+    """One player run: each stage alone, as a fight's camera sees it."""
     from PIL import Image
     maps = {m["name"]: m for m in battle_maps(svc)}
     ms = [maps[n] for n in names if n in maps]
@@ -2483,8 +2368,7 @@ def make_stage_pics(svc, names: list[str]) -> set[str]:
 
 
 def make_fighter_pics(svc, ids: list[str]) -> set[str]:
-    """A fighter in its idle pose as the player draws it in a fight (sprites or Spine), on a transparent background,
-    cut to its body: one player run each."""
+    """A fighter's idle pose on transparent, cut to its body."""
     from PIL import Image
     d = fighter_pic_dir(svc)
     os.makedirs(d, exist_ok=True)
@@ -2515,9 +2399,7 @@ def make_fighter_pics(svc, ids: list[str]) -> set[str]:
 
 
 def fighter_face(svc, cid: str) -> str | None:
-    """A round icon's picture of a fighter (team fights' engine view): its idle picture (make_fighter_pics) cut to a
-    square on its face: the top of its body's column (where its upper part is thickest: not a weapon held out);
-    data/fighter_pics/face/<id>.png, made once. None: no idle picture yet."""
+    """A square face icon from the idle picture (data/fighter_pics/face); None until it exists."""
     from PIL import Image
     src = os.path.join(fighter_pic_dir(svc), _safe_name(str(cid)) + ".png")
     if not os.path.isfile(src):
@@ -2532,7 +2414,7 @@ def fighter_face(svc, cid: str) -> str | None:
         return None
     x0, y0, x1, y1 = box
     w, h = x1 - x0, y1 - y0
-    # its body's column: where the upper part of it is thickest (a sword or a gun held out is thin), smoothed
+    # body column: where the upper part is thickest
     band = a.crop((x0, y0, x1, y0 + max(2, round(h * 0.4))))
     px = band.load()
     cols = [sum(1 for y in range(band.height) if px[x, y]) for x in range(band.width)]
@@ -2560,12 +2442,12 @@ def fighter_face(svc, cid: str) -> str | None:
 
 
 class Renderer:
-    """Renders all skills of one Identity / E.G.O at once (the player loads its bundles once), then serves MP4s."""
+    """Renders all skills of one unit in one player run, then serves the videos."""
 
     def __init__(self, svc):
         self.svc = svc
         self.jobs: dict[tuple, dict] = {}  # (cid, variant) → {"state", "msg", "done": [names], "total"}
-        # pictures made by the player in the background for the Versus page: stages, fighters in their idle pose
+        # background pictures for Versus
         self.stage_q = PicQueue(lambda: stage_pic_dir(svc), ".jpg", lambda n: make_stage_pics(svc, n), STAGE_PICS)
         self.fighter_q = PicQueue(lambda: fighter_pic_dir(svc), ".png", lambda n: make_fighter_pics(svc, n), 1, key=_safe_name)
 
@@ -2576,13 +2458,13 @@ class Renderer:
         return self.fighter_q.status(ids)
 
     def out_dir(self, cid: int, v: str = "") -> str:
-        """Each set of options (see FLAGS) has its own folder: "<cid>", "<cid>_solo", "<cid>_alpha_static"…"""
+        """One folder per option set."""
         v = variant(v)
         return os.path.join(self.svc.store.root, "fx_renders", f"{self.svc.latest_snapshot_id()}_v{VERSION}",
                             f"{cid}_{v}" if v else str(cid))
 
     def video(self, cid: int, name: str, v: str = "") -> str | None:
-        """The render of one skill: an MP4, or a WebM (VP9 with alpha) when the background is transparent."""
+        """One skill's render: MP4, or VP9 WebM with alpha."""
         base = os.path.join(self.out_dir(cid, v), _safe_name(name))
         path = next((base + e for e in (".webm", ".mp4") if os.path.isfile(base + e)), None)
         if path:
@@ -2593,9 +2475,7 @@ class Renderer:
         return path
 
     def prune(self, keep: float = KEEP_SECONDS):
-        """Frees disk: renders made for another snapshot or renderer VERSION, frames left behind by a run the app
-        was closed in the middle of, and videos nobody has watched for `keep` seconds (they are made again on
-        demand)."""
+        """Frees disk: other snapshot / VERSION renders, leftover frames, videos unwatched for `keep` seconds."""
         sid = self.svc.latest_snapshot_id()
         if not sid:
             return
@@ -2642,7 +2522,7 @@ class Renderer:
         return st
 
     def start(self, cid: int, names: list[str] | None = None, v: str = "", kind: str = ""):
-        """kind: of the Effects tab's effects only those of this sub-tab ("skill", "aura", "battle"; "": all)."""
+        """kind: the Effects sub-tab ("" = all)."""
         v = variant(v)
         with _lock:
             if (self.jobs.get((cid, v)) or {}).get("state") == "running":
@@ -2673,7 +2553,7 @@ class Renderer:
                 # its effects: one run of the battle prefab; the player names them as it finds them
                 os.makedirs(out, exist_ok=True)
                 job = dict(make_job(self.svc, cid, tails), effectKind=kind)
-                # and the buff / aura / field effects the game plays for it out of other bundles (with their dependencies)
+                # plus effects from other bundles
                 extra = battle_effects(self.svc, cid, job["prefab"])
                 if extra:
                     have = set(job["bundles"])
@@ -2765,7 +2645,7 @@ class Renderer:
 
     def start_versus(self, spec: dict) -> str:
         if spec.get("mode") == "clash" and spec.get("loop"):
-            # (a loop: nothing before its first frame or after its last — no intro card, E.G.O, death, WIN or HP running down)
+            # a loop has no intro / E.G.O / death / HP
             spec = {k: x for k, x in spec.items() if k not in ("intro", "ego", "death", "hp")}
         key = self.versus_key(spec)
         with _lock:
@@ -2790,8 +2670,7 @@ class Renderer:
             sidx = sound_index(self.svc)
             music = groups[0].pop("music", None)  # (laid under the finished video: through the intro and the E.G.O too)
             st["phase"] = "fight"  # (the UI's progress bar, see vsProgress)
-            # the extras below go into the fight's own encode (_versus_compose); each one it did not take is made as
-            # before, a pass of its own over the finished video (a loop has none; "notes" must come between them)
+            # extras go into the fight's own encode when possible, else as passes
             post = None
             if not job.get("loop") and not spec.get("notes"):
                 post = {"made": set()}
@@ -2825,7 +2704,7 @@ class Renderer:
             st.update(state="error", msg=str(e))
 
     def _versus_audio(self, ff, video, music, sidx, spec):
-        """Under the finished video: the music, from the start to the end (faded out), and the win jingle as WIN shows."""
+        """Music and the win jingle under the finished video."""
         dur = _video_seconds(ff, video)
         ins = []
         hit = _find_sound(sidx, music) if music else None
@@ -2865,10 +2744,7 @@ class Renderer:
         shutil.rmtree(tmpd, ignore_errors=True)
 
     def _versus_compose(self, exe, ff, spec, group, music, sidx, st, made, cmd, filters, frames, v, a):
-        """A Versus video's extras in the fight's own encode (_encode's `extra`), not each a pass of its own over the
-        whole video (_versus_cutins, _versus_ego, _versus_intro, _versus_audio — the same pieces): the skill cut-ins over
-        the fight, the winner's E.G.O cut-in spliced in, the intro card before it all, the music and the win jingle under
-        it all. `made`: the extras it took in."""
+        """A Versus video's extras (cut-ins, E.G.O, intro, music) in the fight's own encode; `made`: those taken."""
         names = sorted(x for x in os.listdir(frames) if re.fullmatch(r"\d{4}\.png", x))
         end = len(names) / 30
         if not names:
@@ -2953,8 +2829,7 @@ class Renderer:
         return "[fx_v]", a
 
     def _versus_ego(self, exe, ff, spec, group, video, sidx, st):
-        """The winner's E.G.O cut-in (picked in versus_job) spliced in before its last skill, right after the
-        player's lead-in, through a white flash both ways."""
+        """Splice the winner's E.G.O cut-in before its last skill."""
         if not group.get("ego") or not _has_audio(ff, video):
             return
         work = video + ".egocard"
@@ -2977,10 +2852,7 @@ class Renderer:
             shutil.rmtree(work, ignore_errors=True)
 
     def _ego_plan(self, exe, ff, group, parts_txt, still_of, work, sidx, st=None):
-        """The pieces of the winner's E.G.O cut-in spliced into a Versus fight (_versus_ego, _versus_compose): its
-        cut-in (rendered and kept if not yet), where the winner's last skill starts in the fight (`parts_txt`, the
-        player's list), the card (frames into `work`; still_of(t, path) writes the fight's frame at t seconds) and the
-        E.G.O start sound. None when it can't be made."""
+        """Pieces of the winner's E.G.O cut-in; None when it can't be made."""
         ego = group.get("ego")
         if not ego:
             return None
@@ -3005,8 +2877,7 @@ class Renderer:
         at, d, x = starts[-n_final], _video_seconds(ff, clip), 0.25
         if d <= 2 * x:
             return None
-        # the card: the battle's last frame darkened, the E.G.O's art on a slanted panel sliding in with ragged purple
-        # edges and streaks, then golden hexagons breaking out of it (the game's E.G.O start)
+        # the E.G.O start card
         os.makedirs(work, exist_ok=True)
         still = os.path.join(work, "still.png")
         still_of(max(0.0, at - 0.04), still)
@@ -3021,9 +2892,7 @@ class Renderer:
         return {"at": at, "d": d, "x": x, "cd": n / 30, "clip": clip, "card": os.path.join(work, "%03d.png"), "start": start}
 
     def _battle_sprite(self, exe, cid):
-        """A character's look in battle (PIL RGBA, transparent around it) for the cut-ins of those without art of
-        their own (enemies, abnormalities): the player's still of its idle pose (idle.png), drawn alone at three times
-        the video's size and cut to what it draws. Kept per snapshot; None when it can't be drawn."""
+        """A unit's battle look for cut-ins of those without art; None when it can't be drawn."""
         from PIL import Image
         d = self.out_dir("sprite-" + _safe_name(str(cid)))
         png = os.path.join(d, "idle.png")
@@ -3052,8 +2921,7 @@ class Renderer:
             return None
 
     def _cutin_frames(self, exe, cid, side: int, out: str, seconds: float = CUTIN_SECONDS) -> bool:
-        """A cut-in panel's frames of character `cid` into `out` (_cutin_card); art: an Identity's own, else its battle
-        sprite, else an enemy's portrait. False when it has none."""
+        """A cut-in panel's frames for `cid`; False when it has no picture."""
         ident = bool(re.fullmatch(r"1\d{4}", str(cid)))
         art = char_art(self.svc, cid) if ident else self._battle_sprite(exe, cid)
         sprite = art is not None and not ident
@@ -3066,10 +2934,7 @@ class Renderer:
         return True
 
     def _versus_cutins(self, exe, ff, spec, group, video):
-        """A cut-in of the one playing it over the fight's fatal skill (a 1v1: always, whatever its length; a team fight:
-        its whole skills longer than CUTIN_MIN, skill_cutins), leading into the skill's strongest moment (cutin_moments)
-        where the player showed it (Versus.parts.txt / .timemap.txt), inside the skill and apart from the others; the
-        last skill's not right at its start when the winner's E.G.O cut-in is spliced in before it (_versus_ego, later)."""
+        """Cut-ins over the fight's skills, leading into each skill's strongest moment."""
         base = os.path.splitext(video)[0]
         work = video + ".cutins"
         try:
@@ -3092,9 +2957,7 @@ class Renderer:
             shutil.rmtree(work, ignore_errors=True)
 
     def _cutin_plan(self, exe, spec, group, parts_txt, timemap_txt, end, work, plan_txt):
-        """Where a Versus fight's skill cut-ins go (_versus_cutins: the rules) and their panels' frames (into `work`):
-        [(start in the fight's video, folder of its frames)], their plan written to `plan_txt` (for checking). `end`: the
-        fight's length; parts_txt / timemap_txt: what the player showed when (played_clock)."""
+        """Where the skill cut-ins go and their frames; plan written to `plan_txt`."""
         entries = group["parts"]
         kills = not spec.get("team")
         cuts = skill_cutins(entries, kills, zoomed=kills, team_kills=not kills)
@@ -3155,10 +3018,7 @@ class Renderer:
 
     # ------------------------------------------------------------ live (the "Versus Live" tab)
     def start_live(self, spec: dict) -> dict:
-        """A clash fight played in the Unity player's own window in real time, nothing saved: the fight a render of
-        `spec` would make (the engine's), with what ffmpeg adds to a render played / shown by the player instead —
-        each part's sounds, the music, the win jingle, the intro card, the winner's E.G.O cut-in (unity/.../ViewerLive.cs).
-        No loop. One at a time."""
+        """A clash fight played live in the player's window (sounds, music, intro, E.G.O), nothing saved. One at a time."""
         with _lock:
             cur = getattr(self, "live", None)
             if not (cur and cur.get("state") in ("preparing", "loading", "playing")):
@@ -3233,9 +3093,7 @@ class Renderer:
                 ego_job = self._live_ego(exe, g, work, sidx, st, clip)
                 if ego_job is None:
                     job.update(egoStart=False)  # (it could not be made: the fight goes on without the lead-in too)
-            # the skill cut-ins (a render's _versus_cutins): each its panel's frames (kept per character and side; made
-            # while the fight plays when not yet, below) and the moments of its skill it may lead into, strongest
-            # first; the player times them as it plays
+            # skill cut-ins for Live
             cutins, cut_who = [], []
             if spec.get("cutins", True):
                 for c in skill_cutins(g["parts"], kills=not team, zoomed=not team, team_kills=team):  # (as a render's, _versus_cutins)
@@ -3259,7 +3117,7 @@ class Renderer:
             prep_error = []
 
             def write_sounds():
-                # the sounds are written while the player starts up (its bundles load meanwhile); it waits for prep.done
+                # sounds written while the player starts
                 try:
                     for hit, path in pending:
                         wav = self._wav(hit)
@@ -3276,7 +3134,7 @@ class Renderer:
                     return
                 open(os.path.join(work, "prep.done"), "w").close()
 
-            def make_cutins():  # (a few seconds each: the player picks them up as they are ready; one not made is left out)
+            def make_cutins():  # picked up as ready; missing ones left out
                 for c, (cid, side) in zip(cutins, cut_who):
                     if os.path.isfile(os.path.join(c["frames"], "ready")):
                         continue
@@ -3315,9 +3173,7 @@ class Renderer:
                 shutil.rmtree(work, ignore_errors=True)
 
     def _live_ego(self, exe, group, work, sidx, st, clip):
-        """The winner's E.G.O cut-in for the Live player, baked as a render has it (the same pieces, _versus_ego): its
-        cut-in as frames (JPEG) and sound (made by the player and kept as for a render, if not yet), the card (RGBA frames
-        over the battle's last frame, which the player holds and darkens), the E.G.O start sound. None when it can't be made."""
+        """The winner's E.G.O cut-in baked for Live; None when it can't be made."""
         ego, ff = group["ego"], ffmpeg_exe()
         ego_out = self.out_dir(ego["id"])
         cut = os.path.join(ego_out, _safe_name(ego["view"]) + ".mp4")
@@ -3325,8 +3181,7 @@ class Renderer:
         if not ff:
             return None
         if not os.path.exists(cut):
-            # not rendered yet: made at the window's size and drawn once, not at 2x2 — a ninth of a render's pixels;
-            # kept apart from the renders' own (those are full size)
+            # made at window size, kept apart from full renders
             small = self.out_dir(f"{ego['id']}-live")
             cut = os.path.join(small, _safe_name(ego["view"]) + ".mp4")
             if not os.path.exists(cut):
@@ -3358,10 +3213,7 @@ class Renderer:
                 "card": os.path.join(d, "card"), "cardFrames": n, "sound": clip(UI_SFX["ego"])}
 
     def _live_cutin(self, exe, cid, side: int, out: str, size=(1280, 720)) -> bool:
-        """A skill cut-in's panel for the Live player (ViewerLive.cs): _cutin_card's frames at the window's picture
-        size, cut to what any of them draws, as raw RGBA bottom row first (out/000.raw…: the player reads them while it
-        plays, no decoding); out/rect.txt: where that is on the picture (x y w h, fractions), how many frames, their
-        width and height; out/ready last. False when it can't be made."""
+        """A cut-in panel for Live as raw RGBA frames + rect.txt; False when it can't be made."""
         from PIL import Image
         full = out + ".full"
         try:
@@ -3404,9 +3256,7 @@ class Renderer:
         return sorted(out, key=lambda x: -x["time"])
 
     def _play(self, exe, ff, job, groups, flags, out, sidx, st, size=(WIDTH, HEIGHT), post=None):
-        """One run of the Unity player; each video is encoded as soon as its frames are complete, several at a time.
-        groups None: the character's effects (the "effects" flag), one video each as the player lists them. post: see
-        _encode."""
+        """One player run; videos encoded as their frames complete. groups None: the effects."""
         work = tempfile.mkdtemp(prefix="fx_", dir=out)
         effects = groups is None
         base = st.get("rendered", 0)
@@ -3437,7 +3287,7 @@ class Renderer:
                 futures = []
                 while True:
                     rc = p.poll()
-                    if effects:  # the player lists the effects first (name, tab), then makes a folder of frames for each that draws
+                    if effects:  # effects listed first, then frames per effect
                         try:
                             with open(os.path.join(work, "effects.txt"), encoding="utf-8") as f:
                                 listed = [ln.split("\t") for ln in f.read().splitlines() if ln]
@@ -3460,12 +3310,10 @@ class Renderer:
                             futures.append(pool.submit(encode, g))
                         elif g["name"] not in encoded and current is None and os.path.isdir(os.path.join(work, g["name"])):
                             current = g["name"]
-                    # for the progress bar: videos whose frames are all there (of this run and the runs before it), and
-                    # the one being drawn
+                    # progress: finished videos, and the one being drawn
                     st["rendered"] = base + len(encoded)
                     if current:
-                        # the video being drawn, for its own progress bar: an effect's frames of the number the player
-                        # wrote first ("total"); a skill's parts started of its parts (parts.txt)
+                        # the current video's own progress
                         d = os.path.join(work, current)
                         try:
                             names = os.listdir(d)
@@ -3506,8 +3354,7 @@ class Renderer:
             shutil.rmtree(work, ignore_errors=True)
 
     def prewarm(self):
-        """Once, in the background when the app starts: the slow first-use parts of a Versus fight's preparation (the sound
-        index, the engine's tables, the FMOD start, the portrait lookup) done before the first fight asks for them."""
+        """Warm up a Versus fight's slow first-use parts in the background."""
         steps = (lambda: __import__("limbusdm.versus_engine", fromlist=["x"])._tables(self.svc),
                  lambda: sound_index(self.svc),
                  lambda: __import__("fmod_toolkit.fmod", fromlist=["x"]).get_pyfmodex_system_instance(
@@ -3533,9 +3380,8 @@ class Renderer:
         return cache[hit]
 
     def _encode(self, ff, work, out, group, sidx, flags=frozenset(), post=None):
-        """One video per skill with its sounds: MP4 (H.264 + AAC), or with a transparent background WebM
-        (VP9 with alpha + Opus), which video editors take as a layer. post: {"fn", "made"}, more in the same encode
-        (_versus_compose, _encode_one's `extra`); if that fails, the video is made without it ("made" emptied)."""
+        """One video per skill with sounds: MP4, or VP9 WebM with alpha. post: more in the same encode; on failure made
+        without it."""
         if post:
             try:
                 return self._encode_one(ff, work, out, group, sidx, flags, post["fn"])
@@ -3545,18 +3391,15 @@ class Renderer:
         return self._encode_one(ff, work, out, group, sidx, flags)
 
     def _encode_one(self, ff, work, out, group, sidx, flags=frozenset(), extra=None):
-        """_encode. extra(cmd, filters, frames, picture, sound): adds its inputs and filters to the command and returns
-        the (picture, sound) filter labels to write (sound None: none)."""
+        """_encode; extra(cmd, filters, frames, picture, sound) adds inputs / filters and returns the labels to write."""
         frames = os.path.join(work, group["name"])
         hdr, alpha = "16bit" in flags, "alpha" in flags
         pattern = os.path.join(frames, "%04d.exr" if hdr else "%04d.png")
-        # part → its starts in the video, in order (written by the player). A part can be played more than once (clash
-        # rounds repeat the clash timelines), each time with its sounds
+        # part → its starts in the video (a part may repeat, each with its sounds)
         starts, when = played_clock(os.path.join(frames, "parts.txt"), os.path.join(frames, "timemap.txt"))
         cut_in = group["name"].startswith("SkillViewEGO_")  # ends at its end marker (see the Viewer): later sounds don't play
 
-        # an E.G.O's cut-in: the Sinner's line ("battle_awaken_<id>_1" / "battle_erosion_<id>_1"), which the game's
-        # script plays when the E.G.O is used, and its text for subtitles
+        # E.G.O cut-in: the Sinner's line and its subtitle
         line = None
         m = re.match(r"^SkillViewEGO_(\d{5})([12])\d$", group["name"])
         if m:
@@ -3573,8 +3416,7 @@ class Renderer:
                        and (w := when(t["name"], s["t"], k, s.get("voice"))) is not None]
         if line:
             sounds.append({"t": LINE_AT, "name": line, "voice": True, "line": True})
-        # (a team fight's background beats: the player lists each timeline it started — job.partners index, video
-        # time, the timeline time it started from — and the group has their sounds)
+        # team fight background beats' sounds
         if group.get("bgSounds") and os.path.isfile(os.path.join(frames, "bg.txt")):
             with open(os.path.join(frames, "bg.txt"), encoding="utf-8") as f:
                 for ln in f:
@@ -3585,8 +3427,7 @@ class Renderer:
                         sounds += [dict(s, t=round(at + s["t"] - frm, 4)) for s in group["bgSounds"].get(x[0]) or [] if frm <= s["t"] <= to + 0.3]
         if "novoice" in flags:
             sounds = [s for s in sounds if not s.get("voice")]
-        # a loop: the opening stand-off's frames are blended into the closing one's and cut from the start (the
-        # fighters stand the same in both; the stage's own animation runs on across the seam)
+        # a loop: opening frames blended into the closing ones
         cut = 0 if hdr else _loop_seam(frames)
         if cut:
             sounds = [dict(s, t=s["t"] - cut / 30) for s in sounds if s["t"] >= cut / 30]
@@ -3602,7 +3443,7 @@ class Renderer:
                 png = os.path.join(frames, "subs.png")
                 _subtitle_png(text, WIDTH, HEIGHT, png)
                 sub = (png, LINE_AT, LINE_AT + max(2.0, dur) + 0.5)
-        # each sound file is an input once, split for every time it is played (many clash rounds repeat the same ones)
+        # each sound file one input, split per play
         inputs: dict = {}  # bank hit → (input number, [delays in ms])
         for s in sounds:
             hit = _find_sound(sidx, s["name"])
@@ -3648,8 +3489,7 @@ class Renderer:
             k = len(inputs) + 1 + (1 if music else 0)
             filters.append(f"[0:v][{k}:v]overlay=0:0:shortest=1:enable='between(t,{sub[1]:.2f},{sub[2]:.2f})'[subv]")
             vin = "[subv]"
-        # video: 16-bit frames are half-float EXR (with alpha: premultiplied); 8-bit ones PNG (alpha straight). The
-        # EXR values are already gamma-encoded like the game's, so they are tagged sRGB, not ffmpeg's "linear"
+        # 16-bit frames: half-float EXR (already gamma-encoded, tagged sRGB); 8-bit: PNG
         if alpha:
             filters.append(f"{vin}format=gbrapf32le,unpremultiply=inplace=1,setparams=color_trc=iec61966-2-1,format=yuva420p[vout]" if hdr
                            else f"{vin}format=yuva420p[vout]")

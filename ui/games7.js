@@ -1,8 +1,4 @@
-// Games → Chain (from one Identity to another, every step sharing something with the one before), Guess the buff
-// (a buff's own effect, as Database → Buff effects shows it), Mixed up (a piece of a track cut into parts — put them
-// back in order) and Jigsaw (an Identity's art cut into tiles — put it together against the clock).
-// Shares the styles, the Identities' list (gxIds), the type-ahead field (gxType) and the Daily challenge / duels of
-// games.js / games3.js.
+// Chain, Guess the buff, Mixed up, Jigsaw.
 "use strict";
 
 // ------------------------------------------------------------------ shared
@@ -30,7 +26,7 @@ function gzScore(g, ok, points, rec) {
   g.done = { ok, points, ...rec };
   g.log.push({ ok, points, ...rec });
 }
-// the result's page: the score, the rounds as a table (head: the columns' names, row: a round's cells)
+// result page: score and rounds table
 function gzResult(game, title, g, mode, head, row, again, back) {
   gmOver(game, g, g.score);
   const s = gz[game], record = !g.daily && g.score > (s.best[mode] || 0);
@@ -61,7 +57,7 @@ function gnLink(a, b, hard) {
   const tb = gnTraits(b, hard);
   return gnTraits(a, hard).find(([k, n]) => tb.some(([k2, n2]) => k === k2 && n === n2)) || null;
 }
-// who is linked to whom, and the links' count from one Identity to every other (with the one it was reached from)
+// link graph and distances
 function gnWeb(hard) {
   const web = new Map(gn.ids.map((x) => [x.key, []]));
   gn.ids.forEach((a, i) => { for (let j = i + 1; j < gn.ids.length; j++) if (gnLink(a, gn.ids[j], hard)) { web.get(a.key).push(gn.ids[j].key); web.get(gn.ids[j].key).push(a.key); } });
@@ -343,7 +339,7 @@ function gyNew(daily) {
   gyLeave();
   const g = gy.game = gzNew("mix", daily, GY_ROUNDS, {});
   g.battle = g.daily || !!gz.mix.battle;
-  // the tracks of all rounds are drawn here, so the next one's file is fetched while this one is played
+  // all rounds drawn now, next track prefetched
   g.list = gzMix(gyPool(g.battle), g.rnd).slice(0, GY_ROUNDS + 4);
   if (typeof muAudio !== "undefined") muAudio.pause();
   gyRound();

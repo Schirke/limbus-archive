@@ -1,7 +1,5 @@
 "use strict";
-// Patches → Change history: what each patch changed in an Identity, an E.G.O, an enemy or a status — numbers and
-// wording, the old text struck out and the new one marked. Read from the reports the app keeps, so it goes back only
-// as far as they do. Data: /api/history (limbusdm/history.py).
+// Patches → Change history: what each patch changed in a card, old text struck out (/api/history).
 let HISTORY = null;
 const hv = { patch: 0, key: "", view: "diff", tech: false, q: "" };
 const HV_KINDS = [["id", "Identities"], ["ego", "E.G.O"], ["enemy", "Enemies"], ["buff", "Statuses"]];
@@ -21,7 +19,7 @@ routes.changes = async (args) => {
   hvDraw();
 };
 
-// the words of two texts set against each other: what left is struck out, what came is marked ([Keyword]s stay whole)
+// word diff of two texts ([Keyword]s whole)
 function hvDiff(a, b) {
   const toks = (s) => s.match(/\[[^\]\s]+\]|\s+|[^\s\[]+|\[/g) || [];
   const x = toks(a), y = toks(b), n = x.length, m = y.length, t = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));

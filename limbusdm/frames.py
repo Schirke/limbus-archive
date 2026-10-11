@@ -1,7 +1,4 @@
-"""A character's sprite frames, by skill: the sprites each skill's animation clips show (read from the clips' sprite
-curves, so shared bundles of early Identities / enemies don't mix characters up), and the poses of its Animator
-(idle, damaged, guard…). Used by the mods' frame editor: a frame is replaced by a PNG of any size, placed by its pivot
-(the character's feet), so nothing has to be found on the sprite atlases."""
+"""A character's sprite frames by skill, and its Animator poses (for the mods' frame editor)."""
 from __future__ import annotations
 
 import io
@@ -14,7 +11,7 @@ from .extract import _env, _lock
 
 
 def _pad(w: int, h: int) -> int:
-    """Room around an exported frame for drawing beyond the original outline (a longer weapon, a cape)."""
+    """Room around an exported frame for drawing past the outline."""
     return int(0.4 * max(w, h)) + 16
 
 
@@ -35,8 +32,7 @@ def _jobs(svc, cid):
 
 
 def character_frames(svc, cid) -> dict:
-    """{"groups": [{"name", "frames": [{"name", "bundle", "pid", "w", "h", "px", "py", "ppu"}]}]} — px / py: the pivot
-    in pixels from the frame's bottom-left; one group per video of the skill renderer, then "Poses"."""
+    """{"groups": [{name, frames}]}: one group per skill video, then "Poses"; pivot from the bottom-left."""
     from .viewer import VERSION, job_groups
     cache = os.path.join(svc.store.root, "fx_jobs", f"{svc.latest_snapshot_id()}_v{VERSION}",
                          f"frames_{re.sub(r'[^\w.-]', '_', str(cid))}.json")
@@ -168,8 +164,7 @@ def safe_file(name: str) -> str:
 
 
 def group_zip(svc, cid, group: str) -> tuple[bytes, str]:
-    """The frames of one skill (group "": of every skill, each frame once — skills share many) as PNGs with room to
-    draw around them, and a note on how to bring them back."""
+    """One skill's frames ("": all) as PNGs with room around them, plus a note."""
     groups = character_frames(svc, cid)["groups"]
     if group:
         g = next((x for x in groups if x["name"] == group), None)
@@ -198,8 +193,7 @@ def group_zip(svc, cid, group: str) -> tuple[bytes, str]:
 
 
 def placement(rec: dict, size: tuple[int, int]) -> tuple[float, float]:
-    """Where the pivot is in a replacement of `size`: an exported frame (with room around it), the bare frame, or
-    another size scaled from the bare one."""
+    """Pivot position in a replacement of `size`."""
     w, h, pad = rec["w"], rec["h"], _pad(rec["w"], rec["h"])
     if size == (w + 2 * pad, h + 2 * pad):
         return rec["px"] + pad, rec["py"] + pad

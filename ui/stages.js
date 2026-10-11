@@ -1,7 +1,5 @@
 "use strict";
-// Story map (Database → Story map): a chapter's stage nodes where the game draws them on its map, and what a fight
-// holds — the waves' enemies, arena and battle themes. Data: /api/stages (limbusdm/stages.py); the enemies' tiles are
-// the handbook's (enemies.js).
+// Database → Story map: chapter nodes on the game's map and what each fight holds (/api/stages).
 let STAGES = null;
 const stv = { ch: 0, node: 0, zoom: 1 };
 const ST_ZOOM = [128, 192, 256, 384];  // a map tile's side on the page (the game's are 2048; the app keeps 384 px previews)

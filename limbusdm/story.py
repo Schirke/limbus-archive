@@ -1,15 +1,5 @@
-"""The story reader (Story): every story the game's Story Theater lists, read scene by scene with its backgrounds, speakers'
-standing pictures, voices, sounds and music.
-
-What the game keeps where:
-* StaticData storytheater-main / -other / -personality: which story files make a chapter's episodes (a node can have a
-  `Before`, an `Inter` and an `After` file) and a banner picture; the chapters' names come from Localize
-  StageChapterText, the episodes' from StageNode (and StoryTheaterOther), the chapters' blurbs from StoryTheaterMain.
-* Story/Effect/<file>.json: the scene script, one row per line of the story (voice sample, background `bg`, picture
-  `cg`, who stands where `characterlist`, expression `feeling`, sound `soundeffect`, music `bgm`, a video, effects).
-* Localize/<lang>/StoryData/<LANG>_<file>.json: the same rows' text (`content`), speaker (`model`, `teller`) and title.
-* StaticData scenario-asset: a speaker's model name -> the picture file name (Story/StandingSprite/<name>.png, or a layered
-  Story/StandingModel/<name>.psb with a body and one face per expression)."""
+"""Story reader: every Story Theater story scene by scene with backgrounds, standing pictures, voices, sounds and music
+(StaticData storytheater-*, Story/Effect, StoryData)."""
 from __future__ import annotations
 
 import json
@@ -23,7 +13,7 @@ UNIT = 100  # a Unity unit is 100 pixels of a standing picture
 
 
 def _rows(loc: str, lang: str, pattern: str) -> list[dict]:
-    """Every row of the Localize/<lang>/ files whose name matches `pattern` ({L} = the language's prefix), oldest first."""
+    """Rows of the Localize/<lang> files matching `pattern`, oldest first."""
     folder, out = os.path.join(loc, lang), []
     pre = LANGS[lang]
     rx = re.compile(pattern.replace("{L}", pre))
@@ -46,8 +36,7 @@ def _roman(s: str) -> str:
 
 
 def build_index(tables: dict, loc: str, lang: str = "en", identities: dict | None = None) -> dict:
-    """The Story page's list: {"main": [chapter], "other": [chapter], "ident": [Sinner]} (see the module doc).
-    tables: StaticData tables storytheater-main / -other / -personality; identities: {id: {"name", "sinner"}}."""
+    """The Story page's list {"main", "other", "ident"}."""
     chap = {}
     for r in _rows(loc, lang, r"{L}_StageChapterText.*\.json$"):
         m = re.match(r"chapter_[a-z]+_(\d+)$", str(r.get("id", "")))
@@ -135,11 +124,7 @@ def _tags(text: str) -> str:
 
 
 def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict, models: dict, voices, assets: dict) -> dict:
-    """One story file as a list of lines: the text and speaker with what the scene shows at that point.
-    effect: Story/Effect rows; loc_rows: StoryData rows (by id); codes: {model name: ScenarioModelCodes row};
-    models: {model name: scenario-asset row}; voices: a set-like of the sample names that exist; assets: see story_assets().
-    A line carries only what changed since the line before: bg (picture name), cg, bgm, sfx, vid, cl = [[model,
-    slot]], f = {model: expression}. -> {"id", "lines": [...], "models": {name: {...}}}"""
+    """One story file as lines: text, speaker, and what changed in the scene since the line before."""
     loc = {r.get("id"): r for r in loc_rows}
     lines, used = [], {}
     pending: dict = {}
@@ -155,7 +140,7 @@ def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict,
         t = loc.get(row.get("id")) or {}
         if row.get("bg"):
             change("bg", str(row["bg"]).split(":")[0])
-        if row.get("cg"):  # "<name>:<FadeIn|FadeOut…>[:range]" entries, several after commas; plain colours are only fades
+        if row.get("cg"):  # "<name>:<Fade…>[:range]" entries
             for ent in re.split(r",(?![^\[]*\])", str(row["cg"])):
                 name, _, how = ent.strip().partition(":")
                 name = name.strip()
@@ -245,7 +230,7 @@ def episode(file_id: str, effect: list[dict], loc_rows: list[dict], codes: dict,
 
 
 def _model_info(row: dict, assets: dict) -> dict:
-    """What the page needs of a speaker's picture: a plain picture (`img`), a layered model (`psb`) and the name's colour."""
+    """A speaker's picture: plain (`img`) or layered (`psb`), and the name's colour."""
     f = str(row.get("fileName") or "")
     out = {"name": row.get("enname") or "", "color": row.get("nameTagColor") or "", "side": row.get("staringSide") or "",
            "y": row.get("bottomYPos") or 0}
@@ -264,8 +249,7 @@ def _loc_root(svc) -> str:
 
 
 def assets(svc) -> dict:
-    """Name (lower case) -> catalog path of the story's pictures: backgrounds, CG, plain standing pictures, layered
-    models (.psb), speakers' log portraits and the videos. Read once per snapshot."""
+    """Name → catalog path of the story's pictures and videos, once per snapshot."""
     import sqlite3
     sid = svc.latest_snapshot_id()
     cached = getattr(svc, "_story_assets", None)
@@ -369,9 +353,7 @@ def episode_of(svc, file_id: str, lang: str = "en") -> dict | None:
 
 
 def model_layout(svc, container: str) -> dict | None:
-    """A layered standing model (Story/StandingModel/<name>.psb): where each of its sprites (the body `default`, one
-    `face_<expression>` each, front pieces) sits, in pixels, y up, from the model's own prefab.
-    -> {"bundle", "layers": [{"n", "s" (sprite id), "l", "b" (left, bottom), "w", "h", "o" (draw order)}]}"""
+    """Layout of a layered standing model's sprites, from its prefab."""
     cache = svc.__dict__.setdefault("_story_models", {})
     if container in cache:
         return cache[container]
@@ -423,7 +405,7 @@ def model_layout(svc, container: str) -> dict | None:
 
 
 def _disk(svc, kind: str, key: str, ext: str, make):
-    """A made answer kept in data/story_cache/<kind>/ so the game's files are opened and converted once."""
+    """An answer kept in data/story_cache/<kind>/."""
     import hashlib
     h = hashlib.sha1(key.encode("utf-8")).hexdigest()
     path = os.path.join(svc.data_dir, "story_cache", kind, h[:2], h + ext)
@@ -445,7 +427,7 @@ def _disk(svc, kind: str, key: str, ext: str, make):
 
 
 def _webp(png: bytes, limit: int, quality: int = 85) -> bytes:
-    """A PNG as WebP, no larger than `limit` pixels either way (a fraction of the size, pictures are shown at most full screen)."""
+    """PNG → WebP no larger than `limit` px."""
     import io
 
     from PIL import Image
@@ -471,7 +453,7 @@ def picture(svc, path: str, limit: int = 1920) -> bytes | None:
 
 
 def sprite_png(svc, bundle: str, pid: int) -> bytes | None:
-    """One sprite of a layered model (as a kept WebP: the page sizes it from the layout, so its pixels may shrink)."""
+    """One sprite of a layered model, as a kept WebP."""
     from . import extract
     file = svc.object_file(bundle)
     if not file:
@@ -480,7 +462,7 @@ def sprite_png(svc, bundle: str, pid: int) -> bytes | None:
 
 
 def audio(svc, sample: str) -> tuple[bytes, str] | None:
-    """A sound of the banks (voice line, effect, music) as a kept Ogg Opus; the plain WAV when it can't be made."""
+    """A bank sound as kept Ogg Opus (WAV when that fails)."""
     import subprocess
 
     from .banks import export_wav

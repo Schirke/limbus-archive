@@ -1,8 +1,5 @@
-"""Take a snapshot of the current game version: catalog, every object in every bundle, every file.
-
-Everything is read-only on the game side. Bundle indexes are reused by bundle hash, file hashes by
-size+mtime, so after the first (slow) snapshot only what changed is scanned again.
-"""
+"""Snapshot of the current game version (catalog, bundle objects, files), read-only; unchanged bundles and files are
+reused."""
 from __future__ import annotations
 
 import fnmatch
@@ -48,9 +45,7 @@ LEN_PREFIX_RE = re.compile(rb"^[\x20-\x7e](?=\\Assets\\|\|)")
 
 
 def code_names(path: str) -> bytes:
-    """Readable strings from IL2CPP global-metadata.dat: ability class names (PassiveAbility_…, CoinAbility_…),
-    script paths (incl. ScriptsForNextUpdate), string literals. Limbus encrypts the identifier table, but this
-    part is plain text; it is found by the density of printable bytes. Sorted, one per line."""
+    """Readable strings from IL2CPP global-metadata.dat (ability classes, script paths, literals), sorted."""
     with open(path, "rb") as f:
         data = f.read()
     win = 1 << 16
@@ -63,8 +58,7 @@ def code_names(path: str) -> bytes:
 
 
 def _worker_start():
-    """Pool worker start: UnityPy in half the memory, and below-normal CPU priority, so the PC stays usable
-    while a snapshot runs on every core."""
+    """Pool worker start: lean UnityPy loading, below-normal priority."""
     lean_loading()
     try:
         import ctypes
@@ -83,8 +77,7 @@ def _index_job(args):
         res = index_bundle(path, Store(store_root), thumbs)
     except Exception as e:
         res = {"objects": [], "errors": [f"bundle unreadable: {type(e).__name__}: {e}"]}
-    # a read bundle is a web of reference cycles: without this the worker keeps it (GBs for a big one) until
-    # Python happens to collect, so the memory budget below is wrong and the PC runs out of memory
+    # bundles are reference cycles: collect now or the worker holds GBs
     gc.collect()
     res["secs"] = round(time.time() - t, 2)
     return res
@@ -110,13 +103,13 @@ def free_memory() -> int:
 
 
 def job_memory(path: str) -> int:
-    """What indexing a bundle costs: (with lean_loading) the decompressed size once, plus decoded textures."""
+    """Memory a bundle takes to index (decompressed size + decoded textures)."""
     from .cabs import unpacked_size
     return int(unpacked_size(path) * 1.6) + (300 << 20)
 
 
 def job_time(mem: int) -> float:
-    """How long a bundle takes, in shares (from job_memory): ~1 + decompressed MB / 20, fitted on a whole game."""
+    """How long a bundle takes, in shares (fitted on a whole game)."""
     return 1 + max(0, mem - (300 << 20)) / 1.6 / (20 << 20)
 
 
@@ -126,7 +119,7 @@ class Snapshotter:
         self.store = store
         self.game = game
         self.ignore = ignore if ignore is not None else DEFAULT_IGNORE
-        # light (Settings): 2 bundles at a time — slower, but needs little memory beside the biggest bundle (~3 GB)
+        # light mode: 2 bundles at a time
         self.workers = workers or (2 if light else max(1, min(12, (os.cpu_count() or 4) - 1)))
         self.thumbs = thumbs
         self.progress = progress or (lambda stage, done, total, msg="", **_: None)
@@ -190,7 +183,7 @@ class Snapshotter:
                 rec["error"] = str(e)
             return rel, rec
 
-        # the first snapshot reads the whole install (~11 GB): hashing in a few threads is ~2x quicker on an SSD
+        # the first snapshot hashes the whole install: a few threads are ~2x quicker on SSD
         with ThreadPoolExecutor(4) as pool:
             futs = [pool.submit(read, job) for job in work]
             for i, fut in enumerate(as_completed(futs)):
@@ -261,9 +254,8 @@ class Snapshotter:
         started = time.time()
         self.progress("bundles", 0, len(jobs), f"{len(jobs)} bundles to index")
         if jobs:
-            # Memory budget: a bundle is decompressed whole while it is read (one Canto bundle takes ~3 GB), so a
-            # new one starts only while the running ones fit in half of the free memory; the biggest runs alone.
-            # Heavy bundles have their own small pool, so only a few of them run at once.
+            # memory budget: a new bundle starts only while running ones fit in half the free memory; heavy ones in
+            # their own small pool
             budget = max(1 << 30, free_memory() // 2)
             heavy_at, reserve = 600 << 20, 1536 << 20
             pending, running, used, i = list(jobs), {}, 0, 0
@@ -295,8 +287,8 @@ class Snapshotter:
                         try:
                             res = fut.result()
                         except BrokenProcessPool:
-                            # a worker died (out of memory, most likely): a new pool, and the bundles it had go again
-                            # once, alone (they never fit next to others now); a second time → left for the next snapshot
+                            # a worker died (likely OOM): new pool, its bundles retried once alone, then left for the
+                            # next snapshot
                             if pools[kind] is pool:
                                 pool.shutdown(wait=False, cancel_futures=True)
                                 pools[kind] = ProcessPoolExecutor(sizes[kind], max_tasks_per_child=8,

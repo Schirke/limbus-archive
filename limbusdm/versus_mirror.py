@@ -1,18 +1,5 @@
-"""Versus → Mirror: a short PvE run in the spirit of the Mirror Dungeon, fought 1v1 with the Versus engine.
-
-The run (user's order): Identity → shop → pack → boss → (gift 1 of 3 + Cost) → shop → pack → boss → the end. Picking a
-pack (1 of 3) is picking the next boss and the gifts that can be found; a lost boss ends the run. Each boss fight starts
-at full HP (user, 2026-10-09: no carrying over); within a fight nothing heals but lifesteal gifts. Exchanges on or off
-for the whole run (run "flow": "" or "series", picked at its start).
-
-Where things live: everything here but `catalog` / `fighters` is plain Python over plain dicts (no Service, no files),
-so the same code can run in the app's server and, later, in a browser (Pyodide) for the website. The fight itself is
-versus_engine's (MirrorFight is its Fight with a build on top: a fight without a build is the engine's own, step for
-step); the player only acts the script out.
-
-Game data used (StaticData): `mirrordungeon-theme-floor` (packs: mapGenOption.bossPool = stage ids), `battle-mirrordungeon`
-(those stages: wave 1's first unit is the boss), `ego-gift(-mirrordungeon)` via mirror.build (names, keyword, tier, icon).
-Gift effects in the game are code: we don't read them — EFFECTS is our own simple table per keyword x tier."""
+"""Versus → Mirror (v1): a short 1v1 PvE run like the Mirror Dungeon (Identity → shop → pack → boss, twice), fought by
+versus_engine. Plain Python over dicts except catalog / fighters; gift effects are our own table (EFFECTS)."""
 from __future__ import annotations
 
 import random
@@ -32,7 +19,7 @@ RULES = {
     "refresh": 50, "kw_refresh": 100,                    # a new shelf; a new shelf of one keyword
     "enhance": (100, 150),                               # + and ++ (a gift's level 1 → 2 → 3)
     "level_mult": (1.0, 1.5, 2.0),                       # what a gift's numbers are worth at level 1 / 2 / 3
-    # HP: real numbers, not the Versus page's "HP per clash" (a build has to matter and carry over)
+    # HP: real numbers
     "hp_player": 70,                                     # the Identity's max HP (before gifts)
     "boss_hp": (1.2, 1.5),                               # each floor's boss: this many times the player's base HP
     "boss_power": (0, 1),                                # each floor's boss: + skill base power
@@ -46,19 +33,13 @@ RULES = {
     "guard_max": 0.5,                                    # a guard takes at most this share off each blow
 }
 
-# keyword (as the gift data names it) → our status; the attack-type keywords' gifts are left out for now (user, 2026-10-09)
+# gift keyword → our status
 STATUS_OF = {"Laceration": "bleed", "Combustion": "burn", "Burst": "rupture", "Breath": "poise", "Vibration": "tremor"}
-# the sound at the start of a Tremor kill: the game's Tremor Burst sound is its battle UI "Panic" one (a recording of
-# Tremor Burst the user downloaded matched it, r 0.998 against all 29 380 of the game's 2.5-9 s sounds; the next 0.93)
+# Tremor kill sound = the battle UI's Panic sound
 TREMOR_SOUND = "047_battleui_panic_a_v1"
 ATK_OF = {"Slash": "Slash", "Penetrate": "Penetrate", "Hit": "Hit"}
 
-# Our gift effects, per keyword and tier (1-4; 5 / EX use 4's). Numbers are at level 1 (RULES level_mult for + / ++).
-#   base / coin: + skill base / coin power   heads: + coin heads chance   coins: + coins on every skill (max_coins)
-#   hp: + max HP share   dmg: + damage share   dmg_<Slash|Penetrate|Hit>: + damage share of that type
-#   take: - damage taken share   lifesteal: share of dealt damage healed
-#   inflict: {status: [potency, count]} on the first coin that lands of each landing   self: {"poise": [p, c]} on own landing
-#   last: x weight of the last skill in the deck (the strongest, as the game's S3)
+# our gift effects per keyword and tier (level 1; see RULES level_mult)
 EFFECTS = {
     "Laceration": {1: {"inflict": {"bleed": [2, 2]}}, 2: {"inflict": {"bleed": [3, 3]}},
                    3: {"inflict": {"bleed": [4, 3]}, "dmg": 0.05}, 4: {"inflict": {"bleed": [5, 4]}, "lifesteal": 0.1}},
@@ -68,8 +49,7 @@ EFFECTS = {
               3: {"inflict": {"rupture": [3, 5]}}, 4: {"inflict": {"rupture": [5, 5]}, "dmg": 0.05}},
     "Breath": {1: {"self": {"poise": [2, 2]}}, 2: {"self": {"poise": [3, 3]}},
                3: {"self": {"poise": [4, 4]}, "coin": 1}, 4: {"self": {"poise": [5, 5]}, "dmg": 0.1}},
-    # (no status of ours yet: plain numbers in their spirit)
-    # Tremor (user, 2026-10-09): piles up; once it reaches the target's HP, the next skill (or counter) that hits it kills it
+    # Tremor: once it reaches the target's HP, the next hit kills
     "Vibration": {1: {"inflict": {"tremor": [3, 0]}}, 2: {"inflict": {"tremor": [4, 0]}}, 3: {"inflict": {"tremor": [6, 0]}},
                   4: {"inflict": {"tremor": [8, 0]}}},
     "Sinking": {1: {"take": 0.04}, 2: {"take": 0.06}, 3: {"take": 0.08, "hp": 0.05}, 4: {"take": 0.12, "hp": 0.05}},
@@ -80,23 +60,18 @@ EFFECTS = {
     "": {1: {"hp": 0.08}, 2: {"lifesteal": 0.05}, 3: {"coin": 1, "hp": 0.05}, 4: {"last": 2.0, "dmg": 0.08}},
 }
 
-# Shield (2026-10-10): extra HP on top of the HP — all damage takes it first, statuses' too (user: Bleed, Burn, Rupture
-# don't go past it; Tremor counts HP + Shield). A gift whose game text gives Shield (catalog: SHIELD_GIFT on its description) starts each
-# boss fight with this share of the max HP as Shield, by tier (on top of its keyword's EFFECTS; x level_mult)
+# Shield: extra HP taken first by all damage; Shield gifts start each fight with this share of max HP
 SHIELD = {1: 0.08, 2: 0.12, 3: 0.16, 4: 0.20}
 SHIELD_GIFT = re.compile(r"(gains?|apply|applied as) [^.]{0,40}?Shield|Shield equal", re.I)
 
 
 # ------------------------------------------------------------------ the data (app side: needs the Service)
 
-# bosses our player can't show (checked 2026-10-10 by rendering every boss of the packs): drawn by Spine alone, which
-# the player has no runtime for — invisible, only their effects show; Don's carnival wheel (48 bodies high) fills the
-# picture with red, Don herself can't be made out
+# bosses our player can't show (Spine-only bodies)
 NOT_BOSSES = {"8045_ElectricCentipedeAppearance", "8048_GentleFairyAppearance", "8390_RealDon_1pAppearance"}
 
 def catalog(svc) -> dict:
-    """{"gifts": {id: {name, kw, tier, sin, desc, pic, price}}, "packs": [{id, name, pic, hard, bosses: [enemy prefab
-    names], pool: [gift ids]}], "ids": [Identity ids that can fight]}. Packs without a boss we can fight are left out."""
+    """{gifts, packs, ids}; packs without a fightable boss are left out."""
     db = svc.mirror_db()
     t = svc.static_tables(["mirrordungeon-theme-floor", "battle-mirrordungeon", "enemy", "abnormality-unit"])
     from . import stages
@@ -128,8 +103,7 @@ def catalog(svc) -> dict:
 
 
 def fighters(svc, cids, cache: dict | None = None) -> dict:
-    """{cid: versus_engine.fighter} (an enemy with its skills' coins as clashes, as the Auto Battler has them); one
-    that can't fight (no skills / no clash animations) is left out."""
+    """{cid: fighter}; units that can't fight are left out."""
     out = {} if cache is None else cache
     for c in cids:
         if c in out:
@@ -146,7 +120,7 @@ def fighters(svc, cids, cache: dict | None = None) -> dict:
 # ------------------------------------------------------------------ a build on a fighter (pure)
 
 def gift_mods(g: dict, level: int = 1) -> dict:
-    """One gift's numbers at its level (EFFECTS of its keyword and tier, times RULES level_mult)."""
+    """One gift's numbers at its level."""
     tab = EFFECTS.get(g.get("kw") or "") or EFFECTS[""]
     eff = tab.get(min(4, max(1, g.get("tier") or 1)))
     k = RULES["level_mult"][max(1, min(3, level or 1)) - 1]
@@ -166,7 +140,7 @@ def gift_mods(g: dict, level: int = 1) -> dict:
 
 
 def build_mods(build: list[dict], gifts: dict) -> dict:
-    """The sum of a build's gifts (build: [{"id", "level" 1-3}]) as one modifier dict (see EFFECTS)."""
+    """A build's gifts summed into one modifier dict."""
     m = {"base": 0, "coin": 0, "heads": 0.0, "coins": 0, "hp": 0.0, "dmg": 0.0, "take": 0.0, "lifesteal": 0.0,
          "shield": 0.0, "last": 1.0, "inflict": {}, "self": {}}
     for b in build:
@@ -235,8 +209,7 @@ def mods_text(m: dict) -> list[str]:
 
 
 def with_build(f: dict, mods: dict, power: int = 0) -> dict:
-    """A copy of fighter f with the build's numbers on its skills (base / coin power, coins, heads chance, last skill's
-    weight); `power`: + base power (a later floor's boss)."""
+    """Fighter f with the build's numbers on its skills; `power`: + base power."""
     skills = []
     for s in f["skills"]:
         s2 = dict(s, base=s["base"] + mods.get("base", 0) + power,
@@ -251,16 +224,8 @@ def with_build(f: dict, mods: dict, power: int = 0) -> dict:
 # ------------------------------------------------------------------ the fight (pure)
 
 class MirrorFight(E.Fight):
-    """versus_engine's Fight with real HP (carried over), a build's damage numbers, lifesteal and four statuses:
-    - Bleed: each clash it fights, it loses Bleed potency HP (count - 1);
-    - Burn: after each landing or stand-off, it loses Burn potency HP (count - 1);
-    - Rupture: each coin that hits it takes + Rupture potency HP (count - 1), on top of the landing's share (the cap
-      on one landing's damage doesn't stop it; the step's "rup" lists each proc for the player);
-    - Poise (own): each of its coins that hits crits with potency x poise_crit (x crit_mult damage; count - 1).
-    A status never takes the last HP outside a landing (the engine ends a fight on a landing). Shield (a build's
-    "shield" share of the max HP, at the start): all damage takes it before the HP, statuses' too. Each step carries
-    "st" (both sides' statuses after it), "sh" (both Shields after it, once anyone has one) and, when it happened,
-    "heal" / "tick" ([left, right] HP gained / lost outside the hits) for the player."""
+    """versus_engine's Fight with real HP, a build's numbers, lifesteal, Shield and four statuses (Bleed, Burn, Rupture,
+    Poise); steps carry st / sh / heal / tick for the player."""
 
     def __init__(self, a, b, seed, opts, hp_max, hp_now):
         R = dict(E.RULES, landing_cap=RULES["landing_cap"])
@@ -305,8 +270,7 @@ class MirrorFight(E.Fight):
         return final
 
     def _land(self, w, sk, coins, whole, defense=None, lethal=True):
-        """versus_engine.Fight.land, but each coin that hits (not dodged, not fully guarded) procs Rupture — also the
-        coins past the landing's cap (their damage stopped by it, the Rupture not)."""
+        """Fight.land, with every hitting coin procing Rupture (past the cap too)."""
         d, R = 1 - w, self.R
         before = E.range_of(self.gap(), R)
         g = (self.F[d]["guard"] or R["plain_guard"]) if defense else None
@@ -326,8 +290,7 @@ class MirrorFight(E.Fight):
                     missed += 1
                     continue
                 broken = True
-            # (a guard's roll off each blow — but at most guard_max of it: a block never stops a blow whole, user 2026-10-10
-            # "sometimes no damage is dealt")
+            # a guard never stops a blow whole
             stop = min(shield, power * RULES["guard_max"]) if defense == "Guard" else 0
             raw = self.coin_damage(w, sk, power, head)
             dmg = raw * (1 - stop / power if power > 0 else 1) if defense == "Guard" else raw
@@ -356,17 +319,16 @@ class MirrorFight(E.Fight):
         return final
 
     def coin_damage(self, w, sk, power, head) -> float:
-        """A coin's damage before the defense and the target's numbers: its power (versus_mirror2 has its own)."""
+        """A coin's raw damage (v2 overrides)."""
         return power
 
     def tremor_kills(self, i) -> bool:
-        """Side i's Tremor is as high as its HP left + Shield (a hit by a skill or counter kills it)."""
+        """Side i's Tremor reaches its HP + Shield."""
         t = (self.st[i].get("tremor") or [0])[0]
         return 0 < self.hp[i] and self.hp[i] + self.sh[i] <= t
 
     def counter(self, d, w):
-        """(Exchanges) a counter on one whose Tremor reaches its HP: d strikes back with a whole skill that kills it;
-        else the engine's counter (one coin, never killing)."""
+        """Counter that kills by Tremor when it can, else the engine's."""
         if self.series or not self.tremor_kills(w) or self.decks[d].counter_coin() is None:
             return super().counter(d, w)
         b4 = E.range_of(self.gap(), self.R)
@@ -376,7 +338,7 @@ class MirrorFight(E.Fight):
         self.land(d, sk, sk["coins"], True)
 
     def rupture(self, i):
-        """A coin hit side i: its Rupture (potency HP, count - 1), never its last HP when the blow may not kill."""
+        """Rupture on a coin hit; never the last HP when the blow may not kill."""
         p = self.spend(i, "rupture")
         n = min(p, self.hp[i] + self.sh[i] - (0 if self._lethal else 1))
         if n > 0:
@@ -438,8 +400,7 @@ class MirrorFight(E.Fight):
         return d
 
     def take(self, i, dmg, atk, most) -> int:
-        """versus_engine.Fight.hurt with Shield: side i takes dmg x its resistance to atk (at most `most`), its Shield
-        first, the rest off its HP."""
+        """Fight.hurt with Shield taken first."""
         mult = self.F[i]["resist"].get(atk, 1.0) or 1.0
         d = min(most, max(1, round(dmg * mult)))
         self.shield_first(i, d)
@@ -474,14 +435,12 @@ class MirrorFight(E.Fight):
         self._heal, self._tick, self._rup = [0, 0], [0, 0], []
 
 
-# the engine's options for a boss fight: the Versus page's clash base (viewer.CLASH_BASE: guards / evades, counters,
-# whole skills up to 5 s, knockback 2x), exchanges ("pace"), the last skill drawn at random
+# engine options for a boss fight
 FIGHT_OPTS = dict(rounds=RULES["rounds"], defend=True, counter=True, bursts=True, burstMax=5, kbscale=2, randskill=True, flow="")
 
 
 class _SeriesOpts(dict):
-    """(Exchanges off) the fight's options, but the series' winner — asked at its end — is one whose Tremor on the other
-    one reaches its HP (its last skill kills by Tremor Burst; the player's side first); else as the engine decides."""
+    """(Exchanges off) the winner is one whose Tremor kills, else the engine's pick."""
 
     def __init__(self, opts, fight):
         super().__init__(opts)
@@ -499,8 +458,7 @@ class _SeriesOpts(dict):
 
 def boss_fight(player: dict, boss: dict, build: list[dict], gifts: dict, floor: int, hp_now: float | None, seed: int,
                opts: dict | None = None) -> dict:
-    """One boss of the run: player (fighter) with its build vs boss (fighter) of floor (0-based); hp_now: the player's
-    HP carried over (None: full). The engine's result + "hpMax" / "hp" in real numbers and "mods"."""
+    """One boss fight of the run; result + real HP and mods."""
     mods = build_mods(build, gifts)
     hp_p = round(RULES["hp_player"] * (1 + mods["hp"]))
     k = min(floor, len(RULES["boss_hp"]) - 1)
@@ -519,7 +477,7 @@ def boss_fight(player: dict, boss: dict, build: list[dict], gifts: dict, floor: 
 
 
 def seconds(fight: dict) -> float:
-    """About how long the fight plays (s): clashes ~1 s each, landings their skill's length, the rest ~0.4 s."""
+    """Rough fight length in seconds."""
     t = 0.0
     for s in fight["steps"]:
         if s["act"] == "clash":
@@ -536,8 +494,7 @@ def seconds(fight: dict) -> float:
 # ------------------------------------------------------------------ the run (pure: state is a plain dict)
 
 def new_run(cat: dict, ids: list, seed: int) -> dict:
-    """A run's state: {"seed", "phase", "floor", "cost", "hp" (None = full), "build", "offer", "shelf", "pack",
-    "boss", "log"}. Phase "id": offer = 3 Identity ids."""
+    """A new run's state; phase "id" offers 3 Identities."""
     rnd = random.Random(seed)
     return {"seed": seed, "step": 0, "phase": "id", "floor": 0, "cost": RULES["cost_start"], "hp": None, "build": [],
             "id": None, "offer": rnd.sample(ids, min(RULES["offers"], len(ids))), "shelf": [], "pack": None,
@@ -612,7 +569,7 @@ def refresh(run, cat, kw=None) -> dict:
 
 
 def leave_shop(run, cat) -> dict:
-    """Shop done: 3 packs to pick from (not ones seen before), phase "pack" — or, after the last boss, the end."""
+    """After the shop: 3 new packs, or the end."""
     rnd = _rnd(run)
     left = [p for p in cat["packs"] if p["id"] not in run["seen"]] or cat["packs"]
     run["offer"] = [p["id"] for p in rnd.sample(left, min(RULES["offers"], len(left)))]
@@ -631,8 +588,7 @@ def pick_pack(run, cat, pid, fightable=None) -> dict:
 
 
 def fight_done(run, cat, fight: dict) -> dict:
-    """A boss fight's result: lost → "end"; won → HP back to full (user, 2026-10-09: not carried over), Cost, phase
-    "reward" (offer = 3 gifts of the pack)."""
+    """Fight result: lost → end; won → full HP, Cost, reward offer."""
     run["log"].append(f"floor {run['floor'] + 1}: {run['boss']} — {'won' if fight['winner'] == 0 else 'lost'}, "
                       f"HP {fight['hp'][0]}/{fight['hpMax'][0]}")
     if fight["winner"] != 0:
@@ -663,8 +619,7 @@ def take_reward(run, cat, gid) -> dict:
 # it, and the boss fight (the same seed every time: the Live window and "Result now" are the same fight).
 
 def app_state(svc) -> dict:
-    """{"cat", "fighters"} of the latest snapshot, kept on the Service (the catalog with names for the page; fighters
-    built as they are needed, ~1 s each)."""
+    """{cat, fighters} of the latest snapshot, kept on the Service."""
     sid = svc.latest_snapshot_id()
     st = getattr(svc, "_versus_mirror", None)
     if st and st["sid"] == sid:
@@ -679,7 +634,7 @@ def app_state(svc) -> dict:
 
 
 def page_catalog(svc) -> dict:
-    """What the page shows: gifts (with our effect in words, per level), packs, the rules, the statuses."""
+    """What the page shows: gifts, packs, rules, statuses."""
     cat = app_state(svc)["cat"]
     gifts = {}
     for gid, g in cat["gifts"].items():
@@ -698,7 +653,7 @@ def _fighters(svc, cids) -> dict:
 
 
 def _offer_ids(svc, run: dict, pool: list) -> None:
-    """run's Identity offer, each one able to fight (one that can't is swapped for another of the pool)."""
+    """The run's Identity offer, each able to fight."""
     rnd = random.Random(run["seed"] * 7 + 1)
     tried = set(run["offer"])
     for i, c in enumerate(run["offer"]):
@@ -712,7 +667,7 @@ def _offer_ids(svc, run: dict, pool: list) -> None:
 
 
 def fight_of(svc, run: dict) -> dict:
-    """The boss fight of run's floor (phase "boss"): boss_fight with the run's Identity, build, HP and the floor's seed."""
+    """The boss fight of the run's floor."""
     st = app_state(svc)
     F = _fighters(svc, [run["id"], run["boss"]])
     if run["id"] not in F or run["boss"] not in F:
@@ -722,8 +677,7 @@ def fight_of(svc, run: dict) -> dict:
 
 
 def fight_summary(fight: dict) -> dict:
-    """A boss fight for the page: who won, HP, how long, and what happened in numbers (per side: clashes won, skills
-    landed, damage dealt by hits / by statuses, healed)."""
+    """A fight summary for the page."""
     side = [{"clashes": 0, "landed": 0, "hits": 0, "status": 0, "heal": 0} for _ in (0, 1)]
     for s in fight["steps"]:
         if s["act"] == "clash" and not s.get("defense") and s.get("loser", -1) in (0, 1):
@@ -742,8 +696,7 @@ def fight_summary(fight: dict) -> dict:
 
 
 def _up_to_date(run: dict, cat: dict) -> None:
-    """A run the page kept from an older catalog (another game version, or gifts left out since — e.g. the attack-type
-    ones): its pack as the catalog has it now, gifts no longer there dropped (a dropped owned gift is paid back)."""
+    """A run kept from an older catalog, brought up to date (dropped gifts refunded)."""
     gifts = cat["gifts"]
     if run.get("pack"):
         run["pack"] = next((p for p in cat["packs"] if p["id"] == run["pack"]["id"]), None) or run["pack"]
@@ -758,9 +711,7 @@ def _up_to_date(run: dict, cat: dict) -> None:
 
 
 def act(svc, run: dict | None, what: str, arg=None) -> dict:
-    """One action of the page on its run: {"run"} after it (+ "fight": its summary, for "fight"). Actions: new (arg: a
-    seed or None), id (arg: Identity id), buy / sell / enhance (gift id), refresh (arg: a keyword or None: any), leave,
-    pack (pack id), fight, reward (gift id, or None: nothing taken)."""
+    """One page action on the run: new, id, buy / sell / enhance, refresh, leave, pack, fight, reward."""
     cat = app_state(svc)["cat"]
     out = {}
     if run is not None:

@@ -175,7 +175,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .sindot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
 .dbf { display: flex; gap: 8px; flex-wrap: wrap; } .dbf input[type=search] { flex: 1; min-width: 240px; }
 .dbchips { margin-top: 6px; align-items: center; } .dbchips .toggle { padding: 3px 9px; }
-/* the game's own UI font, read from the install (falls back to the page font without the game) */
+/* the game's UI font */
 @font-face { font-family: "LC Bebas"; src: url(/api/font?name=BebasKai); font-display: swap; }
 .dbq { width: 100%; height: 38px; margin-bottom: 4px; }
 .dbrow { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
@@ -361,7 +361,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .vsicon.other { outline: 1px dashed var(--muted); }
 .vsicon { background: none; border-color: transparent; }
 
-/* Versus workbench: picker | the two, the fight, earlier videos | stage, music, show, debug, Render / Live */
+/* Versus workbench layout */
 .vsw { display: grid; grid-template-columns: minmax(330px, 460px) minmax(0, 1fr) minmax(290px, 360px); grid-template-areas: "pick mid right"; gap: 16px; align-items: start; }
 .vspick { grid-area: pick; } .vsmid { grid-area: mid; min-width: 0; } .vsright { grid-area: right; }
 .vsmoresk { padding: 3px 6px; font-size: 12px; max-width: 150px; } .vsmoresk.on { border-color: var(--gold); color: var(--gold); }
@@ -507,7 +507,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .enpanic { margin-top: 6px; }
 @media (max-width: 1100px) { .enwrap { grid-template-columns: 300px minmax(0, 1fr); } .engrid { grid-template-columns: repeat(3, 1fr); } }
 
-/* ---- Identity / E.G.O card in the look of the redesigned pages (flat panels, the game's font for titles) */
+/* Identity / E.G.O card */
 .modal-box:has(.ud) { background: var(--bg); border-color: var(--line); border-radius: 0; }
 .ud { color: var(--text); }
 .ud .udtitle { font: 30px/1.1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; text-shadow: none; }
@@ -588,7 +588,7 @@ button.gmopt:hover:not(:disabled) { border-color: var(--gold); }
 .gmlog th { font: 12px Consolas, monospace; letter-spacing: 2px; color: var(--muted); font-weight: normal; } .gmlog td i { font-style: normal; color: var(--muted); font-size: 12px; margin-left: 10px; }
 .gmlog td.ok { color: var(--gold); } .gmlog td.bad { color: var(--rem); }
 
-/* Games: the page of cards, and the line under the menu inside a game (games.js gmHub / gmCrumb) */
+/* Games: cards page and in-game line */
 #subnav .gmcrumb { align-items: center; gap: 10px; }
 #subnav .gmcrumb a.back, #subnav .gmcrumb a.back.active { color: var(--muted); border-bottom-color: transparent; } #subnav .gmcrumb a.back:hover { color: var(--text); }
 #gmcrumb { font: 14px Consolas, "Cascadia Mono", monospace; color: var(--gold); } #gmcrumb::before { content: "/"; color: var(--muted); margin-right: 10px; }
@@ -825,7 +825,7 @@ a.kw.big { text-decoration: none; }
 .vstm.idle { opacity: .5; }
 .vsslot { width: 16px; text-align: center; color: var(--muted, #999); font-size: 12px; }
 
-/* ---- Animations: browser on the left, the open character on the right (tabs: Skills, Battle clips, Effects, Edit mod…) ---- */
+/* Animations: browser left, character right */
 .an-app { display: grid; grid-template-columns: 290px minmax(0, 1fr); height: calc(100vh - 130px); min-height: 420px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
 .an-rail { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
 .an-rhead { padding: 10px; border-bottom: 1px solid var(--line); }
@@ -1119,7 +1119,7 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gdslot small { display: block; font: 11px Consolas, monospace; letter-spacing: 1px; color: var(--gold); }
 .gdslot b { display: block; padding: 2px 8px 0; color: #fff; font: 15px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; text-transform: uppercase; font-weight: normal; }
 .gdslot i { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; padding: 0 6px; font-style: normal; color: var(--muted); font-size: 12px; } .gdslot i img { width: 26px; height: 26px; object-fit: cover; }
-/* Games' page: the mode of the day on top, every game as a tile in its column (games.js gmHub) */
+/* Games page: mode of the day, tiles */
 .gmday { display: grid; grid-template-columns: 430px 1fr; max-width: 1240px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); margin-bottom: 8px; }
 .gmday .gmart { height: 190px; border-bottom: 0; border-right: 1px solid var(--line); } .gmday .gmart svg { width: 84px; height: 84px; } .gmday .gmart.pics img { height: 190px; }
 .gmdaybody { display: flex; flex-direction: column; gap: 7px; padding: 18px 24px; } .gmdaybody .gmkick { color: var(--gold); }
@@ -1154,7 +1154,7 @@ a.gmdot:hover::after { background: var(--gold); } .gmdot.done::after { backgroun
 .gmscore .gmswords { color: var(--gold); margin-right: 2px; }
 button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); border-color: var(--gold); color: #111; font-weight: 600; border-radius: 0; animation: gmDuelCall 1.6s ease-in-out 3; }
 @keyframes gmDuelCall { 50% { box-shadow: 0 0 0 5px rgba(201,162,39,.35); } }
-/* Games: Extraction — the game's screens on a 1280 x 720 stage scaled to the page (games5.js) */
+/* Extraction: 1280 x 720 stage */
 #gebox { position: relative; max-width: 1280px; overflow: hidden; background: #000; border: 1px solid var(--line); }
 #gestage { position: absolute; left: 0; top: 0; width: 1280px; height: 720px; transform-origin: 0 0; overflow: hidden; user-select: none; }
 .gescr { position: absolute; inset: 0; display: none; } .gescr.on { display: block; } .gescr canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -1207,7 +1207,7 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 .gmgrade small { font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 3px; color: var(--muted); }
 .gmgrade b { font: 34px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2.5px; text-transform: uppercase; font-weight: normal; }
 .gmgrade.t0 { color: #8d8388; } .gmgrade.t1 { color: #6fb7c9; } .gmgrade.t2 { color: var(--gold); } .gmgrade.t3 { color: #ff4d4d; text-shadow: 0 0 18px rgba(255,77,77,.55); }
-/* Games: a duel's invite next to the game's name; live matches (games.js gmDuelBar, games6.js) */
+/* duel invite; live matches */
 #gmduelbar { position: absolute; z-index: 4; display: flex; align-items: center; gap: 12px; padding: 5px 6px 5px 14px; background: var(--panel); border: 1px solid var(--gold); }
 #gmduelbar .toggle { padding: 6px 14px; background: var(--gold); border-color: var(--gold); color: #111; font-weight: 600; border-radius: 0; }
 #subnav .gmcrumb a.gmlivenav { margin-right: 10px; padding: 5px 12px; border: 1px solid var(--line); color: var(--gold); font: 13px Consolas, monospace; } #subnav .gmcrumb a.gmlivenav.active { border-color: var(--gold); }
@@ -1360,7 +1360,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .bnlive { color: #7cc66a; font-size: 11px; border: 1px solid #7cc66a; padding: 0 6px; letter-spacing: .08em; }
 .bnended { color: var(--muted); font-size: 11px; border: 1px solid var(--line); padding: 0 6px; letter-spacing: .08em; }
 
-/* ---- Versus → Mirror (vsmirror.js): a short PvE run, the mockup's screens in the app's skin ---- */
+/* Versus → Mirror */
 .vm { max-width: 1300px; display: flex; flex-direction: column; gap: 16px; }
 .vm h1 { margin: 0; }
 .vmkick { font: 14px "LC Bebas", sans-serif; letter-spacing: .22em; text-transform: uppercase; color: #ff4b3a; }
@@ -1446,8 +1446,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .vmrew { align-items: center; text-align: center; }
 .vmrew > button { align-self: stretch; }
 @media (max-width: 1000px) { .vmshop, .vmshop2, .vmside2 { grid-template-columns: 1fr; } }
-/* Database → Sounds (sounds.js): the site's look — the four folders as art tiles, Sinners / Identities as their cards, a folder
-   of sounds with its neighbours on the left, rows with the speaker's picture, the playing one's bar at the bottom */
+/* Database → Sounds */
 #sndpage { --snd-b: "LC Bebas", "Segoe UI", sans-serif; }
 .sndtop { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin: 14px 0 20px; }
 #sndhead > .sndtop:first-child { margin-top: 0; }

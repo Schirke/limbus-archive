@@ -1,7 +1,5 @@
-// Versus → Mirror (limbusdm/versus_mirror2.py, its fight core in versus_mirror.py): 5 floors, 4 characters with their own kits, the
-// game's deck, one defense each; shop with gift slots, lock, recipes (fusion), interest, economy gifts; a pack = a floor
-// with a clear goal (keyword, boss and reward gifts shown before the pick). Route #/vsmirror. The run lives in the page
-// (localStorage "vsmirror"; an older run without v 2 is dropped); /api/mirror/act answers.
+// Versus → Mirror (versus_mirror2.py): 5 floors, 4 kit characters, deck, shop, fusions, economy. Run kept in
+// localStorage; /api/mirror/act answers.
 const m2 = { cat: null, run: null, fight: null, busy: false, kw: null, sel: null, live: null, asked: new Set() };
 const M2_KEEP = "vsmirror";
 const m2Save = () => { try { localStorage.setItem(M2_KEEP, JSON.stringify({ run: m2.run, fight: m2.fight })); } catch { /* not kept */ } };
@@ -19,8 +17,7 @@ const m2Kit = (id) => m2.cat.kits.find((k) => k.id === id) || { rules: [], level
 const m2Pack = (pid) => m2.cat.packs.find((p) => p.id === pid);
 const m2Fig = (id) => (typeof vs !== "undefined" ? vsFigUrl(id) : "");
 const m2IdPic = (id) => { const f = m2Fig(id), u = m2Unit(id); return f ? `<img class="fig" src="${f}" alt="">` : `<img class="idp" src="${u && u.img ? imgThumb(u.img.thumb) : vsIcon(id)}" onerror="vsImgErr(this)" alt="">`; };
-// (bosses: their portrait in a circle — user, 2026-10-10: not the whole Spine figure)
-// (no portrait in the game files: its face cut from its idle picture; neither: hidden)
+// boss portrait in a circle (or a face cut from its idle picture)
 const m2Face = (app, cls = "") => `<span class="m2face ${cls}"><img src="${vsIcon(app)}" data-face="${esc(String(app))}" onerror="m2FaceErr(this)" alt=""></span>`;
 function m2FaceErr(img) {
   if (img.dataset.face) { const id = img.dataset.face; img.dataset.face = ""; img.src = `/api/fighter_face?id=${encodeURIComponent(id)}`; return; }
@@ -109,7 +106,7 @@ function m2Draw() {
 
 const m2StatusHelp = () => `<div class="card vmhelp"><h2>Statuses</h2>${m2.cat.status.map((s) => `<div>${statusIcon(s.kw, "s20")} <b>${esc(s.name)}</b> — ${esc(s.help)}</div>`).join("")}</div>`;
 
-// start screen switch: bosses deal their pack's status (off by default; kept in localStorage)
+// start switch: bosses deal their pack's status
 const m2BossSt = () => { try { return localStorage.getItem("vsmirror.bossSt") === "1"; } catch { return false; } };
 const m2BossStBox = () => `<label class="toggle"><input type="checkbox" id="m2bossst" ${m2BossSt() ? "checked" : ""}> Bosses deal their pack's status</label>`;
 

@@ -1,8 +1,4 @@
-"""CAB name → bundle index, read from UnityFS headers only (no data decompression).
-
-Objects reference other bundles through their SerializedFile's externals ("archive:/CAB-<hash>/CAB-<hash>");
-the CAB hash is not derivable from the bundle's file name, so we read the node list of every bundle once.
-"""
+"""CAB name → bundle, from UnityFS headers only (a CAB hash can't be derived from the file name)."""
 from __future__ import annotations
 
 import struct
@@ -14,7 +10,7 @@ def _cstr(b: bytes, pos: int) -> tuple[str, int]:
 
 
 def _blocks_info(path: str) -> bytes | None:
-    """The decompressed blocks-and-directory info of a UnityFS bundle (a few KB, no data decompression)."""
+    """Blocks and directory info of a UnityFS bundle (no data decompression)."""
     with open(path, "rb") as f:
         head = f.read(4096)
         if not head.startswith(b"UnityFS\0"):

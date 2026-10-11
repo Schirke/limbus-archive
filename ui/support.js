@@ -1,13 +1,11 @@
-// Support: how to help the project (word of mouth, bug reports and ideas, code, money once there is somewhere to
-// send it), who made it, and whose work it stands on. Plain text and links: the page asks the server for nothing,
-// so the web copy shows it as it is.
+// Support page: how to help, who made it, credits. Static.
 "use strict";
 
 const SUP = {
   repo: "https://github.com/Schirke/limbus-archive",
   site: "https://limbus-archive.com",
   discord: "hines9278",
-  // where money can be sent: [name, address, note] — the block is not drawn while this is empty
+  // [name, address, note]; hidden while empty
   money: [],
   // [name, GitHub login, what they did]
   team: [

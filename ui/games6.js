@@ -1,11 +1,5 @@
-// Games → live matches: a room on the site's server (ui/site/worker.js) that two to eight players join by a link or
-// a code, under a nickname. The host picks the game and the mode and starts; everybody then plays the same rounds —
-// a duel's seed (games.js), on the Daily's fixed settings — and sees the others on a panel.
-//   Race: each at their own pace; the result is the game's own.
-//   First to answer (the guessing games): the rounds go in step — the first right answer takes the round's points,
-//   the round ends when it is taken, when everybody has answered, or after GL_ROUND seconds.
-// The room only passes messages on, in one order for everybody: {k: "p"} progress, {k: "a"} an answer of a round,
-// {k: "next"} the host ends a round, {k: "done"} a finished game.
+// Live matches: a room on the site's server for 2-8 players; everybody plays the same seeded rounds, as a race or
+// first-to-answer. The room only relays messages in one order.
 "use strict";
 
 const GL_KEEP = "games_live", GL_ROUND = 30, GL_WIN = 200;
@@ -14,14 +8,14 @@ const gl = { nick: "", id: "", ...(() => { try { return JSON.parse(localStorage.
   ws: null, code: "", room: null, match: null, n: 0, want: "", timer: 0, paid: 0, retry: 0, shut: true };
 if (!gl.id) gl.id = Math.random().toString(36).slice(2, 12);
 const glKeep = () => { try { localStorage.setItem(GL_KEEP, JSON.stringify({ nick: gl.nick, id: gl.id })); } catch {} };
-// where the rooms are: the site itself; the app goes to the site's address (a test may name another)
+// room server: the site (a test may override)
 const glServer = () => (localStorage.getItem("games_live_host") || (document.body.classList.contains("site") ? location.origin : GM_SITE)).replace(/^http/, "ws");
 const glGameOf = (k) => GM_GAMES.find((g) => g[0] === k);
 const glMe = () => gl.room && gl.room.host === gl.id;
 const glSend = (m) => { try { gl.ws && gl.ws.readyState === 1 && gl.ws.send(JSON.stringify(m)); } catch {} };
 const glSet = (patch) => glSend({ t: "set", state: { ...(gl.room ? gl.room.state : {}), ...patch } });
 const glSay = (data) => glSend({ t: "msg", data });
-// the running game of an engine, and how it stands: [done steps, of how many, score as shown]
+// an engine's running game and progress
 function glGame(k) {
   return k === "track" ? gm.game : ["id", "skill", "char"].includes(k) ? gi.game : ["enemy", "canto", "splash", "atlas"].includes(k) ? gp.game
     : k === "wordle" ? gw.game : k === "conn" ? gc.game : k === "grid" ? gg.game : k === "odd" ? go.game
@@ -169,7 +163,7 @@ const glName = (id) => ((gl.room ? gl.room.players : []).find((p) => p.id === id
 // the players of the match who are still in the room
 const glIn = () => gl.match.ids.filter((id) => gl.room.players.some((p) => p.id === id));
 
-// four times a second while a match is on: what I have done goes to the others; the host ends the rounds in step
+// 4x a second: send progress; the host ends rounds
 function glTick() {
   const x = gl.match, g = x && glGame(x.game);
   if (gl.ws && gl.ws.readyState === 1 && (gl.beat = (gl.beat || 0) + 1) % 100 === 0) glSend({ t: "ping" });
@@ -184,7 +178,7 @@ function glTick() {
   const bar = $("#glpanel .gltime i");
   if (bar) bar.style.width = Math.max(0, 100 - (Date.now() - x.t0) / (GL_ROUND * 10)) + "%";
 }
-// the round is over for everybody: who hasn't answered passes; a moment to look, then the next one
+// round over: pass, pause, next
 function glNext(r) {
   const x = gl.match, g = glGame(x.game);
   if (!g || g.round !== r) return;

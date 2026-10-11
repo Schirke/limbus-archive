@@ -63,8 +63,7 @@ class Store:
         if os.path.exists(p):
             return
         from PIL import Image
-        # snapshots make tens of thousands of these: average whole pixel blocks first (one cheap pass), then a
-        # bilinear step to the size, then the fastest WebP method — ~2x quicker than thumbnail() on the full picture
+        # fast thumbnail: block average, bilinear step, fastest WebP (~2x thumbnail())
         if img.mode not in ("RGB", "RGBA"):
             img = img.convert("RGBA")
         k = max(img.size) // THUMB_MAX

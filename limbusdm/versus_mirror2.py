@@ -1,27 +1,6 @@
-"""Versus → Mirror v2: the Mirror run rebuilt after the 2026-10-10 design talk with the user (CLAUDE.md "Mirror v2").
-
-What changed against versus_mirror (v1, kept as it is):
-- the fight: clashes as in v1 (an exchange of 2-5 clash rounds, the one that won more lands its whole skill; user
-  2026-10-10: no coin breaking), skills come from a deck (S1 x3, S2 x2, S3 x1, shuffled, drawn to the end),
-  each fighter has ONE defense — its own from the game's data (Counter, Guard or Evade), damage and statuses in plain
-  numbers (HP is the game's, ~180-250, not 70);
-- four characters only, each with its own kit — the user's own words (memory "user-designs-kits"; numbers in KIT_RULES):
-  Outis 11115: "3 phases, each counter moves her to the next, you have to live until then; in that phase she gets very
-    strong"; Zwei Ishmael 10810: "block stacks Tremor, then one-shots" + (user's pick) "clashes weakly";
-  Ryōshū 10414: "shoots bonus shots, spends her bullets, tries to evade, between the enemy's attacks may shoot to put on
-    effects" (user 2026-10-10: the bonus shot from the start, no level for it); Ryōshū 10412: "stacks damage up on herself; after N stacks (7, as in the
-    game) she locks herself in stone that lets her do nothing" (user: nothing else in stone; leveling changes it later);
-  character levels (bought in the shop) unlock functions — only the ones the user named;
-- 5 floors (boss HP / power rise), the 5th a final boss from a short list; a pack = a floor with a clear goal: its keyword,
-  its bosses (one drawn) and the gift it pays out shown before it is picked; Hard packs: stronger boss, more Cost;
-- economy: interest (+10 per 100 held, at most +50, after each boss), economy gifts (the game's own: Golden Urn breaks after
-  the next won fight for +200, …), few gift slots (6, +1 per boss, at most 10: sell to make room), shop lock, recipe
-  fusion (the game's fixed recipes: all ingredients → one fused gift at ++).
-Kit things show under the HP as statuses with the game's own icons (KIT_ST: Outis' sword stage up to Lævateinn, bullets,
-Gaze of Contempt stacks, the stone = Contempt of the Gaze). Not here yet (user): SP / panic (they ask friends first),
-Starlight buffs, a look of its own for the stone.
-
-Pure like v1 (plain dicts) except catalog / fighters / the app's side at the end."""
+"""Versus → Mirror v2: deck-based fights (S1 x3, S2 x2, S3 x1), one defense per fighter, real HP, four kit characters
+(Outis 11115, Ishmael 10810, Ryōshū 10414 / 10412) with levels, 5 floors, economy (interest, slots, shop lock, fusions).
+Plain dicts except catalog / fighters."""
 from __future__ import annotations
 
 import random
@@ -49,21 +28,19 @@ RULES = {
     "landing_cap": 0.4,          # one landing at most this share of the HP (no one-shots; statuses go past it)
     "rounds": 90,                # clash rounds at most (then the engine's finale)
     "boss_defend": 0.22,         # how often a boss defends instead of clashing
-    "boss_status": 2,            # a boss deals its pack keyword's status as a gift of this tier would (user: a middle value for now)
-    # damage (user 2026-10-10: "a stable, normal damage logic, not tied to the skills"): a landing of the deck's 1st / 2nd /
-    # 3rd skill deals this much, its coins sharing it; each heads + dmg_heads of it on top; each point of power (a boss's
-    # floor, Outis' phase, Charge gifts) + dmg_power; a counter / bonus shot this much. The game's numbers decide clashes only
+    "boss_status": 2,            # boss status strength as a gift of this tier
+    # fixed damage per landing by deck slot, + heads and power bonuses; game numbers decide clashes only
     "dmg": (20, 30, 45), "dmg_counter": 12, "dmg_heads": 0.10, "dmg_power": 0.075,
     "dmg_flat": 60,              # a gift's "+x damage" share → + this x per landing (0.05 → +3)
     "boss_dmg": 0.7,             # a boss's damage x this (its floor's power adds on top)
 }
 
-# Kits: the user's words above; these are only the numbers (all ours, open to the user's say)
+# kit numbers
 KIT_RULES = {
     "phase_power": (-3, -2, -1), # Outis: + base power in phase 1 / 2 / 3 (phase 3 also fights with her Lævateinn skills)
     "zwei_clash": -1,            # Zwei: her clash power
     "block_tremor": 2.0,         # Zwei: Tremor on the enemy per block = this x the block's roll
-    "bullets": 6,                # 10414: her drum (the game's 6 BulletGodok); empty → Tremor Burst on the enemy, then full again
+    "bullets": 6,                # 10414's drum: empty → Tremor Burst, then full again
     "ammo_skills": True,         # 10414: her S1 / S2 spend a bullet too (else only the bonus shots; user: try both)
     "shot_tremor": 4,            # 10414: a bonus shot's Tremor (her S1 coin's in the game)
     "gaze_max": 7, "gaze_dmg": 1,  # 10412: stacks to the stone; + damage per coin per stack
@@ -73,13 +50,12 @@ KIT_RULES = {
 
 # group = the animation (<Char>_S<n>); sid = the game's skill whose numbers it fights with
 KITS = {
-    # (animations as the game ties them: the Appearance's motionList, _motiondetail 6 + n = the skills' skillMotion "S<n>" — her
-    # timeline names don't follow it: S2 plays Phase1_S4, S4 (Rule Violation) Phase1_S5, S6 Phase4_S2, S8 Phase1_S6)
+    # skill → animation via motionList (her timeline names don't match)
     11115: {"key": "phases", "defense": "Counter", "defend_p": 0.25,
             "deck": [("Outis_Middle_Father_Phase1_S1", 1111501), ("Outis_Middle_Father_Phase1_S4", 1111502), ("Outis_Middle_Father_Phase1_S3", 1111503)],
             "deck3": [("Outis_Middle_Father_Phase4_S1", 1111505), ("Outis_Middle_Father_Phase4_S2", 1111506), ("Outis_Middle_Father_Phase4_S3", 1111507)],
             "finisher": ("Outis_Middle_Father_Phase4_S9", 1111509), "counter": "Outis_Middle_Father_Phase1_S5",
-            # her counter (user): "Time to Unpack!" (1111508, skillMotion S8 = motionList 14 = Phase1_S6, 4 timelines for its 4 coins)
+            # her counter: Time to Unpack!
             "unpack": ("Outis_Middle_Father_Phase1_S6", 1111508),
             "words": "3 phases. Each Counter moves her to the next one — you have to live until then; in phase 3 she gets very strong.",
             "rules": ["Defense: Counter — takes the blow, strikes back with Time to Unpack! (whole skill)", "Each Counter: next phase (1 → 2 → 3)",
@@ -106,19 +82,18 @@ KITS = {
             "levels": {}},
 }
 
-# kit things shown under the HP as statuses (the player draws icon + number): key → the game's buff icon
+# kit statuses shown under the HP: key → buff icon
 KIT_ST = {"sw1": "MiddleFatherSwordOneOutis", "sw2": "MiddleFatherSwordTwoOutis", "sw3": "MiddleFatherSwordFourOutis",
           "ammo": "BulletGodok", "gaze": "GazePersonality", "stone": "ContemptPersonality"}
 
-# 10414's bullet drum: the game's effect, a child of her prefab (under DefaultEffectPivot); its animator's states
-# "<name>_ani_<n>" hold n bullets, "_ani_1<n>" fire one of n, "_ani_Re" reloads (the player: Viewer DrumFire)
+# 10414's bullet drum effect (animator states per bullet count)
 DRUM_FX = "FX_PC_9_Ryoshu_Walpu8_Buff8_BulletCylinder"
 
-# the final floor's bosses (big ones of the game that our player shows well; checked in the 2026-10-10 boss renders)
+# final floor bosses
 FINAL_BOSSES = ["8172_MaouHeathclif_MainAppearance", "8049_DongLang_1pAppearance", "8550_LostPassengerAppearance",
                 "8585_ContemptSpiralAppearance"]
 
-# economy gifts: the game's own (their text says what they do; numbers as ours): no fight effect
+# economy gifts: no fight effect
 ECON = {
     9079: {"urn": 200},          # Golden Urn: breaks after the next won fight, +200 Cost (user's example)
     9078: {"income": 30},        # Voracious Hammer: + Cost after each won boss
@@ -150,7 +125,7 @@ def econ_text(e: dict) -> list[str]:
 # ------------------------------------------------------------------ data (app side)
 
 def kit_fighter(base: dict, cid: int, skills_t) -> dict:
-    """A kit character: its deck's skills (the kit's animations with the game's numbers of the kit's skill ids), one defense."""
+    """A kit character: deck skills and one defense."""
     k = KITS[cid]
     by = {s["group"]: s for s in base["skills"]}
 
@@ -178,7 +153,7 @@ def kit_fighter(base: dict, cid: int, skills_t) -> dict:
 
 
 def defense_of(f: dict) -> str:
-    """A fighter's one defense: its kit's, else the data's (Guard / Evade skill, else its Counter), else Guard."""
+    """A fighter's one defense."""
     if f.get("kit"):
         return KITS[f["kit"]]["defense"]
     if f.get("guard"):
@@ -189,7 +164,7 @@ def defense_of(f: dict) -> str:
 # ------------------------------------------------------------------ the fight (pure)
 
 class Deck2(E.Deck):
-    """The game's deck: S1 x3, S2 x2, S3 x1 (later ones x1), shuffled, drawn to the end, then shuffled again."""
+    """The deck: S1 x3, S2 x2, S3 x1, reshuffled when empty."""
 
     def __init__(self, f, rnd, R=E.RULES):
         super().__init__(f, rnd, R)
@@ -216,8 +191,7 @@ class Deck2(E.Deck):
 
 
 class Fight2(M.MirrorFight):
-    """MirrorFight (statuses, Shield, Tremor kills, coin damage) with the new rules: the deck, one
-    defense per side, side 0's kit. `level`: the character's level (its unlocks)."""
+    """MirrorFight with the deck, one defense per side and side 0's kit."""
 
     def __init__(self, a, b, seed, opts, hp_max, hp_now, level=1):
         super().__init__(a, b, seed, opts, hp_max, hp_now)
@@ -267,8 +241,7 @@ class Fight2(M.MirrorFight):
         return (b / c + (b * RULES["dmg_heads"] if head else 0)) * self.mult(sk, w) + flat / c
 
     def counter(self, d, w):
-        """A strike back: Outis' Time to Unpack! (whole, dmg_counter in all); a Tremor kill as before; else one coin of
-        dmg_counter."""
+        """Strike back: Outis' Unpack, a Tremor kill, or one coin."""
         if self.tremor_kills(w) and not self.series and self.decks[d].counter_coin() is not None:
             return super().counter(d, w)
         un = self.F[0].get("unpack") if d == 0 and self.key == "phases" else None
@@ -322,14 +295,12 @@ class Fight2(M.MirrorFight):
         return final
 
     def shot(self, mid: int):
-        """(10414) A bonus shot during the enemy's attack: one coin of her S1, unopposed, + Tremor; 1 bullet. `mid`: the
-        enemy's coins she dodged (its first ones) — the player puts the shot right after the last of them, before its next
-        blow (versus_engine.script); she shoots from where she is, no run-in."""
+        """(10414) Bonus shot during the enemy's attack, after the coins she dodged."""
         sk = self.F[0]["deck1"][0]
         parts = [t for t in sk["parts"] if t["events"].get("hits")]
         if not parts or self.hp[1] <= 1:
             return
-        # (her plain S1 "Bang. Bang." coin that fires at once — Timeline_2, its shot 0.08 s in — so the enemy waits least)
+        # her quickest S1 coin
         anim = min(parts, key=lambda t: min(h["t"] for h in t["events"]["hits"]))
         b4 = E.range_of(self.gap(), self.R)
         self._side, self._first = 0, False
@@ -343,8 +314,7 @@ class Fight2(M.MirrorFight):
         self.spend_bullet()
 
     def spend_bullet(self):
-        """(10414) One bullet out of her drum; the last one: Tremor Burst on the enemy (HP lost = its Tremor, never the
-        last one; its Tremor halves), the drum full again."""
+        """(10414) One bullet; the last one: Tremor Burst, then reload."""
         self.bullets -= 1
         if self.bullets > 0:
             return
@@ -381,7 +351,7 @@ class Fight2(M.MirrorFight):
         return {}
 
     def kit_now(self):
-        """The last step with the kit's state as it is now (it may have changed after the step was logged)."""
+        """The last step with the current kit state."""
         s = self.steps[-1]
         s["kit"] = {"phase": self.phase, "bullets": self.bullets, "gaze": self.gaze, "stone": self.stone}
         if "st" in s:
@@ -451,8 +421,7 @@ class Fight2(M.MirrorFight):
                 if dodged and self.key == "gun" and self.bullets > 0:
                     self.shot(int(dodged.group(1)))
                 continue
-            # an exchange (as before): 2-5 clash rounds, each won by the higher roll of the skill's coins; the one that
-            # won more lands its whole skill, as many won: nobody is hit
+            # an exchange: 2-5 clashes, the one that won more lands its skill
             n = min(rnd.randint(*R["exchange"]), self.rounds - self.clashes)
             wins = [0, 0]
             for r in range(n):
@@ -542,7 +511,7 @@ def boss_power(floor: int, hard: bool) -> int:
 
 
 def flat_mods(m: dict) -> dict:
-    """A build's numbers with its "+x damage" share as + damage per landing (RULES dmg_flat), as the fight uses it."""
+    """Build mods with "+x damage" as flat damage per landing."""
     return dict(m, dmg=0.0, dmgFlat=round(m.get("dmg", 0.0) * RULES["dmg_flat"]))
 
 
@@ -553,8 +522,7 @@ def mods_lines(m: dict) -> list[str]:
 
 
 def boss_mods(kw: str) -> dict:
-    """A boss's own numbers: the status of its pack's keyword (Bleed, Burn, Rupture, Tremor dealt; Poise gained), as a
-    gift of tier boss_status gives it. Sinking / Charge / General have no status: nothing."""
+    """A boss's status from its pack's keyword."""
     m = build_mods([], {})
     eff = (M.EFFECTS.get(kw) or {}).get(RULES["boss_status"]) or {}
     for key in ("inflict", "self"):
@@ -619,7 +587,7 @@ def tier_ok(cat, gid, floor) -> bool:
 
 
 def recipes_open(run, cat) -> list[dict]:
-    """Recipes with at least one ingredient owned (not the fused gift itself): [{"id", "of", "have"}]."""
+    """Recipes with an ingredient owned."""
     own = owned(run)
     out = []
     for r in cat["recipes"]:
@@ -632,7 +600,7 @@ def recipes_open(run, cat) -> list[dict]:
 
 
 def new_run(cat, seed, boss_st=False) -> dict:
-    """boss_st: bosses deal their pack keyword's status (boss_mods; a switch on the start screen, off by default)."""
+    """A new run; boss_st: bosses deal their pack's status."""
     return {"v": 2, "seed": seed, "bossSt": bool(boss_st), "step": 0, "phase": "id", "floor": 0, "cost": RULES["cost_start"], "build": [], "id": None,
             "lv": 1, "offer": list(KITS), "shelf": [], "locked": False, "pack": None, "boss": None, "seen": [], "log": [], "fights": []}
 
@@ -647,8 +615,7 @@ def pick_id(run, cat, cid, kw="") -> dict:
 
 
 def open_shop(run, cat, kw=None, keep=None) -> dict:
-    """A shelf: shop_size gifts of the floor's tiers (from the last pack's pool, else any; one of a started recipe's
-    missing ingredients when there is one); a locked shelf stays (minus what was bought)."""
+    """A shop shelf of the floor's tiers; a locked shelf stays."""
     own = owned(run)
     if keep is None and run.get("locked") and run.get("shelf"):
         run["shelf"] = [g for g in run["shelf"] if g not in own]
@@ -752,7 +719,7 @@ def level_up(run, cat) -> dict:
 
 
 def pack_kw(cat, p) -> str:
-    """A pack's keyword: the one most of its pool's gifts have (economy and general gifts aside)."""
+    """A pack's keyword: the most common in its pool."""
     n = {}
     for g in p["pool"]:
         x = cat["gifts"].get(g)
@@ -762,8 +729,7 @@ def pack_kw(cat, p) -> str:
 
 
 def leave_shop(run, cat, fightable=lambda b: True) -> dict:
-    """3 packs for the next floor, each with its keyword, its bosses (those that can fight; the one fought is drawn from
-    them) and the one gift it pays out, shown before the pick; the last floor: packs of the final bosses."""
+    """3 packs for the next floor with keyword, bosses and reward; last floor: final bosses."""
     rnd = _rnd(run)
     f = run["floor"]
     last = f >= RULES["floors"] - 1
@@ -819,7 +785,7 @@ def pick_pack(run, cat, k) -> dict:
 
 
 def fight_done(run, cat, fight) -> dict:
-    """Lost → the end; won → interest on what is held, the boss's Cost, economy gifts, one more gift slot, the reward."""
+    """Lost → end; won → interest, Cost, economy gifts, a slot, the reward."""
     o = run["at"]
     run["log"].append(f"floor {run['floor'] + 1}: {run['boss']} — {'won' if fight['winner'] == 0 else 'lost'}")
     if fight["winner"] != 0:
@@ -921,7 +887,7 @@ def page_catalog(svc) -> dict:
 
 
 def fight_of(svc, run) -> dict:
-    """The boss fight of run's floor (also what viewer.versus_job plays for a v2 run in the Live window)."""
+    """The boss fight of the run's floor."""
     st = app_state(svc)
     F = _fighters(svc, [run["id"], run["boss"]])
     if run["id"] not in F or run["boss"] not in F:
@@ -937,8 +903,7 @@ def fight_summary(fight) -> dict:
 
 
 def act(svc, run, what, arg=None) -> dict:
-    """One page action on its run: new, id, buy / sell / enhance (gift id), refresh (keyword or None), lock, fuse (recipe
-    id), level, leave, pack (offer index), fight, reward (gift id or None)."""
+    """One page action on the run."""
     st = app_state(svc)
     cat = st["cat"]
     out = {}
@@ -1002,7 +967,7 @@ def act(svc, run, what, arg=None) -> dict:
 
 
 def kit_icon(svc, key: str) -> str:
-    """A KIT_ST status's icon as a PNG file for the player (the game's buff sprite, kept in the UI cache), "" if none."""
+    """A KIT_ST icon as a PNG for the player."""
     import io
     import os
     from .extract import extract

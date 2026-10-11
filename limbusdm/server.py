@@ -18,10 +18,9 @@ from .paths import resource_dir
 from .service import Service
 
 TOKEN_HEADER = "X-Limbus-Datamine"
-# How long the window keeps a picture, font or Spine file before asking again; asked again, it gets "not changed"
-# (304) while the snapshot and the app are the same ones (the ETag), so nothing is cut out of the bundles twice.
+# how long the window keeps a picture; then 304 while snapshot and app are the same (ETag)
 KEEP = "max-age=3600"
-# Lists that only a new snapshot changes and that take a while to put together: answered from memory after the first time.
+# lists only a new snapshot changes: kept in memory after the first time
 PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror"}
 
 
@@ -32,7 +31,7 @@ def _etag(svc) -> str:
 
 def make_handler(svc: Service, ui_dir: str, on_show=None):
     class H(BaseHTTPRequestHandler):
-        # connections are kept open: a page of a few hundred pictures no longer opens one (and a thread) per picture
+        # keep-alive: no connection per picture
         protocol_version = "HTTP/1.1"
         timeout = 120  # an idle connection's thread ends by itself
         disable_nagle_algorithm = True
@@ -68,7 +67,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if ctype.startswith(("video/", "audio/")):
                 self.send_header("Accept-Ranges", "bytes")
             extra = dict(extra or {})
-            # (one Cache-Control only: "no-store" sent next to "max-age" made the window keep nothing at all)
+            # one Cache-Control only
             keep = extra.get("Cache-Control", "").startswith("max-age") and code == 200
             if keep:
                 if not self.path.startswith("/api/thumb?"):  # (a thumbnail is named by its content: kept for the day)
@@ -88,7 +87,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             self._send(code, body, "application/json; charset=utf-8")
 
         def _gz_json_file(self, path, tag=None):
-            """tag: the file's name says what is in it, so the window keeps it and only asks "still the same?" (304)"""
+            """tag: the file name says what is in it (304 when unchanged)"""
             if not os.path.exists(path):
                 return self._json({"error": "not found"}, 404)
             if tag and self.headers.get("If-None-Match") == tag:
@@ -112,8 +111,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             self._send(200, body, ctype, {"Cache-Control": "max-age=86400"} if cache else None)
 
         def _file_live(self, path, ctype):
-            """A file the app itself makes and may make again (an enemy's picture, an effect's video): kept by the window
-            and asked "still the same?" each time — the answer is a few bytes (304) unless the file was written anew."""
+            """A file the app may make again: kept by the window, 304 unless rewritten."""
             if not path or not os.path.exists(path):
                 return self._send(404, b"not found", "text/plain")
             st = os.stat(path)
@@ -130,7 +128,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             self._send(200, body, ctype, {"Cache-Control": "no-cache", "ETag": tag})
 
         def _keep(self) -> bool:
-            """Spine files made for this request are kept on disk: not for the site's export (limbusdm/site.py, urllib)."""
+            """Keep made Spine files on disk (not for the site export)."""
             return not (self.headers.get("User-Agent") or "").startswith("Python-urllib")
 
         def _spine_file(self, p: str):
@@ -148,7 +146,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             return self._send(200, data, mime, {"Cache-Control": "max-age=3600"})
 
         def _asset_thumb(self, path: str):
-            """Small preview of a catalog image path: stored texture thumbnail, else the sprite rendered live."""
+            """Small preview of a catalog image: stored thumbnail, else rendered live."""
             rows = svc.lookup_container(path)
             if not rows and extra_file(path):  # (a picture the game no longer has, shipped with the app)
                 import io
@@ -200,7 +198,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             return self._file(cache, "image/png", cache=True)
 
         def _asset_img(self, path: str):
-            """Full-size picture of a catalog path (Identity art, E.G.O CG…), straight from the game cache."""
+            """Full-size picture of a catalog path, from the game cache."""
             rows = svc.lookup_container(path)
             if not rows and extra_file(path):
                 return self._file(extra_file(path), "image/png", cache=True)
@@ -229,8 +227,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 self.close_connection = True
 
         def _ours(self) -> bool:
-            """The request names this server by its own address. A web page can point a name of its own at 127.0.0.1
-            and then talk to the app as if it were its page (DNS rebinding) — such a request carries that name."""
+            """Whether the Host header is this server's own address."""
             host = (self.headers.get("Host") or "").lower()
             if host in (f"127.0.0.1:{self.server.server_address[1]}", f"localhost:{self.server.server_address[1]}"):
                 return True
@@ -251,7 +248,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             self._run(self._post)
 
         def _get_kept(self):
-            """What the window already has (a picture it kept, a list made once per snapshot) is answered without the work."""
+            """Answer from what the window or memory already has."""
             tag = self.headers.get("If-None-Match")
             if tag and tag == _etag(svc):
                 self._replied = True
@@ -283,7 +280,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if not full.startswith(os.path.normpath(ui_dir) + os.sep):
                     return self._send(403, b"", "text/plain")
                 return self._file(full)
-            if p == "/api/appnotes":  # what's new in the app since the version seen last ({} when seen); all=1: the last releases
+            if p == "/api/appnotes":  # app notes since the version seen last; all=1: the last releases
                 from . import appnotes
                 if q.get("all"):
                     return self._json(appnotes.history())
@@ -446,8 +443,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json(svc.fx.live_status())
             if p == "/api/bgm_tracks":
                 from .viewer import bgm_label, bgm_tracks, sound_index
-                # (with the soundtrack's own name, where it plays and its number in /api/music_audio when the corner
-                # player's list has the same recording: the Versus page shows those and plays a track to listen)
+                # with the track's name and its corner-player number when known
                 roots = {"install": svc.game.game, "locallow": svc.game.locallow}
                 known = {}
                 try:
@@ -555,7 +551,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     scenes = art_scenes(path)
                     found = scenes.get(int(q["atlas"]))
                     if not found and scenes:
-                        # the illustration may use another cut of the same skeleton ("<base>_분리버전" next to "<base>")
+                        # the illustration may use another cut of the skeleton
                         base = next((x["base"] for x in svc.spine_list() if x["bundle"] == q["bundle"] and x["atlas"] == q["atlas"]), None)
                         cuts = {x["atlas"]: x["base"] for x in svc.spine_list() if x["bundle"] == q["bundle"]}
                         found = next((sc for a, sc in scenes.items() if base and cuts.get(str(a), "").startswith(base)), None)
@@ -606,8 +602,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/quiz":  # voice lines for Games -> Guess the Identity
                 return self._json(_quiz_twins(svc, svc.quiz()))
             if p == "/api/game_pics":  # pictures of the Games: the jukebox covers (the track's card), the story's
-                # backgrounds by Canto (Guess the Canto; folders Ep<N> / Ep<N>_<part>, named from the folder on so that
-                # the web copy doesn't take a few hundred full-size pictures for paths to fetch)
+                # story backgrounds by Canto (paths from the folder on)
                 import re as _re
                 base, story = "Assets/Resources_moved/Story/Backgrounds/", {}
                 for r in svc.browse_query("Story/Backgrounds", "Sprite", 5000):
@@ -723,12 +718,11 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                                    "maps": [m["name"] for m in battle_maps(svc)]})
             if p == "/api/enemies":  # the handbook's list; an entry's skill and passive texts come with /api/enemy
                 db = svc.enemy_db()
-                # a Spine-drawn enemy is shown by a picture of its idle pose, taken by the page (the game's portrait
-                # until then); the sprite-drawn ones keep the portrait
+                # Spine enemies: the page's idle-pose picture; sprite ones: the portrait
                 done = {fn[:-4] for fn in os.listdir(_thumb_dir(svc))} if os.path.isdir(_thumb_dir(svc)) else set()
                 spines = svc.enemy_spines()
                 making = _drawn_thumbs(svc, db["list"], spines, done)
-                # twins: looks whose picture repeats an earlier one's in the handbook (Guess the enemy asks it once)
+                # looks whose picture repeats an earlier one
                 from .twins import repeats, sparse
                 looks = [a for a in dict.fromkeys(e["app"] for e in db["list"]) if a in done]
                 files = [os.path.join(_thumb_dir(svc), a + ".png") for a in looks]
@@ -889,7 +883,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     return self._json({"mods": mods.list_mods(svc, cid)})
                 mods.save(svc, cid, b["name"], b)
                 return self._json({"mods": mods.list_mods(svc, cid)})
-            if p == "/api/mirror/act":  # Versus → Mirror: one action on the page's run ({"run", "act", "arg"}) -> {"run", "fight"?}
+            if p == "/api/mirror/act":  # Versus → Mirror: one action on the run
                 from . import versus_mirror2 as M2
                 try:
                     return self._json(M2.act(svc, b.get("run"), b["act"], b.get("arg")))
@@ -972,8 +966,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
 
 
 def spine_file(svc: Service, bundle: str, atlas_pid: int, fn: str, keep: bool = True) -> tuple[bytes, str]:
-    """skeleton.json | skeleton.atlas | <page>.png of a Spine skeleton in a bundle, linked by path id (names repeat:
-    many skeletons are called "imported"). Kept on disk once made (spine.cached; `keep`)."""
+    """skeleton.json / .atlas / page PNG of a Spine skeleton by path id; kept on disk."""
     from .spine import cached
     path = svc.object_file(bundle)
     if not path:
@@ -1035,7 +1028,7 @@ def spine_zip(svc: Service, bundle: str, atlas_pid: int, base: str) -> bytes:
 
 
 def frames_gif(frames: list[str], fps: float) -> bytes:
-    """PNG data URLs (frames captured in the UI, e.g. from the Spine player) → GIF cropped to what is visible."""
+    """PNG data URLs → GIF cropped to what is visible."""
     import base64
     import io
     from PIL import Image
@@ -1053,8 +1046,7 @@ def frames_gif(frames: list[str], fps: float) -> bytes:
     return _save_gif(imgs, durations)
 
 
-# The pictures on the cards of the Games page, three a game, picked by Vlad (2026-10-07) from sets of the game's own:
-# a path in the game's files, or "enemy:<appearance>" = the handbook's picture of that enemy's battle look.
+# Games page card pictures, three a game (Vlad's pick): a game path or "enemy:<appearance>"
 CARD_PRESET = {
     "track": ["Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_24_3.png", "Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_14_1.png",
               "Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_24_1.png"],
@@ -1098,11 +1090,7 @@ CARD_PRESET = {
 
 
 def game_cards(svc: Service, n: int = 12) -> dict:
-    """{game: [picture request]}: the pictures on the cards of the Games page, in order — the same three for
-    everybody (CARD_PRESET). A game without a preset gets a handful of the game's own instead, other ones every time
-    (jukebox covers, Identities, skills, faces from the story's log, enemies, the story's backgrounds), of which the
-    page draws the first three that load. Marked "hub=1" for the web copy: it keeps the cards' pictures in a pack of
-    its own, where any other picture costs the visitor the whole pack it sits in."""
+    """{game: [picture requests]} for the Games page cards: the preset, else random picks ("hub=1" for the site)."""
     import random
     from urllib.parse import quote
     sid = svc.latest_snapshot_id()
@@ -1138,7 +1126,7 @@ def game_cards(svc: Service, n: int = 12) -> dict:
     out = {g: some(g) for g in found}
     for g in ("wordle", "conn"):  # the Identities' games: faces too, other ones on each card
         out[g] = some("id")
-    try:  # enemies by the page's own pictures of their idle pose (made while the handbook is looked through)
+    try:  # enemies by the page's idle-pose pictures
         done = {fn[:-4] for fn in os.listdir(_thumb_dir(svc))} if os.path.isdir(_thumb_dir(svc)) else set()
         apps = sorted({e["app"] for e in svc.enemy_db()["list"] if e.get("app")} & done)
         out["enemy"] = ["/api/enemy_thumb?app=" + quote(a, safe="") + "&hub=1" for a in random.sample(apps, min(n, len(apps)))]
@@ -1153,9 +1141,7 @@ def _thumb_dir(svc) -> str:
 
 
 def _drawn_thumbs(svc, enemies: list, spines: dict, done: set) -> int:
-    """Sprite-drawn enemies without a portrait in the game (the Arknights collab's, …) get the player's picture of
-    their idle pose (Versus' make_fighter_pics) as their handbook picture: those made are copied into enemy_thumbs
-    (added to `done`), the rest queued. Returns how many are still being made."""
+    """Sprite enemies without a portrait get the player's idle-pose picture; returns how many are still queued."""
     if not spines:  # (which ones are Spine-drawn is known only once the skeletons are linked)
         return 0
     from .viewer import _safe_name, fighter_pic_dir
@@ -1179,9 +1165,7 @@ def _drawn_thumbs(svc, enemies: list, spines: dict, done: set) -> int:
 
 
 def _quiz_twins(svc, q: dict) -> dict:
-    """The story's characters (Guess the character) with "twin" (the kept one's place) on those whose picture repeats
-    another's: one portrait for two speakers keeps the speaker it is named after (StoryLog_Sanson: Sansón, not Narrator),
-    else the one with more lines, and gets the other's lines."""
+    """Story characters; a portrait shared by two keeps one speaker ("twin") with both's lines."""
     import unicodedata
     from .twins import repeats
     chars = q.get("chars") or []
@@ -1206,7 +1190,7 @@ def _quiz_twins(svc, q: dict) -> dict:
     order = sorted(range(len(chars)), key=lambda i: (not (chars[i].get("pic") and flat(chars[i]["name"]) in flat(os.path.basename(chars[i]["pic"]))),
                                                      -len(chars[i].get("lines") or []), i))
     twins = {order[k]: order[j] for k, j in repeats([files[i] for i in order]).items()}
-    # the twin's lines go to the one kept (Narrator's to Sansón); it stays in the list, empty, so the others keep their places
+    # the twin stays, empty, so places don't shift
     out = [{**c, "lines": list(c.get("lines") or [])} for c in chars]
     for i, j in twins.items():
         out[j]["lines"] += out[i]["lines"]
@@ -1215,8 +1199,7 @@ def _quiz_twins(svc, q: dict) -> dict:
 
 
 def _no_thumbs(svc, add: str | None = None) -> list[str]:
-    """The enemies the page found no idle pose to take a picture of (ui/enemies.js enThumbs), kept for the game
-    version they were found in: a new one may bring the missing skeleton."""
+    """Enemies with no idle pose to picture, kept per game version."""
     path, sid = os.path.join(_thumb_dir(svc), "_none.json"), svc.latest_snapshot_id()
     try:
         with open(path, encoding="utf-8") as f:
@@ -1233,8 +1216,7 @@ def _no_thumbs(svc, add: str | None = None) -> list[str]:
 
 
 def _safe(fn: str, room: int = 200) -> str:
-    """A file name Windows accepts: no reserved characters, and short enough (a name over 255 chars, or a path over
-    260, fails with "Invalid argument"); a long Versus name is cut after its last " · " part that still fits."""
+    """A file name Windows accepts (no reserved chars, not too long; long Versus names cut at " · ")."""
     fn = "".join(c if c not in '<>:"/\\|?*' else "_" for c in fn).strip()
     if len(fn) > room:
         cut = fn[:room]
@@ -1363,7 +1345,7 @@ def export_object(svc: Service, b: dict) -> dict:
 
 
 def _fx_id(v) -> int | str:
-    """An Identity / E.G.O id, or an enemy's appearance prefab name ("91008_TroubleshooterAppearance")."""
+    """Identity / E.G.O id, or an enemy's appearance prefab name."""
     v = str(v)
     if v.isdigit():
         return int(v)
@@ -1373,7 +1355,7 @@ def _fx_id(v) -> int | str:
 
 
 def _fx_variant(q: dict) -> str:
-    """Skill render options from a request: "v" ("solo_alpha"…, see viewer.FLAGS); the older "solo" flag still works."""
+    """Skill render options from a request ("v", see viewer.FLAGS; old "solo" still works)."""
     from .viewer import variant
     v = q.get("v") or ""
     solo = q.get("solo")

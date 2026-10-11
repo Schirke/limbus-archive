@@ -4,8 +4,7 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const CJK = /[぀-ヿ㐀-鿿가-힯]/;
 const PAGE = 200;
-// every video / sound on the pages starts at the volume of Settings → Video volume (25 % at first); a volume set on one of them
-// is kept for the next. Versus videos (data-vol="keep") and the music players (not on the page) keep their own sound
+// pages' videos / sounds start at Settings → Video volume; a changed volume is kept
 const MEDIA_VOL = "media.vol";
 const mediaVol = () => { try { const v = parseFloat(localStorage.getItem(MEDIA_VOL)); return v >= 0 && v <= 1 ? v : 0.25; } catch { return 0.25; } };
 document.addEventListener("loadstart", (e) => {
@@ -35,10 +34,10 @@ const LANG_KEY = "lang";
 const LANG = { id: "", list: null, tables: {} };
 try { LANG.id = localStorage.getItem(LANG_KEY) || ""; } catch {}
 if (LANG.id === "en") LANG.id = "";
-// the lists that carry the game's texts (others: the app's own words, file names, reports' raw records)
+// lists that carry the game's texts
 const LANG_PAGES = /^\/api\/(units|enemies|enemy|buffs|music|mirror|bgm_tracks|quiz|gacha|sounds|story|story_ep|stages|history|game_cards|characters|skills|versus_list)\b/;
 const LANG_STORY = /^\/api\/(quiz|gacha|sounds|story|story_ep)\b/;  // …and the story / voice lines
-// the fields that are a text to show; anything else only when it reads as a sentence (a name there may be a key)
+// fields to translate; others only when they read as a sentence
 const LANG_FIELDS = new Set(["name", "title", "desc", "flavor", "coindescs", "panicDesc", "lowDesc", "sinnerName", "place", "who", "text", "line", "lines", "abName", "subtitle", "role", "label"]);
 const LANG_MAPS = new Set(["keywords", "tags"]);  // {key: its name} lists (as lists of keys they stay)
 async function langTable(g) {
@@ -69,7 +68,7 @@ async function langApply(path, data) {
   };
   const put = (s, key) => s.length > 1 && (LANG_FIELDS.has(key) || /\S\s+\S+\s+\S/.test(s)) ? look(s) : null;
   if (data && typeof data === "object") walk(data, "");
-  // a {name: picture} list next to rows that name it: the translated names find their pictures too
+  // {name: picture} lists follow translated names
   if (data && data.pics && typeof data.pics === "object" && !Array.isArray(data.pics))
     for (const [k, v] of Object.entries(data.pics)) { const x = put(k, ""); if (x !== null && !(x in data.pics)) data.pics[x] = v; }
   return data;
@@ -78,8 +77,7 @@ async function langList() {
   if (!LANG.list) LANG.list = fetch("/api/langs").then((r) => r.json()).then((o) => o.langs || []).catch(() => []);
   return LANG.list;
 }
-// the new language's table is fetched before the page starts again: the window keeps it, so the pages after the
-// reload get it at once, and a language that can't be had leaves the page as it is
+// fetch the new language's table before reloading; on failure stay as is
 async function langSet(id) {
   if (id && id !== LANG.id) {
     document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.disabled = true);
@@ -167,7 +165,7 @@ $("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 
 const fmtSize = (n) => n == null ? "" : n > 1e9 ? (n / 1e9).toFixed(2) + " GB" : n > 1e6 ? (n / 1e6).toFixed(1) + " MB" : n > 1e3 ? (n / 1e3).toFixed(0) + " KB" : n + " B";
-// version "s20261001_CxWu8Z…" → "build 01.10.2026"; snapshot id "<version>_20261003-205708" → "build 01.10.2026 · taken 03.10 20:57"
+// version / snapshot id → "build 01.10.2026 · taken 03.10 20:57"
 const fmtVer = (v) => { const m = /^s(\d{4})(\d\d)(\d\d)_/.exec(v || ""); return m ? `build ${m[3]}.${m[2]}.${m[1]}` : (v || "?"); };
 const fmtSnap = (id) => { const m = /^(.*)_(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)\d\d$/.exec(id || ""); return m ? `${fmtVer(m[1])} · taken ${m[4]}.${m[3]} ${m[5]}:${m[6]}` : id; };
 const SUMMARY_LABELS = [["leaks", "highlights"], ["foreign_only", "KR/JP-only lines"], ["texts", "texts"], ["data", "data"], ["images", "images"],
@@ -240,7 +238,7 @@ async function refresh() {
   refresh.lastGame = gs;
   if (typeof refresh.hook === "function") refresh.hook();
 }
-// "What's new" of a report: a short text to paste into Discord or Telegram; pops up once for each new patch
+// a report's short "What's new"; pops up once per patch
 async function showNotes(rid) {
   let n;
   try { n = await api(`/api/patchnotes?id=${encodeURIComponent(rid)}`); } catch (e) { toast(esc(e.message)); return; }
@@ -258,7 +256,7 @@ async function showNotes(rid) {
   $("#nopen").onclick = closeModal;
   if (!n.seen) api("/api/patchnotes_seen", { id: rid }).catch(() => {});
 }
-// what's new in the app after it updated: the release notes since the version seen last (from GitHub)
+// app release notes after an update
 function showAppNotes(a) {
   const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
     .map((l) => /^[-*] /.test(l) ? `<li>${l.slice(2)}</li>` : /^#+ /.test(l) ? `<div><b>${l.replace(/^#+ /, "")}</b></div>` : `<div>${l}</div>`).join("");
@@ -274,7 +272,7 @@ async function showAppHistory() {
   $("#status").classList.add("hidden");
   try { showAppNotes(await api("/api/appnotes?all=1")); } catch (e) { toast(esc(e.message)); }
 }
-// at the start: the app's own notes after an update, then a game patch that came in while the app was closed
+// at start: app notes, then a missed game patch
 (async () => {
   const a = await api("/api/appnotes").catch(() => ({}));
   if (a.version) await showAppNotes(a);
@@ -307,7 +305,7 @@ function renderStatus() {
 $("#statusbtn").onclick = () => $("#status").classList.toggle("hidden");
 document.addEventListener("click", (e) => { if (!e.target.closest("#statusbox")) $("#status").classList.add("hidden"); });
 
-// reset timers, Moscow time as UTC hours: daily 00:00, weekly Thursday 00:00, maintenance Thursday 04:00-06:00
+// reset timers (UTC hours)
 function drawTimers() {
   const now = new Date(), H = 3600e3;
   const next = (h, wd) => {
@@ -327,8 +325,7 @@ drawTimers();
 setInterval(drawTimers, 20000);
 setInterval(refresh, 2000);
 
-// A snapshot was taken while the window is open: the lists the pages keep (characters, Identities, enemies, music…)
-// were read from the one before, or from nothing on the first run, so they are read again.
+// A new snapshot: drop the lists the pages kept and read them again.
 function newSnapshot() {
   anim.data = null; UNITS = null; ENEMIES = null; STAGES = null; MIRROR = null; HISTORY = null; ga.data = null; gi.data = null; vs.maps = vs.bgm = null;
   if (typeof m2 !== "undefined") m2.cat = null;
@@ -445,7 +442,7 @@ const view = { tab: "leaks", q: "", kinds: new Set(["added", "changed", "removed
 
 async function renderReport(id, keepTab) {
   const main = $("#main");
-  // (a tab of the report that is open: drawn from what was read — the report is megabytes to fetch and to parse)
+  // same report: redraw from memory
   if (!(keepTab && REPORT && REPORT.id === id)) {
     main.innerHTML = `<div class="muted">Loading report…</div>`;
     try {
@@ -454,11 +451,11 @@ async function renderReport(id, keepTab) {
   }
   const r = REPORT, s = r.summary;
   const counts = {
-    // images: the ones with a path in the game; nameless sprite-sheet pieces are counted inside the tab
+    // images with a game path only
     leaks: s.leaks + s.foreign_only, texts: s.texts, data: s.data, images: (r.sections.images || []).filter((it) => it.path).length || s.images, audio: s.audio,
     video: s.video, code: s.code, catalog: s.catalog_added + s.catalog_removed, other: s.other,
   };
-  // opening a report lands on the first tab with something in it; a tab the user clicks stays open even if empty
+  // open on the first non-empty tab
   if (!keepTab && !counts[view.tab]) view.tab = SECTIONS.find(([k]) => counts[k])?.[0] || "leaks";
   main.innerHTML = `<div class="row"><div class="grow"><h1>Patch · ${esc(fmtVer(r.new.version))}</h1>
     <div class="sub">${esc(fmtSnap(r.new.id))} compared with ${esc(fmtSnap(r.old.id))} · ${s.bundles_changed} bundles changed</div></div>
@@ -554,7 +551,7 @@ function drawAudio(el, all) {
   const counts = {}, sounds = {};
   all.forEach((it) => { const c = audioCat(it); counts[c] = (counts[c] || 0) + 1; sounds[c] = (sounds[c] || 0) + nSounds(it); });
   if (view.audioCat && !counts[view.audioCat]) view.audioCat = null;
-  // by category, then the banks with the most new/changed sounds; metadata-only .bank twins last
+  // by category, then banks with most changes
   const items = all.filter((it) => !view.audioCat || audioCat(it) === view.audioCat)
     .map((it) => [AUDIO_ORDER.indexOf(audioCat(it)), -nSounds(it), it]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
   const chip = (c, label, n, k) => `<button class="toggle ${view.audioCat === c ? "on" : ""}" data-acat="${esc(c || "")}">${esc(label)} <span class="muted small">${k ? `${k} sounds` : `${n} files`}</span></button>`;
@@ -703,7 +700,7 @@ function drawImages(el, all) {
   all.forEach((it) => { const c = imgCat(it); counts[c] = (counts[c] || 0) + 1; });
   const cats = IMG_ORDER.filter((c) => counts[c]);
   if (view.imgCat && !counts[view.imgCat]) view.imgCat = null;
-  // "All" leaves out the nameless sprites (effect frames, map tiles, parts of sprite sheets): thousands, rarely news
+  // "All" skips nameless sprites
   const items = all.filter((it) => view.imgCat ? imgCat(it) === view.imgCat : imgCat(it) !== NOPATH_CAT)
     .map((it) => [IMG_ORDER.indexOf(imgCat(it)), it]).sort((a, b) => a[0] - b[0]).map(([, it]) => it);
   const named = all.length - (counts[NOPATH_CAT] || 0);
@@ -949,7 +946,7 @@ routes.anim = async () => {
   if (anim.sel) openAnimEntry(anim.sel);
   if (anim.data.pending) waitAnimGroups();
 };
-// The enemy → chapter map is built in the background on the first run; regroup when it's ready.
+// Regroup once the enemy → chapter map is ready.
 async function waitAnimGroups() {
   if (anim.waiting) return;
   anim.waiting = true;
@@ -972,7 +969,7 @@ const animThumb = (id) => {
   const u = typeof unitById === "function" && unitById(id);
   return u && u.img && u.img.thumb ? `<img loading="lazy" src="${imgThumb(u.img.thumb)}" onerror="this.style.visibility='hidden'">` : `<span class="an-ph"></span>`;
 };
-// an enemy's picture: the one the Enemies handbook drew (data/enemy_thumbs); the grey square where there is none
+// enemy picture from the handbook, else grey
 const animEnemyThumb = (app) => `<img loading="lazy" src="/api/enemy_thumb?app=${encodeURIComponent(app)}" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'an-ph' }))">`;
 const AN_FILTERS = [["all", "All"], ["ids", "Identities"], ["egos", "E.G.O"], ["enemies", "Enemies"], ["mine", "★ Mine"]];
 function drawAnimTree() {
@@ -1049,9 +1046,7 @@ function findChar(cid) {
   for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos]) if (x.id === cid) return { ...x, sinner: s.name, isEgo: String(cid)[0] === "2" };
   return null;
 }
-// The header of what is open: picture, title, the Mod box (it applies to every tab: Skills and Effects are rendered with
-// the picked mod, Edit mod edits it) and the tabs; the tab's content goes into #abody.
-// A character's mods (the short list): asked once, not at every tab — and again after a mod was changed (api()).
+// Header of the open character: picture, title, Mod box, tabs; mods list cached until a mod changes.
 function animMods(cid) {
   const kept = animMods.kept = animMods.kept || {};
   return kept[cid] = kept[cid] || api(`/api/mods?id=${encodeURIComponent(cid)}&light=1`).catch(() => { delete kept[cid]; return { mods: [] }; });
@@ -1124,7 +1119,7 @@ async function openAnimEntry(sel) {
   body.innerHTML = `<div class="muted">Reading the clips…</div>`;
   try { anim.clips = await api(`/api/owner_clips?id=${c.id}`); } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (!anim.clips.length) { body.innerHTML = `<div class="empty">No battle clips for this one${c.spine.length ? " — see its Spine tab" : ""}.</div>`; return; }
-  // a clip is its object in a bundle: the same clip copied into two bundles has the same id in both
+  // same clip = same object in the same bundle
   const same = (x, y) => x.clip === y.clip && x.bundle === y.bundle;
   if (!anim.clip || !anim.clips.some((x) => same(x, anim.clip))) anim.clip = anim.clips[0];
   const chip = (x) => `<button class="toggle ${same(x, anim.clip) ? "on" : ""}" data-clip="${x.clip}" data-bundle="${esc(x.bundle)}" title="${esc(x.name)}">${esc(x.label)}</button>`;
@@ -1174,12 +1169,10 @@ function fxLabel(name, slots = anim.slots) {
 const FX_OPTS = [["alpha", "Transparent", "transparent"], ["static", "Static camera", "static camera"], ["16bit", "16-bit", "16-bit"], ["tails", "Tails", "tails"],
   ["novoice", "No voice", "no voice"], ["nobg", "No background", "no background", "ego"], ["subs", "Subtitles", "subtitles", "ego"],
   ["nobloom", "No Bloom", "no bloom"], ["buffs", "Buffs", "with buffs", "own"]];
-// options only an E.G.O's cut-in uses
-// ("own": only for one whose buffs have effects of their own — Database → Buff effects)
+// options only E.G.O cut-ins use
 const fxOwn = (id) => anim.fxBuffs?.[id]?.own || [];
 const fxOptFor = (c) => FX_OPTS.filter((o) => !o[3] || (o[3] === "own" ? fxOwn(c.id).length : /^2\d{4}$/.test(String(c.id))));
-// the Effects tab: each effect of the character on its own, always on a transparent background (to lay over footage);
-// no target, cut-in, sound or camera moves to keep still
+// Effects tab: each effect alone, transparent
 const fxEffects = () => anim.tab === "effects";
 const FX_KINDS = [["skill", "Skill effects"], ["aura", "Auras"], ["battle", "Battle VFX"]];
 const FX_NOT_EFFECTS = ["alpha", "static", "novoice", "nobg", "subs", "buffs"];
@@ -1221,7 +1214,7 @@ async function openFx(c, body) {
   const modList = (await animMods(c.id)).mods.map((m) => m.name);
   if (anim.fxMod && !modList.includes(anim.fxMod)) { anim.fxMod = ""; return openFx(c, body); }
   if (!$("#abody") || anim.tab !== tab || fxVariant() !== v) return;
-  // what its buffs change on it (limbusdm/viewer.py buff_levels): a level to render at, the buff behind an effect
+  // buff levels and the buffs behind effects
   anim.fxBuffs = anim.fxBuffs || {};
   const buffs = anim.fxBuffs[c.id];
   if (!buffs) {
@@ -1247,8 +1240,7 @@ async function openFx(c, body) {
     anim.fxMod && `mod ${anim.fxMod}`].filter(Boolean).join(", ");
   const fileName = (n) => `${c.id} ${c.title} - ${label(n)}${tags ? ` (${tags})` : ""}`;
   const save = (items) => exportObj({ fxvideo: { id: c.id, v, items, folder: `${c.id} ${c.title}${tags ? ` (${tags})` : ""}` } });
-  // The page is built once per character / options / mods. After that (while it renders, when it is done) the videos
-  // are updated card by card: new ones are added in their place, a video being watched keeps playing.
+  // Built once per character / options / mods; then videos update card by card.
   const base = `${c.id}:${v}:${modList.join(",")}:${levels.length}`;
   const src = (n, stamp) => `/api/fx_video?${q}&name=${encodeURIComponent(n)}&t=${stamp}`;
   let grid = body.querySelector(".fxgrid");
@@ -1279,9 +1271,7 @@ async function openFx(c, body) {
     });
     grid = body.querySelector(".fxgrid");
   }
-  // the Effects tab's sub-tabs, as the player sorted the effects: a skill's (its timeline switches it on), an aura (what a
-  // buff keeps on the character), a battle effect (a buff's or field's out of another bundle). One is picked first and
-  // Render draws just those; the player lists all of them on every run, so each shows rendered / found
+  // Effects sub-tabs: skill, aura, battle
   const kinds = effects ? st.kinds || {} : {};
   const kindOf = (n) => kinds[n] || "skill";
   const sorted = Object.keys(kinds).length > 0;
@@ -1298,7 +1288,7 @@ async function openFx(c, body) {
   const cur = running && st.current && !vids.includes(st.current.name) ? st.current : null;
   $("#fxbar").innerHTML = cur ? `<div class="card" style="margin-bottom:8px"><div class="row" style="gap:8px"><b class="grow">${esc(label(cur.name))}</b>
       <span class="muted small">${Math.round(100 * cur.frac)}%</span></div><div class="progress"><div style="width:${Math.max(2, 100 * cur.frac)}%"></div></div></div>` : "";
-  // a render that just finished wrote new files under the old names: those not being watched are reloaded
+  // reload finished videos not being watched
   const finished = body.dataset.fxState === "running" && !running;
   const stamp = Date.now();
   const shown = new Map([...grid.children].map((el) => [el.dataset.vid, el]));
@@ -1339,9 +1329,7 @@ async function openFx(c, body) {
     : `<div class="empty">${effects ? `${esc(kindName)}: not` : "Not"} rendered yet${tags ? ` (${esc(tags)})` : ""}. ${effects ? "Each effect is played twice (to measure it, then to record it)." : "Takes about half a minute for one Identity."}</div>`;
   if (running) anim.fxTimer = setTimeout(() => openFx(c, body), 1500);
 }
-// Edit: mods of the skill renders. A mod is a folder of its own (data/mods): its textures replace the game's in
-// the renderer's memory and its colour turns the effects; the game's files and the original renders stay as they are.
-// a picture of an effect that isn't ready yet (its video is still being written) is asked for again a few times
+// Edit: render mods (data/mods), applied in the renderer's memory. A still not ready yet is retried a few times.
 function stillRetry(img) {
   const n = +(img.dataset.n || 0);
   if (n >= 5) return;
@@ -1440,10 +1428,7 @@ async function openMod(c, body, toRender) {
     modFrames(c, m, $("#modframes"), refresh, sub);
   }
 }
-// Effects of the skills drawn as an animation of your own (GIF / APNG / WebP / PNG frames / a zip of PNGs), or as an effect of
-// another character. The list is the character's own effects, rendered alone (transparent: the Effects tab) — started by
-// itself when none is there yet; the player draws the frames where the game's effect is, from the moment it comes on, and the
-// game's effect is not drawn.
+// Skill effects replaced by own frames or another character's effect, drawn where the game's effect was.
 async function modEffects(c, m, host, refresh, cached) {
   clearTimeout(anim.fxTimer);
   const id = encodeURIComponent(c.id), V = "alpha_effects";
@@ -1575,8 +1560,7 @@ async function modEffects(c, m, host, refresh, cached) {
   $("#vback").onclick = () => send({ remove: true });
   if (running) watch();
 }
-// The window for taking an effect of another character: a searchable list of characters on the left, the effects it has
-// rendered as pictures on the right (it can be rendered from here). done({cid, effect}) with the picked one.
+// Picker for another character's effect; done({cid, effect}).
 function fxPicker(done) {
   const V = "alpha_effects";
   const chars = [];
@@ -1629,8 +1613,7 @@ function fxPicker(done) {
   drawChars();
   if (who) load();
 }
-// Timing: when the original skill's video has what (effects coming on, hits, voice lines, sounds, shakes), and where the
-// mod freezes it or plays a stretch slower / faster — drawn on one timeline you can click and drag.
+// Timing: the skill video's events on one timeline, with the mod's freezes and speed stretches.
 async function modTiming(c, m, host, refresh) {
   const id = encodeURIComponent(c.id);
   host.innerHTML = `<div class="muted" style="padding:10px">Reading the skills…</div>`;
@@ -1735,8 +1718,7 @@ async function modTiming(c, m, host, refresh) {
   };
 }
 const fxGroupLabel = (n) => fxLabel(n);
-// Frames of one skill: each one replaced by a PNG of any size (placed by the feet), by another character's frame, or
-// left as it is; and the skill's timing (freeze frames, slow / fast stretches).
+// Frames of one skill: replace each with a PNG or another character's frame; and the skill's timing.
 async function modFrames(c, m, box, refresh, part = "frames") {
   const q = `id=${encodeURIComponent(c.id)}`;
   let fr;
@@ -1969,7 +1951,7 @@ async function openSpine(x, host) {
   host.querySelector(".spzip").onclick = () => exportObj({ spine: { bundle: x.bundle, atlas: x.atlas, base: x.base } });
   host.querySelector(".spgif").onclick = (e) => spineGif(x.base, e.target);
   host.querySelector(".spvid").onclick = (e) => spineVideo(x.base, e.target);
-  // (all at once: the player's script, the illustration's layers, the skeleton's atlas — not one after another)
+  // load script, layers and atlas at once
   spineAtlas(x.bundle, x.atlas);
   const [sp, scene] = await Promise.all([loadSpinePlayer().catch((e) => e),
     api(`/api/spine_scene?bundle=${encodeURIComponent(x.bundle)}&atlas=${x.atlas}`).catch(() => ({}))]);
@@ -1989,8 +1971,7 @@ async function openSpine(x, host) {
     spn.players = [spn.player]; spn.stack = [{ player: spn.player }];
     return;
   }
-  // the stack of the illustration: runs of images share one WebGL canvas, every skeleton gets its own player;
-  // a skeleton's origin sits at (ox, oy) of the frame, 1 skeleton unit = 1 frame pixel
+  // illustration stack: images share a WebGL canvas, each skeleton its own player
   scene.layers.forEach((l) => l.kind === "spine" && spineAtlas(x.bundle, l.atlas));
   const parts = [];
   for (const l of scene.layers) {
@@ -2011,7 +1992,7 @@ async function openSpine(x, host) {
   spn.stack = parts.map((p, i) => p.kind === "fx" ? { canvas: stage.querySelector(`[data-i="${i}"]`) } : { player: players[i] });
   spn.players = players.filter(Boolean);
   spn.player = players[parts.findIndex((p) => p.kind === "spine" && p.l.atlas === String(x.atlas))] || spn.players[0] || null;
-  // animations of the opened skeleton (no player controls in the framed view); the others keep their own
+  // animations of the opened skeleton
   const names = spn.player ? spn.player.skeleton.data.animations.map((a) => a.name) : [];
   if (sel && names.length > 1) {
     const cur = spn.player.animationState.getCurrent(0);
@@ -2020,7 +2001,7 @@ async function openSpine(x, host) {
     sel.onchange = () => { spn.player.setAnimation(sel.value, true); spn.players.forEach((p) => p.play()); };
   }
 }
-// a skeleton's files' address, and its atlas (asked for once; the skeleton and pages are asked for meanwhile, so the player finds them on their way)
+// skeleton files' address; atlas asked once
 const spineBase = (bundle, atlas) => `/spine/${encodeURIComponent(bundle)}/${atlas}.2/skeleton`;  // .2: pages scaled back to the atlas size (old cached copies are stretched)
 function spineAtlas(bundle, atlas) {
   const base = spineBase(bundle, atlas);
@@ -2037,7 +2018,7 @@ function spineAtlas(bundle, atlas) {
   }
   return spn.atlas.get(base);
 }
-// one Spine player in `box`; resolves with the player once loaded (null if it could not play)
+// one Spine player in `box`; null if it can't play
 async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
   const base = spineBase(bundle, atlas);
   // ~10% of atlases are not premultiplied; drawing them as premultiplied gives dark fringes
@@ -2050,7 +2031,7 @@ async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
       showControls: !!opt.controls, interactive: !!opt.controls, preserveDrawingBuffer: true,  // true: frames can be read back for GIFs
       ...(vp ? { viewport: vp } : {}),
       success: (p) => {
-        // many skeletons keep the head / body in a named skin, "default" alone shows a headless or broken model
+        // "default" skin alone is often headless
         const skins = p.skeleton.data.skins.map((s) => s.name);
         const skin = opt.skin && opt.skin !== "default" && skins.includes(opt.skin) ? opt.skin : spineSkin(skins);
         if (skin && skin !== "default") { p.skeleton.setSkinByName(skin); p.skeleton.setSlotsToSetupPose(); }
@@ -2061,7 +2042,7 @@ async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
         resolve(p);
       },
       error: async (p, msg) => {
-        // "Animation bounds are invalid": nothing visible on the first frame — frame it with the skeleton's own bounds
+        // invalid bounds: frame with the skeleton's own bounds
         if (!vp && /bounds/i.test(msg)) {
           const sk = await fetch(`${base}.json`).then((r) => r.json()).catch(() => null);
           const h = sk && sk.skeleton;
@@ -2079,9 +2060,7 @@ async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
   });
 }
 
-// Background / effect layers of an illustration in WebGL. Fx_Team/FX_Grp_SpineIllustShader: the sprite is pushed
-// around by a scrolling noise texture (Noise_*) and faded by a scrolling dissolve texture (Dissolve_*); the colour is
-// tint × White_Intensity (HDR in the game, clipped here). Approximated from the material values.
+// Illustration layers in WebGL, approximating FX_Grp_SpineIllustShader (noise distortion + dissolve).
 const FX_VS = `attribute vec2 p; attribute vec2 t; varying vec2 uv; void main() { uv = t; gl_Position = vec4(p, 0.0, 1.0); }`;
 const FX_FS = `precision mediump float;
 varying vec2 uv;
@@ -2195,7 +2174,7 @@ function sceneFx(stage, scene, runs, bundle) {
   return fx;
 }
 
-// the layers of the Spine view drawn into one 2D canvas, in order (image runs and skeleton players)
+// all layers into one 2D canvas
 function paintStack(ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
   if (spn.fx) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h); }
@@ -2210,7 +2189,7 @@ function stackCanvas(maxSide) {
   c.width = Math.round(src.width * k / 2) * 2; c.height = Math.round(src.height * k / 2) * 2;  // even sizes for video encoders
   return c;
 }
-// one loop of the current animation: step the paused players frame by frame and read the canvases back
+// one loop as GIF, stepping the players frame by frame
 async function spineGif(base, btn) {
   const p = spn.player, entry = p && p.animationState && p.animationState.getCurrent(0);
   if (!entry || !p.canvas) return toast("Nothing is playing");
@@ -2244,7 +2223,7 @@ async function spineGif(base, btn) {
     if (fx) fx.start();
   }
 }
-// one loop recorded in real time from a canvas that composites the layers (WebM: VP9 / VP8, whatever WebView2 has)
+// one loop recorded as WebM
 async function spineVideo(base, btn) {
   const p = spn.player, entry = p && p.animationState && p.animationState.getCurrent(0);
   if (!entry || !p.canvas || !window.MediaRecorder) return toast("Nothing is playing");
@@ -2298,12 +2277,11 @@ function spineSkin(skins) {
 const vs = { left: "", right: "", skill: "", rskill: "", mode: "target", rounds: 2, winner: 0, map: "", lskills: false, rskills: false, defend: true, counter: false, bursts: false, burstMax: 3, maps: null,
   trim: false, bars: false, uisfx: true, numbers: false, dash: false, hp: false, death: false, intro: false, ego: false, music: "", bgm: null,
   pace: false, impact: false, leftovers: "cut", loop: false, notes: false, kbscale: 2, debug: false, base: {}, buff: false, buffboth: false, buffmany: false, buffown: false, buffshort: false, debuff: false, debuffboth: false, debuffmany: false, debuffown: false, debuffshort: false,
-  // (the page: the side a pick fills, the picker's filters, the last picks, each side's last skill drawn at random)
+  // picker state, recent picks, random last skills
   side: "left", ptype: "ids", psinner: 1, pseason: "", pgroup: "", recent: [], lrand: true, rrand: true,
-  // (team fights, limbusdm/versus_team.py: a pick joins its side's team; only the engine view for now)
+  // team fights
   team: false, lefts: [], rights: [] };
-// the Versus switches (limbusdm/viewer.py VS_EXTRAS), in groups; each one on its own. Fixed rules now (always on, no
-// switch): the skill deck (3 : 2 : 1, no repeats), a random last skill, pushing apart two standing in each other.
+// Versus switches in groups
 const VS_GROUPS = [
   ["Fight", [
     ["pace", "Exchanges", "Clashes in exchanges of 2-5, then a skill lands or both spring apart to a stand-off (off: one clash round after another, both springing apart after each, then the winner's skill). Either way the fight engine decides the fight from the game's skill data (coin flips, guards, HP, who runs in, knockback)"],
@@ -2331,15 +2309,13 @@ const VS_GROUPS = [
 ];
 const VS_EXTRAS = VS_GROUPS.flatMap(([, items]) => items);
 const VS_SHOW = ["hp", "intro", "death", "ego", "buff", "debuff"];  // (on the page; the rest is under Debug)
-// what opens under the Buffs / Debuffs chips while one is on: [the switch's ending, its row's name, the choice when
-// off, the choice when on], the same four for both
+// Buffs / Debuffs panel rows: [key ending, name, off, on]
 const VS_BUFF = [["both", "Who", "One side", "Both"], ["many", "How many", "One", "Several"], ["own", "Which", "Any", "Their own"],
   ["short", "How long", "Whole fight", "A few seconds"]];
 const VS_BUFF_KINDS = [["buff", "Buffs"], ["debuff", "Debuffs"]];
 const VS_BUFF_KEYS = VS_BUFF_KINDS.flatMap(([p]) => VS_BUFF.map(([k]) => p + k));
 const VS_DEBUG = ["pace", "loop", "numbers", "dash", "notes"];  // (the Debug panel's chips; 0.10.80 dropped this line while still using it)
-// the base of every clash fight (limbusdm/viewer.py CLASH_BASE): on without switches; the Debug row changes it for a
-// test — `vs.base` holds only what differs from it, and only that is sent (kept until "Reset to base")
+// clash fight base; vs.base holds only what differs
 const VS_BASE = { defend: true, counter: true, bursts: true, burstMax: 5, lskills: true, rskills: true, kbscale: 2, uisfx: true,
   bars: true, trim: true, clean: true, punch: true, flash: true, ramp: true, hitstop: true, slowmo: true, fade: false, camFollow: 0.5 };
 const VS_HIT = ["punch", "flash", "ramp", "hitstop", "slowmo"];  // ("Hit effects": one switch for all five)
@@ -2357,7 +2333,7 @@ const vsB = (k, from = vs.base) => k === "hit" ? VS_HIT.every((h) => vsB(h, from
 function vsBSet(k, v) {
   for (const x of k === "hit" ? VS_HIT : [k]) if (v === VS_BASE[x]) delete vs.base[x]; else vs.base[x] = v;
 }
-// what differs from the base, in words (`from`: a spec, or vs.base; `skip`: keys already told otherwise)
+// differences from the base, in words
 function vsBaseDiff(from, skip = []) {
   const out = VS_BASE_ITEMS.filter(([k]) => !skip.includes(k) && !!vsB(k, from) !== (k === "hit" || VS_BASE[k]))
     .map(([k, label]) => `${label.toLowerCase()} ${vsB(k, from) ? "on" : "off"}`);
@@ -2369,7 +2345,7 @@ function vsBaseDiff(from, skip = []) {
 }
 // (switches only a clash has)
 const VS_CLASH = ["numbers", "dash", "pace", "loop", "notes"];
-// the last choices are kept for the next start (this browser profile's storage; the page works without it)
+// last choices kept for next time
 const VS_KEEP = "versus";
 const VS_NOKEEP = ["maps", "bgm", "q", "skl", "all", "videos", "tags", "over", "tagEdit", "rulesDef"];
 try {
@@ -2398,13 +2374,13 @@ async function vsPage(auto) {
 }
 routes.versus = () => vsPage(false);
 routes.autobattler = () => vsPage(true);
-// the stages' pictures (made by the player on demand, limbusdm/viewer.py Renderer.stage_pics): which there are
+// which stage pictures exist
 function vsPicsSet(st) {
   if (!st) return;
   vs.pics = { have: new Set(st.have), queue: st.queue, busy: st.busy, failed: new Set(st.failed), t: Date.now() };
 }
 const vsPicUrl = (m) => vs.pics && vs.pics.have.has(m) ? `/api/stage_pic?name=${encodeURIComponent(m)}&t=${vs.pics.t}` : "";
-// make pictures of these stages (none: every one without one), then watch until they are there
+// make stage pictures, then watch for them
 async function vsPicsMake(names) {
   vsPicsSet(await api("/api/stage_pics", { names: names || vs.maps || [] }).catch((e) => { toast(esc(e.message)); return null; }));
   vsPicsWatch();
@@ -2421,8 +2397,7 @@ async function vsPicsWatch() {
   if (vs.pics.have.size !== before || !vs.pics.busy) { vsDrawMaps && vsDrawMaps(); vsDrawStage(); }
   vsPicsNote();
 }
-// The stages in sight get their pictures by themselves (a few at a time, when the renderer is free): nobody has to
-// click a stage to see it. One that could not be drawn is not asked for again.
+// Stages in sight get their pictures by themselves; failed ones aren't asked again.
 function vsPicsNear() {
   clearTimeout(vsPicsNear.timer);
   vsPicsNear.timer = setTimeout(() => {
@@ -2447,8 +2422,7 @@ function vsPicsNote() {
   if ($("#vspicall")) $("#vspicall").onclick = () => vsPicsMake();
 }
 let vsDrawMaps = null;
-// everyone to pick: { id, label, group, pg (the Sinner, or the Canto / event), short, type (ids / egos / enemy / boss),
-// sinner (1-12), season (db.js seasonKey) }
+// everyone to pick
 function vsChars() {
   const U = typeof UNITS !== "undefined" ? UNITS : null;
   if (vsChars.cache && vsChars.cache[0] === anim.data && vsChars.cache[1] === U) return vsChars.cache[2];
@@ -2468,7 +2442,7 @@ function vsChars() {
 }
 const vsChar = (id) => vsChars().find((c) => c.id === String(id));
 const vsIcon = (id) => `/api/char_icon?id=${encodeURIComponent(id)}`;
-// a picture that didn't load: an Identity's / E.G.O' thumbnail from the database (some have no profile picture), then nothing
+// fallback picture from the database
 function vsImgErr(img) {
   const id = img.dataset.id || "", u = typeof UNITS !== "undefined" && UNITS && /^\d+$/.test(id) && unitById(+id);
   const alt = u && u.img && u.img.thumb ? imgThumb(u.img.thumb) : "";
@@ -2480,8 +2454,7 @@ function vsImgErr(img) {
   }
   img.style.visibility = "hidden";
 }
-// the fighters in the preview: each as it stands in a fight, its idle pose on a transparent background — the player
-// draws it once (limbusdm/viewer.py make_fighter_pics; a few seconds), the app keeps it
+// fighters' idle pictures, made once by the player
 function vsFigsSet(st) {
   if (st) vs.figs = { have: new Set(st.have), busy: st.busy, failed: new Set(st.failed), t: vs.figs ? vs.figs.t : Date.now() };
 }
@@ -2507,7 +2480,7 @@ const vsTrackLabel = (t) => t.title || t.label;
 const VS_TYPES = [["all", "All"], ["ids", "Identities"], ["egos", "E.G.O"], ["enemy", "Enemies"], ["boss", "Bosses & Abnormalities"]];
 const vsHasSinner = () => ["all", "ids", "egos"].includes(vs.ptype);
 const vsHasGroup = () => ["all", "enemy", "boss"].includes(vs.ptype);
-// the picker's list: the search (over everyone), else its filters; an enemy listed in several groups once
+// picker list: search, else filters
 function vsFiltered() {
   const q = (vs.q || "").trim().toLowerCase();
   const seen = new Set();
@@ -2576,7 +2549,7 @@ function vsPick(k, id, redraw = true) {
   vsKeep();
   if (redraw) { vsDrawPicker(); vsDrawStage(); }
 }
-// ---- a team fight (the "Team" switch): the middle of the page shows each side's team instead of the two-fighter preview
+// team fight view
 function vsDrawTeam() { const box = $("#vsteambox"); if (box) box.innerHTML = ""; }  // (the old chip bar: the stage has the teams now)
 const VS_ROLE = {
   boss: ["★", "boss", "Alone against two or more: its HP and damage are set so that it wins about half of its fights; short cooldown, armor in its later skills, its mass skills sweep all around it, it turns on shooters. Not a tag: it is the lone fighter of a side (see the Boss button)."],
@@ -2737,9 +2710,7 @@ function vsDrawTeamStage(box) {
   $("#vsrounds").onchange = (ev) => setRounds(ev.target.value);
   box.querySelectorAll("[data-rounds]").forEach((b) => b.onclick = () => setRounds(vs.rounds + +b.dataset.rounds));
 }
-// ---- Versus, "Team": the simple team fight, no autobattler logic: the k-th of the left team fights the k-th of the right (the same
-// slot across, or drawn), every pair its own one-on-one, all at the same time (the engine: flow "duels"). The roles, cooldowns, boss
-// and the rest are the Auto Battler tab's.
+// Team: pairs fight one-on-one at the same time (flow "duels")
 function vsDrawDuelStage(box) {
   const nl = vsTeamSide("left").length, nr = vsTeamSide("right").length, even = nl === nr && nl > 0;
   const member = (k, id, i) => {
@@ -2794,7 +2765,7 @@ function vsDrawDuelStage(box) {
   $("#vsrounds").onchange = (ev) => setRounds(ev.target.value);
   box.querySelectorAll("[data-rounds]").forEach((b) => b.onclick = () => setRounds(vs.rounds + +b.dataset.rounds));
 }
-// ---- team rules (Debug): the engine's TEAM numbers the page may change; vs.rules keeps only what differs from the defaults
+// team rules (Debug); vs.rules keeps only changes
 const VS_RULE_FIELDS = [
   ["Kills", [["freeze", "Others stop while a fatal blow plays", "bool"]]],
   ["Exchanges", [["exchange:0", "Clashes in an engagement: at least", "num", 1], ["exchange:1", "at most", "num", 1]]],
@@ -2996,9 +2967,7 @@ function vsDrawStage() {
     box.querySelectorAll("[data-rounds]").forEach((b) => b.onclick = () => setRounds(vs.rounds + +b.dataset.rounds));
   }
 }
-// a list scrolled to its picked row (only the list: the page stays where it is)
-// The right column is one panel with tabs — Stage / Music / Options — and each tab says what is picked. vsDrawRight
-// draws the three sections as before (their ids and handlers stay); this puts them under the tabs.
+// scroll a list to its picked row. Right column: one panel with Stage / Music / Options tabs
 const VS_TABS = [["stage", "Stage"], ["music", "Music"], ["options", "Options"]];
 function vsTabs() {
   const box = $("#vsright");
@@ -3038,8 +3007,7 @@ function vsTabsDraw() {
   const big = $("#vsbig"), pic = vs.map && vsPicUrl(vs.map);
   if (big) { big.style.backgroundImage = pic ? `url('${pic}')` : ""; big.querySelector("b").textContent = now.stage; }
 }
-// Render and Live stand between the fighters' cards and the fight's row on a duel's page (#vsgoslot); the right column
-// draws them, so they are moved there after either is drawn (and back to the column when the page has no such place)
+// Render / Live moved between the fighters' cards and the fight row
 const VS_GO = [".vsgo", "#vsprog", "#vsnote"];
 function vsGoPlace(kept) {
   const slot = $("#vsgoslot"), right = document.querySelector(".vsright");
@@ -3058,7 +3026,7 @@ function vsGoPlace(kept) {
     return r;
   };
   vsDrawRight = function () {
-    // (the old Render / Live go first: else the new ones' handlers are bound to these, found first by id)
+    // remove the old ones first (duplicate ids)
     document.querySelectorAll("#vsgoslot > *").forEach((el) => el.remove());
     const r = right.apply(this, arguments);
     vsGoPlace();
@@ -3181,7 +3149,7 @@ function vsDrawRight() {
   $("#vslivego").onclick = liveStart;
   $("#vslivestop").onclick = async () => { await api("/api/versus_live_stop", {}).catch(() => {}); liveWatch(); };
 }
-// the Debug row (clash only): the clash base's switches; the Debug title tells how many differ from it
+// Debug row: clash base switches
 function drawVsBase() {
   const n = vsBaseDiff(vs.base).length + VS_DEBUG.filter((k) => vs[k]).length;
   if ($("#vsdbgn")) $("#vsdbgn").textContent = n ? `${n} changed` : "";
@@ -3221,8 +3189,7 @@ function vsSpec(mode = vs.mode) {
     spec.kbscale = vs.kbscale;
   } else {
     spec.deck = spec.spread = true;  // (fixed rules: the skill deck, pushed apart)
-    // the last skill: both drawn at random by the engine, else each side's own (a "Random" side: one of its skills
-    // drawn here)
+    // last skill: random, or each side's own
     spec.randskill = vs.lrand && vs.rrand;
     if (!spec.randskill) {
       const draw = (k) => { const l = vs.skl && vs.skl[k] && vs.skl[k].id === vs[k] ? vs.skl[k].list : []; return l.length ? l[Math.floor(Math.random() * l.length)] : ""; };
@@ -3234,7 +3201,7 @@ function vsSpec(mode = vs.mode) {
   }
   return spec;
 }
-// a team fight's render spec (the Team switch): the clash spec with each side's line-up, the Mode's flow
+// team fight render spec
 function vsTeamSpec() {
   const ids = (k) => (vs[k] || []).filter((id) => vsChar(id));
   const l = ids("lefts"), r = ids("rights");
@@ -3270,8 +3237,7 @@ function vsAgain(spec) {
   $("#main").scrollTop = 0;
   toast("That video's settings are back on the page.");
 }
-// how far a Versus render is (0-1): the fight drawn in Unity (by the parts of it begun) is most of it, then the
-// encoding, the E.G.O cut-in, the intro card and the music laid under it
+// Versus render progress (0-1)
 function vsProgress(st) {
   const f = st.current ? st.current.frac : 0;
   switch (st.phase) {
@@ -3309,7 +3275,7 @@ function versusTitle(spec) {
   }
   return `${name(spec.left)} vs ${name(spec.right)}`;
 }
-// what a Versus video is beyond the two: its card's line and, after the names, its saved file's name
+// a Versus video's card line and file name
 function versusWhat(spec, file) {
   const out = [];
   if (spec.mode === "clash") {
@@ -3500,8 +3466,7 @@ routes.settings = async () => {
   $("#open-videos").onclick = () => api("/api/open", { path: st.data_dir + "\\videos" });
 };
 
-// The web copy (limbusdm/site.py) on the Settings page: the build the site shows next to this app's, and the upload
-// the app's look at its own site before the upload (limbusdm/site.py verify): which pages asked for what the site lacks
+// Settings → Website: site build vs app, and the pre-upload check's misses
 function siteCheck(c) {
   if (!c) return "";
   if (c.error) return `<br><span class="bad">The pages weren't checked: ${esc(c.error)}</span>`;
@@ -3519,7 +3484,7 @@ function siteSent(x) {
     + (x.report ? ` · report ${esc(fmtSnap(x.report.split("__")[1] || x.report))}` : "") + (data ? `<br>read again from the game: ${data}` : "")
     + `<br>the site now: ${x.files} files, ${fmtSize(x.bytes)}` + siteCheck(x.check);
 }
-// how every "Send to site" ended, the newest first (limbusdm/site.py SEND_LOG): the toast is gone in seconds
+// "Send to site" log, newest first
 function siteLog(log, when) {
   if (!log || !log.length) return "";
   const took = (s) => s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`;

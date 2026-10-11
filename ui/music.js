@@ -1,6 +1,4 @@
-// The corner music player: the game's own soundtrack from its FMOD banks (/api/music), battle themes first.
-// Repeat plays the same track over and over; a track gets into the favourites by its star (in the list, or next to
-// the name), and "★" over the list leaves the favourites alone to be played — whatever kind they are.
+// Corner music player: the game's soundtrack (/api/music), repeat and favourites.
 "use strict";
 
 const MUSIC_KEEP = "music";
@@ -13,7 +11,7 @@ muAudio.preload = "none";
 
 const muKeep = () => { try { localStorage.setItem(MUSIC_KEEP, JSON.stringify({ battle: mu.battle, shuffle: mu.shuffle, vol: mu.vol, min: mu.min, v: mu.v, repeat: mu.repeat, fav: mu.fav, favs: mu.favs, last: mu.tracks[mu.n]?.event })); } catch {} };
 const muTime = (s) => isFinite(s) ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : "0:00";
-// a theme heard in a few fights only is somebody's own: "Canto 8 · Lei Heng"; the common ones name the chapter
+// a theme heard in few fights names who is fought
 const muSub = (t) => [t.where, t.fights && t.fights <= 3 && t.who.length ? t.who.slice(0, 2).join(", ") : "", t.by].filter(Boolean).join(" · ");
 const muFav = (t) => !!t && mu.favs.includes(t.event);
 const muList = () => mu.tracks.map((t, n) => ({ t, n })).filter(({ t }) => (mu.fav ? muFav(t) : !mu.battle || t.battle)

@@ -1,11 +1,10 @@
-"""Pictures that look the same (one enemy under several names, mobs A / B / C drawn alike, one story portrait for two
-speakers): the Games ask about each look once — Guess the enemy, Guess the character."""
+"""Pictures that look the same, so the Games ask about each look once."""
 from __future__ import annotations
 
 import os
 
 _looks: dict = {}  # (file, mtime, size) -> the picture made small
-_found: dict = {}  # the files' keys in order -> repeats() (the handbook asks at every open; drawn pictures add files)
+_found: dict = {}  # file keys in order → repeats()
 
 
 def _key(path):
@@ -34,13 +33,12 @@ def _same(a, b) -> bool:
         return False
     diff = sum(ImageStat.Stat(ImageChops.difference(a[1], b[1])).mean) / 3
     lit = (sum(ImageStat.Stat(a[1]).mean) + sum(ImageStat.Stat(b[1]).mean)) / 6
-    # small next to how much is drawn: two dark, mostly empty pictures of different enemies differ by little in all
-    # (Dead Rabbits 1 / 2 differ by 57 % of it, the alike mob pairs by 34 % at most)
+    # small next to how much is drawn
     return diff < 6 and diff < 0.45 * max(lit, 1)
 
 
 def repeats(paths: list) -> dict[int, int]:
-    """{place in paths: the earlier place its picture looks like} (a missing / unreadable file never repeats one)."""
+    """{place: earlier place it looks like}"""
     keys = tuple(_key(p) for p in paths)
     if keys in _found:
         return _found[keys]
@@ -64,8 +62,7 @@ def repeats(paths: list) -> dict[int, int]:
 
 
 def sparse(paths, least=0.05):
-    """Indexes of pictures with almost nothing drawn (Grant Us Love's idle shows only its tentacles: its body is not in the
-    picture) — a silhouette game cannot ask about them."""
+    """Pictures with almost nothing drawn (no silhouette to ask about)."""
     from PIL import Image
     out = []
     for i, p in enumerate(paths):

@@ -1,8 +1,4 @@
-// Database → Sounds: every sound of the game's banks in four folders (Sound Effects, Story,
-// Voicefiles, Soundtracks; /api/sounds, limbusdm/soundlib.py), with who says a line and its text. The four folders are
-// art tiles, a Sinner's Identities are their cards, a folder of sounds lists its neighbours on the left. One sound plays
-// at a time in the bar at the bottom (previous / next run through the list shown; Play all goes on by itself), a
-// folder's own sounds can be saved as WAVs at once.
+// Database → Sounds: every bank sound in four folders with speaker and text; one plays at a time, folders save as WAVs.
 "use strict";
 
 const snd = { tree: null, path: [], rows: [], pics: {}, img: "", shown: 0, q: "", cur: -1, all: false, list: [] };
@@ -23,7 +19,7 @@ const sndNum = (n) => n.toLocaleString("en").replace(/,/g, " ");
 const sndT = (ms) => { const s = ms ? Math.max(1, Math.round(ms / 1000)) : 0; return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const sndKey = (r) => r[1] + "#" + r[2];
 const sndSin = (n) => `/api/ui_icon?k=sinner_${n}`;
-// an Identity's / E.G.O's folder in its Sinner's: "Blade Lineage Salsu Faust" → "Blade Lineage Salsu"
+// short name inside its Sinner's folder
 const sndShort = (name, parent) => parent && parent.sinner && name.endsWith(" " + parent.name) ? name.slice(0, -parent.name.length - 1) : name;
 
 routes.sounds = async (args) => {
@@ -188,7 +184,7 @@ function sndMore(first) {
   sndMark();
 }
 
-// play the n-th of the list shown (the bar's previous / next and Play all go along that list)
+// play the n-th of the shown list
 function sndPlay(n, fresh) {
   const a = $("#sndaudio");
   if (fresh || snd.list !== snd.rows) snd.list = snd.rows;

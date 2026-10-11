@@ -1,10 +1,4 @@
-"""Buff effects (Database → Buff effects): the buffs and debuffs the game's data ties to an effect prefab, who gives or
-gets each, and a video of the effect drawn alone by the Unity player.
-
-The ties: static-data/battle-effect rows (keyword → prefab address) and the bundles' effect lists (label → prefab), where
-the keyword / label is a buff's id or one of its abilities (ShinEffect shows the one labelled "Shin"). The plain statuses
-(Burn, Bleed…) have no effect of their own in the data and are not here. Who has a buff: the Identities, E.G.O and
-enemies whose skill / passive rows or texts name it."""
+"""Database → Buff effects: buffs tied to an effect prefab, who gives / gets them, and a video of each effect."""
 from __future__ import annotations
 
 import json
@@ -16,7 +10,7 @@ import threading
 
 from . import units, viewer
 
-VERSION = 1  # bump when the list's layout changes (cached per snapshot) or the videos must be made again
+VERSION = 1  # bump to remake the list or the videos
 HOST = 10101  # the battle prefab the effects are loaded next to (the player needs one; it is not drawn)
 SIZE = (960, 540)
 BATCH = 6  # effects per run of the player
@@ -133,14 +127,13 @@ def build(svc) -> dict:
 
 
 def effect_bundles(svc, extra: list[dict]) -> list[str]:
-    """The bundle files the player needs for these effects (each {"bundle", "asset", "pid"?}): their bundles and all
-    these refer to; a patched copy where a prefab has no address of its own."""
+    """Bundles the player needs for these effects (a patched copy where a prefab has no address)."""
     patched = viewer.patched_bundles(svc, extra)
     files = [patched.get(lg) or svc.object_file(lg) for lg in viewer.bundle_closure(svc, sorted({x["bundle"] for x in extra}))]
     return [p for p in files if p]
 
 
-# effects that are not on the one who has the buff: a field, a mark on the other one or the team, a hit / break
+# effects not on the buff's holder (field, target, team, hit)
 NOT_ON_SELF = re.compile(r"(?i)target|team|_bg|field|map|enemy|hit|broken|burst|projectile")
 
 
@@ -148,10 +141,7 @@ ON_OTHER = re.compile(r"(?i)target|enemy")
 
 
 def unit_buffs(svc, uid, limit: int = 3) -> list[dict]:
-    """The buff effects of one Identity / E.G.O (its id) or enemy (its appearance prefab's name), as its fights show
-    them: the buffs it gives itself on it (who 0), the debuffs it puts on others on the one it fights (who 1). Only
-    effects that have a video (known to draw outside the game), at most `limit` a side.
-    [{"who", "name", "asset", "bundle", "buff": the buff's name}]"""
+    """Buff effects of one unit that have a video: its own buffs (who 0) and the debuffs it inflicts (who 1)."""
     bf = svc.buff_fx
     db = bf.db()
     made = set(bf.status()["have"])
@@ -179,13 +169,8 @@ AT_END = re.compile(r"(?i)end(attack|skill)|succeed|OSA|kill")
 
 
 def skill_plan(svc, cid, groups: list[dict], own: list[dict]) -> list[dict]:
-    """When each of a character's buff effects (`own`, see unit_buffs) comes on in each skill's video, for a render with
-    the "buffs" option: [{"who", "name", "asset", "group", "hit"}], hit = which hit of the skill, from 0 (-1: from the
-    start). Its own buffs are on from the start of every skill (Vlad: no matching to skills for those). A debuff comes
-    on when the skill inflicts it, read from the skill's data (an Identity's video "…_S<n>" is skill <id>*100+n): one a
-    coin gives at that coin's hit, one the skill gives on use from the start, after the attack at its last hit; it shows
-    only in the skills that inflict it. One no skill is known to inflict (a passive's, an enemy's — its skills can't
-    be told from its videos) comes on at the first hit of every skill."""
+    """When each buff effect comes on in each skill video ("buffs" render): own buffs from the start, debuffs at the hit
+    that inflicts them."""
     skills = units._records(svc.static_tables(["skill"]), "skill") if isinstance(cid, int) and 10000 <= cid < 20000 else {}
     ids = {x["id"] for x in own}
     gives: dict[str, dict] = {}  # group → {buff id: hit}
@@ -231,14 +216,8 @@ HOLD = 3.5  # "a few seconds" (how long an effect stays on with that choice)
 
 
 def versus_effects(svc, spec: dict, groups: tuple) -> list[dict]:
-    """The Versus page's Buffs and Debuffs switches: the effects a fight shows on the two, as lines for the player
-    (ViewerBuffs.cs) — {"who": the one it is on, "name", "asset", "bundle", "hold": seconds it stays (0: to the end),
-    "by" / "group": see below}. Each switch has the same four choices (spec keys "<buff|debuff>" + both / many / own /
-    short): on one side (drawn at random) or both; one or up to three a side; any of the game's (out of the effects
-    that have a video, so known to draw outside the game) or only the two's own; to the end of the fight or a few
-    seconds. They come on at random moments — but one's own debuff comes with the skill that inflicts it: "by" = the
-    one inflicting, "group" = that skill's video ("" where the skill isn't known: any of its skills), on from a hit of it.
-    `groups`: each one's skill videos (viewer.job_groups)."""
+    """Effects for the Versus Buffs / Debuffs switches: side, count, any or own, how long; own debuffs come with the skill
+    that inflicts them."""
     import random
     bf = svc.buff_fx
     db = bf.db()
@@ -287,7 +266,7 @@ def versus_effects(svc, spec: dict, groups: tuple) -> list[dict]:
 
 
 class BuffFx:
-    """The videos: made on request, a few effects per run of the player, kept until the next patch."""
+    """Effect videos: made on request, kept until the next patch."""
 
     def __init__(self, svc):
         self.svc = svc

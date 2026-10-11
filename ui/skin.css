@@ -1,5 +1,4 @@
-/* The app's look, made of the game's own menu pieces (frames, plates, icons: /api/gacha_ui cuts them from the install,
-   limbusdm/gacha.py SKIN). Loaded after style.css: only the shared pieces are restyled here, the pages keep their own rules. */
+/* The app's look from the game's menu pieces (/api/gacha_ui); loaded after style.css. */
 :root {
   --bg: #0d0a09; --panel: #17110e; --panel2: #1f1612; --line: #3a2a20; --text: #f1e3cc; --muted: #9c8a76;
   --gold: #f8b400; --cream: #e9c9a0; --hot: #ff8a00; --radius: 0px;
@@ -112,7 +111,7 @@ button.primary:disabled { filter: grayscale(.8); }
 
 /* ---- the corner player ---- */
 #player { border: 12px solid transparent; border-image: var(--k-frame) 44 fill / 12px stretch; background: none; }
-/* the frame takes 24px of the width: the volume and the clock go to a row of their own under the buttons */
+/* volume and clock on their own row */
 #player .c { flex-wrap: wrap; row-gap: 8px; }
 #mu-vol { flex: 1 0 150px; }
 
@@ -157,7 +156,7 @@ button.primary:disabled { filter: grayscale(.8); }
 .vsarena .vstbtn { display: flex; gap: 2px; padding: 3px 5px 5px; }
 .vsarena .vstbtn button { flex: 1; padding: 2px 0; font-size: 12px; clip-path: none; min-width: 0; }
 .vsarena .vstmlist > .muted { background: rgba(0, 0, 0, .6); align-self: center; }
-/* (the Auto Battler's page: the picker on the left, the stage wide, stage / music / switches under it) */
+/* Auto Battler layout */
 .vsw:has(.vsarena) { grid-template-columns: minmax(330px, 420px) minmax(0, 1fr); grid-template-areas: "pick mid" "pick right"; }
 .vsw:has(.vsarena) .vsright { position: static; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
 .vsw:has(.vsarena) .vsright > .vsgo { grid-column: 1 / -1; order: -1; grid-template-columns: minmax(0, 420px) auto; }
@@ -198,7 +197,7 @@ button.primary:disabled { filter: grayscale(.8); }
 .vsgo .vsrender { white-space: nowrap; overflow: hidden; padding-left: 6px; padding-right: 6px; }
 .vsright > .vsgo .vsrender { font-size: 19px; letter-spacing: .06em; }
 
-/* the menu, second pass: Community has a striped icon like the rest (the camera), Games the ticket; the lunacy sits by Extraction's icon */
+/* menu icons: Community, Games; lunacy by Extraction */
 #nav a[data-group=community]::before, #nav a[data-group=community].active::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_13"); width: 34px; }
 #nav a[data-group=community]::before { opacity: .5; filter: sepia(1) saturate(1.6) hue-rotate(-12deg); }
 #nav a[data-group=community]:hover::before { opacity: .85; }
@@ -216,7 +215,7 @@ button.primary:disabled { filter: grayscale(.8); }
 #navlun { margin-left: -1px; top: 14px; font: 15px "LC Bebas", sans-serif; letter-spacing: .06em; }
 #navlun .lunicon { height: 14px; margin-right: 2px; }
 
-/* the player folded: a small framed square with the note (the name next to it while a track plays) */
+/* folded player: a small square */
 #player.min { border: 0; border-image: none; right: 14px; bottom: 14px; }
 #player.min #mu-pill { min-width: 50px; height: 50px; padding: 0 6px; border: 11px solid transparent; border-image: var(--k-frame) 44 fill / 11px stretch; background: none !important;
   color: var(--gold); font: 17px "LC Bebas", "Segoe UI Symbol", sans-serif; letter-spacing: .06em; clip-path: none; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -311,8 +310,7 @@ a.gmdot:hover::after { background: url("/api/gacha_ui?n=New_MainUI_PersonalityLi
 /* the app's usual window is 1400 px: the picker gives the middle some room */
 @media (max-width: 1500px) { .vsw:not(:has(.vsarena)) { grid-template-columns: minmax(300px, 390px) minmax(0, 1fr) minmax(270px, 330px); gap: 12px; } .vsname b, .vsname .big { font-size: 34px; } }
 
-/* a big stream is live: Community keeps its icon and name; the streamer's picture in a red ring and the viewers
-   stand by the icon, as the lunacy does by Extraction's (who it is: in the hint) */
+/* Community live mark by its icon */
 #nav #navcommunity.live { display: flex; padding: 0 8px; gap: 2px; border: 0; background: none; color: var(--muted); min-width: 116px; }
 #nav #navcommunity.live:hover { color: var(--text); } #nav #navcommunity.live.active { color: var(--gold); }
 #nav #navcommunity.live::before { transform: translateX(-30px); }

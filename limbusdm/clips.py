@@ -1,14 +1,4 @@
-"""Replay Unity AnimationClips of 2D sprite characters (Identity / E.G.O battle animations).
-
-A clip (generic, non-legacy) stores its curves in m_MuscleClip: a streamed clip (keyframes with cubic
-coefficients), a dense clip (sampled values) and a constant clip. m_ClipBindingConstant.genericBindings maps
-curve indices to (path hash, component type, attribute); PPtr curves hold indices into pptrCurveMapping
-(the sprites). Paths are CRC32 hashes of transform paths below the Animator's GameObject.
-
-We rebuild the character's hierarchy (Transforms, SpriteRenderers, active flags), sample the clip at its own
-frame rate and output draw lists: which sprite, where, flipped or not, how opaque, in what order.
-Particles, shaders and timelines are not part of this.
-"""
+"""Replays Unity AnimationClips of 2D sprite characters into draw lists (sprite, position, flip, alpha, order)."""
 from __future__ import annotations
 
 import math
@@ -118,8 +108,7 @@ on_drop.append(_scene_cache.clear)  # it holds objects of the bundle (see extrac
 
 
 def _scene(objs: dict) -> dict:
-    """Transforms, GameObjects and SpriteRenderers of a bundle, linked by m_Father / m_GameObject
-    (m_Children lists turned out to be incomplete)."""
+    """Transforms, GameObjects and SpriteRenderers of a bundle, linked by m_Father / m_GameObject."""
     key = id(objs)
     if key in _scene_cache:
         return _scene_cache[key]
@@ -180,7 +169,7 @@ POSE_ORDER = ["default", "move", "guard", "evade", "damaged", "dead", "add"]
 
 
 def list_clips(bundle_path: str) -> list[dict]:
-    """Character animation clips of the bundle with the Animator that plays them (FX / 'Recorded' clips skipped)."""
+    """Character clips of the bundle with the Animator that plays them."""
     env = _env(bundle_path)
     with _lock:
         objs = {o.path_id: o for o in env.objects}
@@ -225,8 +214,7 @@ def clip_kind(name: str) -> tuple[str, int]:
 
 # ------------------------------------------------------------------ sampling
 def bind_slots(cv: Curves, remap: dict | None = None) -> dict:
-    """{path hash: {what: curve index}} — what is "sprite", ("tr", attribute, component) or an attribute name.
-    `remap` turns path hashes of a nested Animator into hashes below the character's root."""
+    """{path hash: {what: curve index}}; `remap` maps a nested Animator's paths under the root."""
     by_path: dict[int, dict] = {}
     for ci, (b, comp) in enumerate(cv.curve_of):
         h = remap.get(b["path"], b["path"]) if remap else b["path"]
@@ -241,8 +229,7 @@ def bind_slots(cv: Curves, remap: dict | None = None) -> dict:
 
 
 class _Sprites:
-    """Sprite references → keys "bundle|pid" plus their size / pivot (sprites can live in other bundles:
-    `resolve(assets_file, file_id, path_id) -> (bundle, obj)`)."""
+    """Sprite references → "bundle|pid" keys with size / pivot (sprites may live in other bundles)."""
 
     def __init__(self, objs, logical, resolve):
         self.objs, self.logical, self.resolve = objs, logical, resolve
@@ -277,9 +264,7 @@ class _Sprites:
 
 
 def _draw(nodes: dict, layers: list, all_layers: bool, sprites: _Sprites) -> list:
-    """Draw list of the hierarchy at one moment. `layers` = [(curves, slots, local time, assets file)], lowest
-    priority first: like Unity's timeline tracks on one Animator, each property comes from the last layer that
-    animates it, the rest keep the scene's values."""
+    """Draw list at one moment; each property comes from the last layer that animates it."""
     def look(h, key):
         for cv, bp, lt, af in reversed(layers):
             slot = bp.get(h)
@@ -352,9 +337,7 @@ def _push(frames: list, f: int, ops: list):
 
 def render_clip(bundle_path: str, clip_pid: int, go_pid: int, all_layers: bool = False, logical: str = "",
                 resolve=None, max_frames: int = 1500) -> dict:
-    """Sample the clip into frames: {"fps", "duration", "frames": [{"f", "d", "ops": [[key, x, y, flip, alpha, sx, sy]]}],
-    "sprites": {key: {bundle, pid, w, h, px, py}}}. x/y are pixel offsets of the sprite pivot from the character
-    origin. Sprites can live in other bundles: `resolve(assets_file, file_id, path_id) -> (bundle, obj)`."""
+    """Sample the clip into frames {fps, duration, frames, sprites}; x / y = pivot offset from the origin."""
     env = _env(bundle_path)
     with _lock:
         objs = {o.path_id: o for o in env.objects}
@@ -433,10 +416,8 @@ def clip_gif(bundle_path: str, clip_id: str, go_pid: int, all_layers: bool = Fal
 
 
 def _save_gif(frames: list, durations: list) -> bytes:
-    """RGBA frames → animated GIF with one shared palette (index 255 = transparent).
-    A fully empty frame (a character vanishing mid-skill) equals Pillow's disposal background, gets no bounding box
-    and is written as a second global header — viewers stop there. Empty frames get a palette whose index 255 has
-    another colour, so Pillow sees a difference and writes a proper full-size transparent frame."""
+    """RGBA frames → GIF with one palette (index 255 transparent); empty frames get a different palette so Pillow writes
+    them."""
     import io
     from PIL import Image
 
@@ -472,8 +453,7 @@ TIMELINE_RE = re.compile(r"_(S(\d+)|Parrying)_Timeline_?([\w]*)$", re.I)
 
 
 def list_timelines(objs: dict, owner: str = "") -> list[dict]:
-    """Skill timelines (…_S2_Timeline_1, …_Parrying_Timeline_3) that animate the character through Animation
-    Tracks — used by a few Identities instead of plain …_S1 clips."""
+    """Skill timelines that animate the character through Animation Tracks."""
     directors = []
     for o in objs.values():
         if o.type.name == "PlayableDirector":
@@ -511,8 +491,7 @@ def list_timelines(objs: dict, owner: str = "") -> list[dict]:
 
 def render_timeline(bundle_path: str, tl_pid: int, go_pid: int, all_layers: bool = False, logical: str = "",
                     resolve=None, binds: dict | None = None, base_clip: int | None = None) -> dict:
-    """Lay the Animation Tracks of a Timeline out in time (infinite 'Recorded' clips and timeline clips with
-    start / clip-in / speed) and sample them like render_clip."""
+    """Lay out a Timeline's Animation Tracks in time and sample them like render_clip."""
     env = _env(bundle_path)
     with _lock:
         objs = {o.path_id: o for o in env.objects}
@@ -559,8 +538,7 @@ def render_timeline(bundle_path: str, tl_pid: int, go_pid: int, all_layers: bool
         nodes = build_hierarchy(objs, go_pid)
         by_tpid = {nd.tpid: nd for nd in nodes.values()}
         sprites = _Sprites(objs, logical, resolve)
-        # tracks bound to the same character are layers of one hierarchy (a "Recorded" track that only moves effects
-        # must not draw the character a second time); a nested Animator (Warp) is mapped into the character's paths
+        # tracks on one character are layers of one hierarchy; a nested Animator is mapped into its paths
         groups: dict[int, dict] = {go_pid: {"nodes": nodes, "layers": []}}
         remaps: dict[int, tuple[int, dict | None]] = {go_pid: (go_pid, None)}
         layers = []  # (start, duration, curves, slots, clip-in, speed, assets file, group, infinite, own)
@@ -587,7 +565,7 @@ def render_timeline(bundle_path: str, tl_pid: int, go_pid: int, all_layers: bool
         for ly in layers:
             if ly[8]:
                 ly[1] = max(ly[1], total)
-        # between clips the character stands in its Default pose (the Animator state the timeline returns to)
+        # between clips: the Default pose
         base = None
         if base_clip and base_clip in objs:
             try:

@@ -1,10 +1,5 @@
-"""The web copy's "With effects" tab (Animations): skills of the Identities and E.G.O rendered by the Unity player.
-
-A browser can't render them, so the site shows the videos this app has made — two sets of options only: with the
-target, and the same with the character's buffs (FX: VARIANTS). The app deletes a render an hour after it was last
-watched (viewer.Renderer.prune); the site's copy is taken by "Send to site" while the render is there, or right after
-each one by render_all (Settings → Website), and then stays in the site's own files until the game or the renderer
-changes. The other options, and rendering itself, are in the app: ui/site/site.js says so on the tab."""
+"""The site's "With effects" tab: videos the app has rendered (with target, and with buffs), kept in the site's files until
+the game or renderer changes."""
 from __future__ import annotations
 
 import json
@@ -29,9 +24,7 @@ def _key(path: str, cid, v: str = "", **q) -> str:
 
 
 def _read(ex) -> dict:
-    """The site's videos as the manifest lists them. After a game patch (or a new renderer) they stay: "old" names the
-    sets — {character: [options]} — still to be rendered again, and each is replaced when its new render is taken
-    (the site used to lose every video at the first send after a patch)."""
+    """The site's videos; after a patch they stay and "old" lists the sets to render again."""
     m, made = ex.read_manifest("fx"), _made(ex.svc)
     out = {"kind": "fx", "id": made, "urls": m.get("urls") or {}, "src": m.get("src") or {}, "have": m.get("have") or {},
            "none": m.get("none") or [], "old": m.get("old") or {}}
@@ -42,8 +35,7 @@ def _read(ex) -> dict:
 
 
 def _take(ex, m: dict, cid: int, v: str) -> int:
-    """The videos of one character rendered with one set of options, as they are now, into the site's files.
-    Returns how many were taken anew."""
+    """Take one character's videos of one option set into the site's files; returns how many are new."""
     fx = ex.svc.fx
     st = fx.status(cid, v)
     if st.get("state") == "running" or not st["videos"]:
@@ -79,8 +71,7 @@ def _take(ex, m: dict, cid: int, v: str) -> int:
 
 
 def _lists(ex, m: dict, before: dict):
-    """What the tab asks before it shows a video: which videos there are for each set of options, the skills' names,
-    the character's buffs — and the site's own list of who has videos at all (/api/site_fx)."""
+    """What the tab asks before a video: video lists, skill names, buffs, and /api/site_fx."""
     cids = sorted(m["have"], key=int)
     want = []
     for c in cids:
@@ -89,7 +80,7 @@ def _lists(ex, m: dict, before: dict):
             m["urls"][_key("/api/fx", c, v)] = ex._store(json.dumps(st).encode(), "application/json")
         k = _key("/api/fx_buffs", c)
         if k not in m["urls"] or before.get(c) != m["have"][c]:
-            try:  # (buff levels are other sets of options: not on the site; "Buffs" only where its videos are)
+            try:  # buff levels not on the site; "Buffs" only where its videos are
                 b = json.loads(ex._get(k)[0])
                 b = {"levels": [], "notes": b.get("notes") or {}, "own": (b.get("own") or []) if m["have"][c].get("buffs") else []}
             except Exception:
@@ -102,7 +93,7 @@ def _lists(ex, m: dict, before: dict):
 
 
 def export(ex) -> dict:
-    """Part of "Send to site": the renders that are on the disk now join the ones the site already keeps."""
+    """Part of "Send to site": renders on disk join the site's."""
     m = _read(ex)
     before = json.loads(json.dumps(m["have"]))
     root = os.path.dirname(ex.svc.fx.out_dir(0))
@@ -122,7 +113,7 @@ def _ids(svc) -> list[int]:
 
 
 def counts(svc) -> dict:
-    """For Settings → Website: how many of the Identities and E.G.O have their videos in the site's files."""
+    """How many Identities / E.G.O have videos on the site."""
     from .site import Exporter
     try:
         m = _read(Exporter(svc, ""))
@@ -136,9 +127,7 @@ def stop():
 
 
 def render_all(svc, base_url: str, progress=None) -> dict:
-    """Render every Identity's and E.G.O's skills that the site has no videos of — with the target, and with its
-    buffs where it has any — and take each into the site's files as it is done. Hours of work the first time; it
-    can be stopped (stop()) and goes on from where it was the next time. Nothing is uploaded: "Send to site" does."""
+    """Render every skill the site lacks videos of and take each in; stoppable, resumes next time. Uploads nothing."""
     from .buffs import unit_buffs
     from .site import Exporter
     progress = progress or (lambda stage, done, total, msg="": None)
@@ -174,7 +163,7 @@ def render_all(svc, base_url: str, progress=None) -> dict:
             time.sleep(1.5)
         if _take(ex, m, cid, v) or ((m["have"].get(str(cid)) or {}).get(v) and v not in m["old"].get(str(cid), [])):
             made += 1
-        else:  # nothing came out (no skill timelines, or the player failed): not tried again for this game version
+        else:  # nothing came out: not tried again this game version
             failed += 1
             m["none"].append(f"{cid}:{v}")
         ex.write_manifest("fx", m)

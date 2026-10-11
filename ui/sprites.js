@@ -12,7 +12,7 @@ const SP_MODE = [["mine", "Edited", "the file as it is in the folder now"], ["or
 
 const spUrl = (f, o = {}) => `/api/sprites/png?zip=${encodeURIComponent(sp.zip)}&frame=${encodeURIComponent(f.name)}${o.size ? `&size=${o.size}` : ""}${o.orig ? `&orig=1&t=${sp.sheet.time}` : `&t=${f.t}`}`;
 const spName = (f) => f.name.replace(/\.png$/i, "");
-// "skill1", "skill1_2", "skill1_10" are one skill; a name that stands alone (idle, dead, guard…) is a pose
+// "skill1_2" belongs to skill1; lone names are poses
 const spKey = (f) => { const n = spName(f), m = n.match(/^(.+?)[ _-]\d+(?:,\d+)*$/); return m ? m[1] : n; };
 function spGroups(frames) {
   const by = new Map();
@@ -141,7 +141,7 @@ function spPick(name) {
   spView();
 }
 
-// ---- the picked frame, big: edited / original / the two in turn, the frame before it shown through, the skill in motion
+// big view: edited / original / blink, onion skin, motion
 function spView() {
   const box = $("#spview"), f = spFrame(sp.sel);
   if (!box) return;
@@ -192,11 +192,9 @@ function spPic(url) {
   }
   return p;
 }
-// where a frame's pivot is in a picture of it: from the left and from the BOTTOM (the zip's note has it for the exported
-// canvas; another size is scaled, as the app does when it loads the frame; no note: the middle of the bottom edge)
+// pivot in a picture, from left and BOTTOM
 const spPivot = (f, w, h) => (f.pivot && f.canvas ? [f.pivot[0] * w / f.canvas[0], f.pivot[1] * h / f.canvas[1]] : [w / 2, 0]);
-// one stage for a whole skill, so the character stays where it stands from frame to frame: as big as what is drawn in
-// its frames (the empty room of the exported canvas is left out), with a margin
+// one stage per skill so the character stays put
 function spStage(g) {
   let L = -1e9, R = -1e9, U = -1e9, D = -1e9;
   for (const f of g.frames) {
@@ -260,7 +258,7 @@ function spPlay(on) {
   if ($("#spgo")) $("#spgo").textContent = sp.playing ? "❚❚" : "▶";
 }
 
-// ---- the files: looked at every 2 s; a frame saved again in the editor gets its tile (and the big view) drawn anew
+// files polled every 2 s
 async function spPoll(now) {
   clearTimeout(sp.timer);
   if (!$("#sppage") || !sp.zip) return;
@@ -281,8 +279,7 @@ async function spPoll(now) {
   sp.timer = setTimeout(spPoll, 2000);
 }
 
-// ---- pictures dropped on the page (or chosen): a zip joins the list; a PNG replaces the frame of its name, or the
-// tile it was dropped on
+// drops: a zip joins, a PNG replaces its frame
 async function spDrop(files, tile, frame) {
   const read = (f) => new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(r.result); r.readAsDataURL(f); });
   const zipf = files.find((f) => /\.zip$/i.test(f.name));

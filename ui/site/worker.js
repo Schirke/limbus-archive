@@ -1,12 +1,5 @@
-// The site's own small server (Cloudflare Worker): everything is still served as files, and /room/<code> is a room of
-// the Games' live matches — a Durable Object that keeps its players' WebSockets and passes their messages on.
-// The room knows nothing of the games: it holds who is in, who the host is, and one "state" the host sets (the game,
-// the mode, the seed…). Every message goes to everybody in the order the room got it, with the room's clock on it —
-// so "who answered first" is the same on every screen.
-//   client → room: {t: "set", state} (the host only) · {t: "msg", data} · {t: "ping"}
-//   room → client: {t: "room", you, host, players: [{id, name}], state, now} · {t: "msg", from, data, now} · {t: "full"} · {t: "pong"}
-// /stat/hit and /stat/get are the site's own count of its visitors (the Site stats page, ui/site/site.js): daily sums
-// only — a visitor is a browser on a day, told apart by a hash that is salted anew each day and dropped the next.
+// The site's Worker: static files, /room/<code> live-match rooms (a Durable Object relaying messages in one order with
+// its clock), and /stat/* visitor counts (daily sums, salted daily hashes).
 import { DurableObject } from "cloudflare:workers";
 
 const MOST = 8;
@@ -14,7 +7,7 @@ const MOST = 8;
 export class Room extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
-    // (a player's "still here" is answered without waking the room: a room nobody plays in costs nothing)
+    // pings answered without waking the room
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('{"t":"ping"}', '{"t":"pong"}'));
   }
 
@@ -86,16 +79,8 @@ export class Room extends DurableObject {
   webSocketError(ws) { return this.webSocketClose(ws); }
 }
 
-// The count. c: a day's sums by key — "v" visitors, "p" pages opened, "pg:<page>", "cc:<country>", "dv:<device>",
-// "u:<Identity or E.G.O>"; s: who was here today (the day's hash, when last, on which page) — for "a visitor once a
-// day" and "on the site now".
-// The Worker does not pass every hit on: it keeps them and hands them over together (FLUSH), and a page sends what it
-// opened in one go (site.js) — so the count costs few requests however many people are here.
-// The allowance (env.BUDGET, JSON from the site's settings: {"day": the day of the month the plan's period starts on,
-// "requests", "objects", "rows": how much of each a period may spend, "used": {"<period>": requests spent before
-// this count began}}): the Stats object sums what the Worker and itself have spent in the period (u), and once one of
-// the three is reached the count and the rooms are closed until the next period — the pages stay.
-const DAY = 86400e3, NOW = 16 * 60e3;  // (a page says "still here" every ten minutes, site.js, and the Worker keeps it for up to five)
+// Stats: daily sums by key and today's visitors; hits are batched by the Worker.
+const DAY = 86400e3, NOW = 16 * 60e3;  // pages report every ten minutes
 const FLUSH = 300e3, MOST_HITS = 300, PER_MIN = 30, OPENED = 50;
 const dayOf = (t) => new Date(t).toISOString().slice(0, 10);
 const budgetOf = (env) => { try { const b = JSON.parse(env.BUDGET || ""); return b && typeof b === "object" ? b : null; } catch { return null; } };
@@ -124,7 +109,7 @@ export class Stats extends DurableObject {
 
   add(day, k, n) { this.put("INSERT INTO c VALUES (?, ?, ?) ON CONFLICT (day, k) DO UPDATE SET n = n + excluded.n", day, k, n); }
 
-  // What the period has spent, with w Worker requests and d requests to the objects more -> {period, until, w, d, r, off}
+  // this period's usage
   spent(w, d) {
     const now = Date.now(), b = this.budget, [period, until] = periodOf(now, (b && +b.day) || 1);
     let u = this.sql.exec("SELECT w, d, r FROM u WHERE period = ?", period).toArray()[0];
@@ -159,8 +144,7 @@ export class Stats extends DurableObject {
       bump("dv:" + (/iPad|Tablet|Android(?!.*Mobi)/i.test(ua) ? "Tablet" : /Mobi|iPhone/i.test(ua) ? "Phone" : "Desktop"));
     }
     this.put("INSERT INTO s VALUES (?, ?, ?, ?) ON CONFLICT (h) DO UPDATE SET at = excluded.at, p = excluded.p", h, day, now, page);
-    // the pages opened since the page told last: [[page, Identity or E.G.O, 1 = its card alone, not a page]]; a page
-    // of before sends one, or a "beat"
+    // pages opened since the last report
     const opened = Array.isArray(m.o) ? m.o.slice(0, OPENED) : m.beat ? [] : [[m.p, m.u]];
     for (const o of opened) {
       if (!Array.isArray(o)) continue;
@@ -200,8 +184,7 @@ export class Stats extends DurableObject {
   }
 }
 
-// What this Worker keeps between requests (it lives for a while, and there are several of them over the world): the
-// hits not handed over yet, what it has spent since, who sent how much this minute, and "closed until".
+// per-isolate state between requests
 const G = { hits: [], w: 0, d: 0, at: 0, off: 0, ips: new Map(), min: 0, got: null };
 
 async function flush(env) {
@@ -214,11 +197,7 @@ async function flush(env) {
   } catch { /* the hits kept since the last time are lost */ }
 }
 
-// The site's old address (*.workers.dev) and www.: a page there has moved for good to the site's own (env.HOME,
-// limbusdm/site.py worker_config). A browser that was on the old one is handed a page first that takes along what the
-// site kept in it (localStorage, the own teams) in the new address' "#move=…" (site.py shell reads it); once it has
-// (cookie), and for search engines, the plain 301. Rooms, the count and the data are answered on every address: the
-// apps before 0.11.65 call the old one.
+// old addresses move for good to the site's own (a browser first carries its storage over)
 const MOVE_PAGE = `<!doctype html><meta charset="utf-8"><title>Limbus Archive</title><meta name="robots" content="noindex">
 <p style="font:15px sans-serif;color:#888">Limbus Archive has moved to <a id="to" href="">limbus-archive.com</a>…</p>
 <script>
@@ -276,18 +255,18 @@ export default {
         return new Response(null, { status: 204 });
       }
       if (env.STATS && u.pathname === "/stat/get" && req.method === "GET") {
-        // (the page can be the owner's alone: a key in the site's settings, see limbusdm/site.py worker_config)
+        // stats page may need a key
         if (env.STATS_KEY && u.searchParams.get("k") !== env.STATS_KEY) return new Response("no", { status: 403 });
         if (!G.got || now - G.got.at > 30e3) {
           const all = await (await env.STATS.get(env.STATS.idFromName("site")).fetch("https://stats/get")).json();
           G.got = { at: now, own: JSON.stringify(all), body: JSON.stringify({ ...all, spent: undefined }) };
         }
-        // (what the period has spent is the owner's: env.OWNER_KEY, the same link as the page's key)
+        // usage for the owner only
         return new Response(env.OWNER_KEY && u.searchParams.get("k") === env.OWNER_KEY ? G.got.own : G.got.body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
       }
       return env.ASSETS ? await env.ASSETS.fetch(req) : new Response("not found", { status: 404 });
     } finally {
-      // (the first hit after a quiet while goes at once, so a Worker few people reach loses nothing)
+      // the first hit after a quiet while goes at once
       if (env.STATS && !closed && (G.hits.length || G.w > 50) && (now - G.at >= FLUSH || G.hits.length >= MOST_HITS)) ctx.waitUntil(flush(env));
     }
   },

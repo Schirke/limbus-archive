@@ -59,7 +59,7 @@ class Names:
         return r.get("name") or str(cid)
 
     def clip_label(self, owner: int, kind: str, n: int, clip_name: str, slot: str | None = None) -> str:
-        """slot: how the game shows that skill ("Skill 3.2", "Defense" — Service.skill_slots), else "Skill <n>"."""
+        """How the game names a skill's slot ("Skill 3.2", "Defense"), else "Skill <n>"."""
         if kind == "skill":
             if str(owner).startswith("1"):
                 name = self.skills.get(owner * 100 + n)
@@ -71,8 +71,7 @@ class Names:
 
 
 def owner_bundles(bundles, cid: int) -> list[str]:
-    """Bundles named after an Identity (p10315_…) or E.G.O (e20405_…, e20402-5_…). Early E.G.O have none of those:
-    their skills' effect bundles are named <id><skill> (2010121 = 20101 + 21) or …_<id>_ego_…"""
+    """Bundles named after an Identity (p10315_…) or E.G.O (e20405_…); early E.G.O: <id><skill> or …_<id>_ego_…"""
     s = str(cid)
     p = ("p" if s.startswith("1") else "e") + s
     ego_skill = re.compile(rf"^{s}\d{{2}}_assets_all$")
@@ -82,7 +81,7 @@ def owner_bundles(bundles, cid: int) -> list[str]:
 
 # ------------------------------------------------------------------ content labels
 SEASON_RE = re.compile(r"^s(\d+)_(\d{2})(\d{2})(\d{2})")
-# labels match the ones content.py builds from the stage tables, so both land in the same group
+# same labels as content.py, so both land in one group
 TAGS = [
     (re.compile(r"a(\d+)c(\d+)p(\d+)"), lambda m: (f"Canto {m.group(2)} · Part {m.group(3)}", int(m.group(2)))),
     (re.compile(r"walpu(\d+)"), lambda m: (f"Walpurgis Night {m.group(1)}", 0)),

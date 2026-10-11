@@ -14,15 +14,14 @@ import UnityPy
 from . import bundles as _bundles  # noqa: F401  (sets the Unity fallback version)
 
 _lock = threading.RLock()  # re-entrant: clip rendering opens dependency bundles while holding it
-# Open bundles, most recent last. A loaded bundle takes ~6x its file size in memory (decompressed and parsed):
-# 470 MB of files kept the app at 3.2 GB. So few are kept, within a size budget, and none once the app is idle.
+# open bundles, newest last; a bundle takes ~6x its size in memory, so few are kept
 _envs: "OrderedDict[str, object]" = OrderedDict()
 _sizes: dict[str, int] = {}
 MAX_ENVS = 4
 MAX_BYTES = 256 * 2**20  # their files; the newest one is kept whatever its size
 IDLE_S = 60
 _last_use = 0.0
-# caches elsewhere that hold objects of a loaded bundle (and so keep it in memory): cleared when the bundles go
+# caches holding objects of loaded bundles: cleared with them
 on_drop: list = []
 _watch = None
 
@@ -47,7 +46,7 @@ def _env(path: str):
 
 
 def drop_all():
-    """Let go of every loaded bundle and what other caches hold of them (the memory goes back to the system)."""
+    """Drop every loaded bundle and the caches holding them."""
     with _lock:
         _envs.clear()
         _sizes.clear()

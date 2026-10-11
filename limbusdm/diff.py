@@ -1,7 +1,4 @@
-"""Compare two snapshots and build a patch report.
-
-Every change ends up in some section — categories only group things, unknown kinds go to "other".
-"""
+"""Compare two snapshots into a patch report; unknown kinds go to "other"."""
 from __future__ import annotations
 
 import json
@@ -18,7 +15,7 @@ CJK_RE = re.compile(r"[぀-ヿ㐀-鿿가-힯]")
 MAX_RECORDS = 400
 
 IMAGE_TYPES = {"Texture2D", "Sprite"}
-# parts of prefabs ("Dummy" attach points, "[Image]Sample" UI nodes…): never news by themselves
+# prefab parts: never news by themselves
 STRUCTURAL_TYPES = {"GameObject", "Transform", "RectTransform", "MonoBehaviour", "Mesh", "Material", "Shader",
                     "MonoScript", "CanvasRenderer", "SpriteRenderer", "MeshRenderer", "MeshFilter", "Animator",
                     "AnimatorController", "Avatar", "ParticleSystem", "ParticleSystemRenderer", "PlayableDirector"}
@@ -29,7 +26,7 @@ CODE_FILES = re.compile(r"(GameAssembly\.dll|global-metadata\.dat|\.dll)$", re.I
 
 # ---------------------------------------------------------------- json records
 def parse_records(data: bytes | None):
-    """Return (records_by_id, raw_obj) for a JSON document shaped like {"dataList": [{id:..}, ...]}."""
+    """(records by id, raw) of a {"dataList": […]} document."""
     if data is None:
         return None, None
     try:
@@ -198,7 +195,7 @@ def localization_index(store: Store, snap: dict, only: set[str] | None = None) -
 
 
 def foreign_only_records(loc: dict) -> dict[str, list]:
-    """Records with real text that exist in KR or JP but not in EN: {base: [{"id", "lang", "record"}]}."""
+    """Records with text in KR / JP but not in EN."""
     out = {}
     for base, langs in loc.items():
         en = langs.get("en", {})
@@ -224,7 +221,7 @@ def diff_snapshots(store: Store, old_id: str, new_id: str) -> dict:
     ob, nb = old["bundles"], new["bundles"]
     affected = {k for k in set(ob) | set(nb) if ob.get(k, {}).get("hash") != nb.get(k, {}).get("hash")}
     om, nm = _object_maps(store, old, affected), _object_maps(store, new, affected)
-    # objects with a path in the game (UI art, story, gacha…) first; nameless parts of effects and maps after
+    # objects with a path first, nameless parts after
     for key in sorted(set(om) | set(nm), key=lambda k: (not k.startswith("c:"), k)):
         o, n = om.get(key), nm.get(key)
         if o and n and o.get("h") == n.get("h"):

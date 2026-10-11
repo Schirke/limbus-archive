@@ -1,7 +1,4 @@
-"""Limbus Archive desktop app: a window (pywebview) over a local server.
-
-On start it checks whether the game has downloaded a new version and, if so, builds the report.
-"""
+"""Limbus Archive desktop app: a pywebview window over a local server; builds a report when the game has a new version."""
 from __future__ import annotations
 
 import json
@@ -12,13 +9,11 @@ import threading
 import urllib.request
 
 PORT = int(os.environ.get("LIMBUS_DM_PORT", "47821"))  # override only for running a second dev copy
-SCHEME = "limbusarchive"  # limbusarchive://open/<page>: a link that opens the app on that page (an invite's button on the site)
+SCHEME = "limbusarchive"  # limbusarchive://open/<page> opens the app on that page
 
 
 def _link(argv: list[str]) -> str:
-    """The page the app was started for by a link (limbusarchive://open/gamechar/duel/abc123) as the window's
-    address "#/gamechar/duel/abc123"; "" without one. Only a page's address gets through: the link comes from a
-    web page."""
+    """The page a limbusarchive:// link asks for, as "#/<page>" (page addresses only); "" without one."""
     for a in argv[1:]:
         m = re.fullmatch(rf"{SCHEME}:/*(?:open/+)?#?/*([\w.%~-]+(?:/[\w.%~-]+)*)/?", a.strip(), re.I)
         if m and len(m.group(1)) <= 200:
@@ -27,8 +22,7 @@ def _link(argv: list[str]) -> str:
 
 
 def _register():
-    """Tells Windows that limbusarchive: links are this app's (the user's own part of the registry, every start: the
-    app may have been moved). Only the built exe on its usual port."""
+    """Registers limbusarchive: links for this exe (built exe on its usual port only)."""
     if not getattr(sys, "frozen", False) or PORT != 47821 or sys.platform != "win32":
         return
     try:
@@ -44,7 +38,7 @@ def _register():
 
 def _already_running(link: str = "") -> bool:
     import socket
-    try:  # (nothing listens there on a usual start: Windows takes 2 s to say so to an HTTP request, a bare connect is told to give up sooner)
+    try:  # a short connect: an HTTP request to a closed port takes 2 s
         socket.create_connection(("127.0.0.1", PORT), timeout=0.3).close()
     except OSError:
         return False
@@ -67,11 +61,7 @@ NET_CONFIG = """<?xml version="1.0" encoding="utf-8"?>
 
 
 def _unblock(root: str = ""):
-    """Lets .NET load the app's own DLLs although Windows marked them "downloaded from the internet" (it marks
-    everything unpacked from a zip the browser saved, and .NET refuses a marked DLL: the window never opened, "Failed
-    to resolve Python.Runtime.Loader.Initialize"). Two ways, either is enough: the mark is taken off every program
-    file (every start — the exe's own mark says nothing: Windows drops it when the user agrees to run the file), and
-    <exe>.config tells .NET to load them anyway."""
+    """Removes Windows' "downloaded" mark from the app's files and writes <exe>.config, so .NET loads the DLLs."""
     if not root:
         if not getattr(sys, "frozen", False) or sys.platform != "win32":
             return
@@ -95,9 +85,7 @@ def _unblock(root: str = ""):
 
 
 def _window_place(w: int = 1400, h: int = 900) -> dict:
-    """The window's size and place: (w, h) shrunk to fit the screen's free area (without the taskbar) and centred in it.
-    Windows' own centring went by the window's full size, so on a screen smaller than 1400x900 (or one scaled to 125 %)
-    the window's bottom half went off under the taskbar. In pywebview's units (logical pixels: physical / scale)."""
+    """Window size fitted to the screen's free area and centred (logical pixels)."""
     if sys.platform != "win32":
         return {"width": w, "height": h}
     try:
@@ -165,8 +153,7 @@ def main():
                 svc.watch["state"] = f"error: {e}"
 
     def watcher():
-        """While the window is open: the game's catalog every 2 min (a local file, no network) and the app's own
-        releases hourly (update_check caches for an hour)."""
+        """While the window is open: the game's catalog every 2 min, the app's releases hourly."""
         import time
         n = 0
         while True:
@@ -183,8 +170,7 @@ def main():
 
     threading.Thread(target=startup_check, daemon=True).start()
     threading.Thread(target=watcher, daemon=True).start()
-    # index of cross-bundle references (needed by some battle animations) and enemy → chapter map; slow only
-    # the first time
+    # cross-bundle index and enemy → chapter map; slow only the first time
     threading.Thread(target=lambda: svc.latest_snapshot_id() and svc.cab_index() and svc._content_bg(),
                      daemon=True).start()
 

@@ -1,5 +1,4 @@
-// Patches -> News: the developers' weekly update notices from the game's Steam page (/api/news, limbusdm/news.py),
-// each next to the patch it is about in the archive; the same notice sits on top of that patch's report.
+// Patches → News: Steam update notices next to their patches (/api/news).
 "use strict";
 
 const nw = { doc: null, at: 0 };
