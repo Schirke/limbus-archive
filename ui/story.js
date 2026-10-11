@@ -127,7 +127,7 @@ function rEnsure() {
     <div class="rbox" id="rbox"><div class="rplates" id="rplates"><div class="rtitle" id="rtitle"></div><div class="rname" id="rname"></div></div><div class="rwho"><b id="rwho"></b><i id="rrole"></i><button type="button" class="rrep" id="rrep" title="Replay voice">▶ voice</button></div><div class="rtxt" id="rtxt"></div><div class="rnext">▼</div></div>
     <div class="rspeed" id="rspeed"></div><div class="rvid" id="rvid"></div>
     <div class="rlog" id="rlog"><div class="rlogh"><b>Log</b><button type="button" id="rlogx">Close</button></div><div class="rlogb" id="rlogb"></div></div>
-    <div class="rend" id="rend"></div></div>`;
+    <div class="rend" id="rend"></div><div class="rend rask" id="rask"></div></div>`;
   document.body.append(el);
   R.el = el;
   R.fit = () => {
@@ -138,7 +138,7 @@ function rEnsure() {
   window.addEventListener("resize", R.fit);
   const stage = $("#rstage");
   let t0 = 0, hz = 0, down = false;
-  const skip = (e) => e.target.closest(".rhud, .rhex, .rmenu, .rlog, .rend, .rrep, .rvid");
+  const skip = (e) => e.target.closest(".rhud, .rhex, .rmenu, .rlog, .rend, .rrep, .rvid, .rask");
   stage.addEventListener("pointerdown", (e) => {
     if (skip(e)) return;
     if (R.el.classList.contains("noui")) { R.el.classList.remove("noui"); return; }  // (a tap brings the hidden interface back)
@@ -188,6 +188,12 @@ function rEnsure() {
   };
   document.addEventListener("keydown", (e) => {
     if (!R.open) return;
+    if ($("#rask").classList.contains("on")) {
+      if (e.key === "Escape") { e.stopPropagation(); $("#rask").classList.remove("on"); }
+      if (e.key === "Enter" || e.key === "y") $('#rask [data-a="yes"]').click();
+      e.preventDefault();
+      return;
+    }
     if (e.key === " " || e.key === "Enter" || e.key === "ArrowRight") { e.preventDefault(); rAdvance(); }
     else if (e.key === "ArrowLeft") { e.preventDefault(); rShow(Math.max(0, R.i - 1)); }
     else if (e.key === "Escape") { e.stopPropagation(); if ($("#rlog").classList.contains("on") || $("#rmenu").classList.contains("on")) { $("#rlog").classList.remove("on"); $("#rmenu").classList.remove("on"); } else rExit(); }
@@ -232,7 +238,7 @@ async function rLoad(file, at) {
   R.pos = lo;
   // the layered pictures this story uses: asked at once, drawn when they are there
   Object.values(ep.models).forEach((m) => { if (m.psb) rLayout(m.psb); });
-  $("#rend").classList.remove("on");
+  $("#rend").classList.remove("on"); $("#rask").classList.remove("on");
   rShow(Math.min(at, Math.max(0, ep.lines.length - 1)));
 }
 // every line's state (what the scene shows) from the changes the lines carry
@@ -461,7 +467,7 @@ function rTick() {
 function rAdvance(auto) {
   if ($("#rvid").style.display === "block") return;
   if (!R.done) { R.spans.forEach((x) => x.classList.add("on")); R.typed = R.spans.length; R.done = true; return; }
-  if ($("#rend").classList.contains("on")) return;
+  if ($("#rend").classList.contains("on") || $("#rask").classList.contains("on")) return;
   rShow(R.i + 1);
 }
 function rEnd() {
@@ -478,11 +484,21 @@ function rEnd() {
     if (a === "exit") rExit();
   };
 }
-// skip: straight into the next story, else the end screen
+// skip (asked first): straight into the next story, else the end screen
 function rSkip() {
-  const next = st.list[R.pos + 1];
-  if (next) { location.hash = "#/story/read/" + encodeURIComponent(next.id); return; }
-  if (R.ep) rShow(R.ep.lines.length);
+  const next = st.list[R.pos + 1], ask = $("#rask");
+  ask.innerHTML = `<h3>Skip this story?</h3><p>${next ? "Next: " + esc(next.title) + (ST_PART[next.detail] ? " · " + ST_PART[next.detail] : "") : "This is the last story of the chapter."}</p>
+    <div><button data-a="yes">Yes</button><button data-a="no">No</button></div>`;
+  ask.classList.add("on");
+  ask.onclick = (e) => {
+    e.stopPropagation();
+    const a = e.target.dataset?.a;
+    if (!a) return;
+    ask.classList.remove("on");
+    if (a !== "yes") return;
+    if (next) location.hash = "#/story/read/" + encodeURIComponent(next.id);
+    else if (R.ep) rShow(R.ep.lines.length);
+  };
 }
 function rExit() {
   R.open = false;

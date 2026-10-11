@@ -43,6 +43,7 @@ body::after { /* the company's seal, bottom right */
 #nav a.active::after { content: ""; position: absolute; inset: 5px 2px; pointer-events: none; border: 10px solid transparent; border-image: var(--k-glow-line) 30 / 10px stretch; }
 #nav a[data-group=patches]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_11"); }
 #nav a[data-group=db]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_10"); }
+#nav a[data-group=story]::before { background-image: url("/api/gacha_ui?n=MainUI_MainStage_2_2"); }
 #nav a[data-group=versus]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_12"); }
 #nav a[data-group=games]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_13"); }
 #nav a[data-group=gacha]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_14"); }
