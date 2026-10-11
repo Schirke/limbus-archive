@@ -25,7 +25,7 @@ import urllib.request
 
 from . import REPO
 
-VERSION = 2
+VERSION = 3
 PUB_BRANCH = "lang-data"
 # (the branch's commit is asked from the repository as git does — no API, no hourly limit — and its files by that commit)
 PUB_REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
@@ -253,9 +253,26 @@ def _build(svc, src: dict) -> dict:
                 if x and x != s and x.strip() and not OWN_GLYPHS.search(x):
                     seen[g][s][x] += 1
                     done[g] += 1
-    tables = {g: {s: c.most_common(1)[0][0] for s, c in seen[g].items()} for g in GROUPS}
+    tables = {g: {} for g in GROUPS}
+    for g in GROUPS:
+        for s, c in seen[g].items():
+            x = _own_tags(s, c.most_common(1)[0][0])
+            tables[g][s] = x
+            one = " ".join(s.split())  # (the app shows many texts on one line: "The House of Spiders:\nThe …" → "… The …")
+            if one != s and one not in seen[g]:
+                tables[g].setdefault(one, " ".join(x.split()))
     cover = {g: round(100 * done[g] / total[g]) if total[g] else 0 for g in GROUPS}
     return {"tables": tables, "cover": cover}
+
+
+TAG = re.compile(r"</?([a-zA-Z-]+)(?:=[^>]*)?>")
+
+
+def _own_tags(en: str, x: str) -> str:
+    """the game's text marks a translation adds for its own look (<cspace=-2px>, <nobr>, <size>…) are left out: the
+    pages draw only the marks the English text has"""
+    keep = {m.group(1).lower() for m in TAG.finditer(en)}
+    return TAG.sub(lambda m: m.group(0) if m.group(1).lower() in keep else "", x)
 
 
 def _paths(svc, src: dict, en_sig: str) -> tuple[str, dict]:
