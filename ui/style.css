@@ -1006,6 +1006,8 @@ details.an-opts summary { cursor: pointer; }
 .strow.story { color: var(--muted); } .strow.story i { color: #8fa3b5; }
 .strow:hover, .strow.on { border-color: var(--gold); background: var(--panel); }
 .stnote { margin: 12px 0; }
+.strow em { font-style: normal; color: #8fa3b5; flex: none; }
+.ststory { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0; } .ststory .muted { margin-left: 4px; }
 .stwave { border: 1px solid var(--line); background: var(--panel); padding: 10px 12px; margin-top: 8px; }
 .stwhead { display: flex; gap: 12px; align-items: center; font: 13px Consolas, monospace; color: #c9bfb2; } .stwhead b { color: #fff; font-weight: normal; }
 .stthemes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; } .sttrack { font-size: 12px; padding: 3px 9px; }

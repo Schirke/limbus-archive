@@ -120,10 +120,10 @@ function rEnsure() {
   const el = document.createElement("div");
   el.id = "streader";
   el.innerHTML = `<div class="rstage" id="rstage"><div class="rcam" id="rcam"><div class="rbgimg" id="rbg"></div><div class="rchars" id="rchars"></div><div class="rcgimg" id="rcg"></div></div><div class="rvig"></div><div class="rfade" id="rfade"></div><div class="rplace" id="rplace"></div>
-    <div class="rhex" id="rhex"><button type="button" class="rhx" data-h="skip" title="Skip to the end"><svg viewBox="0 0 24 24"><path d="M3 5l9 7-9 7zM12 5l9 7-9 7z"/></svg></button><button type="button" class="rhx" data-h="auto" title="Auto"><b>AUTO</b></button><button type="button" class="rhx" data-h="log" title="Log"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zM14 3v5h5M9 11h8M9 14h8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button><button type="button" class="rhx" data-h="hide" title="Hide the interface"><b>UI</b></button><button type="button" class="rhx" data-h="set" title="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 5.1l2 1.6-2 3.5-2.4-.9a8 8 0 0 1-2.2 1.3L15.4 22h-4l-.4-2.6a8 8 0 0 1-2.2-1.3l-2.4.9-2-3.5 2-1.6a8 8 0 0 1 0-2.6l-2-1.6 2-3.5 2.4.9a8 8 0 0 1 2.2-1.3L11.4 2h4l.4 2.6a8 8 0 0 1 2.2 1.3l2.4-.9 2 3.5-2 1.6a8 8 0 0 1 0 2.6z"/></svg></button><button type="button" class="rhx" data-h="more" title="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.6"/></svg></button></div>
+    <div class="rhex" id="rhex"><button type="button" class="rhx" data-h="skip" title="Skip this story"><svg viewBox="0 0 24 24"><path d="M3 5l9 7-9 7zM12 5l9 7-9 7z"/></svg></button><button type="button" class="rhx" data-h="auto" title="Auto"><b>AUTO</b></button><button type="button" class="rhx" data-h="log" title="Log"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zM14 3v5h5M9 11h8M9 14h8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button><button type="button" class="rhx" data-h="hide" title="Hide the interface"><b>UI</b></button><button type="button" class="rhx" data-h="set" title="Settings"><svg viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7zm8.4 5.1l2 1.6-2 3.5-2.4-.9a8 8 0 0 1-2.2 1.3L15.4 22h-4l-.4-2.6a8 8 0 0 1-2.2-1.3l-2.4.9-2-3.5 2-1.6a8 8 0 0 1 0-2.6l-2-1.6 2-3.5 2.4.9a8 8 0 0 1 2.2-1.3L11.4 2h4l.4 2.6a8 8 0 0 1 2.2 1.3l2.4-.9 2 3.5-2 1.6a8 8 0 0 1 0 2.6z"/></svg></button><button type="button" class="rhx" data-h="more" title="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.6"/></svg></button></div>
     <div class="rbar"><i id="rbar"></i></div><div class="rinfo" id="rinfo"></div>
     <div class="rhud"><button type="button" id="rauto">Auto</button><button type="button" id="rmenubtn">Menu</button></div>
-    <div class="rmenu" id="rmenu"><button data-a="log">Log</button><button data-a="voice"></button><button data-a="ui"></button><button data-a="skip">Skip to end of this story</button><button data-a="exit">Exit to list</button></div>
+    <div class="rmenu" id="rmenu"><button data-a="log">Log</button><button data-a="voice"></button><button data-a="ui"></button><button data-a="skip">Skip this story</button><button data-a="exit">Exit to list</button></div>
     <div class="rbox" id="rbox"><div class="rplates" id="rplates"><div class="rtitle" id="rtitle"></div><div class="rname" id="rname"></div></div><div class="rwho"><b id="rwho"></b><i id="rrole"></i><button type="button" class="rrep" id="rrep" title="Replay voice">▶ voice</button></div><div class="rtxt" id="rtxt"></div><div class="rnext">▼</div></div>
     <div class="rspeed" id="rspeed"></div><div class="rvid" id="rvid"></div>
     <div class="rlog" id="rlog"><div class="rlogh"><b>Log</b><button type="button" id="rlogx">Close</button></div><div class="rlogb" id="rlogb"></div></div>
@@ -168,7 +168,7 @@ function rEnsure() {
     e.stopPropagation();
     const h = e.target.closest(".rhx")?.dataset.h;
     if (h === "more") $("#rhex").classList.toggle("open");
-    if (h === "skip") rShow(R.ep.lines.length - 1);
+    if (h === "skip") rSkip();
     if (h === "auto") $("#rauto").click();
     if (h === "log") rLogShow();
     if (h === "hide") setTimeout(() => R.el.classList.add("noui"));
@@ -183,7 +183,7 @@ function rEnsure() {
     if (a === "ui") { R.ui = R.ui ? "" : "alt"; stSet("story.ui", R.ui); R.el.classList.toggle("alt", !!R.ui); rMenuSync(); return; }
     $("#rmenu").classList.remove("on");
     if (a === "log") rLogShow();
-    if (a === "skip") rShow(R.ep.lines.length - 1);
+    if (a === "skip") rSkip();
     if (a === "exit") rExit();
   };
   document.addEventListener("keydown", (e) => {
@@ -477,6 +477,12 @@ function rEnd() {
     if (a === "again") { end.classList.remove("on"); rShow(0); }
     if (a === "exit") rExit();
   };
+}
+// skip: straight into the next story, else the end screen
+function rSkip() {
+  const next = st.list[R.pos + 1];
+  if (next) { location.hash = "#/story/read/" + encodeURIComponent(next.id); return; }
+  if (R.ep) rShow(R.ep.lines.length);
 }
 function rExit() {
   R.open = false;

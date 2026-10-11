@@ -6,13 +6,21 @@ const ST_ZOOM = [128, 192, 256, 384];  // a map tile's side on the page (the gam
 const ST_KIND = { fight: ["⚔", "Fight"], story: ["❝", "Story"], dungeon: ["◈", "Dungeon"], other: ["◇", "Special stage"] };
 const stChapter = () => STAGES.chapters.find((c) => c.id === stv.ch) || STAGES.chapters[0];
 const stNode = (c) => c.nodes.find((n) => n.id === stv.node);
+// node id -> [episode, chapter] of the Story page: the scenes read at that node
+let ST_EPS = null;
+const stStories = async () => {
+  if (ST_EPS) return;
+  if (!st.idx) st.idx = await api("/api/story").catch(() => null);
+  ST_EPS = new Map();
+  for (const c of st.idx ? [...st.idx.main, ...st.idx.other] : []) for (const e of c.eps) if (!ST_EPS.has(e.node)) ST_EPS.set(e.node, [e, c]);
+};
 const stEnemy = (uid) => { const id = STAGES.units[uid]; return id == null ? null : ENEMIES.list.find((e) => e.id === id); };
 
 routes.stages = async (args) => {
   const main = $("#main");
   if (!STAGES || !ENEMIES) {
     main.innerHTML = `<div class="muted">Loading the map…</div>`;
-    try { [STAGES, ENEMIES] = await Promise.all([api("/api/stages"), ENEMIES || api("/api/enemies"), units()]); }
+    try { [STAGES, ENEMIES] = await Promise.all([api("/api/stages"), ENEMIES || api("/api/enemies"), units(), stStories()]); }
     catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   }
   if (!STAGES.chapters.length) { STAGES = null; main.innerHTML = `<div class="empty">Take a snapshot first — the map is read from it.</div>`; return; }
@@ -42,7 +50,7 @@ function stDraw() {
     $("#stout").onclick = () => { stv.zoom = Math.max(0, stv.zoom - 1); stMap(); stMark(true); };
   }
   $("#stlist").innerHTML = c.nodes.map((n) => `<a href="#/stages/${c.id}/${n.id}" data-n="${n.id}" class="strow ${n.kind}">
-      <span>${esc(n.n)}</span><i title="${ST_KIND[n.kind][1]}">${ST_KIND[n.kind][0]}</i><b>${esc(n.title || ST_KIND[n.kind][1])}</b>${n.lv ? `<span class="r">Lv ${n.lv}</span>` : ""}</a>`).join("");
+      <span>${esc(n.n)}</span><i title="${ST_KIND[n.kind][1]}">${ST_KIND[n.kind][0]}</i><b>${esc(n.title || ST_KIND[n.kind][1])}</b>${n.kind !== "story" && ST_EPS.has(n.id) ? `<em title="Has story scenes">❝</em>` : ""}${n.lv ? `<span class="r">Lv ${n.lv}</span>` : ""}</a>`).join("");
   stMap();
   stMark(true);
   stCard();
@@ -104,17 +112,19 @@ function stFight(f, n) {
 function stCard() {
   const box = $("#stcard"), c = stChapter(), n = stNode(c);
   if (!box || !n) return;
-  const fights = n.kind === "dungeon" ? n.fights || [] : n.waves ? [n] : [];
+  const fights = n.kind === "dungeon" ? n.fights || [] : n.waves ? [n] : [], story = ST_EPS.get(n.id);
   const i = c.nodes.indexOf(n), near = (d, s) => c.nodes[i + d] ? `<a class="toggle" href="#/stages/${c.id}/${c.nodes[i + d].id}">${s}</a>` : "";
   box.innerHTML = `<div class="enkick">${esc(c.label)} · ${ST_KIND[n.kind][1]}</div>
     <h2 class="enname">${esc(n.n)}${n.title ? " · " + esc(n.title) : ""}${n.lv ? `<em>LV ${n.lv}</em>` : ""}</h2>
     <div class="entags">${near(-1, "‹ Previous")}${near(1, "Next ›")}<span class="muted">node ${n.id}${n.stage ? ` · stage ${n.stage}` : ""}${n.turns && n.turns < 99 ? ` · ${n.turns} turns` : ""}</span></div>
+    ${story ? `<div class="ststory">${story[0].parts.map(([id, part]) => `<button class="toggle" data-read="${esc(id)}">❝ ${esc(ST_PART[part] || "Read the story")}</button>`).join("")}<span class="muted small">${esc(story[1].label)} · ${esc(story[0].n)} ${esc(story[0].title)}</span></div>` : ""}
     ${n.kind === "story" ? `<div class="muted stnote">A story scene: nobody is fought here.</div>`
       : n.kind === "other" ? `<div class="muted stnote">A stage with rules of its own, not a regular fight.</div>`
       : n.kind === "dungeon" ? `<div class="muted stnote">A dungeon with a map of its own: ${fights.length} different fights inside.</div>`
         + fights.map((f, k) => `<div class="enh">${esc(f.what)} · Lv ${f.lv}</div>${stFight(f, k)}`).join("")
       : fights.length ? stFight(n, 0) : `<div class="muted stnote">The game's files list no fight for this node.</div>`}`;
   box.scrollTop = 0;
+  box.querySelectorAll("[data-read]").forEach((b) => b.onclick = () => stOpen(b.dataset.read, story[1]));
   box.querySelectorAll("[data-track]").forEach((b) => b.onclick = () => muPlay(+b.dataset.track));
   box.querySelectorAll("[data-vs]").forEach((b) => b.onclick = async () => {
     const [f, w] = b.dataset.vs.split(":").map(Number), wave = fights[f].waves[w];

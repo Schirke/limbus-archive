@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 
 # pages that can't work from files: never opened
-APP_ONLY = {"versus", "vsroom", "vslive", "browse", "snapshots", "scan", "settings", "sprites"}
+APP_ONLY = {"versus", "vsroom", "vsmirror", "vslive", "browse", "snapshots", "scan", "settings", "sprites"}
 
 
 def find_browser() -> str | None:
