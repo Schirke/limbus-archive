@@ -1809,27 +1809,39 @@ def deploy(svc, progress=None) -> str:
         raise RuntimeError("Node.js isn't installed — the upload runs Cloudflare's wrangler through npx")
     # run from the data folder: wrangler keeps its files there
     conf = worker_config(svc)
-    p = subprocess.Popen([npx, "--yes", "wrangler@4", "deploy", "-c", conf], cwd=os.path.dirname(conf), stdin=subprocess.DEVNULL,
-                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
-                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    tail, url = [], cfg["url"]
-    for line in p.stdout:
-        line = line.strip()
-        if not line:
-            continue
-        tail = (tail + [line])[-12:]
-        m = re.search(r"Uploaded (\d+) of (\d+) assets", line)
-        if m and progress:
-            progress("site: uploading", int(m.group(1)), int(m.group(2)))
-        m = re.search(r"https://\S+\.workers\.dev", line)
-        if m:
-            url = m.group(0)
-    if p.wait() != 0:
+    url = cfg["url"]
+    for attempt in range(1, DEPLOY_TRIES + 1):
+        p = subprocess.Popen([npx, "--yes", "wrangler@4", "deploy", "-c", conf], cwd=os.path.dirname(conf), stdin=subprocess.DEVNULL,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace",
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        tail = []
+        for line in p.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            tail = (tail + [line])[-12:]
+            m = re.search(r"Uploaded (\d+) of (\d+) assets", line)
+            if m and progress:
+                progress("site: uploading", int(m.group(1)), int(m.group(2)))
+            m = re.search(r"https://\S+\.workers\.dev", line)
+            if m:
+                url = m.group(0)
+        if p.wait() == 0:
+            return url
         if any("EBUSY" in t for t in tail):  # npx could not update wrangler: its files are held by one that is running
             raise RuntimeError("upload failed: another wrangler is running on this computer (a local preview, "
                                "`wrangler dev`?) and holds its files — close it and send again")
-        raise RuntimeError("upload failed: " + " | ".join(tail[-4:]))
+        # Cloudflare's API now and then times out or cuts an answer short: the same upload again a little later
+        if attempt == DEPLOY_TRIES or not any(re.search(DEPLOY_FLAKY, t) for t in tail):
+            raise RuntimeError("upload failed: " + " | ".join(tail[-4:]))
+        if progress:
+            progress("site: uploading", 0, 0, f"Cloudflare didn't answer — trying again ({attempt + 1} of {DEPLOY_TRIES})")
+        time.sleep(30 * attempt)
     return url
+
+
+DEPLOY_TRIES = 4
+DEPLOY_FLAKY = r"\b50[234]\b|Gateway Timeout|Bad Gateway|malformed response|ECONNRESET|ETIMEDOUT|UND_ERR|fetch failed|socket hang up"
 
 
 def verify(ex: "Exporter", progress=None) -> dict:
