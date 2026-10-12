@@ -1,6 +1,7 @@
 {
  "routes": [
   "anim",
-  "compare"
+  "compare",
+  "vsmirror"
  ]
 }
