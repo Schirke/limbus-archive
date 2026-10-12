@@ -750,7 +750,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 except Exception:
                     tracks = {}  # (no sound banks read: the themes are listed by their event names)
                 return self._json({"chapters": db["chapters"], "tile": db.get("tile") or 2048, "units": entry, "tracks": tracks,
-                                   "maps": [m["name"] for m in battle_maps(svc)]})
+                                   "maps": [m["name"] for m in battle_maps(svc)], "assist": db.get("assist") or {},
+                                   "announcers": db.get("announcers") or {}, "sinners": db.get("sinners") or []})
             if p == "/api/enemies":  # the handbook's list; an entry's skill and passive texts come with /api/enemy
                 db = svc.enemy_db()
                 # Spine enemies: the page's idle-pose picture; sprite ones: the portrait

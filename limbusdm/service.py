@@ -1003,7 +1003,14 @@ class Service:
                 if m:
                     tiles.setdefault(m.group(1), {})[f"{int(m.group(2))}_{int(m.group(3))}"] = c
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
-            db = stages.build(self.static_tables(["part", "dungeonMap"] + list(stages.FIGHT_TABLES)), loc, tiles)
+            con = sqlite3.connect(self.ensure_browse())
+            try:
+                pics = {os.path.splitext(c.rsplit("/", 1)[-1])[0]: c for (c,) in con.execute(
+                    "select distinct c from o where type = 'Sprite' and c like '%/Sprite/Unit/Portrait/%_portrait.png'")}
+            finally:
+                con.close()
+            db = stages.build(self.static_tables(["part", "dungeonMap", "restrict-participation", "assistant"] + list(stages.FIGHT_TABLES)),
+                              loc, tiles, pics)
             db["v"] = stages.VERSION
             self.store.write_json(rel, db)
         self._stages = (sid, db)

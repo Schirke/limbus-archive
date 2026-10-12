@@ -117,6 +117,34 @@ function stNodeRead(n, s) {
   document.querySelectorAll(".stpick [data-read]").forEach((b) => b.onclick = () => { closeModal(); stOpen(b.dataset.read, s[1]); });
 }
 
+// a fight's rules (who may / must fight, the announcer) and the game's units fighting on our side
+function stRules(f) {
+  const r = f.rules || {}, S = STAGES.sinners || [], rows = [];
+  const who = (ids) => ids.map((c) => esc(S[c - 1] || `#${c}`)).join(", ");
+  const ann = (ids) => ids.map((a) => esc(STAGES.announcers[a] || `#${a}`)).join(", ");
+  if (r.count) rows.push(["Team", r.count[0] === r.count[1] ? `${r.count[0]} Sinners` : `${r.count[0]}–${r.count[1]} Sinners`]);
+  const can = r.out ? S.map((_, i) => i + 1).filter((c) => !r.out.includes(c)) : null;
+  if (can && r.must && can.every((c) => r.must.includes(c))) rows.push(["Only", `${who(can)} (all must fight)`]);
+  else {
+    if (can) rows.push(can.length <= 6 ? ["Only", who(can)] : ["Can't fight", who(r.out)]);
+    if (r.must) rows.push(["Must fight", who(r.must)]);
+  }
+  if (r.forced) rows.push(["Plays as", r.forced.map(([c, p]) => { const u = unitById(p);
+    return `<a href="#/db/${p}">${esc(u ? `${u.title} ${u.sinnerName}` : `${S[c - 1] || ""} ${p}`)}</a>`; }).join(", ")]);
+  if (r.rental) rows.push(["Rental", `Identities lent by the game · Lv ${r.rental[1]}`]);
+  const need = [r.lv && `Lv ${r.lv}+`, r.uptie && `Uptie ${r.uptie}+`].filter(Boolean).join(", ");
+  if (need || r.egoUptie) rows.push(["Needs", [need && `Identities ${need}`, r.egoUptie && `E.G.O Uptie ${r.egoUptie}+`].filter(Boolean).join(" · ")]);
+  if (r.setLv) rows.push(["Levels", `set to ${r.setLv}`]);
+  if (r.ann) rows.push(["Announcer", ann(r.ann)]);
+  else if (r.noann === "all") rows.push(["Announcer", "none"]);
+  else if (r.noann) rows.push(["Announcer", `not ${ann(r.noann)}`]);
+  const helpers = (f.assist || []).map(([id, guess]) => { const a = STAGES.assist[id] || {};
+    return `<div class="entile${guess ? " guess" : ""}" title="${esc(guess === 2 ? "Added by hand: the stage's script brings this helper in, the data doesn't say" : guess ? "Guessed: the stage shows this Sinner's card at the back and names no helper" : a.name || "")}">
+      ${a.pic ? `<img loading="lazy" src="${imgThumb(a.pic)}" onerror="this.remove()">` : ""}${guess ? `<i class="gq">?</i>` : ""}<span>Lv ${a.lv}</span><b>${esc(a.name || `Unit ${id}`)}</b></div>`; }).join("");
+  return (rows.length ? `<div class="strules">${rows.map(([k, v]) => `<span>${k}</span><div>${v}</div>`).join("")}</div>` : "")
+    + (helpers ? `<div class="enh">Assist units</div><div class="stunits">${helpers}</div>` : "");
+}
+
 // a fight (a node's own, or one inside a dungeon): its waves with arena, themes and enemies
 function stFight(f, n) {
   const tile = ([uid, count, lv]) => {
@@ -134,7 +162,7 @@ function stFight(f, n) {
       ${themes ? `<div class="stthemes">${themes}</div>` : ""}
       <div class="stunits">${w.units.map(tile).join("") || `<div class="muted small">No enemies listed.</div>`}</div>
       ${w.more.length ? `<div class="enh">Reinforcements</div><div class="stunits more">${w.more.map(tile).join("")}</div>` : ""}</div>`;
-  }).join("");
+  }).join("") + stRules(f);
 }
 
 function stCard() {

@@ -1036,6 +1036,8 @@ details.an-opts summary { cursor: pointer; }
 .stthemes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; } .sttrack { font-size: 12px; padding: 3px 9px; }
 .stunits { display: grid; grid-template-columns: repeat(auto-fill, 112px); gap: 6px; margin-top: 8px; }
 .stunits.more { grid-template-columns: repeat(auto-fill, 84px); }
+.strules { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin-top: 8px; font-size: 13px; } .strules > span { color: #8fa3b5; }
+.entile.guess { border-style: dashed; position: relative; } .entile .gq { position: absolute; top: 4px; right: 6px; color: var(--gold); font-weight: bold; }
 @media (max-width: 1100px) { .stwrap { grid-template-columns: 260px minmax(0, 1fr); } }
 /* Games: Limbus Grid (games4.js) */
 .ggbox { display: grid; grid-template-columns: 150px repeat(3, 170px); gap: 6px; margin-top: 14px; }
