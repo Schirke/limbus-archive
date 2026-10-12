@@ -154,7 +154,8 @@ class Snapshotter:
             want_sounds = ext == ".bank"
             want_names = rel.endswith("global-metadata.dat")
             if (prev and prev["size"] == st.st_size and prev["mtime"] == int(st.st_mtime)
-                    and (prev.get("blob") or not want_blob) and ("sounds" in prev or not want_sounds)
+                    and (prev.get("blob") or not want_blob)
+                    and (("sounds" in prev and not str(prev.get("error") or "").startswith("sounds:")) or not want_sounds)
                     and ("names" in prev or not want_names)):
                 files[rel] = prev
             else:

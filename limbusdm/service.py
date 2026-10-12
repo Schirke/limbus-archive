@@ -121,8 +121,24 @@ class Service:
         if cached and cached[0] == (sid, mtime):
             return cached[1]
         snap = self.store.read_json(rel)
+        if snap and sid == self.latest_snapshot_id():
+            self._bank_lists(snap)
         self._snap_cache = ((sid, mtime), snap)
         return snap
+
+    def _bank_lists(self, snap: dict) -> None:
+        """A snapshot that kept no bank's sounds (the read failed then) gets them from the bank files now."""
+        from .banks import list_sounds
+        banks = [(rel, rec) for rel, rec in (snap.get("files") or {}).items() if rel.lower().endswith(".bank")]
+        if any(rec.get("sounds") for _rel, rec in banks):
+            return
+        roots = {"install": self.game.game, "locallow": self.game.locallow}
+        for rel, rec in banks:
+            label, _, sub = rel.partition("/")
+            try:
+                rec["sounds"] = [[x["name"], x["ms"]] for x in list_sounds(os.path.join(roots.get(label) or "", sub))]
+            except Exception:
+                continue
 
     def reports(self):
         d = os.path.join(self.data_dir, "reports")
@@ -883,7 +899,7 @@ class Service:
             return cached[1]
         rel = f"music/{sid}.json.gz"
         db = self.store.read_json(rel)
-        if db is None or db.get("v") != music.VERSION:
+        if db is None or db.get("v") != music.VERSION or not db.get("tracks"):  # (an empty list is built again)
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
             samples = [(name, ms, path, i) for path, rec in self.load_snapshot(sid)["files"].items()
                        if os.path.basename(path).lower().startswith("bgm") for i, (name, ms) in enumerate(rec.get("sounds") or [])]
@@ -905,7 +921,7 @@ class Service:
             return cached[1]
         rel = f"quiz/{sid}.json.gz"
         db = self.store.read_json(rel)
-        if db is None or db.get("v") != quiz.VERSION:
+        if db is None or db.get("v") != quiz.VERSION or not db.get("ids"):
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize")
             story, portraits, path = {}, {}, self.ensure_browse()  # the story's own files: which voice file a line plays
             if path:
@@ -944,7 +960,7 @@ class Service:
             return cached[1]
         rel = f"sound_lib/{sid}.json.gz"
         db = self.store.read_json(rel)
-        if db is None or db.get("v") != soundlib.VERSION:
+        if db is None or db.get("v") != soundlib.VERSION or not db["tree"].get("n"):
             snap = self.load_snapshot(sid)
             roots = {"install": self.game.game, "locallow": self.game.locallow}
             samples, music = [], {}
