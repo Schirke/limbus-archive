@@ -278,6 +278,38 @@
     if (name && !OPEN.has(name)) a.classList.add("apponly");
   });
   document.body.classList.add("site");
+  // phones: the bottom bar slides away while reading down; tab rows show which side has more; a page's description
+  // folds into "How it works"
+  const phone = () => matchMedia("(max-width: 900px)").matches;
+  let lastY = 0;
+  const onScroll = (e) => {
+    const el = e.target === document ? document.scrollingElement : e.target;
+    if (!el || !phone()) return;
+    const y = el.scrollTop, d = y - lastY;
+    if (Math.abs(d) < 8) return;
+    document.body.classList.toggle("navaway", d > 0 && y > 80);
+    lastY = y;
+  };
+  $("#main").addEventListener("scroll", onScroll, { passive: true });
+  document.addEventListener("scroll", onScroll, { passive: true });
+  const edge = (d) => { const more = d.scrollWidth - d.clientWidth > 4;
+    d.classList.toggle("more-r", more && d.scrollLeft + d.clientWidth < d.scrollWidth - 4); d.classList.toggle("more-l", more && d.scrollLeft > 4); };
+  document.querySelectorAll("#subnav div[data-group]").forEach((d) => d.addEventListener("scroll", () => edge(d), { passive: true }));
+  const tabs = () => {
+    const a = document.querySelector("#subnav div:not([hidden]) a.active");
+    if (a && phone()) a.scrollIntoView({ block: "nearest", inline: "nearest" });
+    document.querySelectorAll("#subnav div[data-group]").forEach(edge);
+  };
+  addEventListener("hashchange", () => { document.body.classList.remove("navaway"); lastY = 0; setTimeout(tabs, 50); });
+  addEventListener("resize", tabs);
+  setTimeout(tabs, 50);
+  new MutationObserver(() => {
+    const sub = document.querySelector("#main > .sub, #main > div > .sub");
+    if (!sub || sub.previousElementSibling?.classList.contains("howto")) return;
+    const b = Object.assign(document.createElement("button"), { className: "howto", textContent: "ⓘ How it works" });
+    b.onclick = () => { sub.classList.toggle("open"); b.classList.toggle("open"); };
+    sub.before(b);
+  }).observe($("#main"), { childList: true, subtree: true });
   // an invite: offer to open it in the app
   const appBar = () => {
     const h = location.hash, on = /^#\/(game\w+|games\/track)\/duel\/[\w.%-]+$|^#\/(live|vsroom|gamewho)\/[a-z0-9]{4,10}$/i.test(h);

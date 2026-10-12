@@ -1293,8 +1293,26 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .spbg-checker .spf img, .spbg-checker .spstage { background: repeating-conic-gradient(#3a3a3a 0 25%, #262626 0 50%) 0 0 / 16px 16px; }
 
 /* ---- Tools → Mirror Dungeon planner (ui/mirror.js) ---- */
-.mpcols { display: grid; grid-template-columns: 360px 400px minmax(0, 1fr); gap: 16px; align-items: start; }
-@media (max-width: 1500px) { .mpcols { grid-template-columns: 300px 340px minmax(0, 1fr); } }
+/* the gift picker takes the room: twice the gifts in a row, the build and the floors stay in sight */
+.mpcols { display: grid; grid-template-columns: minmax(0, 1.5fr) 340px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1500px) { .mpcols { grid-template-columns: minmax(0, 1.2fr) 320px minmax(0, 1fr); } }
+.mpchips .kwi { padding: 3px 5px; line-height: 0; } .mpchips .kwi .icofb { line-height: normal; font-size: 12px; }
+#mpsort { font-size: 13px; padding: 4px 8px; }
+/* phones: Gifts / Build / Floors as tabs, a strip to the route */
+.mptabs, .mpstrip { display: none; }
+@media (max-width: 900px) {
+  .mpcols { display: block; } .mpcols > * { margin-bottom: 12px; }
+  .mpcols[data-tab=g] > :nth-child(2), .mpcols[data-tab=g] > :nth-child(3), .mpcols[data-tab=b] > :nth-child(1), .mpcols[data-tab=b] > :nth-child(3),
+  .mpcols[data-tab=f] > :nth-child(1), .mpcols[data-tab=f] > :nth-child(2) { display: none; }
+  .mptabs { display: flex; position: sticky; top: 0; z-index: 5; gap: 4px; margin: 10px 0; padding: 4px 0; background: var(--bg); }
+  .mptabs .toggle { flex: 1; padding: 8px 0; }
+  .mpstrip { display: flex; position: fixed; left: 10px; right: 10px; bottom: 74px; z-index: 800; align-items: center; gap: 8px; padding: 10px 14px;
+    background: #2a1408; color: var(--cream); border: 1px solid #c8862a; font-size: 15px; transition: bottom .22s ease; }
+  body.navaway .mpstrip { bottom: 12px; }
+  .mpstrip b { color: var(--gold); font-size: 17px; } .mpstrip span { margin-left: auto; color: var(--gold); }
+  #mppage .mpgifts { max-height: none; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
+  #mppage .mpbar { flex-wrap: wrap; gap: 8px; }
+}
 .mpcard { margin: 0; }
 .mpcard #mpq { width: 100%; }
 .mpcap { font: 15px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--cream, #e9c9a0); }
@@ -1305,7 +1323,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpchips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; align-items: center; }
 .mpchips .toggle { font-size: 13.5px; padding: 4px 9px 3px; }
 .mpchips .fz.on { color: #d6b8ff; border-color: #a77be0; background: linear-gradient(#4a2f73, #2a1a44); box-shadow: inset 0 0 10px rgba(167, 123, 224, .5); }
-.mpgifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; max-height: calc(100vh - 470px); min-height: 240px; overflow: auto; margin-top: 10px; padding-right: 4px; }
+.mpgifts { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 6px; max-height: calc(100vh - 360px); min-height: 240px; overflow: auto; margin-top: 10px; padding-right: 4px; }
 .mpgift { position: relative; aspect-ratio: 1; background: #0c0807; border: 1px solid var(--line); cursor: pointer; }
 .mpgift img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .mpgift.ex { border-color: #8a6a2c; }

@@ -330,6 +330,7 @@ function gmBest(game) {
   return of(Object.fromEntries(Object.entries(gi.best || {}).filter(([k]) => mine(k) === game)));
 }
 
+let gmGrp = "";  // the hub's group chip ("" = all)
 function gmHub() {
   document.querySelector('#subnav [data-group="games"]').hidden = true;  // the tiles are the menu here
   const left = Math.ceil((new Date(gmDay() + "T21:00:00Z") - Date.now()) / 60000), done = GM_SCORED.filter(([k]) => gmDailyDone(k) != null).length;
@@ -342,11 +343,13 @@ function gmHub() {
       <div class="gmdailybox"><div class="gmkick">DAILY CHALLENGE</div><div class="gmdbig"><i>${done}</i> / ${GM_SCORED.length} today</div>
         <div class="gmddots">${GM_SCORED.map(([k, href, name]) => { const d = gmDailyDone(k); return d == null ? `<a href="${href}/daily" title="${esc(name)}: not played yet — start it"></a>` : `<span class="done" title="${esc(name)}: ${d}"></span>`; }).join("")}</div>
         <small>NEW IN ${Math.floor(left / 60)} H ${left % 60} M${gmW.streak > 1 && [gmDay(), yesterday].includes(gmW.day) ? ` · ${gmW.streak} DAYS IN A ROW` : ""}</small></div></div>
-    <div class="gmcols">${GM_GROUPS.map(([group, keys]) => `<div><div class="gmgrp">${group}</div>${keys.map((key) => { const [k, href, name, , pic, toy] = GM_GAMES.find((g) => g[0] === key), best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
+    <div class="gmgrpbar">${[["", `All · ${GM_GROUPS.reduce((n, [, keys]) => n + keys.length, 0)}`], ...GM_GROUPS.map(([g]) => [g, g])].map(([k, t]) => `<button class="toggle ${gmGrp === k ? "on" : ""}" data-grp="${esc(k)}">${esc(t)}</button>`).join("")}</div>
+    <div class="gmcols ${gmGrp ? "one" : ""}">${GM_GROUPS.map(([group, keys]) => `<div ${gmGrp && gmGrp !== group ? "hidden" : ""}><div class="gmgrp">${group}</div>${keys.map((key) => { const [k, href, name, , pic, toy] = GM_GAMES.find((g) => g[0] === key), best = toy ? 0 : gmBest(k), day = gmDailyDone(k);
       return `<div class="gmtile ${k === mode[0] ? "on" : ""}"><a class="gmtmain" href="${href}"><span class="gmtpic" data-game="${k}">${pic}</span><span><b>${name}</b><small>${toy ? (toy === true ? "A TOY" : toy) : `BEST ${best ? `<i>${best}</i>` : "—"}`}</small></span></a>
         ${toy ? "" : day == null ? `<a class="gmdot" href="${href}/daily" title="Today's Daily: not played yet — start it"></a>` : `<span class="gmdot done" title="Today's Daily: ${day}"></span>`}</div>`; }).join("")}</div>`).join("")}</div>
     <div class="gmgrp gmachhead">Achievements <small>${GM_ACH.filter(([k]) => gmW.ach[k]).length} / ${GM_ACH.length} · each pays lunacy once</small></div>
     <div class="gmach">${GM_ACH.map(([k, name, what, n]) => `<span class="${gmW.ach[k] ? "done" : ""}" title="${esc(what)}"><b>${esc(name)}</b><small>${esc(what)}</small><i>${gmW.ach[k] ? "✓" : "+" + n}</i></span>`).join("")}</div>`;
+  document.querySelectorAll(".gmgrpbar [data-grp]").forEach((b) => b.onclick = () => { gmGrp = b.dataset.grp; gmHub(); });
   // a duel link from a friend opens its game here too (the link itself leads to the website)
   $("#gmduel").onkeydown = (e) => {
     if (e.key !== "Enter") return;

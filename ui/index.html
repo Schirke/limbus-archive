@@ -17,16 +17,13 @@
     <a href="#/patches" data-group="patches">Patches</a>
     <a href="#/db" data-group="db">Database</a>
     <a href="#/story" data-group="story">Story</a>
-    <a href="#/versus" data-group="versus">Versus</a>
     <a href="#/games" data-group="games">Games</a>
-    <a href="#/gamegacha" data-group="gacha" id="navgacha" title="Extraction: the game's own, paid with the lunacy the games give">Extraction<span id="navlun"></span></a>
     <a href="#/community" data-group="community" id="navcommunity" hidden>Community</a>
-    <a href="#/teams" data-group="tools">Tools</a>
+    <a href="#/community" data-group="more" id="navmore">More</a>
   </nav>
-  <button id="sxbtn" title="Search everything (Ctrl+K)"><span class="sxglass">⌕</span><span class="sxbt">Search</span><kbd>Ctrl K</kbd></button>
+  <button id="sxbtn" title="Search everything (Ctrl+K)"><span class="sxglass">⌕</span><span class="sxbt">Search Identities, enemies, story…</span><kbd>Ctrl K</kbd></button>
   <div id="statusbox"><button id="statusbtn"></button><div id="status" class="status hidden"></div></div>
-  <div id="timers"></div>
-  <a href="#/support" data-group="support" id="navsup" title="Support the project"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-10-9.3C.3 8.300 1.800 4 5.800 4c2.300 0 3.900 1.200 6.200 3.700C14.300 5.200 15.900 4 18.200 4c4 0 5.500 4.300 3.800 7.700C19.500 16.400 12 21 12 21z"/></svg>Support</a>
+  <div id="hstack"><div id="timers"></div><a href="#/gamegacha" id="navlun" title="Lunacy: the games pay it, Extraction spends it"></a></div>
   <button id="navlang" title="Language">EN</button>
   <a href="#/settings" data-group="settings" id="navset" title="Settings">⚙</a>
 </header>
@@ -36,8 +33,8 @@
   <div data-group="patches"><a href="#/patches" data-route="patches">Reports</a><a href="#/news" data-route="news">News</a><a href="#/changes" data-route="changes">Change history</a><a href="#/snapshots" data-route="snapshots">Snapshots</a></div>
   <div data-group="versus"><a href="#/versus" data-route="versus">Duel</a><a href="#/autobattler" data-route="autobattler">Auto Battler</a><a href="#/vsroom" data-route="vsroom">Online room</a><a href="#/vsmirror" data-route="vsmirror">Mirror</a></div>
   <div data-group="games" class="gmcrumb"><a href="#/games" data-route="games" class="back">‹ Games</a><span id="gmcrumb"></span><span class="grow"></span><a href="#/live" data-route="live" class="gmlivenav" title="Live match: play with friends at the same time">Live</a><a href="#/games/track" data-game="track" title="Guess the track"></a><a href="#/gameid" data-route="gameid" data-game="id" title="Guess the Identity"></a><a href="#/gamechar" data-route="gamechar" data-game="char" title="Guess the character"></a><a href="#/gameskill" data-route="gameskill" data-game="skill" title="Guess the skill"></a><a href="#/gameenemy" data-route="gameenemy" data-game="enemy" title="Guess the enemy"></a><a href="#/gamecanto" data-route="gamecanto" data-game="canto" title="Guess the Canto"></a><a href="#/gamewordle" data-route="gamewordle" data-game="wordle" title="Limbus Wordle"></a><a href="#/gameconn" data-route="gameconn" data-game="conn" title="Connections"></a><a href="#/gamesplash" data-route="gamesplash" data-game="splash" title="Guess the art"></a><a href="#/gameatlas" data-route="gameatlas" data-game="atlas" title="In pieces"></a><a href="#/gameodd" data-route="gameodd" data-game="odd" title="Odd one out"></a><a href="#/gamegrid" data-route="gamegrid" data-game="grid" title="Limbus Grid"></a><a href="#/gamemix" data-route="gamemix" data-game="mix" title="Mixed up"></a><a href="#/gamebuff" data-route="gamebuff" data-game="buff" title="Guess the buff"></a><a href="#/gamechain" data-route="gamechain" data-game="chain" title="Chain"></a><a href="#/gamejig" data-route="gamejig" data-game="jig" title="Jigsaw"></a><a href="#/gamewhen" data-route="gamewhen" data-game="when" title="When was it"></a><a href="#/gamediff" data-route="gamediff" data-game="diff" title="Spot the difference"></a><a href="#/gamearena" data-route="gamearena" data-game="arena" title="Guess the arena"></a><a href="#/gamehilo" data-route="gamehilo" data-game="hilo" title="Higher or lower"></a><a href="#/gamepassive" data-route="gamepassive" data-game="passive" title="Whose passive"></a><a href="#/gameego" data-route="gameego" data-game="ego" title="Guess the E.G.O"></a><a href="#/gamesound" data-route="gamesound" data-game="sound" title="Guess the sound"></a><a href="#/gamememory" data-route="gamememory" data-game="memory" title="Memory"></a><a href="#/gamedare" data-route="gamedare" data-game="dare" title="Challenge roulette"></a><a href="#/gamewho" data-route="gamewho" data-game="who" title="Guess who"></a></div>
-  <div data-group="gacha"><a href="#/gamegacha" data-route="gamegacha">Extraction</a><a href="#/banners" data-route="banners">Banner archive</a></div>
-  <div data-group="tools"><a href="#/teams" data-route="teams">Team builder</a><a href="#/mirror" data-route="mirror">Mirror Dungeon planner</a><a href="#/sprites" data-route="sprites">Sprite workshop</a></div>
+  <div data-group="games" data-also="versus" class="gmrow"><a href="#/games" data-route="games">All games</a><a href="#/live" data-route="live">Live</a><a href="#/gamegacha" data-route="gamegacha">Extraction</a><a href="#/banners" data-route="banners">Banner archive</a><a href="#/versus" data-route="versus">Versus</a></div>
+  <div data-group="more"><a href="#/community" data-route="community">Community</a><a href="#/teams" data-route="teams">Team builder</a><a href="#/mirror" data-route="mirror">MD planner</a><a href="#/sprites" data-route="sprites">Sprite workshop</a><a href="#/support" data-route="support">Support</a></div>
 </nav>
 <main id="main"></main>
 <div id="modal" class="modal hidden"><div class="modal-box"><button class="close" id="modal-close">×</button><div id="modal-body"></div></div></div>

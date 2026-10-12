@@ -3,7 +3,10 @@
 let MIRROR = null;
 const MP_KEEP = "mirror";
 const MP_MODES = [["Normal", 5, "0"], ["Hard", 5, "1"], ["Hard", 10, "2"], ["Hard", 15, "3"]];  // (name, floors, the game's typeIndex)
-const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1 };
+const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g" };
+// a keyword chip's picture: the status icon, or the damage type's for Hit / Penetrate / Slash (the name on hover)
+const mpKwIco = (k) => { const atk = { Hit: "Blunt", Penetrate: "Pierce", Slash: "Slash" }[k];
+  return atk ? ico(`atk_${atk}`, "s22", mpKw(k), mpKw(k)) : ico(`st_${k}`, "s22", mpKw(k), mpKw(k)); };
 (() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {} }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
 const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want] })); } catch { /* not kept */ } };
 const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, pic: "", kw: "", tier: 0, desc: "" };
@@ -92,8 +95,8 @@ function mpPicker() {
   const tg = (on, attr, label, cls = "") => `<button class="toggle ${cls} ${on ? "on" : ""}" ${attr}>${label}</button>`;
   return `<div class="card mpcard"><input type="text" id="mpq" placeholder="Search a gift…" value="${esc(mp.q)}">
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}</div>
-    <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}"`, esc(mpKw(k)))).join("")}</div>
-    <div class="mpchips"><span class="muted small">Sort</span>${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => tg(mp.sort === k, `data-s="${k}"`, l)).join("")}<span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
+    <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}" title="${esc(mpKw(k))}"`, mpKwIco(k), "kwi")).join("")}</div>
+    <div class="mpchips"><select id="mpsort">${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => `<option value="${k}" ${mp.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select><span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
     <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""}" data-g="${id}" data-pick>${g.pic ? `<img src="${imgThumb(g.pic)}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}</div>`).join("")}</div></div>`;
 }
 
@@ -144,11 +147,13 @@ function mpDraw() {
   main.innerHTML = `<div id="mppage"><h1>Mirror Dungeon planner</h1><div class="sub">Pick the E.G.O gifts you want — the planner says which theme packs to take and on which floors. Gold frame: a gift found in certain packs only.</div>
     <div class="mpbar"><div class="seg">${MP_MODES.map(([n, f, t], i) => (MIRROR.modes[t] ? `<button data-m="${i}" class="toggle ${mp.mode === i ? "on" : ""}">${n} · ${f} floors</button>` : "")).join("")}</div>
       <span><label>Gifts counted from one pack</label><span class="seg">${[2, 3, 4, 0].map((c) => `<button data-c="${c}" class="toggle ${mp.cap === c ? "on" : ""}">${c || "All"}</button>`).join("")}</span></span></div>
-    <div class="mpcols">${mpPicker()}${mpBuild(r)}<div>${mpRoute(r)}</div></div></div>`;
+    <div class="mptabs">${[["g", "Gifts"], ["b", `Build${mp.want.size ? ` · ${mp.want.size}` : ""}`], ["f", "Floors"]].map(([k, t]) => `<button class="toggle ${mp.tab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
+    <div class="mpcols" data-tab="${mp.tab}">${mpPicker()}${mpBuild(r)}<div>${mpRoute(r)}</div></div>
+    ${mp.want.size && mp.tab !== "f" ? `<button class="mpstrip" data-tab="f"><b>${mp.want.size}</b> in the build <span>Route ›</span></button>` : ""}</div>`;
   $(".mpgifts").scrollTop = top;
   const page = $("#mppage");
   page.onclick = (e) => {
-    const t = e.target.closest("[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear]");
+    const t = e.target.closest("[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-tab]");
     if (!t) return;
     const d = t.dataset;
     if (d.m) { mp.mode = +d.m; mp.lock = {}; mp.open = -1; }
@@ -160,9 +165,11 @@ function mpDraw() {
     else if ("clear" in d) { mp.want.clear(); mp.lock = {}; mp.open = -1; }
     else if (d.pin) { const [f, id] = d.pin.split(":").map(Number); if (mp.lock[f] === id) delete mp.lock[f]; else { for (const k in mp.lock) if (mp.lock[k] === id) delete mp.lock[k]; mp.lock[f] = id; } }
     else if (d.open) mp.open = mp.open === +d.open ? -1 : +d.open;
+    else if (d.tab) { mp.tab = d.tab; $("#main").scrollTop = 0; }
     mpTip(null);
     mpDraw();
   };
+  $("#mpsort").onchange = (e) => { mp.sort = e.target.value; mpDraw(); };
   $("#mpq").oninput = (e) => { mp.q = e.target.value; mpDraw(); const q = $("#mpq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); };
   page.onmousemove = (e) => mpTip(e.target.closest("[data-g]"), e);
   page.onmouseleave = () => mpTip(null);

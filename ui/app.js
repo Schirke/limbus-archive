@@ -341,10 +341,14 @@ function drawTimers() {
   };
   const left = (t) => { const m = Math.ceil((t - now) / 60000), d = Math.floor(m / 1440);
     return (d ? d + "d " : "") + Math.floor(m % 1440 / 60) + "h" + (d ? "" : " " + m % 60 + "m"); };
-  const cell = (name, t) => `<span>${name}</span><b class="${t - now < 3 * H ? "soon" : ""}">${left(t)}</b>`;
-  const maint = next(1, 4), ends = new Date(maint - 7 * 24 * H + 2 * H);
-  $("#timers").innerHTML = cell("DAILY RESET", next(21)) + cell("WEEKLY RESET", next(21, 3))
-    + (now < ends ? `<span>MAINTENANCE</span><b class="now">now · ${left(ends)} left</b>` : cell("MAINTENANCE", maint));
+  // one plate: the daily reset (or the maintenance while it runs); all three in its tooltip
+  const maint = next(1, 4), ends = new Date(maint - 7 * 24 * H + 2 * H), daily = next(21), on = now < ends;
+  const el = $("#timers");
+  el.innerHTML = on ? `<i></i><span>Maintenance</span><b class="now">${left(ends)} left</b>`
+    : `<i></i><span>Daily</span><b class="${daily - now < 3 * H ? "soon" : ""}">${left(daily)}</b>`;
+  el.title = `Daily reset: ${left(daily)}
+Weekly reset: ${left(next(21, 3))}
+Maintenance: ${on ? `now, ${left(ends)} left` : left(maint)}`;
 }
 drawTimers();
 setInterval(drawTimers, 20000);
@@ -363,10 +367,13 @@ const routes = {};
 function route() {
   const [, name = "patches", ...rest] = location.hash.split("/");
   const sub = document.querySelector(`#subnav a[data-route="${name}"]`);
-  const group = sub ? sub.parentElement.dataset.group : ({ scan: "patches", vsroom: "versus", gamegacha: "gacha" })[name] || name;
-  document.querySelectorAll("#top a[data-group]").forEach((a) => a.classList.toggle("active", a.dataset.group === group));
-  document.querySelectorAll("#subnav div").forEach((d) => { d.hidden = d.dataset.group !== group; });
-  document.querySelectorAll("#subnav a").forEach((a) => a.classList.toggle("active", a === sub));
+  const group = sub ? sub.parentElement.dataset.group : ({ scan: "patches", vsroom: "versus" })[name] || name;
+  // (Versus lives under Games: its tabs show under the games row; a single game's page lights "All games")
+  const top = ({ versus: "games" })[group] || group;
+  document.querySelectorAll("#top a[data-group]").forEach((a) => a.classList.toggle("active", a.dataset.group === top));
+  document.querySelectorAll("#subnav div").forEach((d) => { d.hidden = d.dataset.group !== group && !(d.dataset.also || "").split(" ").includes(group); });
+  const game = group === "games" && !document.querySelector(`#subnav .gmrow a[data-route="${name}"]`);
+  document.querySelectorAll("#subnav a").forEach((a) => a.classList.toggle("active", a === sub || a.dataset.route === name || (game && a.parentElement.classList.contains("gmrow") && a.dataset.route === "games")));
   refresh.hook = null;
   stopAnim();
   (routes[name] || routes.patches)(rest.map(decodeURIComponent));

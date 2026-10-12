@@ -6,8 +6,11 @@
 #sxbtn { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0 8px 0 auto; height: 34px; min-width: 34px; padding: 0 8px; flex: none;
   background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; border-radius: 0; color: var(--muted); cursor: pointer; font: 13px "Segoe UI", sans-serif; }
 #sxbtn:hover { border-color: var(--gold); color: var(--text); }
-#sxbtn .sxbt, #sxbtn kbd { display: none; }  /* (the header is full: the words only on a wide screen) */
-@media (min-width: 2000px) { #sxbtn { min-width: 170px; } #sxbtn .sxbt { display: block; flex: 1; text-align: left; } #sxbtn kbd { display: inline; } }
+/* a field, not a lone button: the menu has room for it since it has five sections */
+#sxbtn { flex: 0 1 300px; min-width: 34px; justify-content: flex-start; padding: 0 12px; overflow: hidden; }  /* (it gives way before the menu does) */
+#sxbtn .sxbt { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 13px; }
+@media (max-width: 1540px) { #sxbtn { flex-basis: 210px; } #sxbtn kbd { display: none; } }
+@media (max-width: 1200px) { #sxbtn { flex: none; padding: 0 8px; } #sxbtn .sxbt { display: none; } }
 
 body.site #sxbtn ~ #timers { margin-left: 0; }  /* (on the site the timers took the free space) */
 @media (max-width: 900px) { body.site #sxbtn { margin: 0; height: 30px; } }

@@ -47,19 +47,27 @@ body::after { /* the company's seal, bottom right */
 #nav a[data-group=versus]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_12"); }
 #nav a[data-group=games]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_13"); }
 #nav a[data-group=gacha]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_14"); }
-#nav a[data-group=tools]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_9"); }
+#nav a[data-group=tools]::before, #nav a[data-group=more]::before { background-image: url("/api/gacha_ui?n=MainUI_BottomMenu_1_9"); }
 #nav a[data-group=community]::before { background-image: url("/api/gacha_ui?n=MainUI_Lobby_new_1_2"); filter: none; opacity: .75; width: 30px; }
 #nav a[data-group=community].active::before { background-image: url("/api/gacha_ui?n=MainUI_Lobby_new_1_3"); filter: drop-shadow(0 0 6px var(--hot)); opacity: 1; }
-#nav a[hidden] { display: none; }
+#nav a[hidden], #nav #navcommunity:not(.live) { display: none; }  /* (Community is under More; the top shows it while a big stream is live) */
 #navgacha { gap: 2px; }
-#navlun { position: absolute; right: -4px; top: 6px; font: 12px Consolas, monospace; letter-spacing: 0; background: #150d0a; border: 1px solid #5d2a1c; padding: 0 5px; z-index: 1; }
+/* the reset plate with the lunacy plate under it */
+#hstack { display: flex; flex-direction: column; gap: 3px; margin: 0 10px; flex: none; }
+#navlun { display: flex; align-items: center; gap: 6px; padding: 1px 10px; border: 1px solid #5d2a1c; background: #150d0a; text-decoration: none; font: 12px Consolas, monospace; letter-spacing: 0; }
+#navlun b { color: #ff7a6e; font-weight: normal; }
+#navlun:hover { border-color: #c8862a; }
 #navlun:empty { display: none; }
 #navlun .lunicon { height: 13px; }
 #statusbtn { border-radius: 0; border-color: transparent; font: 13px "LC Bebas", sans-serif; letter-spacing: .16em; text-transform: uppercase; }
 .status { top: 46px; border-color: var(--cream); }
-#timers { font: 13px/1.25 "LC Bebas", sans-serif; letter-spacing: .18em; text-transform: uppercase; padding-left: 32px;
-  background: url("/api/gacha_ui?n=MainUI_Inventory_1_21") left center / 24px auto no-repeat; }
+#timers { display: flex; align-items: center; gap: 8px; margin: 0; padding: 1px 10px; border: 1px solid #5d4a35; cursor: help; white-space: nowrap;
+  font: 13px/1.4 "LC Bebas", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: #c9bfb2; }
+#timers i { width: 14px; height: 14px; flex: none; background: url("/api/gacha_ui?n=MainUI_Inventory_1_21") center / contain no-repeat; }
 #timers b { font: 12px Consolas, monospace; letter-spacing: 0; color: var(--text); }
+#timers b.now { color: var(--hot); }
+/* a game's crumb row is gone: the games row and the in-game line take its place */
+#subnav div.gmcrumb { display: none !important; }
 #navsup, #navset { border-radius: 0; }
 #navsup { border: 9px solid transparent; border-image: var(--k-btn) 36 fill / 9px stretch; background: none; padding: 2px 6px; font: 15px "LC Bebas", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--cream); }
 #navsup:hover, #navsup.active { border-image-source: var(--k-btn-on); background: none; color: var(--gold); }
@@ -67,10 +75,10 @@ body::after { /* the company's seal, bottom right */
 #navset:hover { filter: brightness(1.3); }
 #navset.active { background-color: transparent; background-image: url("/api/gacha_ui?n=MainUI_Lobby_new_1_10"); }
 /* narrow windows: the right-hand buttons never shrink (the gear has no text and went to 0 px), the rest gives way */
-#top .brand, #navsup, #navlang, #navset { flex: none; }
+#top .brand, #nav, #navsup, #navlang, #navset { flex: none; }
 #nav { min-width: 0; overflow: hidden; }
 @media (max-width: 1620px) { #nav a { min-width: 78px; padding: 0 5px; font-size: 14px; } }
-@media (max-width: 1540px) { #timers { display: none; } }
+@media (max-width: 1200px) { #timers span { display: none; } }
 @media (max-width: 1340px) { #top .brand { font-size: 0; gap: 0; margin-right: 10px; } }
 @media (max-width: 1200px) { #nav a { min-width: 62px; padding: 0 3px; font-size: 13px; letter-spacing: .06em; } #navsup { font-size: 0; gap: 0; padding: 2px 4px; } }
 
@@ -122,10 +130,6 @@ button.primary:disabled { filter: grayscale(.8); }
 #player .c { flex-wrap: wrap; row-gap: 8px; }
 #mu-vol { flex: 1 0 150px; }
 
-/* the lunacy next to Extraction: right of the icon and the name, not over them */
-#nav #navgacha { display: grid; grid-template: "i l" auto "t l" auto / auto auto; column-gap: 7px; align-content: center; justify-items: center; }
-#nav #navgacha::before { grid-area: i; }
-#navlun { position: static; grid-area: l; align-self: center; }
 
 /* ---- Versus: Render and Live side by side ---- */
 .vsgo { grid-template-columns: 1fr auto; align-items: stretch; }
@@ -210,17 +214,6 @@ button.primary:disabled { filter: grayscale(.8); }
 #nav a[data-group=community]:hover::before { opacity: .85; }
 #nav a[data-group=community].active::before { opacity: 1; filter: sepia(1) saturate(6) hue-rotate(-8deg) drop-shadow(0 0 6px var(--hot)); }
 #nav a[data-group=games]::before { background-image: url("/api/gacha_ui?n=MainUI_Settings_3_20"); }
-#nav #navgacha { grid-template: "i l" auto "t t" auto / auto auto; column-gap: 5px; row-gap: 2px; justify-content: center; }
-#nav #navgacha::before { justify-self: end; }
-#navlun { justify-self: start; background: none; border: 0; padding: 0; font: 13px Consolas, monospace; }
-#navlun .lunicon { height: 15px; margin-right: 3px; }
-#nav #navgacha { display: flex; min-width: 124px; }
-#nav #navgacha::before { transform: translateX(-26px); }
-#navlun { position: absolute; left: 50%; top: 15px; margin-left: -6px; white-space: nowrap; }
-#nav #navgacha { min-width: 104px; }
-#nav #navgacha::before { transform: translateX(-20px); }
-#navlun { margin-left: -1px; top: 14px; font: 15px "LC Bebas", sans-serif; letter-spacing: .06em; }
-#navlun .lunicon { height: 14px; margin-right: 2px; }
 
 /* folded player: a small square */
 #player.min { border: 0; border-image: none; right: 14px; bottom: 14px; }
@@ -259,6 +252,12 @@ button.primary:disabled { filter: grayscale(.8); }
 /* ---- Games: the page of tiles ---- */
 .gmtop { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; max-width: 1560px; margin-bottom: 8px; }
 .gmcols { max-width: 1560px; gap: 18px; }
+/* the hub's group chips: one group at a time as a grid */
+.gmgrpbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 10px; }
+.gmgrpbar .toggle { font: 15px "LC Bebas", sans-serif; letter-spacing: .12em; text-transform: uppercase; padding: 6px 16px; }
+.gmcols.one { display: block; }
+.gmcols.one > div:not([hidden]) { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.gmcols.one .gmgrp { display: none; }
 .gmday { max-width: none; margin: 0; border: 11px solid transparent; border-image: var(--k-frame) 44 fill / 11px stretch; background: none; grid-template-columns: 44% 1fr; }
 .gmday .gmart { height: 230px; border: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 60px) 100%, 0 100%); } .gmday .gmart.pics img { height: 230px; }
 .gmdaybody { padding: 10px 14px 8px 4px; }
