@@ -3,7 +3,7 @@
 "use strict";
 
 const st = { idx: null, tab: "main", sel: {}, pick: {}, ep: null, list: [], i: 0, shut: new Set(), jump: false };
-const ST_PHONE = matchMedia("(max-width: 760px)");  // accordion
+const ST_PHONE = matchMedia("(max-width: 760px), (max-height: 500px)");  // accordion (a phone either way up)
 ST_PHONE.addEventListener("change", () => { if ($("#stpage .stmain")) storyDraw(); });
 const stSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const stGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
@@ -170,16 +170,21 @@ function rEnsure() {
     <div class="rend" id="rend"></div><div class="rend rask" id="rask"></div><div class="rend rload" id="rload"><h3>Loading the story</h3><p id="rlnum"></p><div class="rlbar"><i id="rlbar"></i></div><div><button data-a="go">Start now</button></div></div></div>`;
   document.body.append(el);
   R.el = el;
+  // portrait ("tall"): the picture on top, the text under it in its own sizes; "small": a phone held sideways
   R.fit = () => {
-    const s = $("#rstage");
-    if (s && s.clientWidth) { el.style.setProperty("--u", (s.clientWidth / 1920).toFixed(4)); el.style.setProperty("--k", (s.clientWidth / ST_W).toFixed(5)); }
+    const s = $("#rstage"), tall = el.clientHeight > el.clientWidth;
+    el.classList.toggle("tall", tall);
+    if (!s || !s.clientWidth) return;
+    const w = s.clientWidth, u = tall ? Math.min(w / 700, 0.8) : w / 1920;
+    el.style.setProperty("--u", u.toFixed(4)); el.style.setProperty("--k", (w / ST_W).toFixed(5));
+    el.classList.toggle("small", !tall && u < 0.5);
   };
   new ResizeObserver(R.fit).observe(el);
   window.addEventListener("resize", R.fit);
-  const stage = $("#rstage");
   let t0 = 0, hz = 0, down = false;
   const skip = (e) => e.target.closest(".rhud, .rhex, .rmenu, .rlog, .rend, .rrep, .rvid, .rask, .rload");
-  stage.addEventListener("pointerdown", (e) => {
+  el.addEventListener("contextmenu", (e) => e.preventDefault());  // (a long press: no "save picture" menu)
+  el.addEventListener("pointerdown", (e) => {
     if (skip(e)) return;
     if (R.el.classList.contains("noui")) { R.el.classList.remove("noui"); return; }  // (a tap brings the hidden interface back)
     $("#rmenu").classList.remove("on");
@@ -191,15 +196,17 @@ function rEnsure() {
       rRate(r, dt > 400);
     }, 60);
   });
-  const up = () => {
+  const up = (e) => {
     if (!down) return;
     down = false; clearInterval(hz);
     const dt = performance.now() - t0;
     rRate(1, false);
-    if (dt < 400) rAdvance();
+    if (dt < 400 && e?.type === "pointerup") rAdvance();
   };
-  stage.addEventListener("pointerup", up);
-  stage.addEventListener("pointerleave", up);
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointerleave", up);
+  el.addEventListener("pointercancel", up);  // (the browser took the touch over: stop reading faster)
+  window.addEventListener("blur", up);
   $("#rauto").onclick = (e) => { e.stopPropagation(); R.auto = !R.auto; e.currentTarget.classList.toggle("on", R.auto); $('.rhx[data-h=auto]').classList.toggle("on", R.auto); };
   $("#rmenubtn").onclick = (e) => { e.stopPropagation(); rMenuSync(); $("#rmenu").classList.toggle("on"); };
   $("#rrep").onclick = (e) => { e.stopPropagation(); rVoice(R.i); };
