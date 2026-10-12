@@ -26,6 +26,20 @@ ICONS = {
 }
 
 _lock = threading.Lock()
+_tried: set[str] = set()  # cache folders cut this run: a failed cut is tried again on the next start
+
+
+def site_copy(folder: str, stem: str, key: str, ext: str = "") -> bytes | None:
+    """The website's copy of what the game files didn't give (a mod changed them, a read failed), kept as <stem>.<ext>."""
+    from .webcopy import get
+    got = get(key)
+    if not got:
+        return None
+    data, ext = got[0], ext or got[1]
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, f"{stem}.{ext}"), "wb") as f:
+        f.write(data)
+    return data
 
 
 def _extract_all(game_data: str, cache_dir: str) -> None:
@@ -35,13 +49,14 @@ def _extract_all(game_data: str, cache_dir: str) -> None:
     os.makedirs(cache_dir, exist_ok=True)
     by_name = {v: k for k, v in ICONS.items() if not os.path.exists(os.path.join(cache_dir, f"{k}.png"))}
     files = [os.path.join(game_data, "resources.assets")] + sorted(glob.glob(os.path.join(game_data, "sharedassets*.assets")))
-    left = set(by_name)
+    left, broken = set(by_name), False
     for fp in files:
         if not left:
             break
         try:
             env = UnityPy.load(fp)
         except Exception:
+            broken = True
             continue
         for o in env.objects:
             if o.type.name != "Sprite":
@@ -62,6 +77,8 @@ def _extract_all(game_data: str, cache_dir: str) -> None:
                 left.discard(n)
             except Exception:
                 continue
+    if broken or (left and left == set(by_name)):  # nothing cut: tried again next start
+        return
     with open(os.path.join(cache_dir, ".done"), "w") as f:  # every key looked for, then the ones the game no longer has
         f.write(" ".join(sorted(ICONS)) + "\n" + " ".join(sorted(by_name[n] for n in left)))
 
@@ -89,13 +106,14 @@ def _extract_extras(game_data: str, cache_dir: str) -> None:
     os.makedirs(cache_dir, exist_ok=True)
     seasons: dict[str, str] = {}
     files = [os.path.join(game_data, "resources.assets")] + sorted(glob.glob(os.path.join(game_data, "sharedassets*.assets")))
-    left = set(FONTS)
+    left, broken = set(FONTS), False
     for fp in files:
         if not left and seasons:
             break
         try:
             env = UnityPy.load(fp)
         except Exception:
+            broken = True
             continue
         for o in env.objects:
             try:
@@ -123,14 +141,18 @@ def _extract_extras(game_data: str, cache_dir: str) -> None:
                             break
             except Exception:
                 continue
-    with open(os.path.join(cache_dir, "seasons.json"), "w") as f:
-        json.dump(seasons, f)
+    if seasons or not broken:
+        with open(os.path.join(cache_dir, "seasons.json"), "w") as f:
+            json.dump(seasons, f)
 
 
 def _extras(game_data: str, cache_dir: str) -> None:
-    if not os.path.exists(os.path.join(cache_dir, "seasons.json")):
+    def done():
+        return all(os.path.exists(os.path.join(cache_dir, n)) for n in ["seasons.json"] + [f"{f}.font" for f in FONTS])
+    if not done() and "x" + cache_dir not in _tried:
         with _lock:
-            if not os.path.exists(os.path.join(cache_dir, "seasons.json")):
+            if not done() and "x" + cache_dir not in _tried:
+                _tried.add("x" + cache_dir)
                 _extract_extras(game_data, cache_dir)
 
 
@@ -154,18 +176,23 @@ def font_file(name: str, game_data: str, cache_dir: str) -> bytes | None:
         with open(os.path.join(cache_dir, f"{name}.font"), "rb") as f:
             return f.read()
     except OSError:
-        return None
+        pass
+    from .site import url_key
+    return site_copy(cache_dir, name, url_key("/api/font", name=name), "font")
 
 
 def icon_png(key: str, game_data: str, cache_dir: str) -> bytes | None:
     if key not in ICONS or not game_data:
         return None
     path = os.path.join(cache_dir, f"{key}.png")
-    if not os.path.exists(path) and not _done(cache_dir):
+    if not os.path.exists(path) and not _done(cache_dir) and cache_dir not in _tried:
         with _lock:
-            if not _done(cache_dir):
+            if not _done(cache_dir) and cache_dir not in _tried:
+                _tried.add(cache_dir)
                 _extract_all(game_data, cache_dir)
-    if not os.path.exists(path):
-        return None
-    with open(path, "rb") as f:
-        return f.read()
+    for p in (path, path[:-4] + ".webp"):
+        if os.path.exists(p):
+            with open(p, "rb") as f:
+                return f.read()
+    from .site import url_key
+    return site_copy(cache_dir, key, url_key("/api/ui_icon", k=key))

@@ -808,7 +808,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 png = icon_png(q.get("k", ""), svc.game.data, svc.ui_cache_dir())
                 if png is None:
                     return self._send(404, b"no icon", "text/plain")
-                return self._send(200, png, "image/png", {"Cache-Control": "max-age=86400"})
+                return self._send(200, png, "image/webp" if png[8:12] == b"WEBP" else "image/png", {"Cache-Control": "max-age=86400"})
             return self._send(404, b"not found", "text/plain")
 
         def _post(self):

@@ -22,6 +22,7 @@ UI_USED = (["icon_lunacy", "MainUI_Gacha_5", "MainUI_Gacha_3_4", "MainUI_Gacha_4
            + [f"MainUI_Gacha_4_Card_Foreground_{n}" for n in (1, 2, 3)] + [f"MainUI_Gacha_3_Rank{n}" for n in (1, 2, 3)] + [f"MainUI_Gacha_4_Illust_Rank_{n}" for n in (1, 2, 3)]
            + [f"MainUI_Gacha_4_Illust_E{i + 1}_{g}" for i, g in enumerate(["ZAYIN", "TETH", "HE", "WAW", "ALEPH"])] + [f"MainUI_Logoicon_filter_{n}" for n in range(12)] + SKIN)
 _lock = threading.Lock()
+_tried: set[str] = set()  # folders cut this run: a failed cut is tried again on the next start
 
 
 def build(svc) -> dict:
@@ -105,13 +106,23 @@ def ui_png(name: str, game_data: str, cache_dir: str) -> tuple[bytes, str] | Non
         return None
     folder = os.path.join(cache_dir, "gacha")
     with _lock:
-        if not os.path.exists(os.path.join(folder, ".done6")):
+        if not os.path.exists(os.path.join(folder, ".done6")) and folder not in _tried:
+            _tried.add(folder)
             _extract(game_data, folder)
-    for ext, mime in ((".png", "image/png"), (".jpg", "image/jpeg")):
+    mimes = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp"}
+    for ext, mime in mimes.items():
         fp = os.path.join(folder, name + ext)
         if os.path.exists(fp):
             with open(fp, "rb") as f:
                 return f.read(), mime
+    if name not in UI_USED:
+        return None
+    from .site import url_key
+    from .uiicons import site_copy
+    data = site_copy(folder, name, url_key("/api/gacha_ui", n=name))
+    for ext, mime in mimes.items():
+        if data and os.path.exists(os.path.join(folder, name + ext)):
+            return data, mime
     return None
 
 
@@ -119,10 +130,12 @@ def _extract(game_data: str, folder: str) -> None:
     import UnityPy
     from . import bundles as _bundles  # noqa: F401  (sets the Unity fallback version)
     os.makedirs(folder, exist_ok=True)
+    broken, cut = False, 0
     for fp in [os.path.join(game_data, "resources.assets")] + sorted(glob.glob(os.path.join(game_data, "sharedassets*.assets"))):
         try:
             env = UnityPy.load(fp)
         except Exception:
+            broken = True
             continue
         for o in env.objects:
             kind = o.type.name
@@ -141,7 +154,10 @@ def _extract(game_data: str, folder: str) -> None:
                     img.convert("RGB").resize((1024, 1024)).save(os.path.join(folder, n + ".jpg"), "JPEG", quality=86)
                 else:
                     img.save(os.path.join(folder, n + ".png"), "PNG")
+                cut += 1
             except Exception:
                 continue
+    if broken or not cut:  # tried again next start
+        return
     with open(os.path.join(folder, ".done6"), "w") as f:
         f.write("1")
