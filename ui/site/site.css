@@ -27,6 +27,7 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site.navaway #nav { transform: translateY(100%); }
   body.site #nav a { flex: 1 1 0; min-width: 0; font-size: 11px; padding: 2px 0; }
   body.site #nav a::before { width: 26px; height: 22px; }
+  body.site #nav a.active::after { inset: -5px 18% auto; height: 2px; border: 0; border-image: none; background: var(--gold); box-shadow: 0 0 8px var(--hot); }  /* (a line on the bar's edge: the frame doesn't fit a short item) */
   body.site #nav #navcommunity.live::before { transform: none; }
   body.site #nav #navcommunity.live .cmlive { position: absolute; top: 0; right: 2px; margin: 0; transform: scale(.75); transform-origin: top right; }
   body.site #player { bottom: 78px; transition: bottom .22s ease; }
@@ -42,11 +43,19 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site .howto { display: inline-block; margin: 0 0 10px; padding: 3px 10px; font-size: 13px; background: none; color: var(--muted); border: 1px solid var(--line); }
   body.site .howto.open { color: var(--cream); }
   body.site .howto + .sub:not(.open) { display: none; }
+  /* Animations: the list, then the picked one over it with a way back (site.js sets .anopen) */
+  body.site .an-app { display: block; height: auto; min-height: 0; overflow: visible; border: 0; }
+  body.site .an-rail { border-right: 0; } body.site .an-list, body.site .an-main { overflow: visible; }
+  body.site .an-app:not(.anopen) .an-main, body.site .an-app.anopen .an-rail { display: none; }
+  body.site .an-app.anopen .an-back { display: block; width: 100%; margin-bottom: 8px; text-align: left; }
+  body.site .an-hdr { padding: 10px 8px; gap: 10px; } body.site .an-body, body.site .an-pad { padding: 12px 4px; }
+  body.site .an-tabs { padding: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } body.site .an-tabs button { flex: none; padding: 10px 12px; }
+  body.site .fxgrid { grid-template-columns: minmax(0, 1fr); }
   /* the front page: the app is for Windows, no use offering it here */
   body.site .hgo a[href*="releases"] { display: none; }
   body.site .hkick { display: none; }
 }
-.howto { display: none; }
+.howto, .an-back { display: none; }
 @media (max-width: 640px) {
   .card.rep { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
   .card.rep > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }

@@ -224,6 +224,15 @@
         if (!/^(battle$|spine)/.test(anim.tab || "") && !(anim.tab === "fx" && FXS[sel.cid])) anim.tab = FXS[sel.cid] ? "fx" : c && c.spine.length ? "spine0" : "battle";
       }
       const show = () => { const b = document.querySelector('#aview .an-tabs [data-t="fx"]'); if (b) b.classList.toggle("onsite", !!(mine && FXS[sel.cid])); };
+      // phones show the list or the picked one, not both
+      const app = document.querySelector(".an-app");
+      if (app && !app.classList.contains("anopen")) {
+        const top = (y) => { const m = $("#main"), d = document.scrollingElement, was = m.scrollTop || d.scrollTop; m.scrollTop = d.scrollTop = y; return was; };
+        if (!app.querySelector(".an-back")) app.insertAdjacentHTML("afterbegin", `<button class="an-back">‹ All characters</button>`);
+        const was = matchMedia("(max-width: 900px)").matches ? top(0) : 0;
+        app.classList.add("anopen");
+        app.querySelector(".an-back").onclick = () => { stopAnim(); anim.sel = null; app.classList.remove("anopen"); drawAnimTree(); top(was); };
+      }
       const r = open(sel);
       show();
       await r;
