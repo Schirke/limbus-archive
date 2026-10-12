@@ -208,13 +208,15 @@
   let FXS = {};
   const fxList = fetch("/api/site_fx").then((r) => (r.ok ? r.json() : {})).then((j) => { FXS = j || {}; }).catch(() => {});
   const fxHas = (id, v) => (FXS[id] || []).includes(v);
+  // an enemy's "Animations →" in the handbook: shown when its videos were sent here (ui/enemies.js)
+  window.siteHasFx = (id) => !!FXS[id];
   if (typeof openAnimEntry === "function") {
     const open = openAnimEntry;
     window.openAnimEntry = async (sel) => {
       anim.sel = sel;  // draw the list before waiting
       await fxList;
-      const mine = sel && sel.cid != null && !sel.enemy && !sel.spine;
-      if (mine) {
+      const mine = sel && sel.cid != null && !sel.spine;  // (an enemy has only the With effects tab)
+      if (mine && !sel.enemy) {
         sel.videos = sel.videos || [];
         if (!FXS[sel.cid]) sel.slots = sel.slots || {};  // (the skills' names are here only with the videos)
         const c = findChar(sel.cid);

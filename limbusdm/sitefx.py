@@ -1,5 +1,5 @@
-"""The site's "With effects" tab: videos the app has rendered (with target, and with buffs), kept in the site's files until
-the game or renderer changes."""
+"""The site's "With effects" tab: videos the app has rendered (with target, and with buffs) of Identities, E.G.O and
+enemies (by their appearance prefab), kept in the site's files until the game or renderer changes."""
 from __future__ import annotations
 
 import json
@@ -9,6 +9,7 @@ import threading
 import time
 
 VARIANTS = ("", "buffs")
+FOLDER = re.compile(r"(\d{5}|[\w .()-]{1,120}?Appearance)(?:_(buffs))?")  # a render folder: <id or appearance>[_buffs]
 STAGE = "site: Skills with effects"
 _stop = threading.Event()
 
@@ -72,7 +73,7 @@ def _take(ex, m: dict, cid: int, v: str) -> int:
 
 def _lists(ex, m: dict, before: dict):
     """What the tab asks before a video: video lists, skill names, buffs, and /api/site_fx."""
-    cids = sorted(m["have"], key=int)
+    cids = sorted(m["have"], key=lambda c: (not c.isdigit(), int(c) if c.isdigit() else 0, c))
     want = []
     for c in cids:
         for v in VARIANTS:
@@ -99,9 +100,10 @@ def export(ex) -> dict:
     root = os.path.dirname(ex.svc.fx.out_dir(0))
     n = 0
     for d in sorted(os.listdir(root)) if os.path.isdir(root) else []:
-        x = re.fullmatch(r"(\d{5})(?:_(buffs))?", d)
+        x = FOLDER.fullmatch(d)
         if x:
-            n += _take(ex, m, int(x.group(1)), x.group(2) or "")
+            c = x.group(1)
+            n += _take(ex, m, int(c) if c.isdigit() else c, x.group(2) or "")
     ex.fresh[STAGE.replace("site: ", "")] = n
     _lists(ex, m, before)
     ex.write_manifest("fx", m)
@@ -112,12 +114,19 @@ def _ids(svc) -> list[int]:
     return [c["id"] for s in svc.characters().get("sinners", []) for c in s["ids"] + s["egos"]]
 
 
+def _apps(svc) -> list[str]:
+    """Enemies and abnormalities drawn by a battle prefab (Animations' entries with an appearance)."""
+    return list(dict.fromkeys(x["app"] for g in svc.characters().get("groups", []) for arr in g["kinds"].values() for x in arr if x.get("app")))
+
+
 def counts(svc) -> dict:
-    """How many Identities / E.G.O have videos on the site."""
+    """How many Identities / E.G.O (and enemies) have videos on the site."""
     from .site import Exporter
     try:
         m = _read(Exporter(svc, ""))
-        out = {"have": len(m["have"]), "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False}
+        units = sum(1 for c in m["have"] if c.isdigit())
+        out = {"have": units, "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False,
+               "enemies": {"have": len(m["have"]) - units, "total": len(_apps(svc))}}
     except Exception:
         out = {"have": 0, "total": 0, "videos": 0, "running": False}
     try:
@@ -166,7 +175,7 @@ def render_all(svc, base_url: str, progress=None) -> dict:
     m = _read(ex)
     before = json.loads(json.dumps(m["have"]))
     todo = []
-    for cid in _ids(svc):
+    for cid in _ids(svc) + _apps(svc):  # (Identities and E.G.O first)
         for v in VARIANTS:
             if v == "buffs":
                 try:

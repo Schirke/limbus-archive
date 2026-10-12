@@ -679,8 +679,9 @@ class Exporter:
             for s in chars["sinners"]:
                 s["ids"] = [x for x in s["ids"] if x.get("spine")]
                 s["egos"] = [x for x in s["egos"] if x.get("spine")]
+        sent = set(self.read_manifest("fx").get("have") or {})  # (an enemy drawn by its battle prefab: only with videos here)
         for g in chars["groups"]:
-            g["kinds"] = {k: arr for k, arr in ((k, [x for x in arr if not x.get("app")]) for k, arr in g["kinds"].items()) if arr}
+            g["kinds"] = {k: arr for k, arr in ((k, [x for x in arr if not x.get("app") or x["app"] in sent]) for k, arr in g["kinds"].items()) if arr}
         chars["groups"] = [g for g in chars["groups"] if g["kinds"]]
         chars["pending"] = False
         todo = [x for s in chars["sinners"] for c in s["ids"] + s["egos"] for x in c["spine"]]

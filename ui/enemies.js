@@ -213,7 +213,7 @@ async function drawEnemy() {
         ${stat("Skills", skills.length)}${stat("Slots", v.slots)}</div></div>
     <div class="lvpanel enlv">${e.variants.length > 1 ? `<select id="envar" title="The same enemy with other numbers">${e.variants.map((x, i) => `<option value="${i}" ${x === v ? "selected" : ""}>${esc(x.label)} · Lv ${x.level} · HP ${enHp(x, x.level)}</option>`).join("")}</select>` : ""}
       <span class="lvlabel lv">Lv. <b id="enlvn">${level}</b></span><input type="range" id="enlvr" min="1" max="${Math.max(99, level)}" value="${level}">
-      ${typeof siteLink === "function" ? siteLink(`enemies/${e.id}`) : ""}${e.anim ? `<button id="enanim" title="Its skills with the game's effects">Animations →</button>` : ""}</div>
+      ${typeof siteLink === "function" ? siteLink(`enemies/${e.id}`) : ""}${e.anim ? `<button id="enanim"${typeof siteHasFx === "function" && siteHasFx(e.app) ? ' class="onsite"' : ""} title="Its skills with the game's effects">Animations →</button>` : ""}</div>
     <div class="entabs">${tabs.map(([k, n]) => `<button class="${env.tab === k ? "on" : ""}" data-tab="${k}">${n}</button>`).join("")}</div>
     <div class="enbody">${body}</div>`;
   if (keep) box.querySelector(".enspine").replaceWith(keep);

@@ -3534,7 +3534,7 @@ async function drawSiteBox() {
       <span class="muted small">writes the pages and data out again, packs them and uploads what changed; the progress is in the status at the top</span></div>
     ${siteLog(s.log, when)}
     ${s.fx ? `<div class="row" style="gap:8px;margin-top:10px"><button id="sitefx" ${busy && !fxJob ? "disabled" : ""}>${fxJob ? "Stop rendering" : "Render videos for the site"}</button>
-      <span class="muted small">Animations → With effects on the site: <b>${s.fx.have}</b> of ${s.fx.total} Identities and E.G.O have their videos there (${s.fx.videos} videos; with the target, and with buffs where they have any)${s.fx.old ? `; ${s.fx.old} of them are from before the last patch and will be rendered again` : ""}.
+      <span class="muted small">Animations → With effects on the site: <b>${s.fx.have}</b> of ${s.fx.total} Identities and E.G.O have their videos there (${s.fx.videos} videos; with the target, and with buffs where they have any)${s.fx.old ? `; ${s.fx.old} of them are from before the last patch and will be rendered again` : ""}.${s.fx.enemies ? ` Enemies: <b>${s.fx.enemies.have}</b> of ${s.fx.enemies.total} (rendered after the Identities).` : ""}
         ${s.fx.buffs ? `Buff effects: <b>${s.fx.buffs.have}</b> of ${s.fx.buffs.total} made${s.fx.buffs.failed ? ` (${s.fx.buffs.failed} draw nothing)` : ""}.` : ""}
         Renders the buff effects first, then the skills one by one — hours the first time; it can be stopped and goes on from there. Then Send to site.</span></div>` : ""}
     ${s.command ? `<div class="hint" style="margin-top:10px">The upload alone, by hand (sends what was prepared last):</div>
