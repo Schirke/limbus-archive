@@ -1,3 +1,5 @@
 {
- "routes": []
+ "routes": [
+  "compare"
+ ]
 }
