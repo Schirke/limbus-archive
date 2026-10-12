@@ -133,12 +133,20 @@ class Service:
         if any(rec.get("sounds") for _rel, rec in banks):
             return
         roots = {"install": self.game.game, "locallow": self.game.locallow}
-        for rel, rec in banks:
-            label, _, sub = rel.partition("/")
+        todo = [(rel, rec, os.path.join(roots.get(rel.partition("/")[0]) or "", rel.partition("/")[2])) for rel, rec in banks]
+        have = {rel for rel, _rec in banks}
+        for dirpath, _dirs, names in os.walk(os.path.join(self.game.data or "", "StreamingAssets")) if self.game.data else []:
+            for fn in names:  # (banks the snapshot never listed; the error mark makes the next snapshot read them itself)
+                full = os.path.join(dirpath, fn)
+                rel = "install/" + os.path.relpath(full, self.game.game).replace("\\", "/")
+                if fn.lower().endswith(".bank") and rel not in have:
+                    todo.append((rel, {"size": 0, "mtime": 0, "h": "", "error": "sounds: not in the snapshot"}, full))
+        for rel, rec, full in todo:
             try:
-                rec["sounds"] = [[x["name"], x["ms"]] for x in list_sounds(os.path.join(roots.get(label) or "", sub))]
+                rec["sounds"] = [[x["name"], x["ms"]] for x in list_sounds(full)]
             except Exception:
                 continue
+            snap.setdefault("files", {})[rel] = rec
 
     def reports(self):
         d = os.path.join(self.data_dir, "reports")
