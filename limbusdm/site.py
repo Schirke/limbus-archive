@@ -29,7 +29,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners"]
+BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare"]
 # a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
 CARD_DIRS = ("db", "enemies", "buffs", "og")
 CARD_PAGE = """<!doctype html>
@@ -850,7 +850,7 @@ class Exporter:
         files = list(dict.fromkeys([p[0] for c in chapters for e in c["eps"] for p in e["parts"]]
                                    + [it["story"] for s in idx["ident"] for it in s["items"]]))
         files = [f for f in files if f]
-        lists = ["/api/story", url_key("/api/ui_sprite", n="SettingIcon")] + [url_key("/api/story_ep", id=f) for f in files]
+        lists = ["/api/story", "/api/story_lines", url_key("/api/ui_sprite", n="SettingIcon")] + [url_key("/api/story_ep", id=f) for f in files]
         thumbs = [url_key("/api/asset_thumb", path=c["pic"]) for c in chapters if c.get("pic")]
         banners = {p[2] for c in chapters for e in c["eps"] for p in e["parts"] if p[2]} | {c["pic"] for c in chapters if c.get("pic")}
         pics = [url_key("/api/story_pic", path=b, m=1280) for b in sorted(banners)]
@@ -888,7 +888,7 @@ class Exporter:
             self.failed.append(("/api/stages", str(e)))
         # (voices in reading order: a pack holds the next lines)
         keys = list(dict.fromkeys(lists + thumbs + pics + models + sprites + sounds + voices + music + videos))
-        got = self.fetch_all(keys, {k: f for k, f in have.items() if k != "/api/story"}, "site: Story")
+        got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in ("/api/story", "/api/story_lines")}, "site: Story")
         urls, groups = _grouped(got, [(lists + models, PACK), (thumbs + sprites, GAME_PACK), (pics, SCENE_PACK),
                                       (sounds + voices, VOICE_PACK), (music + videos, PACK)])
         m = {"kind": "story", "id": sid, "urls": urls, "groups": groups}

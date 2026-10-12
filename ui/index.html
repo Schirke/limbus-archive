@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="/ui/style.css">
 <link rel="stylesheet" href="/ui/skin.css">
 <link rel="stylesheet" href="/ui/story.css">
+<link rel="stylesheet" href="/ui/search.css">
 </head>
 <body>
 <header id="top">
@@ -22,6 +23,7 @@
     <a href="#/community" data-group="community" id="navcommunity" hidden>Community</a>
     <a href="#/teams" data-group="tools">Tools</a>
   </nav>
+  <button id="sxbtn" title="Search everything (Ctrl+K)"><span class="sxglass">⌕</span><span class="sxbt">Search</span><kbd>Ctrl K</kbd></button>
   <div id="statusbox"><button id="statusbtn"></button><div id="status" class="status hidden"></div></div>
   <div id="timers"></div>
   <a href="#/support" data-group="support" id="navsup" title="Support the project"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7.5-4.6-10-9.3C.3 8.300 1.800 4 5.800 4c2.300 0 3.900 1.200 6.200 3.700C14.300 5.200 15.900 4 18.200 4c4 0 5.500 4.300 3.800 7.700C19.500 16.400 12 21 12 21z"/></svg>Support</a>
@@ -29,7 +31,7 @@
   <a href="#/settings" data-group="settings" id="navset" title="Settings">⚙</a>
 </header>
 <nav id="subnav">
-  <div data-group="db"><a href="#/db" data-route="db">Identities & E.G.O</a><a href="#/enemies" data-route="enemies">Enemies</a><a href="#/buffs" data-route="buffs">Buff effects</a><a href="#/anim" data-route="anim">Animations</a><a href="#/sounds" data-route="sounds">Sounds</a><a href="#/browse" data-route="browse">Files</a></div>
+  <div data-group="db"><a href="#/db" data-route="db">Identities & E.G.O</a><a href="#/enemies" data-route="enemies">Enemies</a><a href="#/buffs" data-route="buffs">Buff effects</a><a href="#/compare" data-route="compare">Compare <span class="betatag">BETA</span></a><a href="#/anim" data-route="anim">Animations</a><a href="#/sounds" data-route="sounds">Sounds</a><a href="#/browse" data-route="browse">Files</a></div>
   <div data-group="story"><a href="#/story" data-route="story">Story</a><a href="#/stages" data-route="stages">Story map</a></div>
   <div data-group="patches"><a href="#/patches" data-route="patches">Reports</a><a href="#/news" data-route="news">News</a><a href="#/changes" data-route="changes">Change history</a><a href="#/snapshots" data-route="snapshots">Snapshots</a></div>
   <div data-group="versus"><a href="#/versus" data-route="versus">Duel</a><a href="#/autobattler" data-route="autobattler">Auto Battler</a><a href="#/vsroom" data-route="vsroom">Online room</a><a href="#/vsmirror" data-route="vsmirror">Mirror</a></div>
@@ -45,6 +47,8 @@
 <script src="/ui/enemies.js"></script>
 <script src="/ui/stages.js"></script>
 <script src="/ui/story.js"></script>
+<script src="/ui/search.js"></script>
+<script src="/ui/compare.js"></script>
 <script src="/ui/buffs.js"></script>
 <script src="/ui/sprites.js"></script>
 <script src="/ui/music.js"></script>

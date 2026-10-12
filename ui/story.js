@@ -13,7 +13,7 @@ const stImg = (p) => `/api/asset_thumb?path=${encodeURIComponent(p)}`;
 const stFull = (p, m = 1920) => `/api/story_pic?path=${encodeURIComponent(p)}&m=${m}`;
 
 routes.story = async (args) => {
-  let [a, b] = args;
+  let [a, b, c] = args;
   if (!$("#stpage")) {
     $("#main").innerHTML = `<div id="stpage"><div class="muted">Loading…</div></div>`;
   }
@@ -21,7 +21,8 @@ routes.story = async (args) => {
     try { st.idx = await api("/api/story"); }
     catch (e) { $("#stpage").innerHTML = `<div class="card">Could not read the story: ${esc(e.message)}</div>`; return; }
   }
-  if (a === "read") { stRead(b); return; }
+  if (a === "read") { stRead(b, +c || 0); return; }  // (#/story/read/<file>/<line>: the line search opens a line)
+  if (a === "find") return sxFind(b || "");
   if (a === "interv" || a === "mini" || a === "other") a = "main";
   if (a === "ident") { st.tab = a; st.sinner = +b || 0; return stIdentDraw(); }
   if (a === "main") { st.tab = a; if (b) st.sel[a] = b; }
@@ -82,7 +83,7 @@ function storyDraw() {
         <button type="button" class="stenter" data-f="${esc(ep.id)}">Enter</button></div></div>`;
   const track = eps.map((e, k) => `<button type="button" class="stent${k === at ? " on" : ""}${e.id === st.last ? " last" : ""}" data-k="${k}" title="${esc((e.n ? e.n + " " : "") + e.title + (ST_PART[e.detail] ? " · " + ST_PART[e.detail] : ""))}"><span>Ep. ${k + 1}</span><i></i></button>`).join("");
   const panel = `<section class="stpanel">${head}${view}<div class="sttrack">${track}</div></section>`;
-  $("#stpage").innerHTML = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}
+  $("#stpage").innerHTML = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}${sxStoryBar()}
 </div>
     <div class="stmain"><div class="stcantos">${cards.replace("", phone ? panel : "")}</div>${phone ? "" : panel}</div>`;
   $(".stcantos").scrollTop = keep; const pn = $(".stpanel"); if (pn) pn.scrollTop = cur && String(cur.id) === st.drawn ? keepP : 0;
@@ -109,7 +110,7 @@ function storyDraw() {
 // Identity Archive as the game has it: the Sinners' badges on a wall, then a Sinner's Identities (their stories)
 const ST_TILT = [-2, 1.5, -1, 2.5, -1.5, 1, 2, -2.5, 1, -1, 2, -1.5];
 async function stIdentDraw() {
-  const tabs = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}</div>`;
+  const tabs = `<div class="sttabs" role="tablist">${ST_TABS.map(([k, n]) => `<button class="sttab" role="tab" data-tab="${k}" aria-selected="${k === st.tab}">${n}</button>`).join("")}${sxStoryBar()}</div>`;
   const list = st.idx.ident, s = list.find((x) => x.sinner === st.sinner);
   $("#stpage").classList.add("ident");  // (as tall as its content: the page scrolls, the footer stays below)
   if (!s) {
@@ -262,14 +263,14 @@ function rRate(r, show) {
   if (R.voice) { R.voice.playbackRate = Math.min(r, 4); if (r > 4) R.voice.pause(); }
 }
 
-async function stRead(file) {
+async function stRead(file, at = 0) {
   rEnsure();
   const pl = stPlaylist(file);
   st.list = pl.list; st.last = file;
   R.el.classList.toggle("alt", !!R.ui);
   R.el.classList.add("on"); R.open = true; R.fit();
   R.log = []; R.auto = false; $("#rauto").classList.remove("on");
-  await rLoad(file, 0);
+  await rLoad(file, at);
 }
 async function rLoad(file, at) {
   R.file = file;

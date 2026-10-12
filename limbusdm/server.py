@@ -654,6 +654,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 lang = q.get("lang", "en")
                 ep = story.episode_of(svc, q.get("id", ""), lang if lang in story.LANGS else "en")
                 return self._json(ep) if ep else self._json({"error": "no such story"}, 404)
+            if p == "/api/story_lines":  # the line search: every line in English as [story, line, speaker, text]
+                return self._send(200, _story_lines(svc), "application/json; charset=utf-8")
             if p == "/api/story_model":  # a layered standing picture: where its body and faces sit
                 from . import story
                 lay = story.model_layout(svc, q.get("path", "")) if q.get("path", "").startswith("Assets/Resources_moved/Story/StandingModel/") else None
@@ -1434,6 +1436,38 @@ def _fx_variant(q: dict) -> str:
     if solo is True or solo == "1":
         v += "_solo"
     return variant(v)
+
+
+def _story_lines(svc: Service) -> bytes:
+    """Every line of the story for the line search, kept on disk per snapshot (reading all the stories takes a minute)."""
+    from . import story
+    folder = os.path.join(svc.data_dir, "story_lines")
+    name = f"{svc.latest_snapshot_id()}_v{story.VERSION}.json"
+    path = os.path.join(folder, name)
+    if os.path.isfile(path):
+        with open(path, "rb") as f:
+            return f.read()
+    idx = story.index(svc)
+    files = list(dict.fromkeys([pt[0] for c in idx["main"] + idx["other"] for e in c["eps"] for pt in e["parts"]]
+                               + [it["story"] for s in idx["ident"] for it in s["items"]]))
+    who, lines = {}, []
+    for n, fid in enumerate(files):
+        ep = story.episode_of(svc, fid) or {}
+        models = ep.get("models") or {}
+        for i, ln in enumerate(ep.get("lines") or []):
+            text = (ln.get("text") or "").strip()
+            if text:
+                m = models.get(ln.get("who")) or {}
+                lines.append([n, i, who.setdefault((m.get("name") or ln.get("who") or "", m.get("color") or ""), len(who)), text])
+    body = json.dumps({"files": files, "who": [list(k) for k in who], "lines": lines}, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    os.makedirs(folder, exist_ok=True)
+    for old in os.listdir(folder):
+        if old != name:
+            os.remove(os.path.join(folder, old))
+    with open(path + ".tmp", "wb") as f:
+        f.write(body)
+    os.replace(path + ".tmp", path)
+    return body
 
 
 def serve(svc: Service, port: int, on_show=None) -> ThreadingHTTPServer:
