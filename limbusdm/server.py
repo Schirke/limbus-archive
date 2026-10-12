@@ -1363,7 +1363,7 @@ def export_object(svc: Service, b: dict) -> dict:
         saved = None
         for name, fname in items:
             src = svc.fx.video(_fx_id(g["id"]), name, v)  # MP4, or WebM with alpha for a transparent background
-            ext = ".gif" if g.get("discord") else os.path.splitext(src or "")[1]
+            ext = ".gif" if g.get("discord") else " frames" if g.get("frames") else os.path.splitext(src or "")[1]
             fname = _safe(fname, max(40, min(200, 250 - len(dest) - len(ext) - 6)))  # (6: the separator + " (nn)")
             target = os.path.join(dest, fname + ext)
             n = 2
@@ -1373,6 +1373,9 @@ def export_object(svc: Service, b: dict) -> dict:
             if src and g.get("discord"):  # a GIF under Discord's 10 MB
                 from .viewer import discord_gif
                 saved = discord_gif(src, target)
+            elif src and g.get("frames"):  # PNG frames in a folder
+                from .viewer import png_frames
+                saved = png_frames(src, target)
             elif src:
                 saved = target
                 shutil.copyfile(src, saved)
@@ -1388,12 +1391,15 @@ def export_object(svc: Service, b: dict) -> dict:
         dest = os.path.join(out_dir, _safe(g["folder"])) if len(items) > 1 else out_dir
         os.makedirs(dest, exist_ok=True)
         import shutil
-        ext = ".gif" if g.get("discord") else ".webm"
+        ext = ".gif" if g.get("discord") else " frames" if g.get("frames") else ".webm"
         for src, fname in items:
             target = os.path.join(dest, _safe(fname, max(40, min(200, 250 - len(dest) - len(ext)))) + ext)
             if g.get("discord"):  # a GIF under Discord's 10 MB
                 from .viewer import discord_gif
                 discord_gif(src, target)
+            elif g.get("frames"):  # PNG frames in a folder
+                from .viewer import png_frames
+                png_frames(src, target)
             else:
                 shutil.copyfile(src, target)
         return {"path": target if len(items) == 1 else dest}

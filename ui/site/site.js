@@ -19,6 +19,8 @@
   titled();
   // a card's own address: its page shows the card's picture in a link preview (limbusdm/site.py card_pages)
   window.siteLink = (path) => `<button class="sitelink" data-link="${esc(path)}" title="Copy a link to this card: Discord and others show its picture">Copy link</button>`;
+  // the row under a video: the file, a GIF, PNG frames (made at the end of this file); alpha = a transparent video
+  window.siteDl = (url, name, alpha) => `<div class="sdl" data-url="${esc(url)}" data-name="${esc(name)}"${alpha ? " data-alpha" : ""}><small>Download</small><button data-k="video">Video</button><button data-k="gif" title="a looping GIF under 10 MB">GIF</button><button data-k="png" title="every frame as a PNG, in a zip">PNG frames</button>${alpha ? `<span class="sdlbg"><small>GIF / frames on</small><button class="on" data-bg="clear">Transparent</button><button data-bg="black">Black</button></span>` : ""}</div>`;
   document.addEventListener("click", (ev) => {
     const b = ev.target.closest && ev.target.closest("[data-link]");
     if (!b) return;
@@ -290,6 +292,21 @@
   // phones: the bottom bar slides away while reading down; tab rows show which side has more; a page's description
   // folds into "How it works"
   const phone = () => matchMedia("(max-width: 900px)").matches;
+  // Buff effects and Enemies there: the list or the picked card (.enopen), by the address
+  for (const [name, all] of [["buffs", "All buff effects"], ["enemies", "All enemies"]]) {
+    const draw = routes[name];
+    let was = 0, open = false;
+    if (draw) routes[name] = async (args) => {
+      await draw(args);
+      const wrap = document.querySelector("#main .enwrap"), m = $("#main"), d = document.scrollingElement;
+      if (!wrap) return;
+      if (!wrap.querySelector(".en-back")) wrap.insertAdjacentHTML("afterbegin", `<a class="en-back" href="#/${name}">‹ ${all}</a>`);
+      const now = !!args[0];
+      wrap.classList.toggle("enopen", now);
+      if (now !== open && phone()) { const y = m.scrollTop || d.scrollTop; m.scrollTop = d.scrollTop = now ? 0 : was; if (now) was = y; }
+      open = now;
+    };
+  }
   let lastY = 0;
   const onScroll = (e) => {
     const el = e.target === document ? document.scrollingElement : e.target;
@@ -394,4 +411,205 @@
   last();
   $("#sitenotes").onclick = (e) => { e.preventDefault(); showAppHistory(); };
   route();
+})();
+
+// ---- "Download" under a video (the siteDl hook): the file itself, a GIF or PNG frames in a zip, made in the browser
+(() => {
+  const FPS = 30, GIF_MAX = 10e6, GIF_W = 480, GIF_FRAMES = 240;  // (renders are 30 fps; a GIF fits Discord's 10 MB)
+  const clean = (s) => s.replace(/[\\/:*?"<>|]+/g, "_").trim();
+  const save = (blob, name) => {
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: clean(name) });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 60e3);
+  };
+  const tick = () => new Promise((ok) => setTimeout(ok));
+
+  // every frame of a video at fps, drawn w wide (0 = as it is): fn(canvas, ctx, i, n)
+  async function frames(blob, fps, w, black, fn) {
+    const v = Object.assign(document.createElement("video"), { muted: true, playsInline: true, preload: "auto" });
+    v.src = URL.createObjectURL(blob);
+    try {
+      await new Promise((ok, no) => { v.onloadeddata = ok; v.onerror = () => no(new Error("this browser can't read the video")); });
+      const dur = v.duration;
+      if (!isFinite(dur) || !v.videoWidth) throw new Error("this browser can't read the video");
+      const n = Math.max(1, Math.floor(dur * fps + 0.01)), W = w ? Math.min(w, v.videoWidth) : v.videoWidth, H = Math.round(v.videoHeight * W / v.videoWidth);
+      const c = Object.assign(document.createElement("canvas"), { width: W, height: H }), ctx = c.getContext("2d", { willReadFrequently: true });
+      for (let i = 0; i < n; i++) {
+        await new Promise((ok) => { v.onseeked = ok; v.currentTime = Math.min(Math.max(0, dur - 0.001), (i + 0.5) / fps); });
+        if (black) { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H); } else ctx.clearRect(0, 0, W, H);
+        ctx.drawImage(v, 0, 0, W, H);
+        await fn(c, ctx, i, n);
+      }
+    } finally { URL.revokeObjectURL(v.src); v.removeAttribute("src"); v.load(); }
+  }
+
+  // ---- zip, files stored as they are
+  const CRC = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  function zip(files) {  // [name, Blob, crc]
+    const enc = new TextEncoder(), parts = [], dir = [];
+    let at = 0;
+    const rec = (central, name, size, crc, off) => {
+      const b = new DataView(new ArrayBuffer((central ? 46 : 30) + name.length));
+      let p = 0;
+      const u16 = (x) => { b.setUint16(p, x, true); p += 2; }, u32 = (x) => { b.setUint32(p, x, true); p += 4; };
+      u32(central ? 0x02014b50 : 0x04034b50);
+      if (central) u16(20);
+      u16(20); u16(0x0800); u16(0); u16(0); u16(0x21); u32(crc); u32(size); u32(size); u16(name.length); u16(0);
+      if (central) { u16(0); u16(0); u16(0); u32(0); u32(off); }
+      new Uint8Array(b.buffer).set(name, p);
+      return b.buffer;
+    };
+    for (const [n, blob, crc] of files) {
+      const name = enc.encode(n), head = rec(false, name, blob.size, crc);
+      dir.push(rec(true, name, blob.size, crc, at));
+      parts.push(head, blob);
+      at += head.byteLength + blob.size;
+    }
+    const end = new DataView(new ArrayBuffer(22)), size = dir.reduce((s, d) => s + d.byteLength, 0);
+    end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+    end.setUint32(12, size, true); end.setUint32(16, at, true);
+    return new Blob([...parts, ...dir, end.buffer], { type: "application/zip" });
+  }
+
+  // ---- GIF: one palette for the whole clip (median cut over 5-bit colours), ordered dither
+  function palette(list, clear) {
+    const hist = new Uint32Array(32768);
+    for (const px of list) for (let i = 0; i < px.length; i += 16) if (!clear || px[i + 3] >= 128) hist[(px[i] >> 3) << 10 | (px[i + 1] >> 3) << 5 | px[i + 2] >> 3]++;
+    const bins = [];
+    for (let k = 0; k < 32768; k++) if (hist[k]) bins.push(k);
+    const ch = [(k) => k >> 10, (k) => k >> 5 & 31, (k) => k & 31];
+    const box = (b) => {
+      let n = 0, best = 0, wide = -1;
+      for (const k of b) n += hist[k];
+      for (let c = 0; c < 3; c++) { let lo = 31, hi = 0; for (const k of b) { const x = ch[c](k); if (x < lo) lo = x; if (x > hi) hi = x; } if (hi - lo > wide) { wide = hi - lo; best = c; } }
+      return { b, n, c: best, wide };
+    };
+    const boxes = [box(bins)], max = clear ? 255 : 256;
+    while (boxes.length < max) {
+      let at = -1, score = 0;
+      boxes.forEach((x, i) => { const s = x.wide > 0 && x.b.length > 1 ? x.n * (x.wide + 1) : 0; if (s > score) { score = s; at = i; } });
+      if (at < 0) break;
+      const x = boxes[at], f = ch[x.c];
+      x.b.sort((p, q) => f(p) - f(q));
+      let half = 0, cut = 0;
+      while (cut < x.b.length - 1 && half + hist[x.b[cut]] <= x.n / 2) half += hist[x.b[cut++]];
+      cut = Math.max(1, cut);
+      boxes.splice(at, 1, box(x.b.slice(0, cut)), box(x.b.slice(cut)));
+    }
+    const pal = new Uint8Array(768);
+    boxes.forEach((x, i) => {
+      let r = 0, g = 0, b = 0;
+      for (const k of x.b) { const h = hist[k]; r += h * (k >> 10); g += h * (k >> 5 & 31); b += h * (k & 31); }
+      const n = x.n || 1;
+      pal.set([r / n * 8 + 4, g / n * 8 + 4, b / n * 8 + 4], i * 3);
+    });
+    return { pal, n: boxes.length };
+  }
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((x) => (x - 7.5) * 0.6);
+  function indexed(px, w, h, pal, n, clear, near) {
+    const out = new Uint8Array(w * h);
+    for (let y = 0, i = 0, o = 0; y < h; y++) for (let x = 0; x < w; x++, i += 4, o++) {
+      if (clear && px[i + 3] < 128) { out[o] = 255; continue; }
+      const d = BAYER[(y & 3) << 2 | x & 3];
+      const r = Math.min(255, Math.max(0, px[i] + d)), g = Math.min(255, Math.max(0, px[i + 1] + d)), b = Math.min(255, Math.max(0, px[i + 2] + d));
+      const k = (r >> 3) << 10 | (g >> 3) << 5 | b >> 3;
+      let v = near[k];
+      if (v < 0) {
+        const cr = (r & 248) + 4, cg = (g & 248) + 4, cb = (b & 248) + 4;
+        let best = 1e9;
+        for (let p = 0; p < n; p++) { const dr = pal[p * 3] - cr, dg = pal[p * 3 + 1] - cg, db = pal[p * 3 + 2] - cb, e = dr * dr * 2 + dg * dg * 4 + db * db; if (e < best) { best = e; v = p; } }
+        near[k] = v;
+      }
+      out[o] = v;
+    }
+    return out;
+  }
+  function lzw(idx, out) {
+    const CLEAR = 256, END = 257, table = new Map();
+    let size = 9, next = 258, cur = 0, bits = 0, block = [];
+    const put = (code) => {
+      cur |= code << bits; bits += size;
+      while (bits >= 8) { block.push(cur & 255); cur >>>= 8; bits -= 8; if (block.length === 255) { out.push(255, ...block); block = []; } }
+    };
+    put(CLEAR);
+    let pre = idx[0];
+    for (let i = 1; i < idx.length; i++) {
+      const c = idx[i], key = pre << 8 | c, hit = table.get(key);
+      if (hit !== undefined) { pre = hit; continue; }
+      put(pre);
+      if (next < 4096) { table.set(key, next++); if (next - 1 === 1 << size && size < 12) size++; }
+      else { put(CLEAR); table.clear(); size = 9; next = 258; }
+      pre = c;
+    }
+    put(pre); put(END);
+    if (bits) block.push(cur & 255);
+    if (block.length) out.push(block.length, ...block);
+    out.push(0);
+  }
+  async function gif(list, w, h, delay, clear, step) {
+    const { pal, n } = palette(list, clear), near = new Int16Array(32768).fill(-1), parts = [];
+    const head = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, w & 255, w >> 8, h & 255, h >> 8, 0xF7, 0, 0, ...pal,
+      0x21, 0xFF, 11, ...[..."NETSCAPE2.0"].map((c) => c.charCodeAt(0)), 3, 1, 0, 0, 0];
+    parts.push(new Uint8Array(head));
+    for (let i = 0; i < list.length; i++) {
+      const out = [0x21, 0xF9, 4, clear ? 9 : 4, delay & 255, delay >> 8, 255, 0, 0x2C, 0, 0, 0, 0, w & 255, w >> 8, h & 255, h >> 8, 0, 8];
+      lzw(indexed(list[i], w, h, pal, n, clear, near), out);
+      parts.push(new Uint8Array(out));
+      if (i % 4 === 3) { step(i / list.length); await tick(); }
+    }
+    parts.push(new Uint8Array([0x3B]));
+    return new Blob(parts, { type: "image/gif" });
+  }
+  const smaller = (px, w, h, k) => {
+    const a = Object.assign(document.createElement("canvas"), { width: w, height: h }), W = Math.round(w * k), H = Math.round(h * k);
+    a.getContext("2d").putImageData(new ImageData(px, w, h), 0, 0);
+    const b = Object.assign(document.createElement("canvas"), { width: W, height: H }), ctx = b.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(a, 0, 0, W, H);
+    return ctx.getImageData(0, 0, W, H).data;
+  };
+
+  const files = new WeakMap();
+  const file = (row) => { if (!files.has(row)) files.set(row, fetch(row.dataset.url).then((r) => { if (!r.ok) throw new Error("the video isn't here"); return r.blob(); })); return files.get(row); };
+  async function make(row, kind, step) {
+    const name = row.dataset.name, blob = await file(row), alpha = "alpha" in row.dataset, black = alpha && row.classList.contains("black");
+    if (kind === "video") return save(blob, `${name}.${/webm/.test(blob.type) || alpha ? "webm" : "mp4"}`);
+    if (kind === "png") {
+      const list = [];
+      await frames(blob, FPS, 0, black, async (c, ctx, i, n) => {
+        const png = await new Promise((ok) => c.toBlob(ok, "image/png"));
+        list.push([`${clean(name)}_${String(i + 1).padStart(4, "0")}.png`, png, crc32(new Uint8Array(await png.arrayBuffer()))]);
+        step((i + 1) / n);
+      });
+      while (list.length > 1 && list[list.length - 1][2] === list[list.length - 2][2]) list.pop();  // (the sound runs longer than the picture)
+      return save(zip(list), `${name} - frames.zip`);
+    }
+    const probe = Object.assign(document.createElement("video"), { preload: "metadata", src: URL.createObjectURL(blob) });
+    await new Promise((ok) => { probe.onloadedmetadata = probe.onerror = ok; });
+    URL.revokeObjectURL(probe.src);
+    const delay = Math.max(5, Math.ceil(100 / Math.min(20, GIF_FRAMES / (probe.duration || 1))));
+    let list = [], w = 0, h = 0;
+    await frames(blob, 100 / delay, GIF_W, black, (c, ctx, i, n) => { w = c.width; h = c.height; list.push(ctx.getImageData(0, 0, w, h).data); step((i + 1) / n * 0.5); });
+    const same = (a, b) => { for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 3] !== b[i + 3]) return false; return true; };
+    while (list.length > 1 && same(list[list.length - 1], list[list.length - 2])) list.pop();
+    for (let pass = 0; ; pass++) {
+      const out = await gif(list, w, h, delay, alpha && !black, (p) => step(0.5 + p * 0.5));
+      if (out.size <= GIF_MAX || pass === 3 || w < 200) return save(out, `${name}.gif`);
+      const k = Math.sqrt(GIF_MAX / out.size) * 0.9, W = Math.round(w * k), H = Math.round(h * k);
+      list = list.map((px) => smaller(px, w, h, k));
+      w = W; h = H;
+    }
+  }
+  document.addEventListener("click", async (ev) => {
+    const b = ev.target.closest && ev.target.closest(".sdl button"), row = b && b.closest(".sdl");
+    if (!row) return;
+    if (b.dataset.bg) { row.classList.toggle("black", b.dataset.bg === "black"); row.querySelectorAll("[data-bg]").forEach((x) => x.classList.toggle("on", x === b)); return; }
+    if (row.classList.contains("busy")) return;
+    const text = b.textContent;
+    row.classList.add("busy");
+    try { await make(row, b.dataset.k, (p) => { b.textContent = `${Math.round(p * 100)}%`; }); }
+    catch (e) { toast(`Could not make it: ${esc(e.message || String(e))}`); }
+    row.classList.remove("busy");
+    b.textContent = text;
+  });
 })();

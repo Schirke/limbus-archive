@@ -84,8 +84,9 @@ function bfProgress() {
 // Save (WebM) and GIF; app only
 const bfFile = (b, n) => `${bfName(b)} - ${n}`;
 function bfFig(b, n) {
-  const btns = bfHas(n) ? `<span class="grow"></span><button data-bsave="${esc(n)}">Save</button><button data-bgif="${esc(n)}" title="a looping GIF under 10 MB, to post in Discord">GIF</button>` : "";
-  return `${bfVideo(n)}<figcaption class="row bfcap"><span class="mono">${esc(n)}</span>${btns}</figcaption>`;
+  const btns = bfHas(n) ? `<span class="grow"></span><button data-bsave="${esc(n)}">Save</button><button data-bgif="${esc(n)}" title="a looping GIF under 10 MB, to post in Discord">GIF</button><button data-bpng="${esc(n)}" title="every frame as a PNG in a folder, for video editors">PNG</button>` : "";
+  const dl = bfHas(n) && typeof siteDl === "function" ? siteDl(`/api/buff_video?name=${encodeURIComponent(n)}`, bfFile(b, n), true) : "";
+  return `${bfVideo(n)}<figcaption class="row bfcap"><span class="mono">${esc(n)}</span>${btns}</figcaption>${dl}`;
 }
 function bfSaveBtn(b) {
   const made = b.fx.filter(bfHas);
@@ -120,11 +121,11 @@ function drawBuff() {
       : `<div class="muted small">No Identity or handbook enemy names this buff in its skills.</div>`}
     ${same.length ? `<div class="panel"><h4>Same effect</h4><div class="kwrow">${same.map((x) => `<a class="kw ${x.type} big" href="#/buffs/${encodeURIComponent(x.id)}">${esc(bfName(x))}</a>`).join("")}</div></div>` : ""}`;
   box.onclick = (e) => {
-    const t = e.target.closest("[data-bsaveall], [data-bsave], [data-bgif]");
+    const t = e.target.closest("[data-bsaveall], [data-bsave], [data-bgif], [data-bpng]");
     if (!t) return;
-    const items = "bsaveall" in t.dataset ? b.fx.filter(bfHas) : [t.dataset.bsave || t.dataset.bgif];
-    if (t.dataset.bgif) toast("Making the GIF…");
-    exportObj({ buffvideo: { items: items.map((n) => [n, bfFile(b, n)]), folder: bfName(b), discord: !!t.dataset.bgif } });
+    const items = "bsaveall" in t.dataset ? b.fx.filter(bfHas) : [t.dataset.bsave || t.dataset.bgif || t.dataset.bpng];
+    if (t.dataset.bgif || t.dataset.bpng) toast(t.dataset.bgif ? "Making the GIF…" : "Saving the frames…");
+    exportObj({ buffvideo: { items: items.map((n) => [n, bfFile(b, n)]), folder: bfName(b), discord: !!t.dataset.bgif, frames: !!t.dataset.bpng } });
   };
   // the picked buff's videos are made first
   const todo = b.fx.filter((n) => !bfHas(n) && !bfFailed(n) && !BUFFS.current.includes(n));

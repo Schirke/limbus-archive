@@ -51,12 +51,44 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site .an-hdr { padding: 10px 8px; gap: 10px; } body.site .an-body, body.site .an-pad { padding: 12px 4px; }
   body.site .an-tabs { padding: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } body.site .an-tabs button { flex: none; padding: 10px 12px; }
   body.site .fxgrid { grid-template-columns: minmax(0, 1fr); }
+  /* Buff effects, Enemies: the list, then the picked card with a way back (site.js sets .enopen) */
+  body.site .enwrap { display: block; margin-top: 10px; padding-top: 10px; }
+  body.site .enwrap .engrid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+  body.site .enwrap .encard { max-height: none; min-height: 0; overflow: visible; padding: 0; }
+  body.site .enwrap:not(.enopen) .encard, body.site .enwrap.enopen > :not(.encard):not(.en-back) { display: none; }
+  body.site .enwrap.enopen .en-back { display: block; margin-bottom: 10px; padding: 8px 12px; border: 1px solid var(--line); color: var(--cream); text-decoration: none;
+    font: 17px "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  body.site #main:has(> .enwrap.enopen) > :not(.enwrap):not(#sitefoot) { display: none; }
+  body.site #main:has(> .enwrap.enopen) .enwrap { border-top: 0; margin-top: 0; padding-top: 0; }
+  body.site .enhead { flex-wrap: wrap; } body.site .enstats { flex: 1 1 100%; min-width: 0; } body.site .enspine, body.site .enspine.wide { width: 100%; height: 200px; }
+  body.site .bfvids { grid-template-columns: minmax(0, 1fr); } body.site .bfhead h2 { font-size: 24px; line-height: 1.05; }
+  .sdlbg { margin-left: 0; flex-basis: 100%; }
   /* the front page: the app is for Windows, no use offering it here */
   body.site .hgo a[href*="releases"] { display: none; }
   body.site .hkick { display: none; }
 }
-.howto, .an-back { display: none; }
+.howto, .an-back, .en-back { display: none; }
+/* "Download" under a video (site.js siteDl) */
+.sdl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
+.sdl small { font: 12px "LC Bebas", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.sdl button { font-size: 13px; padding: 4px 10px; min-height: 30px; min-width: 54px; } .sdl.busy button[data-k] { opacity: .5; }
+.sdlbg { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; } .sdlbg button { opacity: .55; } .sdlbg button.on { opacity: 1; color: var(--gold); }
+figure:has(.sdl[data-alpha]) video { background: #1b1719 repeating-conic-gradient(#2a2528 0 25%, #1b1719 0 50%) 0 0 / 22px 22px; }
+figure:has(.sdl.black) video { background: #000; }
+/* Identities / E.G.O: two cards a row, as the Uptie stories have */
+@media (max-width: 560px) {
+  .dgrid:not(.stidgrid) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .dgrid:not(.stidgrid) .utitle { font-size: 15px; min-height: 32px; } .dgrid:not(.stidgrid) .uarch, .dgrid:not(.stidgrid) .uwho { font-size: 11px; }
+  .dgrid:not(.stidgrid) .ucap { padding: 6px 8px 8px; } .dgrid:not(.stidgrid) .unew { transform: scale(.72); transform-origin: top left; }
+}
 @media (max-width: 640px) {
+  /* Games: a row per game, the Daily mark on the right */
+  .gmcols { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .gmdot { width: 92px; height: 34px; margin: 0 4px 0 0; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none;
+    border: 1px solid var(--line); font: 13px "LC Bebas", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+  .gmdot::before { content: "Daily"; } .gmdot::after { width: 14px; height: 14px; }
+  .gmdot.done { color: #7fd08a; border-color: rgba(127, 208, 138, .4); } .gmdot.done::before { content: "Daily " attr(data-score); }
+  .gmdot.done::after { content: "✓"; background: none; filter: none; width: auto; height: auto; }
   .card.rep { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
   .card.rep > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
   .gmhubhead { flex-wrap: wrap; gap: 8px 12px; } .gmhubhead #gmduel { width: auto; flex: 1 1 100%; margin: 0; order: 5; }
@@ -69,7 +101,7 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   .cmtext { grid-template-columns: minmax(0, 1fr); }
 }
 /* Animations on the site: Spine and battle only */
-body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #bfsaveall, body.site .bfcap button, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site #agif, body.site #enanim:not(.onsite), body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
+body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #bfsaveall, body.site .bfcap button, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site .fxgrid [data-png], body.site #agif, body.site #enanim:not(.onsite), body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
 body.site .fxapp { opacity: .4; cursor: default; }
 body.site #fxnote { flex-basis: 100%; }
 

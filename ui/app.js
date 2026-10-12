@@ -1329,8 +1329,8 @@ async function openFx(c, body) {
     let el = shown.get(n);
     if (!el) {
       const box = document.createElement("div");
-      box.innerHTML = `<div class="card" data-vid="${esc(n)}"><div class="row" style="margin-bottom:6px;gap:8px"><b class="grow">${esc(label(n))}${buffNote(n) ? ` <span class="muted small">· ${esc(buffNote(n))}</span>` : ""}</b><span class="muted small">${esc(n)}</span>${anim.fxMod && !effects ? `<button data-cmp title="the original and this mod side by side">Compare</button>` : ""}${effects ? `<button data-rep title="draw this effect with an animation of your own (Edit mod → Effects)">Replace…</button>` : ""}<button data-save>Save</button><button data-gif title="a looping GIF under 10 MB, to post in Discord">GIF</button></div>
-        <video controls preload="metadata" src="${src(n, stamp)}" style="width:100%;background:#000"></video></div>`;
+      box.innerHTML = `<div class="card" data-vid="${esc(n)}"><div class="row" style="margin-bottom:6px;gap:8px"><b class="grow">${esc(label(n))}${buffNote(n) ? ` <span class="muted small">· ${esc(buffNote(n))}</span>` : ""}</b><span class="muted small">${esc(n)}</span>${anim.fxMod && !effects ? `<button data-cmp title="the original and this mod side by side">Compare</button>` : ""}${effects ? `<button data-rep title="draw this effect with an animation of your own (Edit mod → Effects)">Replace…</button>` : ""}<button data-save>Save</button><button data-gif title="a looping GIF under 10 MB, to post in Discord">GIF</button><button data-png title="every frame as a PNG in a folder, for video editors">PNG</button></div>
+        <video controls preload="metadata" src="${src(n, stamp)}" style="width:100%;background:#000"></video>${typeof siteDl === "function" ? siteDl(src(n, stamp), fileName(n), effects) : ""}</div>`;
       el = box.firstElementChild;
       el.querySelector("[data-save]").onclick = () => save([[n, fileName(n)]]);
       if (el.querySelector("[data-cmp]")) el.querySelector("[data-cmp]").onclick = () => fxCompare(c, n, v, label(n));
@@ -1340,6 +1340,7 @@ async function openFx(c, body) {
         openAnimEntry(anim.sel);
       };
       el.querySelector("[data-gif]").onclick = () => { toast("Making the GIF…"); exportObj({ fxvideo: { id: c.id, v, items: [[n, fileName(n)]], discord: true } }); };
+      el.querySelector("[data-png]").onclick = () => { toast("Saving the frames…"); exportObj({ fxvideo: { id: c.id, v, items: [[n, fileName(n)]], frames: true } }); };
     } else if (finished) {
       const video = el.querySelector("video");
       if (video.paused) video.src = src(n, stamp);
@@ -1508,7 +1509,7 @@ async function modEffects(c, m, host, refresh, cached) {
       <div class="an-views"><div class="an-pv"><label>Original effect</label><video id="vorig" loop muted autoplay playsinline src="${orig(sel)}"></video></div>
         <div class="an-pv"><label>Your animation${cur ? ` · ${cur.n} frames` : ""}</label>${cur ? `<img id="vown" src="${frameUrl(0)}">` : `<div class="an-hint">Drop a file on the right, or take an effect of another character.</div>`}</div></div>
       <div class="an-tl"><div class="row" style="gap:6px"><button id="vpp">⏸</button>${[0.25, 0.5, 1].map((s) => `<button class="vsp ${s === 1 ? "on" : ""}" data-s="${s}">${s}×</button>`).join("")}
-        <span class="grow"></span><small class="muted" id="vinfo"></small></div>
+        <span class="grow"></span><small class="muted" id="vinfo"></small><button data-vsave="" title="the original effect as a WebM with a transparent background">Save</button><button data-vsave="discord" title="a looping GIF under 10 MB, to post in Discord">GIF</button><button data-vsave="frames" title="every frame as a PNG in a folder, for video editors">PNG</button></div>
         ${cur ? `<div class="an-frames">${Array.from({ length: cur.n }, (_, i) => `<img loading="lazy" data-i="${i}" src="${frameUrl(i)}">`).join("")}</div>` : ""}</div>
       <div class="row" style="gap:8px;flex-wrap:wrap"><button id="vrender" class="primary">Render the skills with this mod</button>
         <span class="muted small grow">The previews show the animation itself. Where it lands in the fight — size, place, timing — shows in the real render; Compare there puts it next to the original.</span></div>
@@ -1531,6 +1532,10 @@ async function modEffects(c, m, host, refresh, cached) {
       </div>` : ""}</section></div>`;
   // list (switching redraws from what is already known: no waiting, no reload)
   host.querySelectorAll("[data-n]").forEach((d) => d.onclick = () => { anim.vfxSel = d.dataset.n; modEffects(c, m, host, refresh, true); });
+  host.querySelectorAll("[data-vsave]").forEach((b) => b.onclick = () => {
+    if (b.dataset.vsave) toast(b.dataset.vsave === "frames" ? "Saving the frames…" : "Making the GIF…");
+    exportObj({ fxvideo: { id: c.id, v: V, items: [[sel, `${c.id} ${c.title || c.name || ""} - ${lab(sel)} (effects)`]], ...(b.dataset.vsave ? { [b.dataset.vsave]: true } : {}) } });
+  });
   const vorig = $("#vorig"), vown = $("#vown");
   let rate = 1, playing = true, frame = 0, timer = 0;
   const fps = () => (cur ? +($("#vfps") ? $("#vfps").value : cur.fps) || 24 : 24);
