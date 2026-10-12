@@ -2,7 +2,8 @@
 // its clock), and /stat/* visitor counts (daily sums, salted daily hashes).
 import { DurableObject } from "cloudflare:workers";
 
-const MOST = 8;
+const MOST = 8, ROOM_KEEP = 12 * 3600e3;
+const what = (state) => [state.kind, state.game, state.mode].filter(Boolean).join(" ").slice(0, 40);
 
 export class Room extends DurableObject {
   constructor(ctx, env) {
@@ -17,7 +18,7 @@ export class Room extends DurableObject {
 
   async fetch(req) {
     if (req.headers.get("Upgrade") !== "websocket") return new Response("a room: connect with a WebSocket", { status: 426 });
-    const q = new URL(req.url).searchParams, id = (q.get("id") || "").slice(0, 24), name = (q.get("name") || "").trim().slice(0, 20) || "Sinner";
+    const u = new URL(req.url), code = u.pathname.split("/").pop(), q = u.searchParams, id = (q.get("id") || "").slice(0, 24), name = (q.get("name") || "").trim().slice(0, 20) || "Sinner";
     const state = (await this.ctx.storage.get("state")) || {}, there = this.players();
     const pair = new WebSocketPair(), [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
@@ -28,9 +29,10 @@ export class Room extends DurableObject {
       return new Response(null, { status: 101, webSocket: client });
     }
     if (again) { again.ws.serializeAttachment(null); try { again.ws.close(1000, "again"); } catch {} }
-    server.serializeAttachment({ id, name, at: again ? again.at : Date.now() });
+    server.serializeAttachment({ id, name, at: again ? again.at : Date.now(), room: code });
     if (!(await this.ctx.storage.get("host")) || !this.players().some((p) => p.id === state.host)) await this.host(state);
     await this.tell();
+    if (!again) this.report(code, state);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -40,6 +42,13 @@ export class Room extends DurableObject {
     state.host = first ? first.id : "";
     await this.ctx.storage.put("state", state);
     await this.ctx.storage.put("host", state.host);
+  }
+
+  // the owner's list of open rooms (Stats): told when someone comes or goes, or the game changes
+  report(code, state) {
+    if (!this.env.STATS || !code) return;
+    const body = JSON.stringify({ code, players: this.players().map((p) => p.name), what: what(state) });
+    this.ctx.waitUntil(this.env.STATS.get(this.env.STATS.idFromName("site")).fetch("https://stats/room", { method: "POST", body }).catch(() => {}));
   }
 
   async tell() {
@@ -56,7 +65,9 @@ export class Room extends DurableObject {
     if (m.t === "set") {
       const state = (await this.ctx.storage.get("state")) || {};
       if (state.host !== me.id || !m.state || typeof m.state !== "object") return;
-      await this.ctx.storage.put("state", { ...m.state, host: state.host });
+      const next = { ...m.state, host: state.host };
+      await this.ctx.storage.put("state", next);
+      if (what(next) !== what(state)) this.report(me.room, next);
       return this.tell();
     }
     if (m.t === "msg") {
@@ -71,6 +82,7 @@ export class Room extends DurableObject {
     try { ws.close(); } catch {}
     if (!me || !me.id) return;
     const state = (await this.ctx.storage.get("state")) || {};
+    this.report(me.room, state);
     if (!this.players().length) return this.ctx.storage.deleteAll();  // the last one left: the room is forgotten
     if (state.host === me.id) await this.host(state);
     await this.tell();
@@ -102,6 +114,7 @@ export class Stats extends DurableObject {
     this.sql.exec("CREATE TABLE IF NOT EXISTS s (h TEXT PRIMARY KEY, day TEXT, at INTEGER, p TEXT)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS salt (day TEXT PRIMARY KEY, v TEXT)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS u (period TEXT PRIMARY KEY, w INTEGER, d INTEGER, r INTEGER)");
+    this.sql.exec("CREATE TABLE IF NOT EXISTS r (code TEXT PRIMARY KEY, since INTEGER, at INTEGER, players TEXT, what TEXT)");
   }
 
   // a statement that writes: its rows are a part of the allowance
@@ -135,6 +148,7 @@ export class Stats extends DurableObject {
       this.put("INSERT INTO salt VALUES (?, ?)", day, salt.v);
       this.put("DELETE FROM s WHERE day < ?", day);
       this.put("DELETE FROM c WHERE day < ?", dayOf(now - 92 * DAY));
+      this.put("DELETE FROM r WHERE at < ?", now - ROOM_KEEP);
     }
     const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(salt.v + String(x.ip || "") + ua));
     const h = [...new Uint8Array(raw).slice(0, 12)].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -162,6 +176,17 @@ export class Stats extends DurableObject {
     return { off: u.off, until: u.until };
   }
 
+  // a room's players now (none: it closed)
+  room(m) {
+    const code = String(m.code || "").replace(/[^a-z0-9]/g, "").slice(0, 10), now = Date.now();
+    const names = (Array.isArray(m.players) ? m.players : []).slice(0, MOST).map((n) => String(n).slice(0, 20));
+    if (!code) return;
+    if (!names.length) this.put("DELETE FROM r WHERE code = ?", code);
+    else this.put("INSERT INTO r VALUES (?, ?, ?, ?, ?) ON CONFLICT (code) DO UPDATE SET at = excluded.at, players = excluded.players, what = excluded.what",
+      code, now, now, JSON.stringify(names), String(m.what || "").slice(0, 40));
+    this.spent(0, 1);
+  }
+
   get() {
     const now = Date.now(), sum = (days) => {
       const o = {};
@@ -175,10 +200,13 @@ export class Stats extends DurableObject {
       days: Array.from({ length: 14 }, (_, i) => dayOf(now - (13 - i) * DAY)).map((d) => [d, by[d] || 0]),
       online: this.sql.exec("SELECT p FROM s WHERE at > ?", now - NOW).toArray().map((r) => r.p),
       spent: { ...u, most: b ? { w: +b.requests || 0, d: +b.objects || 0, r: +b.rows || 0 } : null },
+      rooms: this.sql.exec("SELECT code, since, at, players, what FROM r WHERE at > ? ORDER BY since", now - ROOM_KEEP).toArray()
+        .map((r) => ({ ...r, players: JSON.parse(r.players || "[]") })),
     };
   }
 
   async fetch(req) {
+    if (req.method === "POST" && new URL(req.url).pathname === "/room") { this.room((await req.json().catch(() => null)) || {}); return new Response(null, { status: 204 }); }
     if (req.method === "POST") return Response.json(await this.take((await req.json().catch(() => null)) || {}));
     return new Response(JSON.stringify(this.get()), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
   }
@@ -259,9 +287,9 @@ export default {
         if (env.STATS_KEY && u.searchParams.get("k") !== env.STATS_KEY) return new Response("no", { status: 403 });
         if (!G.got || now - G.got.at > 30e3) {
           const all = await (await env.STATS.get(env.STATS.idFromName("site")).fetch("https://stats/get")).json();
-          G.got = { at: now, own: JSON.stringify(all), body: JSON.stringify({ ...all, spent: undefined }) };
+          G.got = { at: now, own: JSON.stringify(all), body: JSON.stringify({ ...all, spent: undefined, rooms: undefined }) };
         }
-        // usage for the owner only
+        // usage and rooms for the owner only
         return new Response(env.OWNER_KEY && u.searchParams.get("k") === env.OWNER_KEY ? G.got.own : G.got.body, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
       }
       return env.ASSETS ? await env.ASSETS.fetch(req) : new Response("not found", { status: 404 });

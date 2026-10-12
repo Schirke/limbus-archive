@@ -163,6 +163,26 @@ def _read_json(path: str) -> dict:
         return {}
 
 
+ADMIN = "site_admin.json"  # (in the data folder) the owner's choices: pages turned on / off, reports taken off the site
+# ("back": put back, not taken off again by the site's list)
+
+
+def admin(svc) -> dict:
+    a = _read_json(os.path.join(svc.data_dir, ADMIN))
+    return {k: list(a.get(k) or []) for k in ("on", "off", "removed", "back")}
+
+
+def admin_save(svc, a: dict):
+    path = os.path.join(svc.data_dir, ADMIN)
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump(a, f, indent=1)
+    os.replace(path + ".tmp", path)
+
+
+def report_name(rid: str) -> str:
+    return "report-" + hashlib.sha1(rid.encode()).hexdigest()[:12]
+
+
 def _bilibili_live() -> dict:
     from . import bilibili, community
     return {url_key("/api/bilibili", period=p, sort=s): community.URL.replace("streams.json", f"bilibili_{p}_{s}.json")
@@ -1046,7 +1066,9 @@ class Exporter:
         return m
 
     def open_routes(self) -> list[str]:
-        return _read_json(os.path.join(self.out, "d", "check.json")).get("open") or BASE_OPEN
+        a = admin(self.svc)
+        got = _read_json(os.path.join(self.out, "d", "check.json")).get("open") or BASE_OPEN
+        return [r for r in dict.fromkeys(got + a["on"]) if r not in a["off"]]
 
     def pages(self):
         """Everything but the reports."""
@@ -1412,6 +1434,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         if not notes["notes"]:
             notes = (_read_json(path).get("inline") or {}).get("/api/appnotes?all=1") or notes
         idx = {"v": VERSION, "stamp": int(time.time()), "build": build_info(self.svc), "manifests": [n for n in names if ms[n]],
+               "removed": admin(self.svc)["removed"],  # (another computer's send leaves these off too: pull)
                "tr": sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "tr")) if fn.endswith(".json.gz"))
                if os.path.isdir(os.path.join(self.out, "d", "tr")) else [],
                # read by the visitor's browser: live streams and Bilibili lists on GitHub
@@ -1670,7 +1693,13 @@ def pull(ex: Exporter, url: str) -> dict:
                            "game updated so it reads the new version, then send")
     names = set(idx.get("manifests") or [])
     out = {"reports": 0, "removed": 0, "videos": 0, "parts": 0}
-    for name in sorted(n for n in names if n.startswith("report-") and not os.path.exists(ex._manifest_path(n))):
+    # reports taken off the site (here or on another computer) stay off
+    a = admin(svc)
+    removed = list(dict.fromkeys(a["removed"] + [r for r in idx.get("removed") or [] if isinstance(r, str) and r not in a["back"]]))
+    if removed != a["removed"]:
+        admin_save(svc, {**a, "removed": removed})
+    gone = {report_name(r) for r in removed}
+    for name in sorted(n for n in names if n.startswith("report-") and n not in gone and not os.path.exists(ex._manifest_path(n))):
         m = p.manifest(name)
         if not m:
             continue
@@ -1705,7 +1734,10 @@ def pull(ex: Exporter, url: str) -> dict:
         local = ex.read_manifest(name)
         if local.get("id") != made:  # (the skills' videos of the version before stay until rendered again: sitefx._read)
             local = sitefx._read(ex) if name == "fx" else {"kind": name, "id": made, "urls": {}}
-        got = p.files({k: w for k, w in (site.get("urls") or {}).items() if k.startswith(key) and k not in local["urls"]})
+        dropped = set(local.get("dropped") or [])  # (taken off by the owner: sitefx.drop)
+        skip = {sitefx._key(key, cid, v, name=n) for cid, vs in (site.get("have") or {}).items() for v, videos in vs.items()
+                if f"{cid}:{v}" in dropped for n in videos}
+        got = p.files({k: w for k, w in (site.get("urls") or {}).items() if k.startswith(key) and k not in local["urls"] and k not in skip})
         if not got:
             continue
         local["urls"].update(got)
@@ -1715,7 +1747,9 @@ def pull(ex: Exporter, url: str) -> dict:
             have = local.setdefault("have", {})
             for cid, vs in (site.get("have") or {}).items():
                 for v, videos in vs.items():
-                    ok = [n for n in videos if sitefx._key(key, int(cid), v, name=n) in local["urls"]]
+                    ok = [n for n in videos if sitefx._key(key, cid, v, name=n) in local["urls"]]
+                    if not ok:
+                        continue
                     mine_v = have.setdefault(cid, {})
                     mine_v[v] = list(dict.fromkeys(mine_v.get(v, []) + ok))
             local["none"] = list(dict.fromkeys((local.get("none") or []) + (site.get("none") or [])))
@@ -1879,6 +1913,15 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     cfg = config(svc)
     if cfg["project"] and cfg["url"]:  # what was sent from another computer stays (pull)
         pull(ex, cfg["url"])
+    a = admin(svc)
+    if report in a["removed"]:  # (sent on purpose: back on the site)
+        a["removed"].remove(report)
+        a["back"] = list(dict.fromkeys(a["back"] + [report]))
+        admin_save(svc, a)
+    gone = set(a["removed"])
+    for rid in gone:
+        if os.path.exists(ex._manifest_path(report_name(rid))):
+            ex.remove_report(rid)
     if report:
         ex.report(report)
     # reports newer than the site's newest go up too
@@ -1886,10 +1929,10 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
         return r["new"].rsplit("_", 1)[-1]
 
     def there(r):
-        return os.path.exists(ex._manifest_path("report-" + hashlib.sha1(r["id"].encode()).hexdigest()[:12]))
+        return os.path.exists(ex._manifest_path(report_name(r["id"])))
     newest = max((taken(r) for r in svc.reports() if there(r)), default="")
     for r in svc.reports():
-        if r["id"] != report and taken(r) > newest and not there(r):
+        if r["id"] != report and r["id"] not in gone and taken(r) > newest and not there(r):
             ex.report(r["id"])
     ex.pages()
     ex.shell()

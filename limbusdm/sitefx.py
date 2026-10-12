@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import threading
 import time
 
@@ -28,7 +29,7 @@ def _read(ex) -> dict:
     """The site's videos; after a patch they stay and "old" lists the sets to render again."""
     m, made = ex.read_manifest("fx"), _made(ex.svc)
     out = {"kind": "fx", "id": made, "urls": m.get("urls") or {}, "src": m.get("src") or {}, "have": m.get("have") or {},
-           "none": m.get("none") or [], "old": m.get("old") or {}}
+           "none": m.get("none") or [], "old": m.get("old") or {}, "dropped": m.get("dropped") or []}
     if m.get("id") and m.get("id") != made:
         out["old"] = {c: sorted(v for v, names in vs.items() if names) for c, vs in out["have"].items()}
         out["none"] = []  # (what gave nothing may give something now)
@@ -63,6 +64,8 @@ def _take(ex, m: dict, cid: int, v: str) -> int:
                 m["urls"].pop(_key("/api/fx_video", cid, v, name=n), None)
                 m["src"].pop(_key("/api/fx_video", cid, v, name=n), None)
         m["have"].setdefault(str(cid), {})[v] = names
+        if f"{cid}:{v}" in m["dropped"]:  # (made again after drop)
+            m["dropped"].remove(f"{cid}:{v}")
         old = [x for x in m.get("old", {}).get(str(cid), []) if x != v]
         if old:
             m["old"][str(cid)] = old
@@ -108,6 +111,36 @@ def export(ex) -> dict:
     _lists(ex, m, before)
     ex.write_manifest("fx", m)
     return m
+
+
+def drop(svc, base_url: str, cid, v: str = "") -> int:
+    """Takes one option set's videos off the site (with the next Send to site) and deletes its render, so "Render videos
+    for the site" makes it again; returns how many videos went."""
+    from .site import Exporter
+    cid = int(cid) if str(cid).isdigit() else str(cid)
+    if svc.fx.status(cid, v).get("state") == "running":
+        raise RuntimeError("it is being rendered right now")
+    ex = Exporter(svc, base_url)
+    m = _read(ex)
+    before, c = json.loads(json.dumps(m["have"])), str(cid)
+    names = (m["have"].get(c) or {}).pop(v, None) or []
+    for n in names:
+        m["urls"].pop(_key("/api/fx_video", c, v, name=n), None)
+        m["src"].pop(_key("/api/fx_video", c, v, name=n), None)
+    if c in m["have"] and not any(m["have"][c].values()):
+        del m["have"][c]
+        for k in [_key("/api/fx", c, x) for x in VARIANTS] + [_key("/api/fx_buffs", c), _key("/api/skill_slots", c)]:
+            m["urls"].pop(k, None)
+    m["old"][c] = [x for x in m["old"].get(c, []) if x != v]
+    if not m["old"][c]:
+        del m["old"][c]
+    m["none"] = [x for x in m["none"] if x != f"{c}:{v}"]
+    if f"{c}:{v}" not in m["dropped"]:
+        m["dropped"].append(f"{c}:{v}")
+    shutil.rmtree(svc.fx.out_dir(cid, v), ignore_errors=True)
+    _lists(ex, m, before)
+    ex.write_manifest("fx", m)
+    return len(names)
 
 
 def _ids(svc) -> list[int]:
