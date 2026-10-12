@@ -258,6 +258,15 @@
       <p><a href="#/patches">Patches</a> · <a href="#/db">Identities &amp; E.G.O</a></p></div>`;
   };
   for (const name of Object.keys(routes)) if (!OPEN.has(name)) routes[name] = stub;
+  // games the site has no data for: no tile, no Daily, not the mode of the day
+  if (typeof GM_GAMES !== "undefined") {
+    const off = new Set(GM_GAMES.filter((g) => !OPEN.has(g[1].split("/")[1])).map((g) => g[0]));
+    const drop = (a) => { for (let i = a.length - 1; i >= 0; i--) if (off.has(a[i][0])) a.splice(i, 1); };
+    drop(GM_GAMES);
+    drop(GM_SCORED);
+    for (const [, keys] of GM_GROUPS) for (let i = keys.length - 1; i >= 0; i--) if (off.has(keys[i])) keys.splice(i, 1);
+    document.querySelectorAll("#subnav [data-game]").forEach((a) => { if (off.has(a.dataset.game)) a.remove(); });
+  }
   const animPage = routes.anim;
   routes.anim = (args) => {
     const r = animPage(args), sub = document.querySelector("#main .sub");
