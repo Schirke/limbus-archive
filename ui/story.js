@@ -452,7 +452,7 @@ function rBgm(name) {
   R.bgm?.pause();
   if (!name || /^(off|none|stop)$/i.test(name)) { R.bgm = null; return; }
   const a = new Audio(rSrc(rAudioUrl(name)));
-  a.loop = true; a.dataset.vol = "1"; a.volume = mediaVol() * 0.7;
+  a.loop = true; a.dataset.vol = "1"; a.volume = mediaVol() * 0.3;
   a.play().catch(() => {});
   R.bgm = a;
 }
