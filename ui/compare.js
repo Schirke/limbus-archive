@@ -1,6 +1,5 @@
 // Database → Compare (beta): two Identities side by side at one Uptie and level. #/compare/<id>/<id>
 const cq = { a: 0, b: 0, up: 4, level: 0 };
-const CQ_BETA = `<span class="betatag">BETA</span>`;
 routes.compare = async (args) => {
   $("#main").innerHTML = `<div class="muted">Loading…</div>`;
   try { await units(); } catch (e) { $("#main").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
@@ -52,7 +51,7 @@ function cqDraw() {
   const labels = [...new Set([...pa.keys(), ...pb.keys()])].sort((x, y) => x.localeCompare(y, "en", { numeric: true }));
   const sec = (t) => `<tr class="cqsec"><td></td><th>${t}</th><td></td></tr>`;
   const both = (l) => { const a = pa.get(l), b = pb.get(l); return `<div class="cqcols"><div>${a ? skillView(a, up, lv, l, null, true) : `<div class="cqmiss">No ${l}</div>`}</div><div>${b ? skillView(b, up, lv, l, null, true) : `<div class="cqmiss">No ${l}</div>`}</div></div>`; };
-  $("#main").innerHTML = `<div class="cqpage"><h1>Compare ${CQ_BETA}</h1>
+  $("#main").innerHTML = `<div class="cqpage"><h1>Compare</h1>
     <div class="cqctl"><span class="lvlabel">Uptie</span>${[1, 2, 3, 4].map((n) => `<button class="upbtn ${up === n ? "on" : ""}" data-up="${n}" title="${n}">${ico(`up_${n}`, "s22", "", ROMAN[n - 1])}</button>`).join("")}
       <span class="lvlabel">Lv. <b id="cqlvn">${lv}</b></span><input type="range" id="cqlv" min="1" max="${MAX_LEVEL}" value="${lv}"><button id="cqswap">⇄ Swap</button></div>
     <div class="cqpicks">${cqPicker("a")}<div class="cqvs">VS</div>${cqPicker("b")}</div>

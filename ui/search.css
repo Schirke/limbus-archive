@@ -1,7 +1,4 @@
 /* Search (search.js) and Compare (compare.js) */
-.betatag { display: inline-block; font: 11px/1 "LC Bebas", Impact, sans-serif; letter-spacing: .08em; color: #120e0b; background: #f8b400; padding: 3px 5px 2px; margin-left: 6px; vertical-align: middle; }
-#subnav .betatag { font-size: 9px; padding: 2px 3px 1px; margin-left: 4px; vertical-align: 1px; }
-h1 .betatag { font-size: 14px; vertical-align: 6px; }
 .sxglass { font-size: 18px; line-height: 1; color: var(--cream, #e9c9a0); }
 #sxbtn kbd, #sxbox kbd { font: 11px/1 "Segoe UI", sans-serif; color: var(--muted); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 2px 5px; background: rgba(255, 255, 255, .03); }
 
