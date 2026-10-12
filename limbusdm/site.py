@@ -705,7 +705,7 @@ class Exporter:
         chars["groups"] = [g for g in chars["groups"] if g["kinds"]]
         chars["pending"] = False
         todo = [x for s in chars["sinners"] for c in s["ids"] + s["egos"] for x in c["spine"]]
-        todo += [x for g in chars["groups"] for arr in g["kinds"].values() for x in arr]
+        todo += [x for g in chars["groups"] for arr in g["kinds"].values() for x in arr if x.get("atlas")]  # (prefab-drawn: videos only)
         keys, seen = [], set()
 
         def skeleton(bundle, atlas):
