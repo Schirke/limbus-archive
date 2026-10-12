@@ -151,7 +151,7 @@ class Service:
             read += bool(rec["sounds"])
             snap.setdefault("files", {})[rel] = rec
         # (shown on the Sounds page when it stays empty)
-        self._bank_note = f"bank files: {len(banks)} in the snapshot, {len(todo) - len(banks)} more in the game's folder, {read} with sounds" + (f"; {err}" if err else "")
+        self._bank_note = f"bank files: {len(banks)} in the snapshot, {len(todo) - len(banks)} more in the game's folder, {read} with sounds, game folder {self.game.game}" + (f"; {err}" if err else "")
 
     def reports(self):
         d = os.path.join(self.data_dir, "reports")

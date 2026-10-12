@@ -7,6 +7,7 @@ import sys
 
 APP_NAME = "LimbusArchive"
 STEAM_APP_DIR = "Limbus Company"
+STEAM_APP_ID = 1973530
 LOCALLOW = os.path.expandvars(r"%USERPROFILE%\AppData\LocalLow")
 
 
@@ -35,11 +36,19 @@ def steam_libraries() -> list[str]:
 
 
 def find_game_dir() -> str | None:
+    """The install; of several folders (a moved game leaves one behind) the one Steam lists, else the fullest."""
+    best, top = None, -1
     for lib in steam_libraries():
         p = os.path.join(lib, "steamapps", "common", STEAM_APP_DIR)
-        if os.path.exists(os.path.join(p, "LimbusCompany_Data")):
-            return p
-    return None
+        data = os.path.join(p, "LimbusCompany_Data")
+        if not os.path.exists(data):
+            continue
+        score = (4 * os.path.exists(os.path.join(lib, "steamapps", f"appmanifest_{STEAM_APP_ID}.acf"))
+                 + 2 * os.path.isdir(os.path.join(data, "StreamingAssets", "Assets", "Sound"))
+                 + os.path.exists(os.path.join(data, "resources.assets")) + os.path.exists(os.path.join(p, "LimbusCompany.exe")))
+        if score > top:
+            best, top = p, score
+    return best
 
 
 def app_dir() -> str:
