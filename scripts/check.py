@@ -224,7 +224,7 @@ def api_plan(g):
         "/api/versus_list", "/api/versus_live", "/api/versus_team_rules", f"/api/versus_tags?ids={iid}",
         f"/api/versus_plan?left={iid}&right={iid2}&seed=1&rounds=3", "/api/mirror/catalog", "/api/community",
         "/api/community_rec", "/api/bilibili?period=week&sort=views", "/api/news", "/api/browse?q=bgmCover&limit=5",
-        "/api/tree?prefix=Assets/Resources_moved/Sprite/", "/api/buffs?status=1", "/api/stages", "/api/story",
+        "/api/tree?prefix=Assets/Resources_moved/Sprite/", "/api/buffs?status=1", "/api/stages", "/api/story", "/api/story_lines",
         "/api/quiz", f"/api/skill_slots?id={iid}", f"/api/fx?id={iid}", f"/api/fx_buffs?id={iid}",
         f"/api/mods?id={iid}&light=1", f"/api/skills?id={iid}", f"/api/owner_videos?id={iid}",
         f"/api/char_icon?id={iid}", f"/api/char_icon?id={eid}", "/api/ui_icon?k=sinner_1", "/api/gacha_ui?n=icon_lunacy",

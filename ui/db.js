@@ -356,7 +356,7 @@ function openUnit(id) {
     modal(`<div class="ud${hl ? "" : " nohl"}"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
         <div class="grow"><div class="udtitle">${esc(isId ? x.title : x.name)}</div>
         <div class="muted small">${esc(x.sinnerName)} · id ${x.id}${x.date ? ` · updated ${esc(x.date)}` : ""}</div></div>
-        ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}${isId ? `<button id="toanim">Battle animations →</button>` : ""}</div>
+        ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}${isId ? `<button id="tocmp">⇄ Compare</button><button id="toanim">Battle animations →</button>` : ""}</div>
       <div class="udcols"><div class="udleft" id="udleft">${left()}</div><div class="udright" id="udright">${right()}</div></div></div>`);
     bind();
   };
@@ -372,6 +372,7 @@ function openUnit(id) {
     const r = $("#lvr");
     if (r) r.oninput = () => { level = +r.value; $("#lvn").textContent = level; $("#udleft").innerHTML = left(); $(".skpanel").innerHTML = panel(); bindLeft(); };
     bindLeft();
+    if ($("#tocmp")) $("#tocmp").onclick = () => { $("#modal").classList.add("hidden"); location.hash = `#/compare/${x.id}`; };
     if ($("#toanim")) $("#toanim").onclick = () => { $("#modal").classList.add("hidden"); anim.sel = { key: `c${x.id}`, cid: x.id }; location.hash = "#/anim"; };
   };
   const bindLeft = () => { if ($("#art2")) $("#art2").onclick = () => { art2 = !art2; $("#udleft").innerHTML = left(); bindLeft(); }; };
