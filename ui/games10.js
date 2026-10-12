@@ -425,9 +425,9 @@ routes.gamesound = async (args = []) => {
   kqLoading("Guess the sound");
   if (!ks.ann) {
     const [v, u] = await Promise.all([api("/api/game_voices").catch(() => null), units().catch(() => null)]);
-    ks.ann = Object.entries((v || {}).announcers || {}).map(([name, lines]) => ({ key: "a:" + name, name, title: name, sub: "Announcer", kind: "ann", lines }));
+    ks.ann = Object.entries((v || {}).announcers || {}).filter(([, lines]) => lines.length).map(([name, lines]) => ({ key: "a:" + name, name, title: name, sub: "Announcer", kind: "ann", lines }));
     const egos = new Map(((u || {}).egos || []).map((x) => [String(x.id), x]));
-    ks.egos = Object.entries((v || {}).egos || {}).filter(([id]) => egos.has(id)).map(([id, lines]) => { const x = egos.get(id);
+    ks.egos = Object.entries((v || {}).egos || {}).filter(([id, lines]) => egos.has(id) && lines.length).map(([id, lines]) => { const x = egos.get(id);
       return { key: "e" + id, id: x.id, name: x.name + " " + x.sinnerName, title: x.name, sub: x.sinnerName, sinner: x.sinner, kind: "ego", lines, pic: giThumb(x.img.thumb) }; });
     if (!v || !u) setTimeout(() => { ks.ann = null; });
   }

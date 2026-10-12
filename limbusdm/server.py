@@ -493,7 +493,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/stage_pic":
                 from .viewer import stage_pic_dir
                 name = q.get("name", "")
-                if not re.fullmatch(r"[\w .-]+", name):
+                if not re.fullmatch(r"[\w .~-]+", name) or ".." in name:
                     return self._send(404, b"", "text/plain")
                 return self._file(os.path.join(stage_pic_dir(svc), name + ".jpg"), "image/jpeg")
             if p == "/api/game_arenas":  # Guess the arena: where each stage is from (limbusdm/gamedata.py)

@@ -29,7 +29,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare"]
+BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare"]
 # a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
 CARD_DIRS = ("db", "enemies", "buffs", "og")
 CARD_PAGE = """<!doctype html>
@@ -298,6 +298,7 @@ def _ffmpeg() -> str:
 def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
     """Smaller form for the web: PNG → WebP, WAV → Opus; failures stay as they are."""
     spine, music = key.startswith("/spine/"), key.startswith("/api/music_audio")
+    voice = key.startswith("/api/bank") and "/Voice_" in key
     try:
         if ctype == "image/png" and len(data) > 20_000:
             from PIL import Image
@@ -311,7 +312,7 @@ def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
             if b.tell() < len(data):
                 return b.getvalue(), "image/webp"
         if ctype == "audio/wav":
-            p = subprocess.run([_ffmpeg(), "-v", "error", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "96k" if music else "72k", "-f", "ogg", "pipe:1"],
+            p = subprocess.run([_ffmpeg(), "-v", "error", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "96k" if music else "40k" if voice else "72k", "-f", "ogg", "pipe:1"],
                                input=data, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             if p.returncode == 0 and p.stdout:
                 return p.stdout, "audio/ogg"
@@ -807,6 +808,34 @@ class Exporter:
         self.write_manifest("quiz", m)
         return m
 
+    def newgames(self) -> dict:
+        """Guess the arena (the stage pictures) and Guess the sound (announcers' and E.G.O voice lines)."""
+        old = self.read_manifest("newgames")
+        sid = self.svc.latest_snapshot_id()
+        have = self.kept(old)
+        lists = ["/api/game_arenas", "/api/stage_pics"]
+        try:
+            arenas = json.loads(self._get("/api/game_arenas")[0])
+            pics = set(json.loads(self._get("/api/stage_pics")[0]).get("have") or [])
+            voices = json.loads(self._get("/api/game_voices")[0])
+        except Exception as e:
+            self.failed.append(("/api/game_arenas", str(e)))
+            arenas, pics, voices = [], set(), {}
+        stages = [url_key("/api/stage_pic", name=a["name"]) for a in arenas if a["name"] in pics]
+        # a few lines of each announcer (all of them: ~160 MB); the site's list names only those
+        ann = {name: sorted(ls, key=lambda ln: (ln[2] > 6000, ln[1]))[:ANNOUNCER_LINES] for name, ls in (voices.get("announcers") or {}).items()}
+        voices = {"announcers": ann, "egos": voices.get("egos") or {}}
+        lines = [(ln[0], ln[1]) for part in voices.values() for ls in part.values() for ln in ls]
+        clips = [url_key("/api/bank", path=b, i=i) for b, i in dict.fromkeys(lines)]
+        # (the lists are the app's own making: asked again every time)
+        got = self.fetch_all(lists + stages + clips, {k: f for k, f in have.items() if k not in lists}, "site: Games (arenas, voices)")
+        urls, groups = _grouped(got, [(lists, PACK), (stages, GAME_PACK), (clips, VOICE_PACK)])
+        voices = {part: {k: [ln for ln in ls if url_key("/api/bank", path=ln[0], i=ln[1]) in urls] for k, ls in v.items()} for part, v in voices.items()}
+        urls["/api/game_voices"] = self._store(json.dumps(voices, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
+        m = {"kind": "newgames", "id": sid, "urls": urls, "groups": groups}
+        self.write_manifest("newgames", m)
+        return m
+
     def scenes(self) -> dict:
         """Guess the Canto: story backgrounds full size and their previews."""
         old = self.read_manifest("scenes")
@@ -1079,6 +1108,7 @@ class Exporter:
             self.cards()
             self.scenes()
             self.gacha()
+            self.newgames()
         self.units()
         self.langs()
         self.small()
@@ -1473,7 +1503,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 PULL_STAGE = "site: taking from the site"
 # parts pull() takes from the site
-TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "cards", "tools", "extra", "music")
+TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "cards", "tools", "extra", "music")
 PULL_THREADS, PULL_TRIES = 10, 3
 PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
 PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped from it
@@ -1994,7 +2024,8 @@ VIDEO_PART = 2 << 20
 CARD_PACK = 2 << 20  # one Identity's / E.G.O's art and skill pictures: its card in one fetch
 WORD_PACK = 64 << 10  # keyword pictures, ~5 KB each
 GAME_PACK = 128 << 10  # skill pictures, ~15 KB each
-VOICE_PACK = 256 << 10  # voice lines, ~60 KB each
+VOICE_PACK = 256 << 10
+ANNOUNCER_LINES = 8  # Guess the sound on the site: lines of each announcer  # voice lines, ~60 KB each
 SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
 
 
