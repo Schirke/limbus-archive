@@ -651,7 +651,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if q.get("path"):
                     node = soundlib.find(db, json.loads(q["path"]))
                     return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {}})
-                return self._json(soundlib.outline(db["tree"]))
+                return self._json({**soundlib.outline(db["tree"]), "note": "" if db["tree"].get("n") else getattr(svc, "_bank_note", "")})
             if p == "/api/story":  # Database → Story (story.py, private repo): chapters, episodes, Sinners' Identity stories
                 from . import story
                 lang = q.get("lang", "en")

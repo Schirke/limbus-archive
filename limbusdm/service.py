@@ -141,12 +141,17 @@ class Service:
                 rel = "install/" + os.path.relpath(full, self.game.game).replace("\\", "/")
                 if fn.lower().endswith(".bank") and rel not in have:
                     todo.append((rel, {"size": 0, "mtime": 0, "h": "", "error": "sounds: not in the snapshot"}, full))
+        read, err = 0, ""
         for rel, rec, full in todo:
             try:
                 rec["sounds"] = [[x["name"], x["ms"]] for x in list_sounds(full)]
-            except Exception:
+            except Exception as e:
+                err = err or f"{type(e).__name__}: {e}"
                 continue
+            read += bool(rec["sounds"])
             snap.setdefault("files", {})[rel] = rec
+        # (shown on the Sounds page when it stays empty)
+        self._bank_note = f"bank files: {len(banks)} in the snapshot, {len(todo) - len(banks)} more in the game's folder, {read} with sounds" + (f"; {err}" if err else "")
 
     def reports(self):
         d = os.path.join(self.data_dir, "reports")

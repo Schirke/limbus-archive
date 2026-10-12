@@ -84,7 +84,7 @@ async function sndDraw() {
   $("#sndq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { snd.q = e.target.value.trim(); sndDraw().then(() => { const q = $("#sndq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }); }, 350); };
   if (snd.q) return sndSearch();
   if (!path.length) {
-    if (!node.n) { body.innerHTML = `<div class="empty">No sound files were found in the game's folder. Check the game's files (Steam: Properties, Installed Files, Verify integrity), then restart the app.</div>`; return; }
+    if (!node.n) { body.innerHTML = `<div class="empty">No sound files were found in the game's folder. Check the game's files (Steam: Properties, Installed Files, Verify integrity), then restart the app.${node.note ? `<div class="muted" style="margin-top:8px">${esc(node.note)}</div>` : ""}</div>`; return; }
     body.innerHTML = `<div class="sndtiles">${node.kids.map((k) => `<a class="sndtile" href="${sndHash([k.name])}">
       <div class="sndart" style="background-image:url('${imgThumb(SND_TOP[k.name] || "")}')"><span class="sndtag">${(k.kids || []).length} folders</span></div>
       <div class="sndcap"><b>${esc(k.name)}</b><i>${sndNum(k.n)} ${SND_UNIT[k.name] || "sounds"}</i>
