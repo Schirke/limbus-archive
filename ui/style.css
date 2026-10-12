@@ -1097,6 +1097,27 @@ button.ggcell { cursor: pointer; } button.ggcell:hover, .ggcell.on { border-colo
 .gfbox { max-width: 1500px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
 .gfpair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .gfpair canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); cursor: crosshair; } .gfpair.over canvas { cursor: default; }
 @media (max-width: 1100px) { .gfpair { grid-template-columns: 1fr; } }
+/* Games: Higher or lower, Whose passive, Guess the E.G.O, Memory (games10.js) */
+.khbox { max-width: 1000px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+.khpair { display: grid; grid-template-columns: 1fr 170px 1fr; gap: 18px; align-items: center; margin-top: 12px; }
+.khcard { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 14px; background: var(--panel2); border: 1px solid var(--line); }
+.khcard img { width: 100%; max-width: 230px; aspect-ratio: 1; object-fit: cover; object-position: top; } .khcard b { color: #fff; font-weight: normal; } .khcard i { font-style: normal; color: var(--muted); font-size: 12.5px; }
+.khval { font: 34px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; color: var(--gold); } .khcard.hid .khval { color: var(--muted); }
+.khmid { display: flex; flex-direction: column; gap: 10px; text-align: center; font: 22px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; }
+.khmid .ok { color: var(--gold); font-weight: normal; } .khmid .bad { color: var(--red); font-weight: normal; }
+.kpstage { grid-template-columns: minmax(0, 1.2fr) 1fr; align-items: start; }
+.kpcard .row { display: flex; align-items: center; gap: 10px; } .kpcard .row b { color: #fff; font-size: 16px; } .kpcard .skdesc { font-size: 13.5px; }
+.kegrade { font: 22px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 2px; color: var(--gold) !important; }
+.kerow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
+.kesec { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); } .kesec small { font: 11px Consolas, monospace; letter-spacing: 2px; color: var(--muted); } .kesec b { display: block; color: #fff; font-weight: normal; }
+.kehid { margin-top: 14px; padding: 10px; border: 1px dashed var(--line); color: var(--muted); font-size: 12.5px; text-align: center; }
+.kepic { margin-top: 14px; overflow: hidden; border: 1px solid var(--line); } .kepic img { display: block; width: 100%; max-height: 260px; object-fit: cover; object-position: top; }
+.kepic.blur img { filter: blur(9px) saturate(.8); transform: scale(1.08); }
+.kmgrid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; max-width: 1100px; } .kmgrid.hard { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.kmcard { aspect-ratio: 3 / 4; padding: 0; border: 1px solid var(--line); border-radius: 0; background: #1d1719 repeating-linear-gradient(45deg, #2a2124 0 6px, #1d1719 6px 12px); cursor: pointer; overflow: hidden; }
+.kmcard:hover:not(.open) { border-color: var(--gold); } .kmcard.open { background: var(--panel2); border-color: var(--gold); cursor: default; } .kmcard.got { opacity: .55; border-color: var(--line); }
+.kmcard img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; pointer-events: none; }
+@media (max-width: 800px) { .khpair { grid-template-columns: 1fr 1fr; } .khmid { grid-column: 1 / -1; order: 3; flex-direction: row; justify-content: center; } .kpstage { grid-template-columns: 1fr; } .kmgrid, .kmgrid.hard { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 /* Games: When was it, Guess who (games8.js) */
 .gtbox { max-width: 1100px; padding: 22px 26px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
 .gthead { display: flex; gap: 22px; align-items: center; } .gthead img { width: 210px; height: 210px; object-fit: cover; object-position: top; border: 1px solid var(--line); background: var(--panel2); } .gthead .gihints { max-width: 360px; }

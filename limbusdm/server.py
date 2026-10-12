@@ -21,7 +21,8 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 # how long the window keeps a picture; then 304 while snapshot and app are the same (ETag)
 KEEP = "max-age=3600"
 # lists only a new snapshot changes: kept in memory after the first time
-PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror"}
+PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror",
+                "/api/game_arenas", "/api/game_voices"}
 
 
 def _etag(svc) -> str:
@@ -495,6 +496,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if not re.fullmatch(r"[\w .-]+", name):
                     return self._send(404, b"", "text/plain")
                 return self._file(os.path.join(stage_pic_dir(svc), name + ".jpg"), "image/jpeg")
+            if p == "/api/game_arenas":  # Guess the arena: where each stage is from (limbusdm/gamedata.py)
+                from .gamedata import arenas
+                return self._json(arenas(svc))
+            if p == "/api/game_voices":  # Guess the sound: announcers' and E.G.O voice lines
+                from .gamedata import voices
+                return self._json(voices(svc))
             if p == "/api/battle_maps":
                 from .viewer import battle_maps
                 return self._json([m["name"] for m in battle_maps(svc)])
@@ -1159,6 +1166,12 @@ CARD_PRESET = {
     "when": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10102_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10708_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11111_normal.png"],
     "diff": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10905_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10307_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11003_normal.png"],
     "who": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10203_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10804_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11205_normal.png"],
+    "arena": ["stage:Casino1F", "stage:Ab_FireMoth", "stage:DAreaStreet_A"],
+    "hilo": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10404_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11006_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10712_normal.png"],
+    "passive": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10508_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10813_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11103_normal.png"],
+    "ego": ["Assets/Resources_moved/Sprite/Unit/Profile/Ego/20104_awaken_profile.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20202_awaken_profile.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20305_awaken_profile.png"],
+    "sound": ["Assets/Resources_moved/Sprite/Unit/Profile/Ego/20102_awaken_profile.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20106_awaken_profile.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20203_awaken_profile.png"],
+    "memory": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10109_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10611_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11207_normal.png"],
 }
 
 
@@ -1169,7 +1182,8 @@ def game_cards(svc: Service, n: int = 12) -> dict:
     sid = svc.latest_snapshot_id()
     if not sid:
         return {}
-    fixed = {g: ["/api/enemy_thumb?app=" + quote(p[6:], safe="") + "&hub=1" if p.startswith("enemy:") else "/api/asset_thumb?path=" + quote(p, safe="") + "&hub=1"
+    fixed = {g: ["/api/enemy_thumb?app=" + quote(p[6:], safe="") + "&hub=1" if p.startswith("enemy:")
+                 else "/api/stage_pic?name=" + quote(p[6:], safe="") + "&hub=1" if p.startswith("stage:") else "/api/asset_thumb?path=" + quote(p, safe="") + "&hub=1"
                  for p in ps] for g, ps in CARD_PRESET.items()}
     if set(fixed) >= {"track", "id", "skill", "char", "canto", "wordle", "conn", "enemy"}:  # (every card of today: no lists to read)
         return fixed

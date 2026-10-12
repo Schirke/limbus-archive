@@ -285,12 +285,25 @@ const GM_GAMES = [
     gmIcon('<path d="M2.5 15h19M5 12.5v5M10 12.5v5M15 12.5v5M20 12.5v5"/><path d="M12.5 3.5a3 3 0 0 1 3 3c0 2.2-3 5-3 5s-3-2.8-3-5a3 3 0 0 1 3-3z"/>')],
   ["diff", "#/gamediff", "Spot the difference", "An Identity's art twice, the second one changed in a few spots — find them all before the time is up.",
     gmIcon('<rect x="2.5" y="5" width="8.5" height="14"/><rect x="13" y="5" width="8.5" height="14"/><circle cx="6.7" cy="10" r="1.6"/><path d="M4.500 16l2-2.500 2.500 2.500"/><path d="M15 16l2-2.500 2.500 2.500"/><path d="M16.200 8.800l2.600 2.600M18.800 8.800l-2.600 2.600"/>')],
+  ["arena", "#/gamearena", "Guess the arena", "A battle's arena, zoomed in — where is it from: the story's chapter, or the Abnormality fought there?",
+    gmIcon('<path d="M2.5 19h19"/><path d="M4 19l3-7h10l3 7"/><path d="M7 12l2-5h6l2 5"/><path d="M12 7V3.5M12 3.5l3 1.2-3 1.2"/>')],
+  ["hilo", "#/gamehilo", "Higher or lower", "Two Identities and one of their numbers — is the second one's higher or lower? Until the first miss.",
+    gmIcon('<path d="M7 20V5M3.5 8.5L7 5l3.5 3.5"/><path d="M17 4v15M13.5 15.5L17 19l3.5-3.5"/>')],
+  ["passive", "#/gamepassive", "Whose passive", "A passive's text without its name — which Identity's is it?",
+    gmIcon('<rect x="4" y="3" width="16" height="18" rx="1"/><path d="M8 8h8M8 12h8M8 16h4"/><circle cx="17" cy="17" r="2.5"/>')],
+  ["ego", "#/gameego", "Guess the E.G.O", "An E.G.O's card that opens in steps: grade, cost, passive, skill — name the E.G.O.",
+    gmIcon('<path d="M12 2.5l3 5.5 6 1-4.3 4.3 1 6.2L12 16.6 6.3 19.5l1-6.2L3 9l6-1z"/><circle cx="12" cy="11.5" r="2"/>')],
+  ["sound", "#/gamesound", "Guess the sound", "A line from a battle — which announcer says it, or which E.G.O is it the Sinner's line of?",
+    gmIcon('<path d="M4 9.5h3.5L12 5v14l-4.5-4.5H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>')],
+  ["memory", "#/gamememory", "Memory", "Face-down cards, two of each Identity — find every pair with as few misses as you can.",
+    gmIcon('<rect x="3" y="4" width="7.5" height="10" rx="1"/><rect x="13.5" y="4" width="7.5" height="10" rx="1"/><path d="M5 17.5h3.5M15.5 17.5H19M3 20h18"/><path d="M6.8 7.5v3M17.3 7.5v3"/>')],
   // (a game for two: no score, no Daily — the tile says what it is instead)
   ["who", "#/gamewho", "Guess who", "For two: the same 24 Identities and a hidden one each. Ask what the other's is, the game answers — name it first. Or play against the game.",
     gmIcon('<circle cx="8" cy="8" r="3.2"/><path d="M2.5 19c.6-3.2 2.8-5 5.5-5s4.900 1.800 5.500 5"/><path d="M16.2 8.2a2.3 2.3 0 1 1 3.4 2c-.8.4-1.2.9-1.2 1.800"/><path d="M18.4 14.6v.1"/>'), "FOR TWO"]];
 const GM_SCORED = GM_GAMES.filter((g) => !g[5]);
 // the games' page: the columns its tiles stand in
-const GM_GROUPS = [["By ear", ["track", "id", "char", "mix"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff", "diff"]], ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig", "when"]], ["Toys", ["dare", "who"]]];
+const GM_GROUPS = [["By ear", ["track", "id", "char", "mix", "sound"]], ["By eye", ["skill", "enemy", "canto", "splash", "atlas", "buff", "diff", "arena"]],
+  ["Puzzles", ["wordle", "conn", "odd", "grid", "chain", "jig", "when", "hilo", "passive", "ego", "memory"]], ["Toys", ["dare", "who"]]];
 // Mode of the day: a scored game, each once per cycle
 function gmOfDay() {
   const n = Math.floor((Date.now() + 3 * 3600e3) / 864e5), len = GM_SCORED.length, round = Math.floor(n / len);
