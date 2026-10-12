@@ -1,7 +1,6 @@
 {
  "routes": [
   "anim",
-  "autobattler",
   "compare"
  ]
 }
