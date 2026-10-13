@@ -358,7 +358,7 @@ function openUnit(id) {
     modal(`<div class="ud${hl ? "" : " nohl"}"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
         <div class="grow"><div class="udtitle">${esc(isId ? x.title : x.name)}</div>
         <div class="muted small">${esc(x.sinnerName)} · id ${x.id}${x.date ? ` · updated ${esc(x.date)}` : ""}</div></div>
-        ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}${isId ? `<button id="tocmp">⇄ Compare</button><button id="toanim">Battle animations →</button>` : ""}</div>
+        ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}<button id="tocmp">⇄ Compare</button>${isId ? `<button id="toanim">Battle animations →</button>` : ""}</div>
       <div class="udcols"><div class="udleft" id="udleft">${left()}</div><div class="udright" id="udright">${right()}</div></div></div>`);
     bind();
   };

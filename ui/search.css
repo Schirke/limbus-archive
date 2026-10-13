@@ -71,6 +71,8 @@ body.site #sxbtn ~ #timers { margin-left: 0; }  /* (on the site the timers took 
 .cqctl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .cqctl .lvlabel { margin-left: 10px; }
 .cqctl #cqswap { margin-left: auto; }
+.cqkind { display: inline-flex; } .cqkind button.on { color: var(--gold); border-color: var(--gold); }
+.cqtab .kwi { display: inline-flex; align-items: center; gap: 2px; }
 .cqpicks { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-bottom: 10px; }
 .cqvs { font: 34px/1 "LC Bebas", Impact, sans-serif; color: var(--gold); }
 .cqpick { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; }
