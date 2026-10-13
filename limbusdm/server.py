@@ -22,7 +22,7 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 KEEP = "max-age=3600"
 # lists only a new snapshot changes: kept in memory after the first time
 PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror",
-                "/api/game_arenas", "/api/game_voices"}
+                "/api/game_arenas", "/api/game_voices", "/api/announcers"}
 
 
 def _etag(svc) -> str:
@@ -502,6 +502,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/game_voices":  # Guess the sound: announcers' and E.G.O voice lines
                 from .gamedata import voices
                 return self._json(voices(svc))
+            if p == "/api/announcers":  # Announcers page (limbusdm/announcers.py)
+                from . import announcers
+                return self._json(announcers.get(svc))
             if p == "/api/battle_maps":
                 from .viewer import battle_maps
                 return self._json([m["name"] for m in battle_maps(svc)])

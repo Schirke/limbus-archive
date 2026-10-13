@@ -24,11 +24,11 @@ async function sxBack() {
 const sxEn = (s) => s == null || !LANG.id || !sx.back ? "" : (sx.back.m.get(String(s)) || sx.back.m.get(String(s).trim()) || []).join(" / ");
 
 // ------------------------------------------------------------------ the box over everything
-const SX_ORDER = ["Pages", "Keywords", "Identities", "E.G.O", "Passives", "Skills", "Enemies", "Buff effects", "Story", "Music", "Games"];
+const SX_ORDER = ["Pages", "Keywords", "Identities", "E.G.O", "Passives", "Skills", "Enemies", "Buff effects", "Announcers", "Story", "Music", "Games"];
 async function sxData() {
   if (sx.rows && sx.rows.lang === LANG.id) return sx.rows;
   const [, en, bf, mus, sto] = await Promise.all([units(), api("/api/enemies").catch(() => null), api("/api/buffs").catch(() => null),
-    api("/api/music").catch(() => []), api("/api/story").catch(() => null), sxBack()]);
+    api("/api/music").catch(() => []), api("/api/story").catch(() => null), sxBack(), api("/api/announcers").then((d) => { sx.ann = d.list || []; }).catch(() => { sx.ann = []; })]);
   const thumbs = new Set(en?.thumbs || []), season = (x) => x.season && x.season < 100 ? ` · Season ${x.season}` : "";
   const rows = [];
   // every keyword, buff and debuff the Identities' and E.G.O's texts name: opens the database searched by it
@@ -71,6 +71,7 @@ async function sxData() {
     for (const e of c.eps || []) if (e.parts?.[0]) rows.push({ g: "Story", t: e.title || `Episode ${e.n}`, s: `${c.label} · episode ${e.n}`, minor: 1,
       pic: e.parts[0][2] ? stImg(e.parts[0][2]) : "", go: `#/story/read/${encodeURIComponent(e.parts[0][0])}`, k: [e.title, c.label] });
   }
+  for (const a of sx.ann || []) rows.push({ g: "Announcers", t: a.name, s: `Announcer · ${a.lines.length} lines`, pic: a.img ? imgThumb(a.img) : "", go: `#/announcers/${a.id}`, k: [a.name, "announcer"] });
   for (const g of GM_GAMES) rows.push({ g: "Games", t: g[2], s: g[3], icon: "🎲", go: g[1], k: [g[2], g[3], "game"] });
   for (const a of document.querySelectorAll("#nav a[href^='#/'], #subnav a[href^='#/']")) {
     const t = a.textContent.trim().replace(/\s+/g, " ");

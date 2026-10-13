@@ -1650,3 +1650,9 @@ button.sndnav:hover { color: var(--gold); }
 .langrow:hover { border-color: var(--gold); }
 .langby { flex-basis: 100%; }
 @media (max-width: 700px) { .modal-box:has(.langlist) { padding: 14px 12px; } }
+/* Announcers */
+.nchead { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 6px; } .nchead img { height: 150px; max-width: 100%; object-fit: contain; } .nchead h2 { margin: 0 0 4px; }
+.ncline { display: flex; gap: 10px; align-items: baseline; padding: 7px 10px; border: 1px solid var(--line); background: var(--panel); margin-top: 4px; cursor: pointer; font-size: 14px; line-height: 1.4; }
+.ncline:hover, .ncline.on { border-color: var(--gold); } .ncline.on { background: #3a3013; } .ncline.mute { cursor: default; opacity: .7; } .ncline.mute:hover { border-color: var(--line); }
+.ncline .ncplay { flex: none; width: 16px; font-style: normal; color: var(--gold); } .ncline.on .ncplay { visibility: hidden; position: relative; } .ncline.on .ncplay::after { content: "■"; visibility: visible; position: absolute; left: 0; }
+.ncline span { flex: 1; min-width: 0; } .ncline em { flex: none; font: 11px Consolas, monospace; font-style: normal; color: var(--muted); }
