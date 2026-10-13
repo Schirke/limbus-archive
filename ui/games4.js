@@ -86,7 +86,7 @@ function ggDraw() {
       ${g.over ? `${g.daily ? `<button class="toggle" id="ggcopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="ggback">Back</button><button class="gmbtn" id="ggagain">Play again</button>` : `<button class="toggle" id="ggquit">Give up</button>`}</div>
     ${g.over ? `<div class="gmkick gcend">${n === 9 ? "THE WHOLE GRID" : `${n} OF 9 CELLS`} · ${g.score} POINTS — THE EMPTY CELLS SHOW ONE THAT FITS</div>`
     : `<div class="gwtype"><div class="gmkick">${esc(r.name)} × ${esc(c.name)}</div><input id="ggin" class="dbq" placeholder="Identity or Sinner…" autocomplete="off"><div id="ggsugg" class="gmsugg"></div></div>`}
-    <div class="ggbox"><div class="ggcorner">${g.over ? "" : "pick a cell,<br>name an Identity"}</div>${g.cols.map(head).join("")}
+    <div class="ggboard"><div class="ggcorner">${g.over ? "" : "pick a cell,<br>name an Identity"}</div>${g.cols.map(head).join("")}
       ${g.rows.map((row, y) => head(row) + [0, 1, 2].map((x) => cell(y * 3 + x)).join("")).join("")}</div>`;
   document.querySelectorAll("button.ggcell").forEach((b) => b.onclick = () => { g.sel = +b.dataset.i; ggDraw(); });
   if ($("#ggin")) gxType($("#ggin"), $("#ggsugg"), () => gg.ids.filter((x) => !g.got.includes(x)), ggTry);

@@ -114,10 +114,12 @@ function drawDb() {
   $("#dbq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { dbv.q = e.target.value; dbv.shown = 120; drawDbGrid(); }, 200); };
   drawDbGrid();
 }
+// [Key] / <link="Key"> also by the shown name of the keyword, buff or debuff
+const kwNames = (t) => t.replace(/<link="([^"]+)">|\[([A-Za-z0-9_]+)\]/g, (m, a, b) => { const k = a || b, g = UNITS.glossary[k]; return `${m} ${(g && g.name) || UNITS.keywords[k] || UNITS.tags[k] || ""} `; });
 function unitText(x) {
-  const sk = [...(x.skills || []), ...(x.defense || [])].map((s) => { const u = s.up[Math.max(...Object.keys(s.up))]; return `${u.name} ${u.desc}`; });
-  return [x.title, x.name, x.sinnerName, x.id, ...(x.assoc || []), ...(x.statuses || []).map(statusName), ...sk,
-    ...(x.passives || []).flatMap(pasVersions).map((p) => `${p.name} ${p.desc}`)].join(" ").toLowerCase();
+  const sk = [...(x.skills || []), ...(x.defense || [])].map((s) => { const u = s.up[Math.max(...Object.keys(s.up))]; return `${u.name} ${u.desc} ${(u.coindescs || []).flat().join(" ")}`; });
+  return kwNames([x.title, x.name, x.sinnerName, x.id, ...(x.assoc || []), ...(x.statuses || []).map(statusName), ...sk,
+    ...(x.passives || []).flatMap(pasVersions).map((p) => `${p.name} ${p.desc}`)].join(" ")).toLowerCase();
 }
 // a passive and its earlier versions (lower Uptie / Threadspin)
 const pasVersions = (p) => p.prev ? [p, ...pasVersions(p.prev)] : [p];
