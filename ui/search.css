@@ -100,8 +100,12 @@ body.site #sxbtn ~ #timers { margin-left: 0; }  /* (on the site the timers took 
 .cqpow b { color: var(--text); }
 .cqwin .cqpow b { color: #7fd99a; }
 .cqcols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 12px; align-items: start; }
+.cqcols > div { min-width: 0; }
 .cqmiss { color: var(--muted); border: 1px dashed #3a2a20; padding: 18px; text-align: center; }
 @media (max-width: 760px) {
   .cqpicks { grid-template-columns: 1fr; } .cqvs { text-align: center; font-size: 24px; }
-  .cqtab td, .cqtab th { padding: 6px 4px; font-size: 12.5px; } .cqcols { grid-template-columns: 1fr; }
+  .cqtab td, .cqtab th { padding: 6px 4px; font-size: 12.5px; } .cqcols { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .cqcols .skvmeta { flex-wrap: wrap; row-gap: 2px; }
+  .cqkind { flex-basis: 100%; } .cqkind button { flex: 1; } .cqctl .lvlabel { margin-left: 0; }
+  .cqcols > div[data-who]::before { content: attr(data-who); display: block; margin-bottom: 4px; color: var(--gold); font: 15px/1.1 "LC Bebas", Impact, sans-serif; letter-spacing: .04em; }
 }

@@ -68,7 +68,7 @@ function cqDraw() {
   const labels = [...new Set([...pa.keys(), ...pb.keys()])];
   if (!ego) labels.sort((x, y) => x.localeCompare(y, "en", { numeric: true }));
   const sec = (t) => `<tr class="cqsec"><td></td><th>${t}</th><td></td></tr>`;
-  const both = (l) => { const a = pa.get(l), b = pb.get(l); return `<div class="cqcols"><div>${a ? skillView(a, up, lv, l, art(A), true) : `<div class="cqmiss">No ${l}</div>`}</div><div>${b ? skillView(b, up, lv, l, art(B), true) : `<div class="cqmiss">No ${l}</div>`}</div></div>`; };
+  const both = (l) => { const a = pa.get(l), b = pb.get(l); return `<div class="cqcols"><div data-who="${esc(cqName(A))}">${a ? skillView(a, up, lv, l, art(A), true) : `<div class="cqmiss">No ${l}</div>`}</div><div data-who="${esc(cqName(B))}">${b ? skillView(b, up, lv, l, art(B), true) : `<div class="cqmiss">No ${l}</div>`}</div></div>`; };
   $("#main").innerHTML = `<div class="cqpage"><h1>Compare</h1>
     <div class="cqctl"><span class="cqkind"><button class="${ego ? "" : "on"}" data-ego="0">Identities</button><button class="${ego ? "on" : ""}" data-ego="1">E.G.O</button></span>
       <span class="lvlabel">${ego ? "Threadspin" : "Uptie"}</span>${[1, 2, 3, 4].map((n) => `<button class="upbtn ${up === n ? "on" : ""}" data-up="${n}" title="${n}">${ico(`up_${n}`, "s22", "", ROMAN[n - 1])}</button>`).join("")}
@@ -96,7 +96,7 @@ function cqDraw() {
     </table>
     <h3 class="group">Skills</h3>${labels.map(both).join("")}
     <h3 class="group">Passives</h3>
-    <div class="cqcols"><div>${A.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}</div><div>${B.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}</div></div></div>`;
+    <div class="cqcols"><div data-who="${esc(cqName(A))}">${A.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}</div><div data-who="${esc(cqName(B))}">${B.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}</div></div></div>`;
   $("#main").querySelectorAll("[data-up]").forEach((b) => b.onclick = () => { cq.up = +b.dataset.up; cqDraw(); });
   $("#main").querySelectorAll("[data-ego]").forEach((b) => b.onclick = () => { cq.ego = b.dataset.ego === "1"; cqDraw(); });
   if ($("#cqlv")) {
@@ -112,7 +112,7 @@ function cqDraw() {
       list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${imgThumb(x.img.thumb)}" alt=""><span>${esc(cqName(x))} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
       list.querySelectorAll("[data-id]").forEach((d) => d.onmousedown = () => { cq[cqKey(p.dataset.side)] = +d.dataset.id; cqDraw(); });
     };
-    inp.onfocus = () => sxBack();
+    inp.onfocus = () => sxBack().then(() => { if (inp.value) inp.oninput(); });
     inp.onblur = () => setTimeout(() => { list.innerHTML = ""; }, 150);
   });
 }
