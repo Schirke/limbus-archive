@@ -140,14 +140,16 @@ async function langFirst() {
 async function langMenu() {
   const list = await langList();
   const groups = new Map();
-  // (a translation made by people, without AI tools: marked, and first in its language)
-  const human = (l) => typeof langHuman === "function" && langHuman(l.id);
+  // (made by people without AI tools: a star, first in its language; a machine translation people corrected: next)
+  const mark = (l) => typeof langMark === "function" ? langMark(l.id) : "";
+  const rank = (l) => ["edited", "human"].indexOf(mark(l));
   for (const l of list) { if (!groups.has(l.label)) groups.set(l.label, []); groups.get(l.label).push(l); }
-  for (const ls of groups.values()) ls.sort((a, b) => human(b) - human(a));
+  for (const ls of groups.values()) ls.sort((a, b) => rank(b) - rank(a));
   const row = (l) => {
     const c = l.cover && l.cover.core != null ? `${l.cover.core} %` : "";
     const by = (l.authors || []).slice(0, 4).join(", ") + ((l.authors || []).length > 4 ? "…" : "");
-    return `<div class="langitem"><button class="langrow${LANG.id === l.id ? " on" : ""}" data-lang="${esc(l.id)}"><b>${human(l) ? `<span class="langstar">★</span> ` : ""}${esc(l.name)}</b>${human(l) ? `<span class="langhuman" title="Translated by people, without AI tools">Made without AI</span>` : ""}${c ? `<span class="muted small">${c} of the game's text</span>` : ""}
+    return `<div class="langitem"><button class="langrow${LANG.id === l.id ? " on" : ""}" data-lang="${esc(l.id)}"><b>${mark(l) === "human" ? `<span class="langstar">★</span> ` : ""}${esc(l.name)}</b>${mark(l) === "human" ? `<span class="langhuman" title="Translated by people, without AI tools">Made without AI</span>`
+        : mark(l) === "edited" ? `<span class="langhuman ed" title="A machine translation checked and corrected by people">AI, edited by hand</span>` : ""}${c ? `<span class="muted small">${c} of the game's text</span>` : ""}
       ${by ? `<span class="muted small langby">${esc(by)}</span>` : ""}</button>${l.link ? `<a class="small" href="${esc(l.link)}" target="_blank" rel="noopener">source</a>` : ""}</div>`;
   };
   modal(`<h2>Language</h2><p class="muted small">The game's texts — names, skills, passives, statuses, lines — as the game shows them in that language:
