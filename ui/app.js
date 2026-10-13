@@ -229,8 +229,11 @@ async function refresh() {
   renderStatus();
   if (STATE.ext && !window.extLoaded) {  // optional extensions (the ext folder in the data folder, not part of the app's files)
     window.extLoaded = true;
+    const had = new Set(Object.keys(routes));
     for (const n of Array.isArray(STATE.ext) ? STATE.ext : ["ext"]) {
-      const s = document.createElement("script"); s.src = `/ext/${n}.js`; s.async = false; s.onload = () => route(); document.head.appendChild(s);
+      const s = document.createElement("script"); s.src = `/ext/${n}.js`; s.async = false; document.head.appendChild(s);
+      // (drawn again only when the open page is one this script brought)
+      s.onload = () => { const name = location.hash.split("/")[1]; if (routes[name] && !had.has(name)) route(); Object.keys(routes).forEach((k) => had.add(k)); };
     }
   }
   const j = STATE.job;
