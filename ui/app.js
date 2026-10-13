@@ -2320,7 +2320,7 @@ function spineSkin(skins) {
 // (their start frame, skills, the fight), stage / music / what to show / Debug and the Render and Live buttons on the right.
 const vs = { left: "", right: "", skill: "", rskill: "", mode: "target", rounds: 2, winner: 0, map: "", lskills: false, rskills: false, defend: true, counter: false, bursts: false, burstMax: 3, maps: null,
   trim: false, bars: false, uisfx: true, numbers: false, dash: false, hp: false, death: false, intro: false, ego: false, music: "", bgm: null,
-  pace: false, impact: false, leftovers: "cut", loop: false, notes: false, kbscale: 2, debug: false, base: {}, buff: false, buffboth: false, buffmany: false, buffown: false, buffshort: false, debuff: false, debuffboth: false, debuffmany: false, debuffown: false, debuffshort: false,
+  pace: false, impact: false, leftovers: "cut", loop: false, notes: false, fast: false, kbscale: 2, debug: false, base: {}, buff: false, buffboth: false, buffmany: false, buffown: false, buffshort: false, debuff: false, debuffboth: false, debuffmany: false, debuffown: false, debuffshort: false,
   // picker state, recent picks, random last skills
   side: "left", ptype: "ids", psinner: 1, pseason: "", pgroup: "", recent: [], lrand: true, rrand: true,
   // team fights
@@ -2347,12 +2347,13 @@ const VS_GROUPS = [
     ["debuffmany", "Debuffs: several", "Up to three debuffs a side over the fight (off: one)"],
     ["debuffown", "Debuffs: their own", "Only the debuffs the other one inflicts, each coming on when a hit of the skill that inflicts it lands (off: any debuff of the game, at random moments)"],
     ["debuffshort", "Debuffs: a few seconds", "A debuff goes out after a few seconds (off: it stays to the end of the fight)"],
-    ["ego", "E.G.O cut-in", "The winner (a Sinner) shows one of its E.G.O cut-ins before its last skill — makes the video several seconds longer"]]],
+    ["ego", "E.G.O cut-in", "The winner (a Sinner) shows one of its E.G.O cut-ins before its last skill — makes the video several seconds longer"],
+    ["fast", "Fast render", "For a slow PC: the fight is drawn at 720p and the skill cut-in panels are left out — the video is made two to three times quicker"]]],
   ["Test", [
     ["notes", "Engine notes", "(For testing, with Exchanges) what the fight engine decided, written over the video: each clash's powers and coins left, who loses it, the range, damage"]]],
 ];
 const VS_EXTRAS = VS_GROUPS.flatMap(([, items]) => items);
-const VS_SHOW = ["hp", "intro", "death", "ego", "buff", "debuff"];  // (on the page; the rest is under Debug)
+const VS_SHOW = ["hp", "intro", "death", "ego", "buff", "debuff", "fast"];  // (on the page; the rest is under Debug)
 // Buffs / Debuffs panel rows: [key ending, name, off, on]
 const VS_BUFF = [["both", "Who", "One side", "Both"], ["many", "How many", "One", "Several"], ["own", "Which", "Any", "Their own"],
   ["short", "How long", "Whole fight", "A few seconds"]];
@@ -3272,7 +3273,7 @@ function vsAgain(spec) {
   vs.left = String(vs.left); vs.right = String(vs.right);
   vs.rounds = +vs.rounds || 1; vs.winner = +vs.winner || 0;
   vs.map = spec.map || ""; vs.music = spec.music || "";
-  for (const k of VS_SHOW.concat(VS_DEBUG, VS_BUFF_KEYS)) vs[k] = !!spec[k];
+  for (const k of VS_SHOW.concat(VS_DEBUG, VS_BUFF_KEYS)) if (k !== "fast") vs[k] = !!spec[k];  // ("fast" is the PC's, not the fight's)
   vs.lrand = vs.rrand = spec.mode !== "clash" || spec.randskill !== false;
   vs.base = spec.mode === "clash" ? Object.fromEntries(Object.keys(VS_BASE).filter((k) => k in spec && spec[k] !== VS_BASE[k]).map((k) => [k, spec[k]])) : {};
   vs.skl = {};

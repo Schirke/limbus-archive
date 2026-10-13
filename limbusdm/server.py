@@ -981,7 +981,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 spec.update({k: b[k] for k in ("map", "speed", "pause", "rspeed", "rpause", "lskills", "rskills", "defend", "counter",
                                         "bursts", "burstMax", "seed", "hitstop", "trim", "clean", "spread", "numbers",
                                         "slowmo", "dash", "music", "hp", "death", "intro", "ego", "lname", "rname",
-                                        "bars", "uisfx", "pace", "ramp", "throw", "punch", "fade", "loop", "flash", "randskill", "kbscale", "camFollow", "deck", "notes",
+                                        "bars", "uisfx", "pace", "ramp", "throw", "punch", "fade", "loop", "flash", "randskill", "kbscale", "camFollow", "deck", "notes", "fast",
                                         "buff", "buffboth", "buffmany", "buffown", "buffshort",
                                         "debuff", "debuffboth", "debuffmany", "debuffown", "debuffshort") if b.get(k) is not None})
                 if b.get("mirror"):  # (Versus → Mirror: the run's boss fight, the engine's MirrorFight; see versus_job)
