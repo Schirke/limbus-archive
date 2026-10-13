@@ -5,6 +5,7 @@ import os
 
 _looks: dict = {}  # (file, mtime, size) -> the picture made small
 _found: dict = {}  # file keys in order → repeats()
+_thin: dict = {}  # ((file, mtime, size), least) -> sparse() said yes
 
 
 def _key(path):
@@ -66,10 +67,15 @@ def sparse(paths, least=0.05):
     from PIL import Image
     out = []
     for i, p in enumerate(paths):
-        try:
-            a = Image.open(p).convert("RGBA").getchannel("A")
-        except OSError:
+        k = (_key(p), least)
+        if k[0] is None:
             continue
-        if sum(a.histogram()[128:]) < least * a.width * a.height:
+        if k not in _thin:
+            try:
+                a = Image.open(p).convert("RGBA").getchannel("A")
+            except OSError:
+                continue
+            _thin[k] = sum(a.histogram()[128:]) < least * a.width * a.height
+        if _thin[k]:
             out.append(i)
     return out
