@@ -50,7 +50,7 @@ function langFonts(f) {
 try { const s = JSON.parse(localStorage.getItem("lang_fonts") || "null"); if (s && LANG.id && s.id === LANG.id) langFonts(s.f); } catch {}
 // lists that carry the game's texts
 const LANG_PAGES = /^\/api\/(announcers|units|enemies|enemy|buffs|music|mirror|bgm_tracks|quiz|gacha|sounds|story|story_ep|stages|history|game_cards|characters|skills|versus_list)\b/;
-const LANG_STORY = /^\/api\/(quiz|gacha|sounds|story|story_ep)\b/;  // …and the story / voice lines
+const LANG_STORY = /^\/api\/(announcers|quiz|gacha|sounds|story|story_ep)\b/;  // …and the story / voice lines
 // fields to translate; others only when they read as a sentence
 const LANG_FIELDS = new Set(["name", "title", "desc", "flavor", "coindescs", "panicDesc", "lowDesc", "sinnerName", "place", "who", "text", "line", "lines", "abName", "subtitle", "role", "label"]);
 const LANG_MAPS = new Set(["keywords", "tags"]);  // {key: its name} lists (as lists of keys they stay)

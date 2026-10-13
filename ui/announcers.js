@@ -30,6 +30,8 @@ routes.announcers = async (args = []) => {
   ncDraw();
 };
 
+// the game's own <i> / <b> stay, any other tag is dropped
+const ncText = (s) => esc(String(s).replace(/<(?!\/?[ib]>)[^>]*>/g, "")).replace(/&lt;(\/?[ib])&gt;/g, "<$1>").replace(/\n/g, "<br>");
 const ncHas = (s, q) => String(s || "").toLowerCase().includes(q);
 
 function ncDraw() {
@@ -49,7 +51,7 @@ function ncDraw() {
   $("#nccard").innerHTML = `<div class="nchead">${(a.imgs.length ? a.imgs : [a.img]).filter(Boolean).map((p) => `<img src="${imgFull(p)}" onerror="this.remove()">`).join("")}
       <div><h2>${esc(a.name)}</h2><div class="muted small">${a.lines.length} lines${lines.length !== a.lines.length ? ` · ${lines.length} shown` : ""}</div></div></div>
     ${[...groups].map(([k, rows]) => `<div class="enh">${esc(nc.data.kinds[k] || "Other")}</div>${rows.map(([l, i]) =>
-      `<div class="ncline ${l[2] ? "" : "mute"}" data-i="${i}"><i class="ncplay">${l[2] ? "▶" : ""}</i><span>${l[1] ? esc(l[1]) : `<span class="muted">(no text)</span>`}</span><em>${sec(l[4])}</em></div>`).join("")}`).join("")}`;
+      `<div class="ncline ${l[2] ? "" : "mute"}" data-i="${i}"><i class="ncplay">${l[2] ? "▶" : ""}</i><span>${l[1] ? ncText(l[1]) : `<span class="muted">(no text)</span>`}</span><em>${sec(l[4])}</em></div>`).join("")}`).join("")}`;
   $("#nccard").scrollTop = 0;
   $("#nccard").querySelectorAll(".ncline:not(.mute)").forEach((r) => r.onclick = () => {
     const i = +r.dataset.i, l = a.lines[i], same = nc.on === i;
