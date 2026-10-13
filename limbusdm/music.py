@@ -8,13 +8,13 @@ import re
 
 from . import content, units
 
-VERSION = 3
+VERSION = 4
 NEAR = 60  # ms an event's length may differ from its sample's
 BOSS_FIGHTS = 3  # a theme heard in so few story fights is somebody's own: named after who is fought there
 STORY_TABLES = ("battle-story", "battle-ab", "battle-dungeon")
 PHASES = ["초반부", "전반부", "중반부", "후반부"]  # early, early, middle, late (the first Cantos' tracks are named in Korean)
 # events cut from several samples: the one to play
-ALIAS = {"LimbusCompany_BGM_PV": "BGM_PV", "Battle_Cp2_Rodion_Lobby": "Battle_Cp2_Rodion",
+ALIAS = {"LimbusCompany_BGM_PV": "BGM_PV", "ChickenEvent2": "LC_3.5__BGM_C_LOOP", "Battle_Cp2_Rodion_Lobby": "Battle_Cp2_Rodion",
          "Battle_Cp3_BetweenTwoWorlds_Lobby": "Between Two Worlds_Master [Game Loop Part1]",
          "Battle_Cp4_FlyMyWings_Lobby": "Fly, My Wings_Main -13LUFS_Master_동랑 에고 보스전",
          "Battle_Cp4_DongLangEGOBattle": "Fly, My Wings_Main -13LUFS_Master_동랑 에고 보스전",
