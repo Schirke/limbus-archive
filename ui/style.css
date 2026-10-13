@@ -750,9 +750,18 @@ button.gihint { cursor: pointer; } button.gihint:hover { border-color: var(--gol
 /* Support (support.js): ways to help, who made it, credits */
 .suppage { max-width: 1100px; }
 .supways { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
-.supway { display: flex; flex-direction: column; padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gold); }
+.supway { display: flex; flex-direction: column; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--gold); }
 .supway small, .suptier small { font: 11px Consolas, monospace; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
-.supway h2 { font: 22px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; margin: 4px 0 8px; }
+.supway h2 { font: 19px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; margin: 2px 0 6px; }
+.suptwo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: 26px; align-items: start; margin-bottom: 8px; }
+.suptwo h2 { margin-top: 0; } .suptwo .supteam { flex-direction: column; } .suptwo .supman { min-width: 0; }
+.supthanks { color: #cfc6bd; margin: 0 0 12px; line-height: 1.5; }
+.suptrows { display: flex; flex-direction: column; gap: 6px; }
+.suptrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); }
+.suptrow .lg { color: var(--gold); font: 15px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .05em; }
+.suptrow .nm { color: #fff; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.suptrow .by { grid-column: 2 / -1; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+@media (max-width: 760px) { .suptwo { grid-template-columns: minmax(0, 1fr); gap: 14px; } .suptrow { grid-template-columns: minmax(0, 1fr) auto; } .suptrow .lg, .suptrow .by { grid-column: 1 / -1; } }
 .supway p { margin: 0 0 8px; line-height: 1.5; color: #cfc6bd; }
 .suplinks { display: flex; gap: 8px; flex-wrap: wrap; margin-top: auto; padding-top: 8px; }
 .suplinks a { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); text-decoration: none; }

@@ -30,6 +30,7 @@ function betaHuman(list, edited) {
   beta.human = ids(list);
   beta.edited = ids(edited);
   try { localStorage.setItem("beta_human", JSON.stringify([[...beta.human], [...beta.edited]])); } catch (e) { /* read again next time */ }
+  if (typeof supTranslators === "function") supTranslators();  // (the Support page's list, when it is open)
 }
 function betaApply(list) {
   beta.routes = new Set(Array.isArray(list) ? list.filter((r) => typeof r === "string") : []);
