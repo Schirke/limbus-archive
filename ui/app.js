@@ -152,10 +152,17 @@ async function langMenu() {
         : mark(l) === "edited" ? `<span class="langhuman ed" title="A machine translation checked and corrected by people">AI, edited by hand</span>` : ""}${c ? `<span class="muted small">${c} of the game's text</span>` : ""}
       ${by ? `<span class="muted small langby">${esc(by)}</span>` : ""}</button>${l.link ? `<a class="small" href="${esc(l.link)}" target="_blank" rel="noopener">source</a>` : ""}</div>`;
   };
+  // two columns: the game's own languages, the players' translations
+  const own = (ls) => ls.every((l) => l.name === "Official" && !l.link);
+  const grp = (official) => [...groups].filter(([, ls]) => own(ls) === official).map(([label, ls]) =>
+    `<div class="langgrp"><div class="langhead">${esc(label)}</div>${ls.map(row).join("")}</div>`).join("");
+  const fans = [...groups.values()].some((ls) => !own(ls));
   modal(`<h2>Language</h2><p class="muted small">The game's texts — names, skills, passives, statuses, lines — as the game shows them in that language:
       its own Korean and Japanese, and the players' translations (credit to their teams).</p>
-    <div class="langlist"><div class="langgrp"><div class="langhead">English</div><div class="langitem"><button class="langrow${LANG.id ? "" : " on"}" data-lang=""><b>The game's own</b></button></div></div>
-    ${[...groups].map(([label, ls]) => `<div class="langgrp"><div class="langhead">${esc(label)}</div>${ls.map(row).join("")}</div>`).join("")}</div>
+    <div class="langcols"><div class="langlist"><div class="langcol">Official</div>
+      <div class="langgrp"><div class="langhead">English</div><div class="langitem"><button class="langrow${LANG.id ? "" : " on"}" data-lang=""><b>The game's own</b></button></div></div>
+      ${grp(true)}</div>
+    ${fans ? `<div class="langlist"><div class="langcol">Fan translations</div>${grp(false)}</div>` : ""}</div>
     <label class="small"><input type="checkbox" id="uilangon"> The app's own buttons and texts too, where they are translated</label>`);
   document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.onclick = () => langSet(b.dataset.lang));
   const on = $("#uilangon");
