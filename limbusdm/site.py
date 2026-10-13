@@ -29,7 +29,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare"]
+BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers"]
 # a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
 CARD_DIRS = ("db", "enemies", "buffs", "og")
 CARD_PAGE = """<!doctype html>
@@ -49,6 +49,7 @@ SECTIONS = {
     "db": ("Identities & E.G.O", "Every Limbus Company Identity and E.G.O: skills, coins, passives, resistances, stats and full art."),
     "enemies": ("Enemies", "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by Canto."),
     "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
+    "announcers": ("Announcers", "Every battle announcer of Limbus Company with all of its lines by situation: read them and hear them."),
     "story": ("Story", "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by Canto."),
     "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
     "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
@@ -836,6 +837,27 @@ class Exporter:
         self.write_manifest("newgames", m)
         return m
 
+    def announcers(self) -> dict:
+        """Announcers page: the list, the pictures and every line's voice clip."""
+        old = self.read_manifest("announcers")
+        sid = self.svc.latest_snapshot_id()
+        have = self.kept(old)
+        lists = ["/api/announcers"]
+        try:
+            ann = json.loads(self._get("/api/announcers")[0]).get("list") or []
+        except Exception as e:
+            self.failed.append(("/api/announcers", str(e)))
+            ann = []
+        pics = [url_key("/api/asset_thumb", path=a["img"]) for a in ann if a.get("img")]
+        pics += [url_key("/api/asset_img", path=p) for a in ann for p in (a.get("imgs") or [a.get("img")]) if p]
+        clips = [url_key("/api/bank", path=b, i=i) for b, i in dict.fromkeys((ln[2], ln[3]) for a in ann for ln in a["lines"] if ln[2])]
+        # (the list is the app's own making: asked again every time)
+        got = self.fetch_all(lists + pics + clips, {k: f for k, f in have.items() if k not in lists}, "site: Announcers")
+        urls, groups = _grouped(got, [(lists, PACK), (pics, GAME_PACK), (clips, VOICE_PACK)])
+        m = {"kind": "announcers", "id": sid, "urls": urls, "groups": groups}
+        self.write_manifest("announcers", m)
+        return m
+
     def scenes(self) -> dict:
         """Guess the Canto: story backgrounds full size and their previews."""
         old = self.read_manifest("scenes")
@@ -1125,6 +1147,7 @@ class Exporter:
             self.music()
         if self.cfg["story"]:
             self.story()
+            self.announcers()
 
     # -- the site around the data
     def shell(self):
@@ -1503,7 +1526,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 PULL_STAGE = "site: taking from the site"
 # parts pull() takes from the site
-TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "cards", "tools", "extra", "music")
+TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "announcers", "cards", "tools", "extra", "music")
 PULL_THREADS, PULL_TRIES = 10, 3
 PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
 PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped from it
