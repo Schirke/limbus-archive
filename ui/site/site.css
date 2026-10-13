@@ -55,6 +55,8 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site .enwrap { display: block; margin-top: 10px; padding-top: 10px; }
   body.site .enwrap .engrid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
   body.site .enwrap .encard { max-height: none; min-height: 0; overflow: visible; padding: 0; }
+  body.site .enwrap .enlv { flex-wrap: wrap; } body.site .enwrap .enlv select { flex: 1 1 100%; max-width: none; min-width: 0; } body.site .enwrap .enlv .lvlabel.lv { margin-left: 0; }
+  body.site .enwrap .enres.sin { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; } body.site .enwrap .enres.sin > div { font-size: 12px; } body.site .enwrap .enstage { flex-wrap: wrap; }
   body.site .enwrap:not(.enopen) .encard, body.site .enwrap.enopen > :not(.encard):not(.en-back) { display: none; }
   body.site .enwrap.enopen .en-back { display: block; margin-bottom: 10px; padding: 8px 12px; border: 1px solid var(--line); color: var(--cream); text-decoration: none;
     font: 17px "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
