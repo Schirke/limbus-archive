@@ -1649,6 +1649,8 @@ button.sndnav:hover { color: var(--gold); }
 .langrow.on { border-color: var(--gold); background: rgba(201,162,39,.1); }
 .langrow:hover { border-color: var(--gold); }
 .langby { flex-basis: 100%; }
+.langstar { color: var(--gold); }
+.langhuman { font-size: 11px; line-height: 1; padding: 3px 6px; border: 1px solid var(--gold); color: var(--gold); white-space: nowrap; align-self: center; }
 @media (max-width: 700px) { .modal-box:has(.langlist) { padding: 14px 12px; } }
 /* Announcers */
 .nchead { display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 6px; } .nchead img { height: 150px; max-width: 100%; object-fit: contain; } .nchead h2 { margin: 0 0 4px; }
