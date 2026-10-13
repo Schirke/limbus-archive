@@ -24,21 +24,39 @@ async function sxBack() {
 const sxEn = (s) => s == null || !LANG.id || !sx.back ? "" : (sx.back.m.get(String(s)) || sx.back.m.get(String(s).trim()) || []).join(" / ");
 
 // ------------------------------------------------------------------ the box over everything
-const SX_ORDER = ["Pages", "Keywords", "Identities", "E.G.O", "Enemies", "Buff effects", "Story", "Music", "Games"];
+const SX_ORDER = ["Pages", "Keywords", "Identities", "E.G.O", "Passives", "Skills", "Enemies", "Buff effects", "Story", "Music", "Games"];
 async function sxData() {
   if (sx.rows && sx.rows.lang === LANG.id) return sx.rows;
   const [, en, bf, mus, sto] = await Promise.all([units(), api("/api/enemies").catch(() => null), api("/api/buffs").catch(() => null),
     api("/api/music").catch(() => []), api("/api/story").catch(() => null), sxBack()]);
   const thumbs = new Set(en?.thumbs || []), season = (x) => x.season && x.season < 100 ? ` · Season ${x.season}` : "";
   const rows = [];
-  const used = new Set([...Object.keys(UNITS.keywords || {}), ...UNITS.ids.flatMap((x) => x.statuses || [])]);
-  const buffIds = new Set((bf?.list || []).map((b) => b.id));
-  for (const k of used) {
-    const g = UNITS.glossary[k];
-    if (g?.name) rows.push({ g: "Keywords", t: g.name, s: sxPlain(g.desc).slice(0, 90), html: statusIcon(k, "s28"), go: buffIds.has(k) ? `#/buffs/${k}` : "#/db/ids", kw: buffIds.has(k) ? "" : g.name, k: [g.name, k] });
+  // every keyword, buff and debuff the Identities' and E.G.O's texts name: opens the database searched by it
+  const used = new Map(Object.keys(UNITS.keywords || {}).map((k) => [k, 1e6]));
+  const count = (t) => { for (const m of String(t || "").matchAll(/<link="([^"]+)">|\[([A-Za-z0-9_]+)\]/g)) used.set(m[1] || m[2], (used.get(m[1] || m[2]) || 0) + 1); };
+  const own = [];
+  for (const x of [...UNITS.ids, ...UNITS.egos]) {
+    const ego = !x.title, who = `${ego ? x.name : x.title} · ${x.sinnerName}`, go = `#/db/${ego ? "ego" : "ids"}/${x.id}`, pic = imgThumb(x.img.thumb), names = new Set();
+    for (const sk of [...(x.skills || []), ...(x.defense || [])]) {
+      for (const u of Object.values(sk.up)) { count(u.desc); (u.coindescs || []).flat().forEach(count); }
+      const n = topUp(sk).name;
+      if (n && n !== String(sk.id) && !names.has(n)) { names.add(n); own.push({ g: "Skills", t: n, s: who, pic, go, k: [n] }); }
+    }
+    for (const p of (x.passives || []).flatMap(pasVersions)) {
+      count(p.desc);
+      if (p.name && !names.has(p.name)) { names.add(p.name); own.push({ g: "Passives", t: p.name, s: who, pic, go, k: [p.name] }); }
+    }
   }
+  const kws = new Map();
+  for (const [k, n] of [...used].sort((a, b) => b[1] - a[1])) {
+    const g = UNITS.glossary[k];
+    if (!g?.name) continue;
+    if (!kws.has(g.name)) kws.set(g.name, { g: "Keywords", t: g.name, s: sxPlain(g.desc).replace(/\s+/g, " ").slice(0, 90), ...(g.icon ? { pic: imgThumb(g.icon) } : { html: statusIcon(k, "s28") }), go: "#/db/ids", kw: g.name, k: [g.name, k] });
+  }
+  rows.push(...kws.values());
   for (const x of UNITS.ids) rows.push({ g: "Identities", t: x.title, s: x.sinnerName + season(x), pic: imgThumb(x.img.thumb), go: `#/db/ids/${x.id}`, k: [x.title, x.sinnerName, x.id] });
   for (const x of UNITS.egos) rows.push({ g: "E.G.O", t: x.name, s: `${x.sinnerName} · ${x.grade}`, pic: imgThumb(x.img.thumb), go: `#/db/ego/${x.id}`, k: [x.name, x.sinnerName, x.grade, x.id] });
+  rows.push(...own);
   const seen = new Set();
   for (const e of en?.list || []) {
     if (seen.has(e.name + "|" + e.group)) continue;
@@ -80,7 +98,7 @@ function sxOpen() {
   if ($("#sxbox")) return;
   const el = document.createElement("div");
   el.id = "sxbox";
-  el.innerHTML = `<div class="sxpanel"><div class="sxin"><span class="sxglass">⌕</span><input id="sxq" placeholder="Search Identities, E.G.O, enemies, effects, story, music…" autocomplete="off"><kbd>Esc</kbd></div>
+  el.innerHTML = `<div class="sxpanel"><div class="sxin"><span class="sxglass">⌕</span><input id="sxq" placeholder="Search Identities, E.G.O, skills, passives, keywords, enemies, story, music…" autocomplete="off"><kbd>Esc</kbd></div>
     <div id="sxres"><div class="sxhint">Type a name in your language or in English.</div></div>
     <div class="sxfoot"><span><kbd>↑</kbd><kbd>↓</kbd> choose</span><span><kbd>Enter</kbd> open</span><span><kbd>Ctrl</kbd><kbd>K</kbd> anywhere</span></div></div>`;
   document.body.appendChild(el);

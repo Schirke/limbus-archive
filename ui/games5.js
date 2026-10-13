@@ -10,7 +10,7 @@ const GA_KEEP = "games_gacha", GA_COST = 130, GA_PITY = 200;
 // the Sinners' colours, as the game writes their lines and name plates
 const GA_SINNER = ["#d4e1e8", "#ffb1b4", "#ffef23", "#cf0000", "#3f58c8", "#5bffde", "#8a5bd0", "#ff9500", "#b3202a", "#9bb01a", "#4f8f5e", "#a8622a"];
 const GA_GLOW = { r1: [150, 150, 160], r2: [235, 70, 45], r3: [255, 205, 60], ego: [80, 150, 255] };
-const ga = { st: null, data: null, banner: null, run: 0, skip: null, voice: null, pics: {} };
+const ga = { st: null, data: null, banner: null, run: 0, skip: null, voice: null, pics: {}, old: new Set() };
 const gaNew = () => ({ pulls: 0, n: { r3: 0, r2: 0, r1: 0, ego: 0 }, since: 0, got: {}, pity: {}, banner: 0, all: true });
 const gaKeep = () => { try { localStorage.setItem(GA_KEEP, JSON.stringify(ga.st)); } catch {} };
 const gaUi = (n) => "/api/gacha_ui?n=" + n;
@@ -69,7 +69,7 @@ routes.gamegacha = async (args = []) => {
   // an archived banner opened by link joins the tiles
   for (const id of [+args[0], ga.st.banner]) {
     const b = id && !ga.data.banners.some((x) => x.id === id) && ga.data.archive.find((x) => x.id === id);
-    if (b) ga.data.banners.unshift(b);
+    if (b) { ga.data.banners.unshift(b); ga.old.add(b.id); }
   }
   if (+args[0] && ga.data.banners.some((x) => x.id === +args[0])) { ga.st.banner = +args[0]; gaKeep(); }
   ga.banner = ga.data.banners.find((b) => b.id === ga.st.banner) || ga.data.banners[0];
@@ -93,8 +93,9 @@ const gaShow = (id) => { document.querySelectorAll("#gestage .gescr").forEach((d
 function gaRoll(tenth) {
   const b = ga.banner, st = ga.st, ego = (g) => String(g.g).startsWith("EGO");
   const left = b.groups.some((g) => ego(g) && g.ids.some((i) => !st.got[i]));
+  // (the tenth of a ten: a group without its own share is out, so 00 or better)
   const share = (g) => { const o = g.occ, plain = tenth ? "TENTH" : "DEFAULT";
-    return ego(g) ? (g.ids.some((i) => !st.got[i]) ? o[plain] ?? o.DEFAULT ?? 0 : 0) : o[(left ? "" : "COMPLETE_EGO_") + plain] ?? o[plain] ?? o.DEFAULT ?? 0; };
+    return ego(g) && !g.ids.some((i) => !st.got[i]) ? 0 : (ego(g) || left ? undefined : o["COMPLETE_EGO_" + plain]) ?? o[plain] ?? 0; };
   let r = Math.random() * b.groups.reduce((s, g) => s + share(g), 0), group = b.groups.find((g) => share(g) > 0) || b.groups[0];
   for (const g of b.groups) { r -= share(g); if (r < 0) { group = g; break; } }
   const from = ego(group) ? group.ids.filter((i) => !st.got[i]) : group.ids, id = from[Math.floor(Math.random() * from.length)];
@@ -117,7 +118,7 @@ function gaHome() {
   const up = b.groups.filter((x) => String(x.g).endsWith("_pickup")).flatMap((x) => x.ids).map(gaU);
   // TEMPORARY test button (+1300 lunacy)
   $("#gehome").innerHTML = `<div class="gewallet">${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b><button id="getest" title="For testing: lunacy for nothing. To be removed.">+ 1300 · test</button></div>
-    <div class="getiles">${ga.data.banners.map((x) => `<img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">`).join("")}</div>
+    <div class="getiles">${ga.data.banners.map((x) => `<div class="getile"><img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">${ga.old.has(x.id) ? `<button data-drop="${x.id}" title="Remove this banner from the list">×</button>` : ""}</div>`).join("")}</div>
     <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.illust ? gaFull(b.illust) : ""}')"></div>${b.typo ? `<img class="getypo" src="${gaFull(b.typo)}">` : ""}
       <div class="geinfo">${b.end ? `<div class="geend">Until ${esc(b.end.slice(0, 10))}</div>` : ""}
         <div>000 <b>${rate("3")}</b> &nbsp; E.G.O <b>${rate("EGO")}</b> &nbsp; 00 <b>${rate("2")}</b></div><div>The tenth of a ten: 00 or better.</div>
@@ -128,6 +129,11 @@ function gaHome() {
       ${gmW.lunacy < GA_COST ? `<a class="gebroke" href="#/games">Out of lunacy — play a game: today's Dailies pay the most</a>` : ""}</div>`;
   document.querySelectorAll("#gehome [data-b]").forEach((el) => el.onclick = () => { ga.banner = ga.data.banners.find((x) => x.id === +el.dataset.b); st.banner = ga.banner.id; gaKeep();
     const w = gaSnd("gacha_whoosh", 0.4); if (w) setTimeout(() => w.pause(), 1200);  // (the sample is the whoosh three times over: the first only)
+    gaHome(); });
+  document.querySelectorAll("#gehome [data-drop]").forEach((el) => el.onclick = () => { const id = +el.dataset.drop;
+    ga.old.delete(id); ga.data.banners = ga.data.banners.filter((x) => x.id !== id);
+    if (b.id === id) { ga.banner = ga.data.banners[0]; st.banner = ga.banner.id; gaKeep(); }
+    history.replaceState(null, "", "#/gamegacha");
     gaHome(); });
   $("#getest").onclick = () => { gmW.lunacy += 10 * GA_COST; gmWKeep(); gaHome(); };
   $("#ge1").onclick = () => gaPull(1);

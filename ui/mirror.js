@@ -153,7 +153,7 @@ function mpDraw() {
   $(".mpgifts").scrollTop = top;
   const page = $("#mppage");
   page.onclick = (e) => {
-    const t = e.target.closest("[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-tab]");
+    const t = e.target.closest("[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],button[data-tab]");
     if (!t) return;
     const d = t.dataset;
     if (d.m) { mp.mode = +d.m; mp.lock = {}; mp.open = -1; }
