@@ -32,7 +32,22 @@ async function api(path, body) {
 // visit takes the browser's language when there is a translation of it.
 const LANG_KEY = "lang";
 const LANG = { id: "", list: null, tables: {}, back: new Map() };
-try { LANG.id = localStorage.getItem(LANG_KEY) || ""; } catch {}
+// the best translation of the browser's language out of a list ("" = English)
+function langPick(list) {
+  const code = (l) => l.lang.toLowerCase();
+  for (const w of (navigator.languages || [navigator.language || ""]).map((x) => x.toLowerCase())) {
+    if (w.startsWith("en")) break;
+    const zh = w.startsWith("zh") ? (/(tw|hk|mo|hant)/.test(w) ? "zh-hant" : "zh-hans") : null;
+    const hits = list.filter((l) => zh ? code(l) === zh : code(l) === w || code(l).split("-")[0] === w.split("-")[0]);
+    if (hits.length) return hits.sort((a, b) => ((b.cover || {}).core || 0) - ((a.cover || {}).core || 0))[0].id;
+  }
+  return "";
+}
+try {
+  // (the site hands the list over before the scripts start: a first visit picks its language without a reload)
+  if (localStorage.getItem(LANG_KEY) === null && window.SITE_LANGS) localStorage.setItem(LANG_KEY, langPick(SITE_LANGS) || "en");
+  LANG.id = localStorage.getItem(LANG_KEY) || "";
+} catch {}
 if (LANG.id === "en") LANG.id = "";
 // a pack's own fonts: titles in place of the game's Bebas, texts too when set; kept for the next load.
 // Only for letters past Latin-1 (English keeps Bebas / Segoe UI; punctuation and arrows too); css: sized to stand next to them
@@ -118,20 +133,9 @@ async function langFirst() {
   let saved = null;
   try { saved = localStorage.getItem(LANG_KEY); } catch { return; }
   if (saved !== null) return;
-  const list = await langList();
-  const want = (navigator.languages || [navigator.language || ""]).map((x) => x.toLowerCase());
-  const code = (l) => l.lang.toLowerCase();
-  for (const w of want) {
-    if (w.startsWith("en")) break;
-    const zh = w.startsWith("zh") ? (/(tw|hk|mo|hant)/.test(w) ? "zh-hant" : "zh-hans") : null;
-    const hits = list.filter((l) => zh ? code(l) === zh : code(l) === w || code(l).split("-")[0] === w.split("-")[0]);
-    if (!hits.length) continue;
-    hits.sort((a, b) => ((b.cover || {}).core || 0) - ((a.cover || {}).core || 0));
-    try { localStorage.setItem(LANG_KEY, hits[0].id); } catch {}
-    location.reload();
-    return;
-  }
-  try { localStorage.setItem(LANG_KEY, "en"); } catch {}
+  const id = langPick(await langList());
+  try { localStorage.setItem(LANG_KEY, id || "en"); } catch {}
+  if (id) location.reload();
 }
 async function langMenu() {
   const list = await langList();
