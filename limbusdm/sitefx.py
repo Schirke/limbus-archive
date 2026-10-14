@@ -29,11 +29,29 @@ def _read(ex) -> dict:
     """The site's videos; after a patch they stay and "old" lists the sets to render again."""
     m, made = ex.read_manifest("fx"), _made(ex.svc)
     out = {"kind": "fx", "id": made, "urls": m.get("urls") or {}, "src": m.get("src") or {}, "have": m.get("have") or {},
-           "none": m.get("none") or [], "old": m.get("old") or {}, "dropped": m.get("dropped") or []}
+           "none": m.get("none") or [], "old": m.get("old") or {}, "dropped": m.get("dropped") or [], "was": m.get("was")}
     if m.get("id") and m.get("id") != made:
         out["old"] = {c: sorted(v for v, names in vs.items() if names) for c, vs in out["have"].items()}
         out["none"] = []  # (what gave nothing may give something now)
+        out["was"] = m["id"]
     return out
+
+
+def _since(m: dict) -> int | None:
+    """The renderer version the old videos came from when only it changed (same game version), else None."""
+    was, now = (re.match(r"(.+)_v(\d+)$", x or "") for x in (m.get("was"), m.get("id")))
+    return int(was.group(2)) if was and now and was.group(1) == now.group(1) else None
+
+
+def _changed(svc, cid, since: int | None) -> bool:
+    """Whether a new renderer draws cid differently (else its old videos stay)."""
+    if since is None:
+        return True
+    try:
+        from .viewer import render_changed
+        return render_changed(svc, cid, since)
+    except Exception:
+        return True
 
 
 def _take(ex, m: dict, cid: int, v: str) -> int:
@@ -219,11 +237,21 @@ def render_all(svc, base_url: str, progress=None) -> dict:
             if (not (m["have"].get(str(cid)) or {}).get(v) or v in m["old"].get(str(cid), [])) and f"{cid}:{v}" not in m["none"]:
                 todo.append((cid, v))
     made = failed = 0
+    since, same = _since(m), {}
     for i, (cid, v) in enumerate(todo):
         if _stop.is_set():
             break
         label = f"{cid}{' with buffs' if v else ''}"
         progress("site: rendering skills", i, len(todo), label)
+        if v in m["old"].get(str(cid), []) and (m["have"].get(str(cid)) or {}).get(v):
+            if cid not in same:
+                same[cid] = not _changed(svc, cid, since)
+            if same[cid]:  # (the new renderer draws it as before: its videos stay)
+                m["old"][str(cid)] = [x for x in m["old"][str(cid)] if x != v]
+                if not m["old"][str(cid)]:
+                    del m["old"][str(cid)]
+                ex.write_manifest("fx", m)
+                continue
         if not svc.fx.status(cid, v)["videos"]:
             svc.fx.start(cid, None, v)
             time.sleep(0.5)
