@@ -113,6 +113,19 @@ def job_time(mem: int) -> float:
     return 1 + max(0, mem - (300 << 20)) / 1.6 / (20 << 20)
 
 
+def _kill(pool) -> None:
+    """Stops a pool now, running bundles too (shutdown() would wait for them)."""
+    for p in list((getattr(pool, "_processes", None) or {}).values()):
+        try:
+            p.terminate()
+        except Exception:
+            pass
+    pool.shutdown(wait=False, cancel_futures=True)
+
+
+STALL_MIN, STALL_X = 20 * 60, 25  # a bundle is given up after max(20 min, 25x its expected time)
+
+
 class Snapshotter:
     def __init__(self, store: Store, game: GamePaths, ignore: list[str] | None = None,
                  workers: int | None = None, thumbs: bool = True, progress=None, light: bool = False):
@@ -250,9 +263,10 @@ class Snapshotter:
         total_bytes = sum(j[3] for j in jobs) or 1
         total_time = sum(job_time(j[4]) for j in jobs) or 1
         done_bytes = done_time = 0
-        errors, failed, retried = {}, [], set()
+        errors, failed, retried, stalled, stopped = {}, [], set(), set(), set()
         sizes_of = {j[0]: j[4] for j in jobs}
-        started = time.time()
+        started = last_done = time.time()
+        read_secs = read_shares = 0.0
         self.progress("bundles", 0, len(jobs), f"{len(jobs)} bundles to index")
         if jobs:
             # memory budget: a new bundle starts only while running ones fit in half the free memory; heavy ones in
@@ -274,37 +288,58 @@ class Snapshotter:
                         job = pending.pop(k)
                         kind = "heavy" if job[4] >= heavy_at else "light"
                         running[pools[kind].submit(_index_job, (job[1], self.store.root, self.thumbs))] = \
-                            (job, kind, pools[kind])
+                            (job, kind, pools[kind], time.time())
                         used += job[4]
-                    done, _ = wait(running, return_when=FIRST_COMPLETED)
+                    done, _ = wait(running, timeout=2, return_when=FIRST_COMPLETED)
+                    if self.cancelled:
+                        raise InterruptedError
+                    now = time.time()
+                    if not done and now - last_done >= 30:
+                        # long reads: say which bundle and for how long instead of an old time-left guess
+                        job, _k, pool, t0 = min(running.values(), key=lambda r: r[3])
+                        self.progress("bundles", i, len(jobs), f"reading {job[0]} ({job[3] >> 20} MB file) for "
+                                      f"{int(now - t0) // 60} min", eta=-1)
+                        per_share = read_secs / read_shares if read_shares else 1.0
+                        for job, kind, pool, t0 in list(running.values()):
+                            if now - t0 > max(STALL_MIN, STALL_X * per_share * job_time(job[4])):
+                                stalled.add(job[0])
+                                stopped.add(pool)
+                                _kill(pool)
+                                if pools[kind] is pool:
+                                    pools[kind] = ProcessPoolExecutor(sizes[kind], max_tasks_per_child=8,
+                                                                      initializer=_worker_start)
                     for fut in done:
-                        job, kind, pool = running.pop(fut)
+                        job, kind, pool, t0 = running.pop(fut)
                         logical, path, rel, size, mem = job
                         used -= mem
-                        if self.cancelled:
-                            for f in running:
-                                f.cancel()
-                            raise InterruptedError
+                        last_done = now
                         try:
                             res = fut.result()
                         except BrokenProcessPool:
-                            # a worker died (likely OOM): new pool, its bundles retried once alone, then left for the
-                            # next snapshot
+                            # a worker died (likely OOM) or a stuck one was stopped: new pool; its bundles retried
+                            # once alone, then left for the next snapshot
                             if pools[kind] is pool:
                                 pool.shutdown(wait=False, cancel_futures=True)
                                 pools[kind] = ProcessPoolExecutor(sizes[kind], max_tasks_per_child=8,
                                                                   initializer=_worker_start)
-                            if logical not in retried:
+                            if pool in stopped and logical not in stalled:  # only stopped along with a stuck one
+                                pending.insert(0, job)
+                                continue
+                            if logical not in retried and logical not in stalled:
                                 retried.add(logical)
                                 pending.insert(0, (logical, path, rel, size, budget + 1))
                                 continue
-                            errors[logical] = ["not read: the reading process stopped (out of memory?)"]
+                            errors[logical] = ["not read: it took too long, tried again next snapshot"
+                                               if logical in stalled else
+                                               "not read: the reading process stopped (out of memory?)"]
                             failed.append(logical)
                             res = None
                         if res is not None:
                             if res["errors"]:
                                 errors[logical] = res["errors"][:20]
                             self.store.write_json(rel, res)
+                            read_secs += res.get("secs") or 0
+                            read_shares += job_time(mem)
                         done_bytes += size
                         done_time += job_time(sizes_of[logical])
                         i += 1
@@ -315,7 +350,10 @@ class Snapshotter:
                                       eta=eta)
             finally:
                 for p in pools.values():
-                    p.shutdown(wait=True, cancel_futures=True)
+                    if running:  # cancelled or failed: don't wait for the bundles still being read
+                        _kill(p)
+                    else:
+                        p.shutdown(wait=True, cancel_futures=True)
         for logical in missing + failed:
             bundles[logical].pop("index", None)
 

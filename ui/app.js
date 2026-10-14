@@ -403,7 +403,7 @@ function jobBlock() {
   if (!j) return "";
   if (j.running) {
     const snap = j.kind === "snapshot";
-    const left = j.eta == null ? (snap && j.stage === "bundles" ? " · working out the time left…" : "") : j.eta < 60 ? " · less than a minute left" : ` · about ${Math.round(j.eta / 60)} min left`;
+    const left = j.eta == null ? (snap && j.stage === "bundles" ? " · working out the time left…" : "") : j.eta < 0 ? "" : j.eta < 60 ? " · less than a minute left" : ` · about ${Math.round(j.eta / 60)} min left`;
     return `<div class="card"><b>${esc(j.kind)}</b> — ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}${left}<div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div><div class="small muted mono">${esc(j.msg || "")}</div>${snap ? `<div class="small muted">You can cancel and take the snapshot later: what is already read is kept, it goes on from there.</div>` : ""}<button class="danger" onclick="api('/api/cancel',{})">Cancel</button></div>`;
   }
   if (j.error) return `<div class="card"><span class="badge removed">failed</span> ${esc(j.kind)}: ${esc(j.error)}</div>`;
