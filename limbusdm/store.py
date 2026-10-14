@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import tempfile
 
 THUMB_MAX = 384
@@ -22,6 +23,8 @@ class Store:
             os.makedirs(os.path.join(root, sub), exist_ok=True)
 
     def path(self, kind: str, key: str, ext: str) -> str:
+        if not re.fullmatch(r"[0-9a-f]{2,64}", key or ""):
+            key = "--"
         return os.path.join(self.root, kind, key[:2], key + ext)
 
     @staticmethod

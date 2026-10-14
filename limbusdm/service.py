@@ -1371,9 +1371,11 @@ class Service:
         g = self.game
         root, _, rest = rel.partition("/")
         base = {"install": g.game, "locallow": g.locallow}.get(root)
-        if not base or not rest or ".." in rest.split("/"):
+        if not base or not rest or ":" in rest or ".." in rest.replace("\\", "/").split("/"):
             return None
-        p = os.path.join(base, *rest.split("/"))
+        p = os.path.normpath(os.path.join(base, *rest.split("/")))
+        if os.path.commonpath([os.path.normcase(p), os.path.normcase(os.path.normpath(base))]) != os.path.normcase(os.path.normpath(base)):
+            return None
         return p if os.path.isfile(p) else None
 
     def tree(self, prefix: str, sid: str | None = None):
