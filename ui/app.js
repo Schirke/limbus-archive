@@ -1217,7 +1217,7 @@ function fxLabel(name, slots = anim.slots) {
 // render options (limbusdm/viewer.py FLAGS); each set is rendered and kept separately
 const FX_OPTS = [["alpha", "Transparent", "transparent"], ["static", "Static camera", "static camera"], ["16bit", "16-bit", "16-bit"], ["tails", "Tails", "tails"],
   ["novoice", "No voice", "no voice"], ["nobg", "No background", "no background", "ego"], ["subs", "Subtitles", "subtitles", "ego"],
-  ["nobloom", "No Bloom", "no bloom"], ["buffs", "Buffs", "with buffs", "own"]];
+  ["nobloom", "No Bloom", "no bloom"], ["buffs", "Buffs", "with buffs", "own"], ["targets", "Targets", "with targets", "ego"]];
 // options only E.G.O cut-ins use
 const fxOwn = (id) => anim.fxBuffs?.[id]?.own || [];
 const fxOptFor = (c) => FX_OPTS.filter((o) => !o[3] || (o[3] === "own" ? fxOwn(c.id).length : /^2\d{4}$/.test(String(c.id))));
