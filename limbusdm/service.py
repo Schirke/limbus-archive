@@ -854,6 +854,20 @@ class Service:
         ds = u.get("defense") or []
         for i, s in enumerate(ds if isinstance(ds, list) else [ds], 1):
             out[s["id"] - cid * 100] = {"slot": "Defense" + (f" {i}" if len(ds) > 1 else ""), "name": name(s)}
+        # joint skills with another Identity (videos "…_S<n>_<its id>"): "with" = {its id: its name}
+        import re
+        browse = self.ensure_browse()
+        if not browse:
+            return out
+        db = sqlite3.connect(browse)
+        try:
+            rows = db.execute("select distinct bundle from o where bundle like ?", (f"p{cid}_additionaltimeline%characterfollowtimeline%",)).fetchall()
+        finally:
+            db.close()
+        names = {x["id"]: f"{x.get('title', '')} {x.get('sinnerName', '')}".strip() for x in self.unit_db().get("ids", [])}
+        joint = {m.group(1): names.get(int(m.group(1)), m.group(1)) for (b,) in rows if (m := re.search(rf"_{cid}_(\d+)$", b))}
+        if joint:
+            out["with"] = joint
         return out
 
     # ------------------------------------------------------------ Identity / E.G.O database, the user's team

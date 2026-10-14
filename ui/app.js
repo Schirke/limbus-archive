@@ -1204,8 +1204,10 @@ function fxLabel(name, slots = anim.slots) {
   const view = /^SkillViewEGO_\d{5}(\d)(\d)$/.exec(name);
   if (view) return view[1] === "1" ? "E.G.O" : view[1] === "2" ? "E.G.O · Corrosion" : `E.G.O · ${view[1]}${view[2]}`;
   const sk = (n) => (slots && slots[n] ? slots[n].slot : `Skill ${n}`);
-  const whole = /_S(\d+)$/.exec(name);
-  if (whole) return sk(whole[1]) + (slots && slots[whole[1]] && slots[whole[1]].name ? ` · ${slots[whole[1]].name}` : "");
+  // (a joint skill: "…_S<n>_<the other Identity's id>")
+  const whole = /(?:^|_)S(\d+)(?:_(\d{5}))?$/.exec(name);
+  const mate = whole && whole[2] ? ` · with ${slots?.with?.[whole[2]] || whole[2]}` : "";
+  if (whole) return sk(whole[1]) + (slots && slots[whole[1]] && slots[whole[1]].name ? ` · ${slots[whole[1]].name}` : "") + mate;
   const m = /_(?:S(\d+)_)?(Parrying_Lose|Parrying|Duel_?Win|Guard_?Win|Retreat|Special)?_?Time?line[ _]?(.*)$/i.exec(name);
   if (!m) return name.replace(/_/g, " ");
   const kind = { parrying_lose: "Clash lost", parrying: "Clash", duel_win: "Clash won", duelwin: "Clash won", guard_win: "Guard won",
@@ -1276,7 +1278,7 @@ async function openFx(c, body) {
   if (buffs && anim.fxLevel && anim.fxLevel >= levels.length) { anim.fxLevel = 0; return openFx(c, body); }
   const buffNote = (n) => buffs?.notes?.[n] || buffs?.notes?.[n.replace(/_\d+$/, "")] || "";
   const running = st.state === "running";
-  const key = (n) => { if (n.startsWith("SkillViewEGO_")) return [-1, 0, n]; const m = /_S(\d+)(?:_Time?line[ _]?(.*))?$/.exec(n); return m ? [0, slotOrder(+m[1]), m[2] || ""] : [1, 0, n]; };
+  const key = (n) => { if (n.startsWith("SkillViewEGO_")) return [-1, 0, n]; const m = /(?:^|_)S(\d+)(?:_(\d{5})|_Time?line[ _]?(.*))?$/.exec(n); return m ? [0, slotOrder(+m[1]), m[2] || m[3] || ""] : [1, 0, n]; };
   const vids = [...st.videos].sort((a, b) => { const x = key(a), y = key(b); return x[0] - y[0] || x[1] - y[1] || String(x[2]).localeCompare(String(y[2]), undefined, { numeric: true }); });
   const note = running ? `${st.done.length} / ${st.total || "?"} done · ${esc(st.msg || "")}`
     : st.state === "error" ? `<span class="bad">${esc(st.msg)}</span>`
@@ -2954,7 +2956,7 @@ function vsDrawStage() {
     if (!s || s.id !== vs[k]) return `<span class="muted small">…</span>`;
     if (s.err) return `<span class="bad small">${esc(s.err)}</span>`;
     const rand = clash && vs[rk];
-    const main = s.list.filter((n) => /_S\d+$|^SkillViewEGO_/i.test(n)), more = s.list.filter((n) => !main.includes(n));
+    const main = s.list.filter((n) => /(?:^|_)S\d+$|^SkillViewEGO_/i.test(n)), more = s.list.filter((n) => !main.includes(n));
     return (clash ? `<button class="toggle ${rand ? "on" : ""}" data-srand="${k}" title="Its last skill: a random one of its own">Random</button>` : "")
       + main.map((n) => `<button class="toggle ${!rand && n === vs[key] ? "on" : ""}" data-skill="${k}" data-n="${esc(n)}" title="${esc(n)}">${esc(fxLabel(n, s.slots))}</button>`).join("")
       + (more.length ? `<select class="vsmoresk ${!rand && more.includes(vs[key]) ? "on" : ""}" data-skillsel="${k}" title="Its other timelines"><option value="">${more.length} more…</option>${more.map((n) =>

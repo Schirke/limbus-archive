@@ -185,7 +185,7 @@ def skill_plan(svc, cid, groups: list[dict], own: list[dict]) -> list[dict]:
     ids = {x["id"] for x in own}
     gives: dict[str, dict] = {}  # group → {buff id: hit}
     for g in groups:
-        m = re.search(r"_S(\d+)", g["name"])
+        m = re.search(r"(?:^|_)S(\d+)", g["name"])
         row = skills.get(cid * 100 + int(m.group(1))) if m and skills else None
         if not row or not row.get("skillData"):
             continue
