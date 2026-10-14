@@ -3,6 +3,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 const MOST = 8, ROOM_KEEP = 12 * 3600e3;
+const RATE_MS = 10e3, RATE_MOST = 80, RATE = new WeakMap();
 const what = (state) => [state.kind, state.game, state.mode].filter(Boolean).join(" ").slice(0, 40);
 
 export class Room extends DurableObject {
@@ -61,6 +62,10 @@ export class Room extends DurableObject {
     try { m = JSON.parse(text); } catch { return; }
     const me = ws.deserializeAttachment();
     if (!me || !me.id || typeof text !== "string" || text.length > 8000) return;
+    const now = Date.now(), r = RATE.get(ws) || { at: now, n: 0 };
+    if (now - r.at > RATE_MS) { r.at = now; r.n = 0; }
+    RATE.set(ws, r);
+    if (++r.n > RATE_MOST) { try { ws.close(1008, "too fast"); } catch {} return; }
     if (m.t === "ping") return ws.send(JSON.stringify({ t: "pong", now: Date.now() }));
     if (m.t === "set") {
       const state = (await this.ctx.storage.get("state")) || {};

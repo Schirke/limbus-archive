@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -114,10 +115,6 @@ def worker_config(svc) -> str:
            "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "Room"}, {"name": "STATS", "class_name": "Stats"}]},
            "migrations": [{"tag": "v1", "new_sqlite_classes": ["Room"]}, {"tag": "v2", "new_sqlite_classes": ["Stats"]}]}
     cfg["vars"] = {}
-    if config(svc).get("stats_key"):  # the Site stats page answers only who has the key (else: everybody)
-        cfg["vars"]["STATS_KEY"] = config(svc)["stats_key"]
-    if config(svc).get("owner_key"):  # Site stats shows the allowance's spending only to who has this key
-        cfg["vars"]["OWNER_KEY"] = config(svc)["owner_key"]
     if isinstance(config(svc).get("budget"), dict):  # what a period of the Cloudflare plan may spend (worker.js)
         cfg["vars"]["BUDGET"] = json.dumps(config(svc)["budget"])
     if config(svc)["url"]:  # the site's own address: its old one (*.workers.dev) and www. move there (worker.js moved)
@@ -1172,8 +1169,8 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
   if (location.hash.startsWith("#move=")) {{
     let m = {{}};
     try {{ m = JSON.parse(decodeURIComponent(location.hash.slice(6))); }} catch (e) {{ /* the page as it is */ }}
-    history.replaceState(null, "", location.pathname + location.search + (m.h || ""));
-    try {{ for (const [k, v] of Object.entries(m.d || {{}})) if (localStorage.getItem(k) === null) localStorage.setItem(k, v); }} catch (e) {{ /* not kept */ }}
+    history.replaceState(null, "", location.pathname + location.search + (/^#/.test(m.h || "") ? m.h : ""));
+    try {{ for (const [k, v] of Object.entries(m.d || {{}})) if (typeof v === "string" && !/^(games_live_host|statskey|lang_fonts|beta.*)$/.test(k) && localStorage.getItem(k) === null) localStorage.setItem(k, v); }} catch (e) {{ /* not kept */ }}
     try {{
       const c = await caches.open("own");
       if (m.own && !(await c.match("/api/myteam"))) await c.put("/api/myteam", new Response(m.own, {{ headers: {{ "Content-Type": "application/json; charset=utf-8" }} }}));
@@ -1884,6 +1881,7 @@ def deploy(svc, progress=None) -> str:
             if m:
                 url = m.group(0)
         if p.wait() == 0:
+            _put_keys(svc, npx, conf)
             return url
         if any("EBUSY" in t for t in tail):  # npx could not update wrangler: its files are held by one that is running
             raise RuntimeError("upload failed: another wrangler is running on this computer (a local preview, "
@@ -1895,6 +1893,25 @@ def deploy(svc, progress=None) -> str:
             progress("site: uploading", 0, 0, f"Cloudflare didn't answer — trying again ({attempt + 1} of {DEPLOY_TRIES})")
         time.sleep(30 * attempt)
     return url
+
+
+def _put_keys(svc, npx: str, conf: str) -> None:
+    keys = {name: config(svc)[k] for k, name in (("stats_key", "STATS_KEY"), ("owner_key", "OWNER_KEY")) if config(svc).get(k)}
+    if not keys:
+        return
+    fd, path = tempfile.mkstemp(suffix=".json", dir=os.path.dirname(conf))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(keys, f)
+        subprocess.run([npx, "--yes", "wrangler@4", "secret", "bulk", path, "-c", conf], cwd=os.path.dirname(conf),
+                       stdin=subprocess.DEVNULL, capture_output=True, timeout=300, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError):
+        pass
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
 
 
 DEPLOY_TRIES = 4
@@ -2262,6 +2279,8 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
     with open(os.path.join(dst, "d", "index.json"), "w", encoding="utf-8") as f:
         json.dump(ix, f, ensure_ascii=False)
     with open(os.path.join(dst, "_headers"), "w", encoding="utf-8") as f:
+        f.write("/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: SAMEORIGIN\n  Content-Security-Policy: frame-ancestors 'self'\n"
+                "  Referrer-Policy: strict-origin-when-cross-origin\n")
         f.write("".join(f"/d/{sub}/*\n  Cache-Control: public, max-age=31536000, immutable\n" for sub in ("p", "f", "k")))
     keep_k = {n for n in shards["f"] if n} | {shards["files"]}
     for sub, keep in (("p", packs), ("k", keep_k), ("m", set(os.listdir(os.path.join(src, "d", "m")))), ("tr", set(os.listdir(os.path.join(src, "d", "tr"))))):
