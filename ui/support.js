@@ -28,7 +28,8 @@ async function supTranslators() {
   box.innerHTML = list.map((l) => `<div class="suptrow"><span class="lg">${esc(l.label)}</span>
     <span class="nm"><b>${mark(l) === "human" ? `<span class="langstar">★</span> ` : ""}${esc(l.name)}</b>${mark(l) === "human" ? `<span class="langhuman" title="Translated by people, without AI tools">Made without AI</span>`
       : mark(l) === "edited" ? `<span class="langhuman ed" title="A machine translation checked and corrected by people">AI, edited by hand</span>` : ""}</span>
-    ${l.link ? `<a class="small" href="${esc(l.link)}" target="_blank" rel="noopener">their page ↗</a>` : "<span></span>"}
+    <span class="lk">${l.link ? `<a class="small" href="${esc(l.link)}" target="_blank" rel="noopener">their page ↗</a>` : ""}${(l.license || {}).url
+      ? `<a class="small" href="${esc(l.license.url)}" target="_blank" rel="noopener">${esc(l.license.name || "License")} ↗</a>` : ""}</span>
     <span class="by">${(l.authors || []).map(esc).join(", ")}</span></div>`).join("");
 }
 routes.support = () => {

@@ -760,6 +760,7 @@ button.gihint { cursor: pointer; } button.gihint:hover { border-color: var(--gol
 .suptrow { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; padding: 9px 12px; background: var(--panel); border: 1px solid var(--line); }
 .suptrow .lg { color: var(--gold); font: 15px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .05em; }
 .suptrow .nm { color: #fff; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.suptrow .lk { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 2px 10px; }
 .suptrow .by { grid-column: 2 / -1; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 @media (max-width: 760px) { .suptwo { grid-template-columns: minmax(0, 1fr); gap: 14px; } .suptrow { grid-template-columns: minmax(0, 1fr) auto; } .suptrow .lg, .suptrow .by { grid-column: 1 / -1; } }
 .supway p { margin: 0 0 8px; line-height: 1.5; color: #cfc6bd; }
