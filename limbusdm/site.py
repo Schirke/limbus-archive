@@ -1473,7 +1473,9 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             return ""
 
     def index(self):
-        names = sorted(fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "m")) if fn.endswith(".json.gz"))
+        # (later manifests win: "extra" first, so an old auto-fetched answer never covers a part's own)
+        names = sorted((fn[:-8] for fn in os.listdir(os.path.join(self.out, "d", "m")) if fn.endswith(".json.gz")),
+                       key=lambda n: (n != "extra", n))
         ms = {n: self.read_manifest(n) for n in names}
         reports = sorted((m["meta"] for m in ms.values() if m.get("kind") == "report" and m.get("meta")),
                          key=lambda r: r["id"], reverse=True)
