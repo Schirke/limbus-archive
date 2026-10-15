@@ -37,7 +37,7 @@ CARD_PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{full}</title>
 {head}
-<script>location.replace({to})</script>
+<script>if(!/bot|crawl|spider|slurp|lighthouse/i.test(navigator.userAgent))location.replace({to})</script>
 <style>body{{margin:0;background:#12100e;color:#e9e2d4;font:16px/1.55 system-ui,"Segoe UI",sans-serif}}main{{max-width:860px;margin:0 auto;padding:16px}}a{{color:#e8b33a}}</style>
 </head><body><main><h1>{title}</h1><p>{desc}</p>{body}<p><a href="/#/{route}">Open on Limbus Archive</a></p></main></body></html>
 """
@@ -1315,7 +1315,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         cards = self.card_pages(url)
         # search engines are kept out unless the site's settings say "index": true
         with open(os.path.join(self.out, "robots.txt"), "w") as f:
-            f.write(("User-agent: *\nAllow: /\n" + (f"Sitemap: {url}/sitemap.xml\n" if url else "")) if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
+            f.write(("User-agent: *\nAllow: /\nDisallow: /api/\n" +(f"Sitemap: {url}/sitemap.xml\n" if url else "")) if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
         # (the list of those pages, for a search engine to find them all)
         sitemap = os.path.join(self.out, "sitemap.xml")
         if self.cfg.get("index") and url:
