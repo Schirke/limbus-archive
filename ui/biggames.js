@@ -1,17 +1,18 @@
 // Big games: the larger games, shipped built (ui/big/*.js, loaded by refresh from STATE.big). Each stays hidden until the
 // owner turns it on for everyone (Admin → Pages, beta.json "games"); admins see them all the time.
 "use strict";
-const BIG = [];  // {key, route, tile, scored}
+const BIG = [];  // {key, route, tile, scored, need}
 const big = { on: new Set() };
 try { big.on = new Set(JSON.parse(localStorage.getItem("big_on") || "[]")); } catch (e) { /* none until beta.json is read */ }
 const bigAdmin = () => typeof STATE !== "undefined" && STATE && Array.isArray(STATE.ext) && STATE.ext.length > 0;
 const bigSeen = (k) => big.on.has(k) || bigAdmin();
 
-// called by a big game's script: its tile ([key, page, name, about, icon, toy]) and whether it has a Daily
-function bigGame(tile, scored) {
+// called by a big game's script: its tile ([key, page, name, about, icon, toy]), whether it has a Daily, and a function
+// that asks the app for everything the game can use
+function bigGame(tile, scored, need) {
   const key = tile[0], route = tile[1].split("/")[1];
   if (BIG.some((g) => g.key === key)) return;
-  BIG.push({ key, route, tile, scored });
+  BIG.push({ key, route, tile, scored, need });
   const play = routes[route];
   routes[route] = (args) => bigSeen(key) ? play(args) : (location.hash = "#/games");
   bigSync();
@@ -41,6 +42,15 @@ function bigSync() {
   if (nav) nav.hidden = !BIG.some((g) => bigSeen(g.key));
   const page = location.hash.split("/")[1] || "";
   if (changed && ((page === "games" && !location.hash.startsWith("#/games/")) || page === "biggames")) route();
+}
+
+// every request the big games make (Send to site runs this in a hidden window: site.py Exporter.biggames)
+async function bigNeeds() {
+  performance.setResourceTimingBufferSize(1e6);
+  performance.clearResourceTimings();
+  for (const g of BIG) if (g.need) try { await g.need(); } catch (e) { console.warn(g.key, e); }
+  const own = location.origin + "/api/";
+  return [...new Set(performance.getEntriesByType("resource").map((e) => e.name).filter((u) => u.startsWith(own)).map((u) => u.slice(location.origin.length)))];
 }
 
 routes.biggames = () => {

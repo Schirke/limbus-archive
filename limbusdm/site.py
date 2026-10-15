@@ -15,7 +15,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from html import escape as html_escape
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 from urllib.request import urlopen
 
 from .paths import resource_dir
@@ -317,6 +317,65 @@ def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
     except Exception:
         pass
     return data, ctype
+
+
+# the big games: their pages, and what of their requests the site keeps (the rest: other parts, or the app's own)
+BIG_OPEN = ["biggames", "singingmachine", "slice"]
+BIG_ASKS = {"/api/frames", "/api/frame_png", "/api/sounds", "/api/bank", "/api/stage_pic", "/api/asset_thumb", "/api/asset_img", "/api/enemy_thumb"}
+
+
+def _big_needs(base: str, progress=None) -> list[str]:
+    """Every request the big games make, from the app at `base`, run in a hidden window."""
+    from .sitecheck import _Tab, _free_port, find_browser
+    exe = find_browser()
+    if not exe:
+        raise RuntimeError("no Edge or Chrome to run the games in")
+    port, prof = _free_port(), tempfile.mkdtemp(prefix="limbus-big-")
+    proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
+                             "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-background-timer-throttling",
+                             "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", "about:blank"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    tab = None
+    try:
+        tabs = None
+        for _ in range(60):
+            try:
+                tabs = json.load(urlopen(f"http://127.0.0.1:{port}/json", timeout=2))
+                break
+            except Exception:
+                time.sleep(0.25)
+        if not tabs:
+            raise RuntimeError("the browser didn't start")
+        tab = _Tab(next(t for t in tabs if t["type"] == "page")["webSocketDebuggerUrl"])
+        tab.call("Page.enable")
+        tab.call("Page.navigate", url=base + "/#/biggames")
+        end = time.time() + 60
+        while tab.js("window.bigLoaded === true && typeof bigNeeds === 'function'") is not True:
+            if time.time() > end:
+                raise RuntimeError("the big games didn't load")
+            time.sleep(0.5)
+        # (long: every enemy's frames; asked for in the page, read back when done)
+        tab.js("window.__need = null; bigNeeds().then((l) => { window.__need = l; }, (e) => { window.__need = String(e); }); 0")
+        end, t0 = time.time() + 1800, time.time()
+        while True:
+            got = tab.js("window.__need")
+            if isinstance(got, list):
+                return got
+            if isinstance(got, str) or time.time() > end:
+                raise RuntimeError(f"the big games' data: {got or 'too slow'}")
+            if progress:
+                progress("site: Big games (what they use)", 0, 0, f"{int(time.time() - t0)} s")
+            time.sleep(1)
+    finally:
+        try:
+            tab and tab.call("Browser.close")
+        except Exception:
+            pass
+        try:
+            proc.wait(5)
+        except Exception:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
+        shutil.rmtree(prof, ignore_errors=True)
 
 
 def _grouped(got: dict, first: list[tuple[list, int]]) -> tuple[dict, list]:
@@ -857,6 +916,43 @@ class Exporter:
         self.write_manifest("announcers", m)
         return m
 
+    def biggames(self) -> dict:
+        """The big games (ui/big): what each asks the app for, found by running them in a hidden window (bigNeeds)."""
+        old = self.read_manifest("biggames")
+        sid = self.svc.latest_snapshot_id()
+        big = os.path.join(resource_dir(), "ui", "big")
+        names = sorted(fn for fn in os.listdir(big) if fn.endswith(".js")) if os.path.isdir(big) else []
+        if not names:
+            return old
+        h = hashlib.sha1()
+        for fn in names:
+            with open(os.path.join(big, fn), "rb") as f:
+                h.update(f.read())
+        made = f"{sid}|{h.hexdigest()[:12]}"
+        have = self.kept(old)
+        if old.get("made") == made and all(os.path.exists(os.path.join(self.out, "d", f)) for f in have.values()):
+            return old  # (same game data, same games: nothing new to ask)
+        try:
+            asked = _big_needs(self.base, self.progress)
+        except Exception as e:
+            self.failed.append(("big games", str(e)))
+            return old
+        keys = []
+        for u in asked:
+            path, _, qs = u.partition("?")
+            if path not in BIG_ASKS:
+                continue
+            q = dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))
+            keys.append(url_key(path, **q))
+        keys = list(dict.fromkeys(keys))
+        lists = [k for k in keys if k.split("?")[0] in ("/api/frames", "/api/sounds")]
+        got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in lists}, "site: Big games")
+        sounds = [k for k in keys if k.startswith("/api/bank")]
+        urls, groups = _grouped(got, [(lists, PACK), ([k for k in keys if k not in lists and k not in sounds], GAME_PACK), (sounds, VOICE_PACK)])
+        m = {"kind": "biggames", "id": sid, "made": made, "urls": urls, "groups": groups}
+        self.write_manifest("biggames", m)
+        return m
+
     def scenes(self) -> dict:
         """Guess the Canto: story backgrounds full size and their previews."""
         old = self.read_manifest("scenes")
@@ -1120,7 +1216,9 @@ class Exporter:
     def open_routes(self) -> list[str]:
         a = admin(self.svc)
         got = _read_json(os.path.join(self.out, "d", "check.json")).get("open") or BASE_OPEN
-        return [r for r in dict.fromkeys(got + a["on"]) if r not in a["off"]]
+        # (the big games: open once their data is sent; who sees them is beta.json "games")
+        big = BIG_OPEN if os.path.exists(self._manifest_path("biggames")) else []
+        return [r for r in dict.fromkeys(got + a["on"] + big) if r not in a["off"]]
 
     def pages(self):
         """Everything but the reports."""
@@ -1147,12 +1245,13 @@ class Exporter:
         if self.cfg["story"]:
             self.story()
             self.announcers()
+        self.biggames()
 
     # -- the site around the data
     def shell(self):
         """index.html, UI files, service worker, d/index.json."""
         ui = os.path.join(resource_dir(), "ui")
-        shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico", "fx", "big"))  # (big: the big games are app only for now)
+        shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico", "fx"))
         shutil.copyfile(os.path.join(ui, "site", "sw.js"), os.path.join(self.out, "sw.js"))
         with open(os.path.join(ui, "index.html"), encoding="utf-8") as f:
             html = f.read()
@@ -1256,7 +1355,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             open_.add("games/track")
         pages = {}
         for route in ["home"] + list(SECTIONS) + list(names):
-            if route in pages or route not in open_ or not (route in SECTIONS or names.get(route)):
+            if route in pages or route not in open_ or route in BIG_OPEN or not (route in SECTIONS or names.get(route)):  # (big games: shown only once turned on)
                 continue
             title, desc = SECTIONS.get(route) or (names[route], f"{names[route]}: a Limbus Company guessing game on Limbus Archive. "
                                                                  "Play alone or in a live match with friends.")
@@ -1482,7 +1581,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         # (with the ones a report taken from the site is between: pull)
         snaps = {**_read_json(os.path.join(self.out, "d", "snapshots.json")), **{s["id"]: s for s in self.svc.snapshots()}}
         used = [snaps[i] for i in sorted({r[k] for r in reports for k in ("old", "new")} & set(snaps))]
-        state = {"game": {"ok": True, "dir": "", "catalog": ""}, "snapshots": used, "reports": reports, "job": None,
+        state = {"game": {"ok": True, "dir": "", "catalog": ""}, "snapshots": used, "reports": reports, "job": None, "big": self.svc._big(),
                  "watch": {"state": "", "last_check": ""}, "settings": {}, "data_dir": "", "update": None,
                  "version": __import__("limbusdm").__version__, "site": True}
         # the app's release notes, shown to visitors with an older copy open; kept when not read
@@ -1529,7 +1628,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 PULL_STAGE = "site: taking from the site"
 # parts pull() takes from the site
-TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "announcers", "cards", "tools", "extra", "music")
+TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "announcers", "cards", "tools", "extra", "music", "biggames")
 PULL_THREADS, PULL_TRIES = 10, 3
 PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
 PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped from it
@@ -1599,6 +1698,8 @@ def _unchanged(a: dict, b: dict):
             return bundle(path.split("/")[2])
         if path == "/api/thumb":  # named by its content
             return True
+        if path == "/api/frame_png":
+            return bundle(q.get("bundle", ""))
         if path in ("/api/object", "/api/clip", "/api/spine_scene", "/api/scene_sprite"):
             return bundle(q.get("bundle", ""))
         if path in ("/api/asset_img", "/api/asset_thumb"):

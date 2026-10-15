@@ -20,6 +20,7 @@ routes.announcers = async (args = []) => {
   if (!nc.data.list.length) { main.innerHTML = `<h1>Announcers</h1><div class="empty">Take a snapshot first — the announcers are read from it.</div>`; return; }
   nc.id = +args[0] || nc.id || nc.data.list[0].id;
   ncStop();
+  if ($("#ncgrid")) return ncDraw();  // (another announcer: the list stays where it was scrolled)
   main.innerHTML = `<h1>Announcers</h1>
     <div class="sub">Every battle announcer of the game with all of its lines, sorted by what happens in the fight. Press a line to hear it.</div>
     <input type="search" id="ncq" class="dbq" placeholder="Search: an announcer or words of a line…" value="${esc(nc.q)}">
@@ -38,8 +39,10 @@ function ncDraw() {
   const q = nc.q.trim().toLowerCase();
   const list = nc.data.list.filter((a) => !q || ncHas(a.name, q) || a.lines.some((l) => ncHas(l[1], q)));
   if (list.length && !list.some((a) => a.id === nc.id)) nc.id = list[0].id;
+  const box = $("#ncgrid").parentElement, top = [box.scrollTop, $("#ncgrid").scrollTop];
   $("#ncgrid").innerHTML = list.map((a) => `<a class="entile ${a.id === nc.id ? "on" : ""}" href="#/announcers/${a.id}" title="${esc(a.name)}">
     ${a.img ? `<img src="${imgThumb(a.img)}" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(a.name)}</b></a>`).join("") || `<div class="muted">Nothing found.</div>`;
+  [box.scrollTop, $("#ncgrid").scrollTop] = top;
   const a = list.find((x) => x.id === nc.id);
   ncStop();
   if (!a) { $("#nccard").innerHTML = ""; return; }
