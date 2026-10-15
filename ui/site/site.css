@@ -19,6 +19,9 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site #subnav div:not([hidden]) { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
   body.site #subnav a { flex: none; }
   body.site #main { padding: 14px 12px 90px; }
+  body.site .hhero { margin: -14px -12px 0; }
+  body.site .hart { background-position: 50% 20%; }
+  body.site .hhero::before { background: linear-gradient(rgba(13, 10, 9, .62), rgba(13, 10, 9, .5) 45%, rgba(13, 10, 9, .85) 75%, var(--bg)); }
   body.site #hstack { margin: 0 4px; }
   body.site #timers, body.site #navlun { padding: 0 6px; }
   /* the five sections: a bar at the bottom that slides away while reading down */
