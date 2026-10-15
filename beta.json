@@ -5,7 +5,9 @@
   "compare",
   "vsmirror"
  ],
- "off": [],
+ "off": [
+  "lunatest"
+ ],
  "games": [
   "singingmachine",
   "slice"
