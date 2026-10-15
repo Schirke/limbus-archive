@@ -16,6 +16,13 @@ if (Test-Path "unity\LimbusViewer\Python") {
 } else {
   Write-Warning "unity\LimbusViewer\Python not found: renders and Versus will be off"
 }
+# The big games: built from the player's repo into ui\big (needs node)
+if (Test-Path "unity\LimbusViewer\Web\ship.py") {
+  uv run python unity\LimbusViewer\Web\ship.py ui
+  if ($LASTEXITCODE -ne 0) { throw "the big games failed to build" }
+} else {
+  Write-Warning "unity\LimbusViewer\Web not found: no big games"
+}
 try {
   uv run pyinstaller --noconfirm --clean --windowed --name LimbusArchive --icon ui/icon.ico `
     --distpath . --workpath build @hidden `

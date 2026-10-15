@@ -170,6 +170,12 @@ class Service:
         names = sorted(fn[:-3] for fn in os.listdir(d) if fn.endswith(".js")) if os.path.isdir(d) else []
         return sorted(names, key=lambda n: n != "ext")
 
+    @staticmethod
+    def _big() -> list[str]:
+        from .paths import resource_dir
+        d = os.path.join(resource_dir(), "ui", "big")
+        return sorted(fn[:-3] for fn in os.listdir(d) if fn.endswith(".js")) if os.path.isdir(d) else []
+
     def state(self):
         g = self.game
         return {
@@ -184,6 +190,7 @@ class Service:
             "update": (getattr(self, "_update", None) or (0, None))[1],
             "site_publish": os.path.exists(os.path.join(self.data_dir, "site_config.json")),  # the web copy is set up here
             "ext": self._ext(),  # the extensions in the data folder (their scripts)
+            "big": self._big(),  # the big games' built scripts (ui/biggames.js)
         }
 
     # ------------------------------------------------------------ jobs

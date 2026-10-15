@@ -1152,7 +1152,7 @@ class Exporter:
     def shell(self):
         """index.html, UI files, service worker, d/index.json."""
         ui = os.path.join(resource_dir(), "ui")
-        shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico", "fx"))
+        shutil.copytree(ui, os.path.join(self.out, "ui"), dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.ico", "fx", "big"))  # (big: the big games are app only for now)
         shutil.copyfile(os.path.join(ui, "site", "sw.js"), os.path.join(self.out, "sw.js"))
         with open(os.path.join(ui, "index.html"), encoding="utf-8") as f:
             html = f.read()

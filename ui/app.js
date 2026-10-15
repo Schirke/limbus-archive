@@ -241,10 +241,22 @@ async function refresh() {
     STATE = await api("/api/state");
   } catch (e) { return; }
   renderStatus();
+  const had = new Set(Object.keys(routes));
+  if (!window.bigLoaded) {  // the big games (ui/big, built: biggames.js); true once all are in
+    let left = (STATE.big || []).length;
+    window.bigLoaded = left ? "loading" : true;
+    for (const n of STATE.big || []) {
+      const s = document.createElement("script"); s.src = `/ui/big/${n}.js`; s.async = false; document.head.appendChild(s);
+      s.onload = s.onerror = () => {
+        if (!--left) window.bigLoaded = true;
+        const name = location.hash.split("/")[1]; if (routes[name] && (!had.has(name) || (!left && name === "biggames"))) route(); Object.keys(routes).forEach((k) => had.add(k));
+      };
+    }
+  }
   if (STATE.ext && !window.extLoaded) {  // optional extensions (the ext folder in the data folder, not part of the app's files)
     window.extLoaded = true;
-    const had = new Set(Object.keys(routes));
-    for (const n of Array.isArray(STATE.ext) ? STATE.ext : ["ext"]) {
+    // (an admin's own copy of a big game, from before it shipped, is left out)
+    for (const n of (Array.isArray(STATE.ext) ? STATE.ext : ["ext"]).filter((n) => !(STATE.big || []).includes(n.replace(/fx$/, "")))) {
       const s = document.createElement("script"); s.src = `/ext/${n}.js`; s.async = false; document.head.appendChild(s);
       // (drawn again only when the open page is one this script brought)
       s.onload = () => { const name = location.hash.split("/")[1]; if (routes[name] && !had.has(name)) route(); Object.keys(routes).forEach((k) => had.add(k)); };

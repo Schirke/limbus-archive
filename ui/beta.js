@@ -1,7 +1,7 @@
 // BETA marks: the pages the owner marks as beta (Admin → Pages), read from beta.json on GitHub; shown on their menu links
 // and next to the page's title, in the app and on the site. The same file's "off" = parts of pages switched off,
 // "human" = translations made by people without AI tools, "edited" = machine translations corrected by people (marks in
-// the language menu).
+// the language menu), "games" = the big games turned on for everyone (biggames.js).
 "use strict";
 const BETA_URL = "https://raw.githubusercontent.com/Schirke/limbus-archive/community-config/beta.json";
 const beta = { routes: new Set(), human: new Set(), edited: new Set(), raf: 0 };
@@ -45,7 +45,7 @@ function betaApply(list) {
 (() => {
   try { betaApply(JSON.parse(localStorage.getItem("beta") || "[]")); betaOff(JSON.parse(localStorage.getItem("beta_off") || "[]"));
     betaHuman(...JSON.parse(localStorage.getItem("beta_human") || "[[], []]")); } catch (e) { /* none until read */ }
-  fetch(BETA_URL, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { betaApply(j.routes); betaOff(j.off); betaHuman(j.human, j.edited); } }).catch(() => {});
+  fetch(BETA_URL, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { betaApply(j.routes); betaOff(j.off); betaHuman(j.human, j.edited); if (typeof bigOn === "function") bigOn(j.games); } }).catch(() => {});
   const main = document.querySelector("#main");
   if (main) new MutationObserver(() => {
     if (!beta.routes.size && !document.querySelector("#main h1 .betatag")) return;
