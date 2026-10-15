@@ -16,6 +16,7 @@ function bigGame(tile, scored, need) {
   const play = routes[route];
   routes[route] = (args) => bigSeen(key) ? play(args) : (location.hash = "#/games");
   bigSync();
+  if (typeof muGameCheck === "function") muGameCheck();
 }
 // the owner's list from beta.json
 function bigOn(list) {

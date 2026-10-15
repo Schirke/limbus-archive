@@ -135,3 +135,11 @@ async function muStart() {
   muTick();
 }
 muStart();
+// on a game's page the player steps aside: its button sat over the games' own controls
+function muGameCheck() {
+  const page = location.hash.split("/")[1] || "", big = typeof BIG !== "undefined" ? BIG.map((g) => g.route) : [];
+  const games = typeof GM_GAMES !== "undefined" ? GM_GAMES.map((g) => g[1].split("/")[1]).filter((r) => r !== "games") : [];
+  document.body.classList.toggle("ingame", page === "live" || location.hash.startsWith("#/games/") || games.includes(page) || big.includes(page));
+}
+addEventListener("hashchange", muGameCheck);
+addEventListener("load", muGameCheck);

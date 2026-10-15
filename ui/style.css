@@ -530,7 +530,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .ud .udhead button { border-radius: 0; }
 
 /* the corner music player (music.js) */
-#player { position: fixed; right: 18px; bottom: 18px; z-index: 45; width: 340px; font-size: 13px; }
+#player { position: fixed; right: 18px; bottom: 18px; z-index: 45; width: 340px; font-size: 13px; } body.ingame #player { display: none; }
 #mu-body { position: relative; background: #161315; border: 1px solid var(--line); border-top: 2px solid var(--gold); padding: 10px 13px 11px; box-shadow: 0 8px 30px #000a; }
 #mu-kind { font: 11px Consolas, "Cascadia Mono", monospace; letter-spacing: 2px; color: var(--gold); }
 #mu-name { display: block; margin: 3px 0 1px; font-size: 14px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1279,12 +1279,22 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 .glrow b { width: 18px; color: var(--muted); font-weight: normal; } .glrow .toggle { padding: 2px 8px; font-size: 12px; }
 .glres { max-width: 560px; margin: 14px 0 4px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); } .glres .gmkick { margin-bottom: 9px; }
 .glres .glrow.win span { color: var(--gold); font: 20px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; }
-#glpanel { position: fixed; right: 18px; top: 150px; z-index: 44; width: 250px; padding: 12px; background: rgba(27,23,25,.96); border: 1px solid var(--line); border-top: 2px solid var(--gold); } body:has(#glpanel) #main { padding-right: 296px; }
+#glpanel { position: fixed; right: 18px; top: 150px; z-index: 44; width: 250px; padding: 12px; background: rgba(27,23,25,.96); border: 1px solid var(--line); border-top: 2px solid var(--gold); }
+@media (min-width: 901px) { body:has(#glpanel) #main { padding-right: 296px; } }
 #glpanel .glhead { margin-bottom: 9px; font: 12px Consolas, monospace; letter-spacing: 2px; color: var(--gold); } #glpanel .glrow { padding: 6px 9px; background: var(--panel2); }
 .gltime { height: 4px; margin-bottom: 7px; background: var(--line); } .gltime i { display: block; height: 100%; width: 100%; background: var(--gold); }
 .glsaid { min-height: 32px; margin-bottom: 8px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 /* (rounds in step: the room moves everybody on, not the player) */
 body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #gmquit, body.glfirst #giquit, body.glfirst #gpquit { display: none; }
+/* (phones: the others in one strip over the top bar, the game keeps the whole width) */
+@media (max-width: 900px) {
+  #glpanel { left: 0; right: 0; top: 0; width: auto; z-index: 1000; display: flex; align-items: center; gap: 6px; padding: 6px 8px; overflow-x: auto; border: 0; border-bottom: 2px solid var(--gold); background: rgba(18,15,16,.97); }
+  #glpanel .glhead { flex: none; margin: 0; font-size: 0; letter-spacing: 0; } #glpanel .glhead svg { width: 18px; height: 18px; }
+  #glpanel .glrow { flex: none; align-items: baseline; gap: 6px; margin: 0; padding: 4px 8px; white-space: nowrap; }
+  #glpanel .glrow span { flex: none; max-width: 96px; } #glpanel .glrow i { min-width: 0; }
+  #glpanel .gltime { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; margin: 0; }
+  #glpanel .glsaid { flex: 1 0 120px; min-height: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 
 /* Sprite workshop (ui/sprites.js): a frames zip as one sheet; --sph = the tiles' height */
 .sph { margin: 16px 0 6px; } .sph button { margin-left: 8px; vertical-align: middle; }
