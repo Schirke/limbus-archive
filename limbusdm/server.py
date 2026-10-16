@@ -505,7 +505,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json(voices(svc))
             if p == "/api/announcers":  # Announcers page (limbusdm/announcers.py)
                 from . import announcers
-                return self._json(announcers.get(svc))
+                return self._json(_announcer_links(announcers.get(svc)))
             if p == "/api/abno_logs":  # Abnormality logs page (limbusdm/abnologs.py)
                 from . import abnologs
                 return self._json(abnologs.get(svc))
@@ -653,8 +653,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     m = _re.match(r"E[pP](\d+)(?:_[123])?/[^/]+$", (r["c"] or "")[len(base):]) if (r["c"] or "").startswith(base) else None
                     if m:
                         story.setdefault(m.group(1), []).append(r["c"][len(base):])
+                # (a background: its Canto, small and full-size picture, by path)
+                scenes = sorted((rel, int(n)) for n, rels in story.items() for rel in set(rels))
                 return self._json({"track": sorted(r["c"] for r in svc.browse_query("bgmCover", "Sprite", 500) if "/bgmCover_" in (r["c"] or "")),
-                                   "story": {k: sorted(set(v)) for k, v in story.items()}})
+                                   "scenes": [{"key": rel, "canto": n, "thumb": links.thumb(base + rel), "img": links.img(base + rel)} for rel, n in scenes]})
             if p == "/api/game_cards":  # the pictures on the cards of the Games page
                 return self._json(game_cards(svc, int(q.get("n", 12))))
             if p == "/api/sounds":  # Database → Sounds (limbusdm/soundlib.py): all folders, one folder's sounds, a search
@@ -733,12 +735,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     return self._json({"error": "no such line"}, 404)
                 return self._send(200, export_wav(*hit)[0], "audio/wav", {"Cache-Control": "max-age=86400"})
             if p == "/api/mirror":  # Tools → Mirror Dungeon planner: theme packs, their gifts, fusions
-                return self._json(svc.mirror_db())
+                return self._json(_mirror_links(svc.mirror_db()))
             if p == "/api/mirror/catalog":  # Versus → Mirror (limbusdm/versus_mirror2.py): gifts, packs, kits, rules
                 from . import versus_mirror2 as M2
                 return self._json(M2.page_catalog(svc))
             if p == "/api/history":  # Patches → Change history: what the kept reports changed in each card
-                return self._json({k: v for k, v in svc.history_db().items() if k != "stamp"})
+                return self._json(_history_links(svc, {k: v for k, v in svc.history_db().items() if k != "stamp"}))
             if p == "/api/gacha":  # Games → Extraction: the game's banners, pools, lines and sounds
                 from . import gacha
                 return self._json(gacha.build(svc))
@@ -1266,6 +1268,28 @@ def _skill_links(svc, s: dict | None, sid, pic: str):
     if pic and not svc.lookup_container(path) and not extra_file(path):
         path = pic
     return {**s, "iconUrl": links.thumb(path), "artUrl": links.img(path)}
+
+
+def _mirror_links(db: dict) -> dict:
+    """The planner's gifts and theme packs with their picture's link."""
+    return {**db, "gifts": {k: {**g, "tile": links.thumb(g.get("pic"))} for k, g in (db.get("gifts") or {}).items()},
+            "packs": [{**p, "tile": links.thumb(p.get("pic"))} for p in db.get("packs") or []]}
+
+
+def _history_links(svc, db: dict) -> dict:
+    """A card's picture (an enemy's drawn portrait once it is drawn) and a changed row's skill icon, as links."""
+    done = {fn[:-4] for fn in os.listdir(_thumb_dir(svc))} if os.path.isdir(_thumb_dir(svc)) else set()
+    card = lambda c: {**c, "tile": links.thumb(c["pic"]) if c.get("pic") else links.enemy_thumb(c["app"]) if c.get("app") and _safe(c["app"]) in done else ""}  # noqa: E731
+    row = lambda r: {**r, "iconUrl": links.thumb(r["icon"])} if r.get("icon") else r  # noqa: E731
+    return {**db, "cards": {k: card(c) for k, c in (db.get("cards") or {}).items()},
+            "patches": [{**p, "cards": {k: {**c, "groups": [{**g, "rows": [row(r) for r in g["rows"]]} for g in c["groups"]]} for k, c in p["cards"].items()}}
+                        for p in db.get("patches") or []]}
+
+
+def _announcer_links(db: dict) -> dict:
+    """Announcers with their picture links and each line's voice clip: [kind, text, bank, i, ms, clip]."""
+    return {**db, "list": [{**a, "tile": links.thumb(a.get("img")), "pics": [links.img(p) for p in a.get("imgs") or [a.get("img")] if p],
+                            "lines": [[*ln, links.bank(ln[2], ln[3]) if ln[2] else ""] for ln in a["lines"]]} for a in db.get("list") or []]}
 
 
 def _thumb_dir(svc) -> str:

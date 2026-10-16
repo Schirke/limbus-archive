@@ -41,7 +41,7 @@ function ncDraw() {
   if (list.length && !list.some((a) => a.id === nc.id)) nc.id = list[0].id;
   const box = $("#ncgrid").parentElement, top = [box.scrollTop, $("#ncgrid").scrollTop];
   $("#ncgrid").innerHTML = list.map((a) => `<a class="entile ${a.id === nc.id ? "on" : ""}" href="#/announcers/${a.id}" title="${esc(a.name)}">
-    ${a.img ? `<img src="${imgThumb(a.img)}" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(a.name)}</b></a>`).join("") || `<div class="muted">Nothing found.</div>`;
+    ${a.tile ? `<img src="${a.tile}" loading="lazy" onerror="this.remove()">` : ""}<b>${esc(a.name)}</b></a>`).join("") || `<div class="muted">Nothing found.</div>`;
   [box.scrollTop, $("#ncgrid").scrollTop] = top;
   const a = list.find((x) => x.id === nc.id);
   ncStop();
@@ -51,7 +51,7 @@ function ncDraw() {
   const groups = new Map();
   for (const x of lines) { if (!groups.has(x[0][0])) groups.set(x[0][0], []); groups.get(x[0][0]).push(x); }
   const sec = (ms) => ms ? `${(ms / 1000).toFixed(1)} s` : "";
-  $("#nccard").innerHTML = `<div class="nchead">${(a.imgs.length ? a.imgs : [a.img]).filter(Boolean).map((p) => `<img src="${imgFull(p)}" onerror="this.remove()">`).join("")}
+  $("#nccard").innerHTML = `<div class="nchead">${a.pics.map((p) => `<img src="${p}" onerror="this.remove()">`).join("")}
       <div><h2>${esc(a.name)}</h2><div class="muted small">${a.lines.length} lines${lines.length !== a.lines.length ? ` · ${lines.length} shown` : ""}</div></div></div>
     ${[...groups].map(([k, rows]) => `<div class="enh">${esc(nc.data.kinds[k] || "Other")}</div>${rows.map(([l, i]) =>
       `<div class="ncline ${l[2] ? "" : "mute"}" data-i="${i}"><i class="ncplay">${l[2] ? "▶" : ""}</i><span>${l[1] ? ncText(l[1]) : `<span class="muted">(no text)</span>`}</span><em>${sec(l[4])}</em></div>`).join("")}`).join("")}`;
@@ -63,7 +63,7 @@ function ncDraw() {
     nc.on = i;
     r.classList.add("on");
     if (typeof muAudio !== "undefined") muAudio.pause();
-    nc.audio.src = `/api/bank?path=${encodeURIComponent(l[2])}&i=${l[3]}`;
+    nc.audio.src = l[5];
     nc.audio.play().catch(() => ncStop());
   });
 }

@@ -105,8 +105,7 @@ async function gpOpen(page, daily) {
     const arts = ids.filter((x) => x.art).map((x) => ({ ...x, thumb: x.pic, pic: full(x.art) }));
     const egos = ((units || {}).egos || []).filter((e) => e.img && e.img.art).map((e) => ({ key: "g" + e.id, id: e.id, name: e.name + " " + e.sinnerName, title: e.name,
       sub: e.sinnerName, sinner: e.sinner, season: giSeason(units, e.season), thumb: e.img.thumb ? giThumb(e.img.thumb) : "", pic: full(e.img.art) }));
-    const scenes = Object.entries((pics || {}).story || {}).flatMap(([n, list]) => list.map((p) => ({ key: p, canto: +n, name: "Canto " + n, title: "Canto " + n, sub: "",
-      pic: `/api/asset_img?path=${encodeURIComponent("Assets/Resources_moved/Story/Backgrounds/" + p)}`, thumb: giThumb("Assets/Resources_moved/Story/Backgrounds/" + p) })));
+    const scenes = ((pics || {}).scenes || []).map((s) => ({ key: s.key, canto: s.canto, name: "Canto " + s.canto, title: "Canto " + s.canto, sub: "", pic: s.img, thumb: s.thumb }));
     gp.data = { enemies, ids, arts, egos, scenes, atlas: [], cantos: [...new Set(scenes.map((s) => s.canto))].sort((a, b) => a - b) };
   }
   if (page === "atlas" && !gp.data.atlas.length) {  // the Identities whose art moves: the first skeleton of each is the art itself

@@ -71,7 +71,7 @@ async function sxData() {
     for (const e of c.eps || []) if (e.parts?.[0]) rows.push({ g: "Story", t: e.title || `Episode ${e.n}`, s: `${c.label} · episode ${e.n}`, minor: 1,
       pic: e.parts[0][2] ? stImg(e.parts[0][2]) : "", go: `#/story/read/${encodeURIComponent(e.parts[0][0])}`, k: [e.title, c.label] });
   }
-  for (const a of sx.ann || []) rows.push({ g: "Announcers", t: a.name, s: `Announcer · ${a.lines.length} lines`, pic: a.img ? imgThumb(a.img) : "", go: `#/announcers/${a.id}`, k: [a.name, "announcer"] });
+  for (const a of sx.ann || []) rows.push({ g: "Announcers", t: a.name, s: `Announcer · ${a.lines.length} lines`, pic: a.tile, go: `#/announcers/${a.id}`, k: [a.name, "announcer"] });
   for (const g of GM_GAMES) rows.push({ g: "Games", t: g[2], s: g[3], icon: "🎲", go: g[1], k: [g[2], g[3], "game"] });
   for (const a of document.querySelectorAll("#nav a[href^='#/'], #subnav a[href^='#/']")) {
     const t = a.textContent.trim().replace(/\s+/g, " ");

@@ -706,7 +706,7 @@ class Exporter:
             got.update((k, level[k]) for k in todo if k in level)
             todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen]
             seen.update(todo)
-        urls, groups = _grouped(got, [([k for k in got if re.match(p, k)], size) for p, size in sec["packs"]])
+        urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in got if re.match(p, k)], size) for pat, size in sec["packs"]])
         m = {"kind": name, "id": self.svc.latest_snapshot_id(), "urls": urls, "groups": groups}
         self.write_manifest(name, m)
         return m
@@ -900,27 +900,6 @@ class Exporter:
         self.write_manifest("newgames", m)
         return m
 
-    def announcers(self) -> dict:
-        """Announcers page: the list, the pictures and every line's voice clip."""
-        old = self.read_manifest("announcers")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        lists = ["/api/announcers"]
-        try:
-            ann = json.loads(self._get("/api/announcers")[0]).get("list") or []
-        except Exception as e:
-            self.failed.append(("/api/announcers", str(e)))
-            ann = []
-        pics = [url_key("/api/asset_thumb", path=a["img"]) for a in ann if a.get("img")]
-        pics += [url_key("/api/asset_img", path=p) for a in ann for p in (a.get("imgs") or [a.get("img")]) if p]
-        clips = [url_key("/api/bank", path=b, i=i) for b, i in dict.fromkeys((ln[2], ln[3]) for a in ann for ln in a["lines"] if ln[2])]
-        # (the list is the app's own making: asked again every time)
-        got = self.fetch_all(lists + pics + clips, {k: f for k, f in have.items() if k not in lists}, "site: Announcers")
-        urls, groups = _grouped(got, [(lists, PACK), (pics, GAME_PACK), (clips, VOICE_PACK)])
-        m = {"kind": "announcers", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("announcers", m)
-        return m
-
     def abnologs(self) -> dict:
         """Abnormality logs page: the list, the pictures and each one's Spine look."""
         old = self.read_manifest("abnologs")
@@ -985,32 +964,6 @@ class Exporter:
         urls, groups = _grouped(got, [(lists, PACK), ([k for k in keys if k not in lists and k not in sounds], GAME_PACK), (sounds, VOICE_PACK)])
         m = {"kind": "biggames", "id": sid, "made": made, "urls": urls, "groups": groups}
         self.write_manifest("biggames", m)
-        return m
-
-    def scenes(self) -> dict:
-        """Guess the Canto: story backgrounds full size and their previews."""
-        old = self.read_manifest("scenes")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        try:
-            story = json.loads(self._get("/api/game_pics")[0]).get("story") or {}
-        except Exception as e:
-            self.failed.append(("/api/game_pics", str(e)))
-            story = {}
-        paths = sorted({"Assets/Resources_moved/Story/Backgrounds/" + p for ps in story.values() for p in ps})
-        full = [url_key("/api/asset_img", path=p) for p in paths]
-        thumbs = [url_key("/api/asset_thumb", path=p) for p in paths]
-        got = self.fetch_all(["/api/game_pics"] + full + thumbs, {k: f for k, f in have.items() if k != "/api/game_pics"},
-                             "site: Games (story backgrounds)")
-        # a background a pack, or nearly
-        urls, groups = _grouped(got, [(["/api/game_pics"], PACK), (full, SCENE_PACK), (thumbs, GAME_PACK)])
-        m = {"kind": "scenes", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("scenes", m)
-        # drop the old auto-fetched copy
-        extra = self.read_manifest("extra")
-        if "/api/game_pics" in extra.get("urls", {}):
-            del extra["urls"]["/api/game_pics"]
-            self.write_manifest("extra", extra)
         return m
 
     def gacha(self) -> dict:
@@ -1188,36 +1141,6 @@ class Exporter:
             self.write_manifest("extra", extra)
         return m
 
-    def tools(self) -> dict:
-        """Mirror planner and Change history: lists (asked every time) and the pictures they name."""
-        old = self.read_manifest("tools")
-        sid = self.svc.latest_snapshot_id()
-        lists = ["/api/mirror", "/api/history"]
-        have = self.kept(old, lists)
-        got = {}
-        for k in lists:
-            try:
-                got[k] = json.loads(self._get(k)[0])
-            except Exception as e:
-                self.failed.append((k, str(e)))
-                got[k] = {}
-        thumb = lambda p: url_key("/api/asset_thumb", path=p)  # noqa: E731
-        md, hist = got["/api/mirror"], got["/api/history"]
-        planner = [thumb(x["pic"]) for x in list((md.get("gifts") or {}).values()) + (md.get("packs") or []) if x.get("pic")]
-        drawn = os.path.join(self.svc.data_dir, "enemy_thumbs")
-        cards = []
-        for c in (hist.get("cards") or {}).values():
-            if c.get("pic"):
-                cards.append(thumb(c["pic"]))
-            elif c.get("app") and os.path.exists(os.path.join(drawn, c["app"] + ".png")):
-                cards.append(url_key("/api/enemy_thumb", app=c["app"]))
-        cards += [thumb(r["icon"]) for p in hist.get("patches") or [] for c in p["cards"].values() for g in c["groups"] for r in g["rows"] if r.get("icon")]
-        files = self.fetch_all(lists + planner + cards, have, "site: Tools (planner, change history)")
-        urls, groups = _grouped(files, [(["/api/mirror"] + planner, PACK), (["/api/history"] + cards, PACK)])
-        m = {"kind": "tools", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("tools", m)
-        return m
-
     def langs(self) -> dict:
         """Language tables and their list; a table is kept while its source is the same."""
         from . import langs
@@ -1266,13 +1189,13 @@ class Exporter:
         if self.cfg["games"]:
             self.quiz()
             self.cards()
-            self.scenes()
+            self.crawl("scenes")
             self.gacha()
             self.newgames()
         self.units()
         self.langs()
         self.small()
-        self.tools()
+        self.crawl("tools")
         self.buffs()
         if self.cfg["spine"]:  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
             from . import sitefx
@@ -1285,7 +1208,7 @@ class Exporter:
             self.music()
         if self.cfg["story"]:
             self.story()
-            self.announcers()
+            self.crawl("announcers")
             self.abnologs()
         self.biggames()
 
@@ -2214,6 +2137,14 @@ FRESH_FACES = 32  # the newest Identities' pictures (two per Identity) in a pack
 # sections made by following links (Exporter.crawl): the lists to start from, and packs by request (first match wins)
 CRAWL = {
     "enemies": {"stage": "Enemies", "start": ["/api/enemies"], "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]},
+    # the planner's gifts then theme packs with its list, the history with the rest
+    "tools": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
+              "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]},
+    # Guess the Canto picks a background at random: all of them, a small one with its full-size picture
+    "scenes": {"stage": "Games (story backgrounds)", "start": ["/api/game_pics"],
+               "packs": [(r"/api/game_pics$", PACK), (r"/api/asset_img\?", SCENE_PACK), (r"/api/asset_thumb\?", GAME_PACK)]},
+    "announcers": {"stage": "Announcers", "start": ["/api/announcers"],
+                   "packs": [(r"/api/announcers$", PACK), ((r"/api/asset_thumb\?", r"/api/asset_img\?"), GAME_PACK), (r"/api/bank\?", VOICE_PACK)]},
 }
 LINK = re.compile(r"/(api|spine)/")
 # what a first visit asks whatever page it opens, each kind in its own pack: a new visitor fetches these, not the big packs they'd sit in

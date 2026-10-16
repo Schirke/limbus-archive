@@ -19,6 +19,11 @@ def img(path: str) -> str:
     return f"/api/asset_img?path={_q(path)}" if path else ""
 
 
+def bank(path: str, i) -> str:
+    """One sound of a sound bank."""
+    return f"/api/bank?path={_q(path)}&i={i}" if path else ""
+
+
 def enemy_thumb(app: str) -> str:
     """The page's picture of an enemy's idle pose."""
     return f"/api/enemy_thumb?app={_q(app)}" if app else ""

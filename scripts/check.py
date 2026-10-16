@@ -218,7 +218,7 @@ def api_plan(g):
     art = (ident.get("img") or {}).get("art")
     plan = [
         "/api/appnotes", "/api/appnotes?all=1", "/api/types", "/api/marks", "/api/myteam", "/api/mirror", "/api/history",
-        "/api/gacha", "/api/game_pics", "/api/game_cards", "/api/music", "/api/sounds", "/api/sounds?q=yi%20sang",
+        "/api/gacha", "/api/game_pics", "/api/announcers", "/api/game_cards", "/api/music", "/api/sounds", "/api/sounds?q=yi%20sang",
         "/api/langs", "/api/ui_langs", "/api/ui_lang/status", "/api/ui_lang?lang=ru", "/api/site_status", "/api/sprites",
         "/api/mods_owned", "/api/battle_maps", "/api/bgm_tracks", "/api/stage_pics", "/api/fighter_pics",
         "/api/versus_list", "/api/versus_live", "/api/versus_team_rules", f"/api/versus_tags?ids={iid}",

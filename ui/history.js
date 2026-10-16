@@ -41,10 +41,10 @@ function hvDiff(a, b) {
   return out;
 }
 
-const hvPic = (c) => { const src = c.pic ? imgThumb(c.pic) : c.app ? `/api/enemy_thumb?app=${encodeURIComponent(c.app)}` : ""; return src ? `<img src="${src}" loading="lazy" onerror="this.style.visibility='hidden'">` : "<i></i>"; };
+const hvPic = (c) => c.tile ? `<img src="${c.tile}" loading="lazy" onerror="this.style.visibility='hidden'">` : "<i></i>";
 function hvRow(r) {
   if (!hv.tech && !r.nums.length && !r.texts.length && !r.new) return "";
-  const icon = r.icon ? imgThumb(r.icon) : "";
+  const icon = r.iconUrl || "";
   const nums = r.nums.map(([l, o, n]) => `<span>${esc(l)} ${o} → <b class="${n < o ? "dn" : "up"}">${n}</b></span>`).join("");
   const texts = r.texts.map(([w, o, n]) => `<div class="hvtxt"><em>${esc(w)}</em>${hv.view === "diff" || !o ? hvDiff(o, n) : `<div class="hvba"><div>${fmtDesc(o)}</div><div>${fmtDesc(n)}</div></div>`}</div>`).join("");
   const tech = hv.tech && r.tech.length ? `<div class="hvtech">${r.tech.map(([p, o, n]) => (o || n ? `${esc(p)}: <span>${esc(o)}</span> → <span>${esc(n)}</span>` : esc(p))).join("<br>")}</div>` : "";

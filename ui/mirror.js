@@ -9,8 +9,8 @@ const mpKwIco = (k) => { const atk = { Hit: "Blunt", Penetrate: "Pierce", Slash:
   return atk ? ico(`atk_${atk}`, "s22", mpKw(k), mpKw(k)) : ico(`st_${k}`, "s22", mpKw(k), mpKw(k)); };
 (() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {} }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
 const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want] })); } catch { /* not kept */ } };
-const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, pic: "", kw: "", tier: 0, desc: "" };
-const mpGi = (id, cls = "", info = true) => (mpG(id).pic ? `<img class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""} src="${imgThumb(mpG(id).pic)}" loading="lazy">` : `<i class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""}></i>`);
+const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, tile: "", kw: "", tier: 0, desc: "" };
+const mpGi = (id, cls = "", info = true) => (mpG(id).tile ? `<img class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""} src="${mpG(id).tile}" loading="lazy">` : `<i class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""}></i>`);
 const MP_TAP = matchMedia("(hover: none)").matches;  // phones: a tap on a picker tile opens the gift's card
 const mpKw = (k) => ((UNITS.glossary || {})[k] || {}).name || statusName(k);
 // which floor list of a pack a floor reads
@@ -106,7 +106,7 @@ function mpPicker() {
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}${N > 10 ? tg(mp.only === "deep", 'data-o="deep" title="Gifts found on floors 11–15 only"', "Floors 11–15") : ""}</div>
     <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}" title="${esc(mpKw(k))}"`, mpKwIco(k), "kwi")).join("")}${tg(mp.kw === "-", 'data-k="-" title="Gifts without a keyword"', "No keyword")}</div>
     <div class="mpchips"><select id="mpsort">${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => `<option value="${k}" ${mp.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select><span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
-    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""}" data-g="${id}" data-pick>${g.pic ? `<img src="${imgThumb(g.pic)}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}</div>`).join("")}</div></div>`;
+    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""}" data-g="${id}" data-pick>${g.tile ? `<img src="${g.tile}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}</div>`).join("")}</div></div>`;
 }
 
 function mpBuild(r) {
@@ -128,7 +128,7 @@ function mpBuild(r) {
 function mpRoute(r) {
   const luck = (x) => x.extra.filter((g) => r.src[g] && r.src[g].luck && r.src[g].f === x.f);
   const icons = (x) => x.take.map((g) => mpGi(g, r.only.has(g) ? "only" : "")).join("") + x.extra.map((g) => mpGi(g, luck(x).includes(g) ? "luck" : "dim")).join("");
-  const pk = (p, cls) => (p.pic ? `<img class="${cls}" src="${imgThumb(p.pic)}" loading="lazy">` : `<i class="${cls}"></i>`);
+  const pk = (p, cls) => (p.tile ? `<img class="${cls}" src="${p.tile}" loading="lazy">` : `<i class="${cls}"></i>`);
   const lane = (x) => `<div class="mplane">${x.cands.map((p) => { const gs = r.gives(p); return `<div class="mpbc ${p === x.p ? "sel" : ""}" data-pin="${x.f}:${p.id}" title="${p === x.p && x.lock ? "Pinned — click to let go" : "Pin this pack to the floor"}">${pk(p, "pk")}<span class="cnt">${gs.length} of yours</span>
       <div class="pn">${esc(p.name)}</div><div class="mpmini">${gs.slice(0, 10).map((g) => mpGi(g, r.only.has(g) ? "only" : "", false)).join("")}</div></div>`; }).join("")}</div>`;
   const arr = (x) => `<span class="arr">${mp.open === x.f ? "▴" : "▾"}</span>`;
@@ -210,8 +210,8 @@ window.addEventListener("hashchange", () => mpTip(null));
 function mpCard(id) {
   const g = mpG(id), packs = [...new Set(MIRROR.packs.filter((p) => p.excl.includes(id)).map((p) => p.name))];
   const into = Object.keys(MIRROR.fus).filter((r) => MIRROR.fus[r].some((rs) => rs.includes(id))).map(Number);
-  const chip = (x) => `<a class="mpcchip" data-card="${x}">${mpG(x).pic ? `<img src="${imgThumb(mpG(x).pic)}">` : ""}${esc(mpG(x).name)}</a>`;
-  modal(`<div class="mpcardx"><div class="mpchead">${g.pic ? `<img src="${imgThumb(g.pic)}">` : ""}<div><h2>${esc(g.name)}</h2>
+  const chip = (x) => `<a class="mpcchip" data-card="${x}">${mpG(x).tile ? `<img src="${mpG(x).tile}">` : ""}${esc(mpG(x).name)}</a>`;
+  modal(`<div class="mpcardx"><div class="mpchead">${g.tile ? `<img src="${g.tile}">` : ""}<div><h2>${esc(g.name)}</h2>
       <div class="muted small">${[g.tier && "Tier " + g.tier, g.kw && esc(mpKw(g.kw)), g.sin].filter(Boolean).join(" · ")}</div></div></div>
     <div class="mpcdesc">${fmtDesc(g.desc)}</div>${mdTeamLine(id)}
     ${MIRROR.fus[id] ? `<h4>Fusion of</h4>${MIRROR.fus[id].map((rs) => `<div class="mpcrow">${rs.map(chip).join("<b>+</b>")}</div>`).join("")}` : ""}
