@@ -1,0 +1,180 @@
+{
+ "v": 1,
+ "at": 1792134839,
+ "langs": [
+  {
+   "id": "kr",
+   "name": "Official",
+   "lang": "ko",
+   "version": "",
+   "authors": [],
+   "link": "",
+   "license": {},
+   "cover": {
+    "core": 95,
+    "story": 66
+   },
+   "sig": "8019a4658f40",
+   "src": "kr.c28a71d8626b",
+   "files": {
+    "core": "kr.core.json.gz",
+    "story": "kr.story.json.gz"
+   }
+  },
+  {
+   "id": "jp",
+   "name": "Official",
+   "lang": "ja",
+   "version": "",
+   "authors": [],
+   "link": "",
+   "license": {},
+   "cover": {
+    "core": 96,
+    "story": 66
+   },
+   "sig": "b1255576cb06",
+   "src": "jp.6e0b2505ee57",
+   "files": {
+    "core": "jp.core.json.gz",
+    "story": "jp.story.json.gz"
+   }
+  },
+  {
+   "id": "es-DreamsOffice",
+   "name": "Dreams Office",
+   "lang": "es",
+   "version": "v9.13",
+   "authors": [
+    "Mokoutanized",
+    "DjPixelES",
+    "Oriane",
+    "capslockSleep",
+    "Herkenni",
+    "Nuklear",
+    "Frost-12",
+    "Kurotomaki",
+    "Weeblations",
+    "JadedVoid",
+    "Seismol76",
+    "Polori",
+    "DrEnnnnigma",
+    "Melky",
+    "Kaunto",
+    "LuckAfter",
+    "Cleoh",
+    "DaniUltraReal",
+    "Hidalgotraductor",
+    "lejoram",
+    "Ubanaciel",
+    "Wilson2Step",
+    "Raum2901",
+    "Donki-nari",
+    "Laloh-id"
+   ],
+   "link": "https://github.com/Dreams-Office/LimbusCompanySpanishTranslationTeam",
+   "license": {
+    "name": "MIT",
+    "url": "https://github.com/Dreams-Office/LimbusCompanySpanishTranslationTeam/blob/main/LICENSE"
+   },
+   "cover": {
+    "core": 86,
+    "story": 58
+   },
+   "sig": "d311e99c8f9a",
+   "src": "es-DreamsOffice.862a2f0a790f",
+   "files": {
+    "core": "es-DreamsOffice.core.json.gz",
+    "story": "es-DreamsOffice.story.json.gz"
+   }
+  },
+  {
+   "id": "ru-mtl",
+   "name": "MTL",
+   "lang": "ru",
+   "version": "v2.7.10",
+   "authors": [
+    "kimght",
+    "DAFTPUSiK",
+    "x1bViolet",
+    "Babkaebpmg",
+    "KJHater"
+   ],
+   "link": "https://github.com/kimght/LimbusCompanyRuMTL",
+   "license": {
+    "name": "CC BY-NC-SA 4.0",
+    "url": "https://github.com/kimght/LimbusCompanyRuMTL/blob/main/LICENSE"
+   },
+   "cover": {
+    "core": 91,
+    "story": 66
+   },
+   "sig": "d613ffcb92c3",
+   "src": "ru-mtl.1cd6b74600a6",
+   "files": {
+    "core": "ru-mtl.core.json.gz",
+    "story": "ru-mtl.story.json.gz"
+   }
+  },
+  {
+   "id": "vn-Kazike",
+   "name": "The Kazike Team",
+   "lang": "vi",
+   "version": "v1.0.15",
+   "authors": [
+    "Worny",
+    "pauuuuuuu",
+    "leox01997",
+    "frieds_eggs",
+    "dysphoria013",
+    "kirizakigeiz",
+    "mrslyhd",
+    "firefox0457",
+    "alexandrina_0",
+    "rubiry",
+    "hampter2857",
+    "prolq",
+    "majiconoki_777",
+    "toibingoo_57036",
+    "foufouw"
+   ],
+   "link": "https://github.com/Kiroinotcool/THE-KAZIKE-TEAM-LIMBUS",
+   "license": {},
+   "cover": {
+    "core": 37,
+    "story": 52
+   },
+   "sig": "4124f3ab27ee",
+   "src": "vn-Kazike.2b5c066c0961",
+   "files": {
+    "core": "vn-Kazike.core.json.gz",
+    "story": "vn-Kazike.story.json.gz"
+   }
+  },
+  {
+   "id": "zh-CN",
+   "name": "Localize Limbus Company",
+   "lang": "zh-Hans",
+   "version": "2026101602",
+   "authors": [
+    "Limbus Localize Company"
+   ],
+   "link": "https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany",
+   "license": {
+    "name": "CC BY-NC-SA 4.0",
+    "url": "https://github.com/LocalizeLimbusCompany/LocalizeLimbusCompany/blob/main/LICENSE"
+   },
+   "cover": {
+    "core": 95,
+    "story": 67
+   },
+   "sig": "88dee0373c5b",
+   "src": "zh-CN.8e9a49677859",
+   "files": {
+    "core": "zh-CN.core.json.gz",
+    "story": "zh-CN.story.json.gz"
+   }
+  }
+ ],
+ "ui": {}
+}
