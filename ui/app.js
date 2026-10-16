@@ -2072,8 +2072,8 @@ async function openSpine(x, host) {
 }
 // skeleton files' address; atlas asked once
 const spineBase = (bundle, atlas) => `/spine/${encodeURIComponent(bundle)}/${atlas}.2/skeleton`;  // .2: pages scaled back to the atlas size (old cached copies are stretched)
-function spineAtlas(bundle, atlas) {
-  const base = spineBase(bundle, atlas);
+function spineAtlas(bundle, atlas, files) {
+  const base = files ? files.atlas.slice(0, -".atlas".length) : spineBase(bundle, atlas);  // files: the server's links
   spn.atlas = spn.atlas || new Map();
   if (!spn.atlas.has(base)) {
     const p = fetch(`${base}.atlas`).then((r) => r.ok ? r.text() : "").catch(() => "");
@@ -2089,13 +2089,13 @@ function spineAtlas(bundle, atlas) {
 }
 // one Spine player in `box`; null if it can't play
 async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
-  const base = spineBase(bundle, atlas);
+  const base = spineBase(bundle, atlas), files = opt.files || { atlas: `${base}.atlas`, json: `${base}.json` };
   // ~10% of atlases are not premultiplied; drawing them as premultiplied gives dark fringes
-  const atlasText = await spineAtlas(bundle, atlas);
+  const atlasText = await spineAtlas(bundle, atlas, opt.files);
   const pma = /^\s*pma\s*:\s*true/mi.test(atlasText);
   return new Promise((resolve) => {
     const make = (vp) => new sp.SpinePlayer(box, {
-      jsonUrl: `${base}.json`, atlasUrl: `${base}.atlas`,
+      jsonUrl: files.json, atlasUrl: files.atlas,
       alpha: true, backgroundColor: "#00000000", premultipliedAlpha: pma,
       showControls: !!opt.controls, interactive: !!opt.controls, preserveDrawingBuffer: true,  // true: frames can be read back for GIFs
       ...(vp ? { viewport: vp } : {}),
@@ -2113,7 +2113,7 @@ async function addSpinePlayer(sp, box, bundle, atlas, viewport, opt) {
       error: async (p, msg) => {
         // invalid bounds: frame with the skeleton's own bounds
         if (!vp && /bounds/i.test(msg)) {
-          const sk = await fetch(`${base}.json`).then((r) => r.json()).catch(() => null);
+          const sk = await fetch(files.json).then((r) => r.json()).catch(() => null);
           const h = sk && sk.skeleton;
           if (h && h.width > 0 && h.height > 0) {
             box.innerHTML = "";

@@ -12,6 +12,7 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+from . import links
 from .extra import file_of as extra_file
 from .extract import extract
 from .paths import resource_dir
@@ -789,7 +790,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 files = [os.path.join(_thumb_dir(svc), a + ".png") for a in looks]
                 twins = [looks[i] for i in dict.fromkeys(list(repeats(files)) + sparse(files))]  # (+ pictures with next to nothing drawn)
                 return self._json({**{k: v for k, v in db.items() if k not in ("skills", "passives", "list")},
-                                   "list": [{**e, "spine": bool(spines.get(e["app"]))} for e in db["list"]],
+                                   "list": [_enemy_entry(e, bool(spines.get(e["app"])), e["app"] in done) for e in db["list"]],
                                    "thumbs": sorted({e["app"] for e in db["list"]} & done), "twins": twins, "nothumb": _no_thumbs(svc),
                                    "making": making})
             if p == "/api/enemy_thumb":
@@ -803,9 +804,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 bodies = [b for v in e["variants"] for b in [v] + v["parts"]]
                 sk = {s for b in bodies for s in b["skills"] + b.get("defense", [])}
                 pa = {x for b in bodies for x in b["passives"]}
+                spine = svc.enemy_spines().get(e["app"]) or []
+                # idle pose: not a death one
+                look = next((x for x in spine if not re.search(r"destroy|dead|broken|_die", x["base"], re.I)), spine[0] if spine else None)
                 # (the cache turns the ids into strings)
-                return self._json({"spine": svc.enemy_spines().get(e["app"]) or [],
-                                   "skills": {s: db["skills"].get(s) or db["skills"].get(str(s)) for s in sk},
+                return self._json({"spine": spine, "look": look and {**look, "files": links.spine(look["bundle"], look["atlas"])},
+                                   "skills": {s: _skill_links(svc, db["skills"].get(s) or db["skills"].get(str(s)), s, e.get("pic")) for s in sk},
                                    "passives": {x: db["passives"].get(x) or db["passives"].get(str(x)) for x in pa}})
             if p == "/api/myteam":
                 return self._json(svc.my_team())
@@ -847,7 +851,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 img.thumbnail((256, 256))
                 os.makedirs(_thumb_dir(svc), exist_ok=True)
                 img.save(os.path.join(_thumb_dir(svc), app + ".png"), "PNG")
-                return self._json({"ok": True})
+                return self._json({"ok": True, "url": links.enemy_thumb(app)})
             if p == "/api/fighter_pics":  # make pictures of these fighters' idle pose (the player, in the background)
                 return self._json(svc.fx.fighter_pics([str(_fx_id(n)) for n in b.get("ids") or []]))
             if p == "/api/stage_pics":  # make pictures of these stages (the player, in the background)
@@ -1243,6 +1247,25 @@ def game_cards(svc: Service, n: int = 12) -> dict:
         traceback.print_exc()
     out.update(fixed)
     return out
+
+
+def _enemy_entry(e: dict, spine: bool, drawn: bool) -> dict:
+    """A handbook entry with its pictures: the grid's, the card's when it has no Spine, the portrait (face: other pages
+    show it too)."""
+    pic = e.get("pic")
+    tile = links.enemy_thumb(e["app"]) if drawn and (spine or not pic) else links.thumb(pic)
+    big = "" if spine else links.img(pic) or (links.enemy_thumb(e["app"]) if drawn else "")
+    return {**e, "spine": spine, "info": f"/api/enemy?id={e['id']}", "tile": tile, "big": big, "face": links.thumb(pic)}
+
+
+def _skill_links(svc, s: dict | None, sid, pic: str):
+    """A skill with its picture; none in the game: the enemy's portrait."""
+    if not s:
+        return s
+    path = s.get("iconPath") or links.SKILL_ICON.format(s.get("icon") or sid)
+    if pic and not svc.lookup_container(path) and not extra_file(path):
+        path = pic
+    return {**s, "iconUrl": links.thumb(path), "artUrl": links.img(path)}
 
 
 def _thumb_dir(svc) -> str:

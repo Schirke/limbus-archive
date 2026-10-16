@@ -64,10 +64,12 @@ async function enDrawn() {
     enDrawn.busy = false;
     const d = await api("/api/enemies").catch(() => null);
     if (!d || !ENEMIES) return;
-    const fresh = d.thumbs.filter((a) => !ENEMIES.thumbs.includes(a));
+    const fresh = d.thumbs.filter((a) => !ENEMIES.thumbs.includes(a)), now = new Map(d.list.map((o) => [o.id, o]));
     Object.assign(ENEMIES, { thumbs: d.thumbs, making: d.making });
     for (const o of ENEMIES.list) {
-      const tile = fresh.includes(o.app) && document.querySelector(`.entile[data-e="${o.id}"]`);
+      if (!fresh.includes(o.app) || !now.has(o.id)) continue;
+      Object.assign(o, { tile: now.get(o.id).tile, big: now.get(o.id).big });
+      const tile = document.querySelector(`.entile[data-e="${o.id}"]`);
       if (!tile) continue;
       const img = tile.querySelector("img");
       if (img) img.remove();
@@ -87,9 +89,8 @@ function drawEnemyGrid() {
   markEnemy();
   drawEnemy();
 }
-const enThumbUrl = (e) => `/api/enemy_thumb?app=${encodeURIComponent(e.app)}`;
-const enTileImg = (e) => ENEMIES.thumbs.includes(e.app) && (e.spine || !e.pic) ? `<img class="sp" loading="lazy" src="${enThumbUrl(e)}" onerror="this.remove()">`
-  : e.pic ? `<img loading="lazy" src="${imgThumb(e.pic)}" onerror="this.remove()">` : "";
+// pictures: the server's links (tile, big)
+const enTileImg = (e) => e.tile ? `<img${ENEMIES.thumbs.includes(e.app) && (e.spine || !e.pic) ? ` class="sp"` : ""} loading="lazy" src="${e.tile}" onerror="this.remove()">` : "";
 function markEnemy() {
   document.querySelectorAll("#engrid .entile").forEach((a) => a.classList.toggle("on", +a.dataset.e === env.sel));
 }
@@ -105,8 +106,7 @@ function enResists(b) {
 }
 const enStagger = (b, level) => b.stagger.length ? b.stagger.map((p) => `${Math.floor(enHp(b, level) * p / 100)} <small>${p}%</small>`).join(" · ") : "—";
 
-// Spine idle pose in the card
-const enSpinePick = (list) => (list || []).find((x) => !/destroy|dead|broken|_die/i.test(x.base)) || (list || [])[0];
+// Spine idle pose in the card (texts.look)
 let enPlayer = null;
 function enSpineStop() { if (enPlayer) { try { enPlayer.dispose(); } catch (e) { /* already gone */ } enPlayer = null; } }
 window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/enemies")) enSpineStop(); });
@@ -114,7 +114,7 @@ async function enSpineStart(x, box) {
   enSpineStop();
   let sp;
   try { sp = await loadSpinePlayer(); } catch (e) { box.remove(); return; }
-  const p = await addSpinePlayer(sp, box, x.bundle, x.atlas, null, {});
+  const p = await addSpinePlayer(sp, box, x.bundle, x.atlas, null, { files: x.files });
   if (!box.isConnected) { if (p) p.dispose(); return; }  // another enemy was picked meanwhile
   enPlayer = p;
 }
@@ -138,19 +138,22 @@ async function enThumbs() {
         const e = todo.shift();
         if (seen.has(e.app)) continue;
         seen.add(e.app);
-        const texts = e.texts || await api(`/api/enemy?id=${e.id}`).catch(() => null);
-        const x = enSpinePick(texts && texts.spine);
+        const texts = e.texts || await api(e.info).catch(() => null);
+        const x = texts && texts.look;
         if (!x) { enNoThumb(e); continue; }
         host.innerHTML = "";
-        const p = await addSpinePlayer(sp, host, x.bundle, x.atlas, null, {});
+        const p = await addSpinePlayer(sp, host, x.bundle, x.atlas, null, { files: x.files });
         if (!p) { e.nothumb = true; continue; }  // (the player didn't start: tried again another time)
         await new Promise((ok) => setTimeout(ok, 1200));  // (the player fades its loading logo out first)
         const data = host.querySelector("canvas").toDataURL("image/png");
         p.dispose();
-        await api("/api/enemy_thumb", { app: e.app, data });
+        const { url } = await api("/api/enemy_thumb", { app: e.app, data });
         ENEMIES.thumbs.push(e.app);
         for (const o of ENEMIES.list) {
-          const tile = o.app === e.app && document.querySelector(`.entile[data-e="${o.id}"]`);
+          if (o.app !== e.app) continue;
+          if (o.spine || !o.pic) o.tile = url;  // (as the server's _enemy_entry)
+          if (!o.spine && !o.pic) o.big = url;
+          const tile = document.querySelector(`.entile[data-e="${o.id}"]`);
           if (!tile) continue;
           const img = tile.querySelector("img");
           if (img) img.remove();
@@ -171,7 +174,7 @@ async function drawEnemy() {
   const box = $("#encard"), e = ENEMIES.list.find((x) => x.id === env.sel);
   if (!box) return;
   if (!e) { enSpineStop(); box.innerHTML = ""; return; }
-  if (!e.texts) e.texts = await api(`/api/enemy?id=${e.id}`).catch(() => ({ skills: {}, passives: {}, spine: [] }));
+  if (!e.texts) e.texts = await api(e.info).catch(() => ({ skills: {}, passives: {}, spine: [] }));
   if (env.sel !== e.id || !$("#encard")) return;
   const v = e.variants[env.variant] || e.variants[0];
   const level = env.level || v.level, hp = enHp(v, level);
@@ -193,7 +196,7 @@ async function drawEnemy() {
       ${v.sanity.lowDesc ? `<div class="skdesc enpanic"><span class="muted">Low morale:</span> ${fmtDesc(v.sanity.lowDesc, true)}</div>` : ""}
       ${v.sanity.panicDesc ? `<div class="skdesc enpanic"><span class="muted">Panic:</span> ${fmtDesc(v.sanity.panicDesc, true)}</div>` : ""}`;
   } else if (env.tab === "skills") {
-    body = skills.map(([s, label]) => skillView(s, 1, level, label, e.pic, true)).join(`<div class="sksep"></div>`) || `<div class="muted">No skills with a name in the game's files.</div>`;
+    body = skills.map(([s, label]) => skillView(s, 1, level, label, e.face && { thumb: e.face }, true)).join(`<div class="sksep"></div>`) || `<div class="muted">No skills with a name in the game's files.</div>`;
   } else if (env.tab === "passives") {
     body = passives.map(([p, label]) => passiveHtml(p, true).replace("Battle passive", label ? esc(label) : "Passive")).join("") || `<div class="muted">No passives.</div>`;
   } else {
@@ -201,12 +204,12 @@ async function drawEnemy() {
         ${s.stages.map((x) => `<div class="enstage sub"><span>${/^1\d{4}$/.test(x.id) ? `${+String(x.id).slice(1, 3)}-${+String(x.id).slice(3)}` : x.id}</span><b>${esc(x.title || "")}</b><span>${esc(x.place || "")}</span><span class="r">Lv ${x.lv}</span></div>`).join("")}`).join("")
       || `<div class="muted">Not placed in any stage of the current version.</div>`;
   }
-  const spine = enSpinePick(e.texts.spine), old = box.querySelector(".enspine");
+  const spine = e.texts.look, old = box.querySelector(".enspine");
   const keep = old && old.dataset.e === `${e.id}` && enPlayer ? old : null;  // the same enemy: its player goes on playing
   box.innerHTML = `<div class="enkick">${esc(v.label)}${v.cls ? ` · ${esc(v.cls)}` : ""}</div>
     <h2 class="enname">${esc(e.name)}<em>LV ${level}</em></h2>
     <div class="entags">${[...v.assoc, ...v.tags].map((t) => `<span>${esc(t)}</span>`).join("")}<span class="muted">id ${v.ids.slice(0, 4).join(", ")}${v.ids.length > 4 ? "…" : ""}</span></div>
-    <div class="enhead">${spine ? "" : `<div class="enpic">${e.pic ? `<img src="${imgFull(e.pic)}" onerror="this.remove()">` : ENEMIES.thumbs.includes(e.app) ? `<img src="${enThumbUrl(e)}" onerror="this.remove()">` : ""}</div>`}
+    <div class="enhead">${spine ? "" : `<div class="enpic">${e.big ? `<img src="${e.big}" onerror="this.remove()">` : ""}</div>`}
       ${spine ? `<div class="enspine wide" data-e="${e.id}" title="Its idle pose (Spine). All its animations: the Animations page"></div>` : ""}
       <div class="enstats">${stat("HP", hp, ico("hp", "s20", "HP", ""))}${stat("Speed", v.speed.length ? v.speed.join("-") : "—")}
         ${stat("Def level", `${level + v.def}<small>${v.def >= 0 ? "+" : ""}${v.def}</small>`, ico("def", "s20", "Defense level", ""))}${stat("Stagger", enStagger(v, level))}

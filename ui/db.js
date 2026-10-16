@@ -276,14 +276,16 @@ function skillView(s, up, level, label, fallbackImg, plain = false) {
   const pl = ks.filter((k) => k < up), prev = !s.up[up] || !pl.length ? null : s.up[Math.max(...pl)];
   const chg = (f) => prev && f(prev) !== f(u) ? " hl" : "";
   const color = SIN_COLORS[u.sin] || "#777";
-  const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = imgThumb(iconPath);
+  // (enemies: the server's links; fallbackImg {thumb, img} too)
+  const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = s.iconUrl || imgThumb(iconPath);
+  const fb = typeof fallbackImg === "string" ? { thumb: imgThumb(fallbackImg), img: imgFull(fallbackImg) } : fallbackImg || {};
   const key = frameKey(u.sin, s.tier, label === "Defense");
   const coinOf = (v) => v.coin == null ? "" : `${v.op === "SUB" ? "−" : "+"}${v.coin}`, coin = coinOf(u);
   const off = level + (u.level || 0);
   return `<div class="skv" style="--sin:${color}">
     <div class="skvtop">
       ${u.base != null ? `<div class="skvbase${chg((v) => v.base)}">${u.base}</div>` : ""}
-      <div class="skvicon${key ? " framed" : ""}"><img ${key ? `data-src="${icon}" style="visibility:hidden"` : `src="${icon}"`} ${key ? `data-frame="${key}" data-art="${imgFull(iconPath)}" ${fallbackImg ? `data-art2="${imgFull(fallbackImg)}"` : ""} data-name="${esc(`${s.id} ${u.name}`)}" title="Click to save the icon in its frame" onclick="saveIcon(this)"` : ""} onerror="${fallbackImg ? `this.onerror=null;this.src='${imgThumb(fallbackImg)}'` : "this.remove()"}">${coin ? `<span class="skvcoin${chg(coinOf)}">${esc(coin)}</span>` : ""}</div>
+      <div class="skvicon${key ? " framed" : ""}"><img ${key ? `data-src="${icon}" style="visibility:hidden"` : `src="${icon}"`} ${key ? `data-frame="${key}" data-art="${s.artUrl || imgFull(iconPath)}" ${fb.img ? `data-art2="${fb.img}"` : ""} data-name="${esc(`${s.id} ${u.name}`)}" title="Click to save the icon in its frame" onclick="saveIcon(this)"` : ""} onerror="${fb.thumb ? `this.onerror=null;this.src='${fb.thumb}'` : "this.remove()"}">${coin ? `<span class="skvcoin${chg(coinOf)}">${esc(coin)}</span>` : ""}</div>
       <div class="skvmain">
         <div class="skvcoins">${Array.from({ length: u.coins }, (_, i) => coinIcon((u.coinkinds || [])[i] || "")).join("")}${s.copies ? `<span class="copies">×${s.copies}</span>` : ""}</div>
         <div class="skvbanner">${sinIcon(u.sin, "s20")}<span>${esc(u.name)}</span></div>

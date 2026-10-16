@@ -18,6 +18,7 @@ from html import escape as html_escape
 from urllib.parse import quote, unquote
 from urllib.request import urlopen
 
+from . import links
 from .paths import resource_dir
 
 VERSION = 1
@@ -476,7 +477,8 @@ class Exporter:
         # sounds one at a time (FMOD), pictures a few at once
         with ThreadPoolExecutor(4) as pool:
             list(pool.map(one, todo))
-        self.fresh[stage.replace("site: ", "")] = resumed + sum(1 for k in todo if k in out)  # (the rest: the app has nothing there)
+        part = stage.replace("site: ", "")  # (a crawl asks level by level)
+        self.fresh[part] = self.fresh.get(part, 0) + resumed + sum(1 for k in todo if k in out)  # (the rest: the app has nothing there)
         return out
 
     # a send that stops halfway goes on next time from d/fetched.txt
@@ -691,51 +693,47 @@ class Exporter:
         self.write_manifest("units", m)
         return m
 
-    def enemies(self) -> dict:
-        """The enemy handbook: list, texts, pictures, idle-pose Spine files, skill icons."""
-        old = self.read_manifest("enemies")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        self.progress("site: Enemies", 0, 0)
-        db = json.loads(self._get("/api/enemies")[0])
-        keys = ["/api/enemies"] + [url_key("/api/enemy_thumb", app=a) for a in db.get("thumbs", [])]
-        thumbs, full, seen = set(), set(), set()
-        for e in db["list"]:
-            k = url_key("/api/enemy", id=e["id"])
-            keys.append(k)
-            try:
-                texts = json.loads(self._text(k, have))
-            except Exception:
-                continue
-            for s, sk in texts.get("skills", {}).items():  # (the page's path: ui/db.js skillView)
-                sk = sk or {}
-                icon = sk.get("iconPath") or f"Assets/Resources_moved/Sprite/SkillIcon/{sk.get('icon') or s}.png"
-                thumbs.add(icon)
-                full.add(icon)
-            sp = texts.get("spine") or []
-            # (the page's pick: ui/enemies.js enSpinePick)
-            x = next((x for x in sp if not re.search(r"destroy|dead|broken|_die", x["base"], re.I)), sp[0] if sp else None)
-            if e.get("pic"):
-                thumbs.add(e["pic"])
-                if not x:
-                    full.add(e["pic"])
-            if x and (x["bundle"], x["atlas"]) not in seen:
-                seen.add((x["bundle"], x["atlas"]))
-                base = f"/spine/{x['bundle']}/{x['atlas']}.2/"
-                keys += [base + "skeleton.atlas", base + "skeleton.json"]
-                try:  # the atlas names its pages: a line that is a file name
-                    atlas = self._text(base + "skeleton.atlas", have)
-                    keys += [base + ln.strip() for ln in atlas.splitlines() if ln.strip().lower().endswith(".png")]
-                except Exception:
-                    pass
-        keys += [url_key("/api/asset_thumb", path=p) for p in sorted(thumbs)] + [url_key("/api/asset_img", path=p) for p in sorted(full)]
-        got = self.fetch_all(list(dict.fromkeys(keys)), have, "site: Enemies")
-        # grid pictures in small packs, in grid order
-        tiles = [url_key("/api/enemy_thumb", app=e["app"]) for e in db["list"] if e.get("app")]
-        urls, groups = _grouped(got, [(["/api/enemies"], PACK), (tiles, VOICE_PACK)])
-        m = {"kind": "enemies", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("enemies", m)
+    def crawl(self, name: str) -> dict:
+        """A CRAWL section: its lists, then every file their answers link to (links.py), level by level."""
+        sec = CRAWL[name]
+        stage = "site: " + sec["stage"]
+        have = self.kept(self.read_manifest(name), sec["start"])  # (the lists: asked every time)
+        self.progress(stage, 0, 0)
+        got, todo = {}, list(sec["start"])
+        seen = set(todo)
+        while todo:
+            level = self.fetch_all(todo, have, stage)
+            got.update((k, level[k]) for k in todo if k in level)
+            todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen]
+            seen.update(todo)
+        urls, groups = _grouped(got, [([k for k in got if re.match(p, k)], size) for p, size in sec["packs"]])
+        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "urls": urls, "groups": groups}
+        self.write_manifest(name, m)
         return m
+
+    def _links(self, key: str, rel: str) -> list[str]:
+        """What an answer links to: /api/… and /spine/… strings in a list's JSON, the pages an atlas names."""
+        if key.endswith(".atlas"):
+            with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8", errors="replace") as f:
+                return [key.rpartition("/")[0] + "/" + ln.strip() for ln in f if ln.strip().lower().endswith(".png")]
+        if not key.startswith("/api/") or ".json" not in rel:
+            return []
+        out = []
+
+        def walk(o):
+            if isinstance(o, dict):
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+            elif isinstance(o, str) and LINK.match(o):
+                out.append(links.key(o))
+        try:
+            walk(self._stored(rel))
+        except (OSError, ValueError):
+            pass
+        return out
 
     def music(self) -> dict:
         """The soundtrack as Opus straight from the banks."""
@@ -1282,7 +1280,7 @@ class Exporter:
         if self.cfg["spine"]:
             self.anim()
         if self.cfg["enemies"]:
-            self.enemies()
+            self.crawl("enemies")
         if self.cfg["music"]:
             self.music()
         if self.cfg["story"]:
@@ -1569,12 +1567,11 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
                  skills_html(x.get("skills") or [], x.get("passives") or []), art((x.get("img") or {}).get("art")))
         if "enemies" in open_:
             for x in (load("/api/enemies") or {}).get("list") or []:
-                texts = load(url_key("/api/enemy", id=x["id"])) or {}
+                texts = load(links.key(x.get("info") or "")) or {}
                 sk = list((texts.get("skills") or {}).values())
                 names = [n for n, _ in (skill(s or {}) for s in sk) if n]
                 desc = f"{x.get('kind') or 'Enemy'} · {x.get('label')}." + (f" Skills: {' · '.join(dict.fromkeys(names))}." if names else "")
-                pic = next((k for k in (x.get("app") and url_key("/api/enemy_thumb", app=x["app"]), thumb(x.get("pic")), art(x.get("pic")))
-                            if k and k in urls), "")
+                pic = next((k for k in (links.key(x[f]) for f in ("tile", "big") if x.get(f)) if k in urls), "")
                 card(f"enemies/{x['id']}", f"enemies/{x['id']}", x.get("name") or str(x["id"]), short(desc),
                      skills_html([s or {} for s in sk]), pic, big=False)
         if "buffs" in open_:
@@ -2214,6 +2211,11 @@ VOICE_PACK = 256 << 10
 ANNOUNCER_LINES = 8  # Guess the sound on the site: lines of each announcer  # voice lines, ~60 KB each
 SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
 FRESH_FACES = 32  # the newest Identities' pictures (two per Identity) in a pack of their own
+# sections made by following links (Exporter.crawl): the lists to start from, and packs by request (first match wins)
+CRAWL = {
+    "enemies": {"stage": "Enemies", "start": ["/api/enemies"], "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]},
+}
+LINK = re.compile(r"/(api|spine)/")
 # what a first visit asks whatever page it opens, each kind in its own pack: a new visitor fetches these, not the big packs they'd sit in
 START = (r"^/api/(font\?|langs$|ui_langs$|site_fx$|music$)", r"^/api/gacha_ui\?n=(icon_lunacy|%s)$", r"^/api/ui_icon\?k=(sinner|rank|st)_", r"^/api/units$")
 
