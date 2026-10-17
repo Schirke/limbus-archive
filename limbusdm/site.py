@@ -418,7 +418,7 @@ def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
             if b.tell() < len(data):
                 return b.getvalue(), "image/webp"
         if ctype == "audio/wav":
-            p = subprocess.run([_ffmpeg(), "-v", "error", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "96k" if music else "40k" if voice else "72k", "-f", "ogg", "pipe:1"],
+            p = subprocess.run([_ffmpeg(), "-v", "error", "-i", "pipe:0", "-c:a", "libopus", "-b:a", "96k" if music else "40k" if voice else "72k", "-fflags", "+bitexact", "-flags:a", "+bitexact", "-f", "ogg", "pipe:1"],
                                input=data, capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             if p.returncode == 0 and p.stdout:
                 return p.stdout, "audio/ogg"
@@ -1867,6 +1867,11 @@ def _game(made: str) -> str:
     return re.sub(r"_\d{8}-\d{6}", "", made or "")
 
 
+def _pair(rid: str) -> tuple:
+    """A report's game versions, without when this computer read them."""
+    return tuple(_game(x) for x in rid.split("__"))
+
+
 def _unchanged(a: dict, b: dict):
     """→ whether a request answers the same in snapshots a and b (its source file has the same hash)."""
     ba, bb = a.get("bundles") or {}, b.get("bundles") or {}
@@ -2076,12 +2081,13 @@ def pull(ex: Exporter, url: str) -> dict:
         if site.get("v") != VERSION or _game(site.get("id")) != _game(made):
             continue
         local = ex.read_manifest(name)
-        if local.get("id") != made:  # (the skills' videos of the version before stay until rendered again: sitefx._read)
+        stale = local.get("id") != made  # (then the site's videos, made for this version, win over these)
+        if stale:  # (the skills' videos of the version before stay until rendered again: sitefx._read)
             local = sitefx._read(ex) if name == "fx" else {"kind": name, "id": made, "urls": {}}
         dropped = set(local.get("dropped") or [])  # (taken off by the owner: sitefx.drop)
         skip = {sitefx._key(key, cid, v, name=n) for cid, vs in (site.get("have") or {}).items() for v, videos in vs.items()
                 if f"{cid}:{v}" in dropped for n in videos}
-        got = p.files({k: w for k, w in (site.get("urls") or {}).items() if k.startswith(key) and k not in local["urls"] and k not in skip})
+        got = p.files({k: w for k, w in (site.get("urls") or {}).items() if k.startswith(key) and (stale or k not in local["urls"]) and k not in skip})
         if not got:
             continue
         local["urls"].update(got)
@@ -2095,7 +2101,20 @@ def pull(ex: Exporter, url: str) -> dict:
                     if not ok:
                         continue
                     mine_v = have.setdefault(cid, {})
-                    mine_v[v] = list(dict.fromkeys(mine_v.get(v, []) + ok))
+                    if not stale:
+                        mine_v[v] = list(dict.fromkeys(mine_v.get(v, []) + ok))
+                        continue
+                    # (the site's set as it is: rendered for this version)
+                    for n in mine_v.get(v, []):
+                        if n not in ok:
+                            local["urls"].pop(sitefx._key(key, cid, v, name=n), None)
+                            local["src"].pop(sitefx._key(key, cid, v, name=n), None)
+                    mine_v[v] = ok
+                    old = [x for x in (local.get("old") or {}).get(cid, []) if x != v]
+                    if old:
+                        local["old"][cid] = old
+                    else:
+                        (local.get("old") or {}).pop(cid, None)
             local["none"] = list(dict.fromkeys((local.get("none") or []) + (site.get("none") or [])))
         ex.write_manifest(name, local)
     # game-file parts this computer can't go on from: taken from the site
@@ -2312,8 +2331,11 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
         return os.path.exists(ex._manifest_path(report_name(r["id"])))
     newest = max((taken(r) for r in svc.reports() if there(r)), default="")
     empty = set(ex.made().get("empty") or [])
+    # (a patch another computer sent: its report has other read times in its id)
+    mdir = os.path.join(ex.out, "d", "m")
+    has = {_pair(ex.read_manifest(fn[:-8]).get("id") or "") for fn in os.listdir(mdir) if fn.startswith("report-")}
     for r in svc.reports():
-        if r["id"] != report and r["id"] not in gone | empty and taken(r) > newest and not there(r):
+        if r["id"] != report and r["id"] not in gone | empty and taken(r) > newest and not there(r) and _pair(r["id"]) not in has:
             ex.report(r["id"])
     ex.pages()
     # what changed since the last send that went through: nothing → nothing to write, pack, check or upload
@@ -2340,6 +2362,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     if not cfg["project"]:
         sent()
         ex.forget()
+        ex.sweep()
         return {"site": "", "dir": packed_dir(svc), "check": chk, **size}
     # what this upload changes: packed files vs the last sent
     before, root = _read_json(sent_path).get("files") or {}, packed_dir(svc)
@@ -2357,6 +2380,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
         json.dump({"files": now, "last": last}, f)
     sent()
     ex.forget()
+    ex.sweep()  # (unnamed files)
     return {"site": url, "dir": packed_dir(svc), "sent": last, **size}
 
 
