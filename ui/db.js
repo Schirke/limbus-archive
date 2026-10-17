@@ -476,38 +476,55 @@ function teamStats() {
   const st = {}, sins = {}, atk = {};
   pool.forEach((x) => {
     x.statuses.forEach((k) => st[k] = (st[k] || 0) + 1);
-    x.skills.forEach((s) => { const u = topUp(s); sins[u.sin] = (sins[u.sin] || 0) + (s.copies || 1); if (u.atk) atk[u.atk] = (atk[u.atk] || 0) + (s.copies || 1); });
+    x.skills.forEach((s) => { const u = topUp(s), n = s.copies ?? 1; if (!n) return; sins[u.sin] = (sins[u.sin] || 0) + n; if (u.atk) atk[u.atk] = (atk[u.atk] || 0) + n; });
   });
   return { deployed, pool, st, sins, atk };
 }
+function tbCard(sid, i, S, here) {
+  const x = unitById(MY.slots[sid]), name = UNITS.sinners[sid - 1];
+  const egos = here || x ? (MY.egos[sid] || []).map(unitById).filter(Boolean) : [];
+  const egoImg = (e) => { const pr = here ? tbPrice(e.cost, "", S) : null;
+    return `<img class="${pr ? "tb" + pr.v : ""}" src="${imgThumb(e.img.thumb)}" title="${esc(e.grade)} · ${esc(e.name)}${pr ? ": " + esc(pr.text) : ""}" onerror="this.style.visibility='hidden'">`; };
+  return `<div class="tbc ${x ? "" : "empty"} ${x && !here ? "bk" : ""} ${tbSel === sid ? "sel" : ""}" data-slot="${sid}" ${x ? `draggable="true" title="${esc(x.title)}"` : ""}>
+    ${x ? `<button class="tbn ${i < 0 ? "off" : ""}" data-tbo="${sid}" title="${i < 0 ? "Not in the order: click to add" : "Click two numbers to swap them (again on the same one: take it out), or drag the card"}">${i < 0 ? "+" : i + 1}</button>${tbPasMark(x, here ? "battle" : "support", S)}` : ""}
+    <div class="tbimg">${x ? `<img class="u" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">` : ico(`sinner_${sid}`, "s36", name, "")}</div>
+    <div class="tbegos">${egos.map(egoImg).join("")}</div>
+    <div class="tbname">${esc(x ? x.title : "Pick")}</div><div class="tbsin">${esc(name)}</div></div>`;
+}
 function drawBuilder() {
-  const el = $("#builder");
-  const pos = (sid) => MY.order.indexOf(sid) + 1;
-  const slots = UNITS.sinners.map((name, i) => {
-    const sid = i + 1, x = unitById(MY.slots[sid]), p = pos(sid);
-    const egos = (MY.egos[sid] || []).map(unitById).filter(Boolean);
-    return `<div class="slot ${x ? "" : "empty"}" data-slot="${sid}">
-      <button class="ord ${p ? (p <= ORDER_MAX ? "on" : "bk") : ""}" data-ord="${sid}" title="Deployment order: click to add / remove">${p || "+"}</button>
-      ${x ? `<img src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'"><div class="stitle">${esc(x.title)}</div>` : `<div class="semblem">${ico(`sinner_${sid}`, "s36", name, "")}</div><div class="stitle muted">${MY.slots[sid] ? `Id ${MY.slots[sid]} — newer than this game data` : "Pick"}</div>`}
-      ${egos.length ? `<div class="slotegos">${egos.map((e) => `<img src="${imgThumb(e.img.thumb)}" title="${esc(e.grade)} · ${esc(e.name)}" onerror="this.style.visibility='hidden'">`).join("")}</div>` : ""}
-      <div class="small muted">${esc(name)}</div></div>`;
-  }).join("");
-  const { deployed, st, sins, atk } = teamStats();
+  const el = $("#builder"), has = (sid) => !!unitById(MY.slots[sid]);
+  MY.order = MY.order.filter(has);
+  const sides = tbSides(), S = tbSins(sides.field), card = (sid) => tbCard(sid, MY.order.indexOf(sid), S, sides.field.includes(sid));
+  const team = `<div class="tbteam">${UNITS.sinners.map((_, i) => card(i + 1)).join("")}</div>`;
+  const { st, sins, atk } = teamStats();
   const total = Object.values(sins).reduce((a, b) => a + b, 0) || 1;
-  el.innerHTML = `<div class="slots">${slots}</div>
-    <div class="row" style="margin:8px 0;gap:8px;flex-wrap:wrap">
-      <span class="muted small">${deployed.length ? `First ${Math.min(ORDER_MAX, deployed.length)} in order` : "Whole team"}:</span>
+  const stats = `<div class="row tbstats">
       ${UNITS.statuses.filter((k) => st[k]).map((k) => `<span class="kwi small">${statusIcon(k, "s22")}<b>${st[k]}</b> ${esc(statusName(k))}</span>`).join("") || `<span class="muted small">no statuses yet</span>`}
       <span class="sep"></span>${Object.entries(atk).map(([k, n]) => `<span class="kwi small">${ico(`atk_${k}`, "s18", k, "")}<b>${n}</b> ${esc(k)}</span>`).join("")}
       <span class="grow"></span><button id="clearteam">Clear</button></div>
-    <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${s} ${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>`;
-  el.querySelectorAll("[data-slot]").forEach((d) => d.onclick = (e) => { if (!e.target.closest("[data-ord]")) pickFor(+d.dataset.slot); });
-  el.querySelectorAll("[data-ord]").forEach((b) => b.onclick = () => {
-    const sid = +b.dataset.ord, i = MY.order.indexOf(sid);
-    if (i >= 0) MY.order.splice(i, 1); else if (MY.slots[sid]) MY.order.push(sid); else return pickFor(sid);
-    saveMy(); drawBuilder();
-  });
-  $("#clearteam").onclick = () => { MY.slots = {}; MY.order = []; MY.egos = {}; saveMy(); drawBuilder(); };
+    <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${s} ${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>
+    ${sides.field.length ? `<div class="tbrate"><span class="muted small" title="Each used skill gives one of its sin; on average, from the ${sides.field.length} on the field">Sins a turn ≈</span>${UNITS.sins.filter((s) => S.rate[s]).map((s) => `<span class="tbcost">${sinIcon(s, "s16")}${S.rate[s].toFixed(1)}</span>`).join("")}
+      <span class="muted small">· E.G.O frame: <i class="tbkey slow"></i> slow to gather <i class="tbkey no"></i> no such sin on the field</span></div>` : ""}`;
+  const P = tbPasList(sides, S);
+  const panel = sides.field.length ? `<div class="card tbpanel"><div class="tbtabs">
+      <button class="toggle ${tbTab === "md" ? "on" : ""}" data-tbtab="md">MD gifts</button>
+      <button class="toggle ${tbTab === "pas" ? "on" : ""}" data-tbtab="pas">Passives${P.bad.length ? ` <b class="tbwarn">${P.bad.length}</b>` : ""}</button></div>
+    ${tbTab === "md" ? tbMd(sides) : tbPas(P, S)}</div>` : "";
+  el.innerHTML = `<div class="tbwrap"><div>${team}${stats}</div>${panel}</div>`;
+  tbBind(el);
+}
+// passives with a sin condition: battle ones on the field, support ones in the backup
+function tbPasList(sides, S) {
+  const xs = (sids) => sids.map((sid) => unitById(MY.slots[sid])).filter(Boolean);
+  const rows = (list, kind) => list.flatMap((x) => x.passives.filter((p) => p.kind === kind && p.cost.length).map((p) => ({ x, p, pr: tbPrice(p.cost, p.mode, S) })));
+  const all = [...rows(xs(sides.field), "battle"), ...rows(xs(sides.bench), "support")];
+  return { all, bad: all.filter((r) => r.pr.v !== "ok") };
+}
+function tbPas({ all, bad }, S) {
+  const shown = (tbAll ? all : bad).map(({ x, p, pr }) => tbRow(x.img.thumb, p.name, `${p.kind === "battle" ? "Passive" : "Support"} · ${x.title}`, tbCosts(p.cost, p.mode, S), pr, tbPlain(p.desc))).join("");
+  return `<div class="tbhead"><span class="muted small">${all.length - bad.length} of ${all.length} switch on easily</span><span class="grow"></span><button id="tbfind">Find support passives</button></div>
+    ${shown || `<div class="muted small">${all.length ? "Every passive with a sin condition works with this team." : "No passive here asks for sins."}</div>`}
+    ${all.length && bad.length < all.length ? `<button class="tblink" data-tball>${tbAll ? "Only the problems" : `Show all ${all.length}`}</button>` : ""}`;
 }
 function pickFor(sid) {
   const list = UNITS.ids.filter((x) => x.sinner === sid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -524,7 +541,7 @@ function pickFor(sid) {
     const arr = UNITS.egos.filter((x) => x.sinner === sid && x.grade === g).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
     modal(`<h2 style="margin-top:0">${esc(UNITS.sinners[sid - 1])}</h2>${egoRow()}
       <div class="chips" style="margin-bottom:10px">${cur[gi] ? `<button data-none="1">Remove</button>` : ""}</div>
-      <div class="ugrid small-cards">${arr.map((x) => unitCard(x, cur[gi] === x.id ? `<div class="picked">✓</div>` : "")).join("") || `<div class="muted">No ${g} E.G.O for this Sinner.</div>`}</div>`);
+      <div class="ugrid small-cards">${arr.map((x) => unitCard(x, (cur[gi] === x.id ? `<div class="picked">✓</div>` : "") + tbEgoBadge(sid, x))).join("") || `<div class="muted">No ${g} E.G.O for this Sinner.</div>`}</div>`);
     const body = $("#modal-body");
     body.querySelectorAll("[data-gi]").forEach((b) => b.onclick = () => { gi = +b.dataset.gi; draw(); });
     const set = (id) => {
@@ -552,6 +569,204 @@ function pickFor(sid) {
     });
     const none = body.querySelector("[data-none]");
     if (none) none.onclick = () => { delete MY.slots[sid]; MY.order = MY.order.filter((s) => s !== sid); saveMy(); $("#modal").classList.add("hidden"); drawBuilder(); };
+  };
+  draw();
+}
+
+// ------------------------------------------------------------------ Team checks: sins for E.G.O and passives, MD gifts
+// A used skill gives one of its sin; each turn a Sinner is dealt 2 of its 6 skill copies and uses one.
+function tbSides() {
+  const all = UNITS.sinners.map((_, i) => i + 1), has = (sid) => !!unitById(MY.slots[sid]);
+  let field = MY.order.slice(0, ORDER_MAX).filter(has);
+  if (!field.length) field = all.filter(has);
+  return { field, bench: all.filter((sid) => !field.includes(sid)) };
+}
+// rate: sins a turn on average; can: per Sinner, the chance a turn deals it a skill of that sin
+function tbSins(field) {
+  const rate = {}, can = {};
+  for (const sid of field) {
+    const d = {};
+    unitById(MY.slots[sid]).skills.forEach((s) => { const n = s.copies ?? 1, sin = topUp(s).sin; if (n) d[sin] = (d[sin] || 0) + n; });
+    const tot = Object.values(d).reduce((a, b) => a + b, 0);
+    for (const [sin, c] of Object.entries(d)) {
+      rate[sin] = (rate[sin] || 0) + c / tot;
+      (can[sin] = can[sin] || []).push(tot > 1 ? 1 - ((tot - c) * (tot - c - 1)) / (tot * (tot - 1)) : 1);
+    }
+  }
+  return { rate, can };
+}
+function tbAtLeast(ps, n) {
+  let dp = [1];
+  for (const p of ps) { const nx = Array(dp.length + 1).fill(0); dp.forEach((v, k) => { nx[k] += v * (1 - p); nx[k + 1] += v * p; }); dp = nx; }
+  return dp.slice(n).reduce((a, b) => a + b, 0);
+}
+// a sin price against the field: v = ok / slow / no
+function tbPrice(cost, mode, S) {
+  if (!cost || !cost.length) return null;
+  if (mode === "res") {
+    const lack = cost.find(({ sin, n }) => (S.can[sin] || []).length < n);
+    if (lack) return { v: "no", text: `Won't activate: ${(S.can[lack.sin] || []).length} on the field use ${lack.sin}, Resonance needs ${lack.n}` };
+    const p = Math.min(...cost.map(({ sin, n }) => tbAtLeast(S.can[sin], n)));
+    return { v: p >= 0.5 ? "ok" : "slow", text: `Resonance on ≈${Math.round(p * 100)}% of turns` };
+  }
+  const lack = cost.find(({ sin }) => !S.rate[sin]);
+  if (lack) return { v: "no", text: `Won't activate: no ${lack.sin} skills on the field` };
+  const t = Math.max(1, Math.ceil(Math.max(...cost.map(({ sin, n }) => n / S.rate[sin]))));
+  return { v: t <= 3 ? "ok" : "slow", text: `≈${t} turn${t > 1 ? "s" : ""} to gather` };
+}
+const tbCosts = (cost, mode, S) => (cost || []).map(({ sin, n }) => `<span class="tbcost ${(mode === "res" ? (S.can[sin] || []).length >= n : S.rate[sin]) ? "" : "no"}" title="${mode === "res" ? "Resonance" : "Owned"} ${n} ${sin}">${sinIcon(sin, "s16")}${n}</span>`).join("");
+const tbPlain = (t) => String(t || "").replace(/<[^>]+>/g, "").replace(/\[(\w+)\]/g, (_, k) => statusName(k));
+const tbRow = (img, name, sub, costs, pr, tip = "") => `<div class="tbrow ${pr ? pr.v : ""}" title="${esc(tip)}"><img src="${imgThumb(img)}" onerror="this.style.visibility='hidden'">
+  <div class="tbtx"><b>${esc(name)}</b><small>${esc(sub)}</small>${pr ? `<small class="tbv">${esc(pr.text)}</small>` : ""}</div><span class="tbcosts">${costs}</span></div>`;
+
+// the worst sin check of an Identity's passives of this kind, as a corner mark on its slot
+function tbPasMark(x, kind, S) {
+  const bad = x.passives.filter((p) => p.kind === kind && p.cost.length).map((p) => ({ p, pr: tbPrice(p.cost, p.mode, S) })).filter((r) => r.pr.v !== "ok");
+  if (!bad.length) return "";
+  const v = bad.some((r) => r.pr.v === "no") ? "no" : "slow";
+  return `<span class="tbmark ${v}" title="${esc(bad.map((r) => `${kind === "battle" ? "Passive" : "Support passive"} ${r.p.name}: ${r.pr.text}`).join("\n"))}">${v === "no" ? "!" : "~"}</span>`;
+}
+let tbAll = false, tbClose = false, tbSel = 0, tbTab = "md";
+// on an E.G.O card in the picker: can the field gather its price
+function tbEgoBadge(sid, e) {
+  const { field } = tbSides();
+  if (!field.includes(sid)) return "";
+  const pr = tbPrice(e.cost, "", tbSins(field));
+  return pr ? `<div class="tbbadge ${pr.v}">${esc(pr.v === "no" ? "No such sin on the field" : pr.text.replace(" to gather", ""))}</div>` : "";
+}
+// Mirror Dungeon gifts that switch on only for a team (mirror.team_conds, read from the English text); names compared
+// in English
+let TB_MD = null;
+const tbOn = new Set(), tbOff = new Set();
+const mdFacs = (x) => x._fac || (x._fac = [...x.assoc, ...(x.traitKw || []).map((t) => t.name)].map(langEn));
+const mdMet = (c) => (c.n ? c.have >= c.n : c.have > 0), mdCnt = (c) => (c.n ? `${c.have}/${c.n}` : `${c.have}, more = stronger`);
+function mdConds(g) {
+  if (g._c) return g._c;
+  const facs = mdConds.f || (mdConds.f = new Set(UNITS.ids.flatMap(mdFacs)));
+  return (g._c = (g.team || []).map((c) => (c.fs ? { ...c, fs: c.fs.map(langEn) } : c))
+    .filter((c) => (c.kind === "st" ? UNITS.statuses.includes(c.k) : c.kind === "fac" ? c.fs.every((f) => facs.has(f)) : true)));
+}
+function mdCount(c, { field, bench }) {
+  const sids = c.scope === "all" ? field.concat(bench) : c.scope === "bench" ? bench : field;
+  return sids.map((sid) => unitById(MY.slots[sid])).filter(Boolean).filter((x) => c.kind === "st" ? x.statuses.includes(c.k)
+    : c.kind === "fac" ? c.fs.some((f) => mdFacs(x).includes(f))
+    : (((MIRROR || {}).users || {})[c.k] || []).includes(x.id)).length;
+}
+const mdLabel = (c) => (c.kind === "fac" ? c.fs.join(" or ") : c.kind === "use" ? `${((UNITS.glossary || {})[c.k] || {}).name || c.k} users` : statusName(c.k))
+  + { field: " on the field", all: " in the team", bench: " in the backup" }[c.scope];
+// for the MD planner: how the saved team meets a gift's condition
+function mdTeamLine(id) {
+  if (!MY || !UNITS || !Object.values(MY.slots).some(unitById)) return "";
+  const sides = tbSides();
+  return mdConds(mpG(id)).map((c) => { c = { ...c, have: mdCount(c, sides) }; return `<small class="mdteam ${mdMet(c) ? "ok" : "bad"}">Your team: ${esc(mdLabel(c))} ${mdCnt(c)}</small>`; }).join("");
+}
+// gifts by condition, one row each; a fusion's parts come with it in the planner, so they aren't listed
+function tbMd(sides) {
+  if (!MIRROR) {
+    if (!TB_MD) TB_MD = mpLoad().then(() => tbRedraw()).catch(() => { TB_MD = "failed"; tbRedraw(); });
+    return `<div class="muted small">${TB_MD === "failed" ? "No Mirror Dungeon data: take a snapshot first." : "Reading the gifts…"}</div>`;
+  }
+  const seen = new Set(), list = [];
+  for (const [id, g] of Object.entries(MIRROR.gifts)) {
+    const cs = mdConds(g).map((c) => ({ ...c, have: mdCount(c, sides) }));
+    if (!cs.length || !cs.some((c) => c.have) || seen.has(g.name)) continue;
+    seen.add(g.name);
+    const met = cs.every(mdMet);
+    if (met || cs.every((c) => c.have >= c.n - 2)) list.push({ id: +id, g, cs, met, fus: !!MIRROR.fus[id] });
+  }
+  const parts = new Set(), addParts = (id) => (MIRROR.fus[id] || []).flat().forEach((p) => { if (!parts.has(p)) { parts.add(p); addParts(p); } });
+  list.forEach((x) => addParts(x.id));
+  const groups = new Map();
+  for (const x of list.filter((x) => !parts.has(x.id))) {
+    const key = JSON.stringify(x.cs.map((c) => [c.kind, c.k, c.fs, c.n, c.scope]));
+    if (!groups.has(key)) groups.set(key, { cs: x.cs, met: x.met, gifts: [] });
+    groups.get(key).gifts.push(x);
+  }
+  const gs = [...groups.values()];
+  gs.forEach((G) => G.gifts.sort((a, b) => b.fus - a.fus || b.g.tier - a.g.tier || a.g.name.localeCompare(b.g.name)));
+  gs.sort((a, b) => b.gifts.filter((x) => x.fus).length - a.gifts.filter((x) => x.fus).length || b.gifts.length - a.gifts.length);
+  const on = (x) => (x.met && !tbOff.has(x.id)) || tbOn.has(x.id), shown = gs.flatMap((G) => (G.met || tbClose ? G.gifts : []));
+  const icon = (x) => `<span class="tbgi ${on(x) ? "on" : ""}" data-tbg="${x.id}" title="${esc(`${x.g.name} · Tier ${ROMAN[x.g.tier - 1] || x.g.tier}${x.fus ? " · Fusion" : ""}\n\n${tbPlain(x.g.desc)}`)}">${x.g.pic ? `<img src="${imgThumb(x.g.pic)}" loading="lazy">` : ""}${x.fus ? "<s>F</s>" : ""}</span>`;
+  const row = (G) => `<div class="tbgrp ${G.met ? "ok" : "no"}"><div class="tbcond">${G.met ? "✓" : "·"} ${G.cs.map((c) => `${esc(mdLabel(c))} <b>${mdCnt(c)}</b>`).join(" + ")}</div><div class="tbgis">${G.gifts.map(icon).join("")}</div></div>`;
+  const met = gs.filter((G) => G.met), close = gs.filter((G) => !G.met), picked = shown.filter(on);
+  return `${met.map(row).join("") || `<div class="muted small">${close.length ? "Nothing switches on with this team yet." : "No gift asks for what this team has."}</div>`}
+    ${close.length ? `<button class="tblink" data-tbclose>${tbClose ? "Hide the almost ones ▴" : `Almost (${close.length}) ▾`}</button>${tbClose ? close.map(row).join("") : ""}` : ""}
+    ${shown.length ? `<div class="muted small tbhint">Click a gift to leave it out · F = fusion, its parts are planned with it</div><button id="tbplan" class="tbplan" ${picked.length ? "" : "disabled"}>Plan ${picked.length} in the MD planner ›</button>` : ""}`;
+}
+function tbRedraw() { if ($("#builder") && location.hash.startsWith("#/teams")) drawBuilder(); }
+function tbBind(el) {
+  const has = (sid) => !!unitById(MY.slots[sid]);
+  const swap = (a, b) => {
+    const o = MY.order.slice(), i = o.indexOf(a), j = o.indexOf(b);
+    if (a === b || (i < 0 && j < 0)) return;
+    if (i >= 0 && j >= 0) { o[i] = b; o[j] = a; } else if (i >= 0) o[i] = b; else o[j] = a;
+    MY.order = o; saveMy();
+  };
+  el.querySelectorAll("[data-slot]").forEach((d) => {
+    const sid = +d.dataset.slot;
+    d.onclick = (e) => { if (!e.target.closest("[data-tbo],.tbmark")) pickFor(sid); };
+    if (!has(sid)) return;
+    d.ondragstart = (e) => { e.dataTransfer.setData("text/plain", String(sid)); e.dataTransfer.effectAllowed = "move"; };
+    d.ondragover = (e) => { e.preventDefault(); d.classList.add("over"); };
+    d.ondragleave = () => d.classList.remove("over");
+    d.ondrop = (e) => { e.preventDefault(); tbSel = 0; swap(+e.dataTransfer.getData("text/plain"), sid); drawBuilder(); };
+  });
+  el.querySelectorAll("[data-tbo]").forEach((b) => b.onclick = () => {
+    const sid = +b.dataset.tbo;
+    if (tbSel === sid) { MY.order = MY.order.filter((s) => s !== sid); saveMy(); tbSel = 0; }
+    else if (tbSel) { swap(tbSel, sid); tbSel = 0; }
+    else if (MY.order.includes(sid)) tbSel = sid;
+    else { MY.order.push(sid); saveMy(); }
+    drawBuilder();
+  });
+  el.querySelectorAll("[data-tbtab]").forEach((b) => b.onclick = () => { tbTab = b.dataset.tbtab; drawBuilder(); });
+  const clear = el.querySelector("#clearteam");
+  if (clear) clear.onclick = () => { MY.slots = {}; MY.order = []; MY.egos = {}; saveMy(); drawBuilder(); };
+  const find = el.querySelector("#tbfind");
+  if (find) find.onclick = tbFind;
+  el.querySelectorAll("[data-tball]").forEach((b) => b.onclick = () => { tbAll = !tbAll; drawBuilder(); });
+  el.querySelectorAll("[data-tbclose]").forEach((b) => b.onclick = () => { tbClose = !tbClose; drawBuilder(); });
+  el.querySelectorAll("[data-tbg]").forEach((r) => r.onclick = () => {
+    const id = +r.dataset.tbg;
+    if (r.classList.contains("on")) { tbOn.delete(id); tbOff.add(id); } else { tbOff.delete(id); tbOn.add(id); }
+    drawBuilder();
+  });
+  const plan = el.querySelector("#tbplan");
+  if (plan) plan.onclick = () => {
+    const ids = [...el.querySelectorAll("[data-tbg].on")].map((r) => +r.dataset.tbg);
+    const st = teamStats().st, lead = Object.keys(st).sort((a, b) => st[b] - st[a])[0];
+    ids.forEach((id) => mp.want.add(id));
+    mp.kw = lead || ""; mp.tab = "b";
+    mpSave();
+    location.hash = "#/mirror";
+  };
+}
+// support passives of every Identity a backup Sinner could take, checked against the field's sins
+function tbFind() {
+  let st = "", works = false, top = 0;
+  const draw = () => {
+    const { field, bench } = tbSides(), S = tbSins(field);
+    const groups = bench.map((sid) => {
+      const rows = UNITS.ids.filter((x) => x.sinner === sid).sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+        .flatMap((x) => x.passives.filter((p) => p.kind === "support").map((p) => ({ x, p, pr: tbPrice(p.cost, p.mode, S) })))
+        .filter(({ p, pr }) => (!st || p.desc.includes(`[${st}]`)) && (!works || !pr || pr.v !== "no"));
+      return rows.length ? `<div class="tbsub">${esc(UNITS.sinners[sid - 1])}</div>` + rows.map(({ x, p, pr }) => `<div class="tbrow tbpick ${pr ? pr.v : ""} ${MY.slots[sid] === x.id ? "on" : ""}" data-tbpick="${sid}:${x.id}">
+        <img src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'"><div class="tbtx"><b>${esc(p.name)}</b><small>${esc(x.title)}${MY.slots[sid] === x.id ? " · in the team" : ""}</small>
+        ${pr ? `<small class="tbv">${esc(pr.text)}</small>` : ""}<div class="tbdesc">${fmtDesc(p.desc)}</div></div><span class="tbcosts">${tbCosts(p.cost, p.mode, S)}</span></div>`).join("") : "";
+    }).join("");
+    modal(`<h2 style="margin-top:0">Support passives for the backup</h2>
+      <div class="sub">Sinners not among the first ${ORDER_MAX} in order. Red: the sins of the ${field.length} on the field can't switch it on. Click one to put that Identity in the team.</div>
+      <div class="chips" style="margin-bottom:10px"><button class="toggle ${works ? "on" : ""}" data-tbw="1">Only ones that work</button>
+        ${UNITS.statuses.map((k) => `<button class="toggle ${st === k ? "on" : ""}" data-tbst="${k}">${statusIcon(k, "s18")}${esc(statusName(k))}</button>`).join("")}</div>
+      ${groups || `<div class="muted">${bench.length ? "Nothing fits." : "Every Sinner is on the field."}</div>`}`);
+    const body = $("#modal-body"), box = body.closest(".modal-box");
+    box.scrollTop = top;
+    body.querySelector("[data-tbw]").onclick = () => { works = !works; draw(); };
+    body.querySelectorAll("[data-tbst]").forEach((b) => b.onclick = () => { st = st === b.dataset.tbst ? "" : b.dataset.tbst; draw(); });
+    body.querySelectorAll("[data-tbpick]").forEach((r) => r.onclick = () => {
+      const [sid, id] = r.dataset.tbpick.split(":").map(Number);
+      MY.slots[sid] = id; saveMy(); drawBuilder(); top = box.scrollTop; draw();
+    });
   };
   draw();
 }

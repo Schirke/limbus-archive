@@ -1090,6 +1090,7 @@ class Service:
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
             db = mirror.build(self.static_tables(["mirrordungeon-theme-floor", "mirror-dungeon-common-data", "ego-gift", "ego-gift-mirrordungeon",
                                                   "mirrordungeon"]), loc, gifts, cards)
+            db["users"] = mirror.users(db, self.unit_db())
             db["v"] = mirror.VERSION
             self.store.write_json(rel, db)
         self._mirror = (sid, db)

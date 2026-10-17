@@ -99,7 +99,6 @@ figure:has(.sdl.black) video { background: #000; }
   .gmhubhead { flex-wrap: wrap; gap: 8px 12px; } .gmhubhead #gmduel { width: auto; flex: 1 1 100%; margin: 0; order: 5; }
   .gmtop > * { min-width: 0; } .gmday { grid-template-columns: minmax(0, 1fr); }
   .gmday .gmart { clip-path: none; }
-  .slots { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .gmplay { flex-wrap: wrap; } .gmdaybody .gmplay { height: auto; } .gmdaybody .gmplay > * { min-height: 38px; }
   .cmrow { grid-template-columns: 18px 124px minmax(0, 1fr); gap: 4px 10px; padding: 8px 8px 8px 4px; }
   .cmrow > :nth-child(4) { grid-column: 3; justify-self: start; }

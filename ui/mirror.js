@@ -17,14 +17,17 @@ const mpSpec = (f) => (mp.mode === 0 ? ["0", f] : f < 5 ? ["1", f] : f < 10 ? ["
 const mpAllowed = (p, f) => { const [d, lf] = mpSpec(f), fl = p.floors[d]; return !!fl && (lf < 0 || fl.includes(lf)); };
 const mpFloor = (f) => (f < 5 ? "Floor " + (f + 1) : f < 10 ? "Floors 6–10" : "Floors 11–15");
 
+async function mpLoad() {
+  if (MIRROR) return MIRROR;
+  const [m] = await Promise.all([api("/api/mirror"), units()]);
+  m.excl = new Set(m.packs.flatMap((p) => p.excl));
+  for (const g of [...mp.want]) if (!m.gifts[g]) mp.want.delete(g);
+  return (MIRROR = m);
+}
 routes.mirror = async () => {
   const main = $("#main");
-  if (!MIRROR) {
-    main.innerHTML = `<h1>Mirror Dungeon planner</h1><div class="muted">Reading the game's files…</div>`;
-    try { [MIRROR] = await Promise.all([api("/api/mirror"), units()]); } catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-    MIRROR.excl = new Set(MIRROR.packs.flatMap((p) => p.excl));
-    for (const g of [...mp.want]) if (!MIRROR.gifts[g]) mp.want.delete(g);
-  }
+  if (!MIRROR) main.innerHTML = `<h1>Mirror Dungeon planner</h1><div class="muted">Reading the game's files…</div>`;
+  try { await Promise.all([mpLoad(), myTeam().catch(() => {})]); } catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (!location.hash.startsWith("#/mirror")) return;
   if (!MIRROR.packs.length) { MIRROR = null; main.innerHTML = `<h1>Mirror Dungeon planner</h1><div class="empty">Take a snapshot first — the packs and gifts are read from it.</div>`; return; }
   if (!MIRROR.modes[MP_MODES[mp.mode][2]]) mp.mode = 1;
@@ -108,7 +111,7 @@ function mpBuild(r) {
     if (r.nowhere.includes(g)) return '<small class="bad">⚠ in no pack of this mode</small>';
     return `<small class="bad">⚠ no free floor — ${r.packs.filter((p) => r.gives(p).includes(g)).slice(0, 3).map((p) => esc(p.name)).join(", ")}</small>`;
   };
-  const item = (g) => { const f = r.fus.find(([res]) => res === g); return `<div class="mpck">${mpGi(g)}<div><b>${esc(mpG(g).name)}</b>${f ? `<small class="fz">Fusion of ${f[1].length} gifts</small>` : line(g)}</div>
+  const item = (g) => { const f = r.fus.find(([res]) => res === g); return `<div class="mpck">${mpGi(g)}<div><b>${esc(mpG(g).name)}</b>${f ? `<small class="fz">Fusion of ${f[1].length} gifts</small>` : line(g)}${mdTeamLine(g)}</div>
       ${f ? `<div class="parts">${f[1].map((p) => `<div>${mpGi(p)}<span>${esc(mpG(p).name)}<br>${MIRROR.fus[p] ? '<small class="fz">a fusion itself — below</small>' : line(p)}</span></div>`).join("")}</div>` : ""}</div>`; };
   const extra = r.fus.map(([res]) => res).filter((g) => !mp.want.has(g));
   return `<div class="card mpcard"><div class="row"><span class="mpcap">Your build<small>${mp.want.size} gifts</small></span><span class="grow"></span>${mp.want.size ? "<button data-clear>Clear all</button>" : ""}</div>
@@ -184,7 +187,7 @@ function mpTip(el, e) {
   if (tip.dataset.g !== id) {
     const g = mpG(id), packs = [...new Set(MIRROR.packs.filter((p) => p.excl.includes(+id)).map((p) => p.name))];
     tip.dataset.g = id;
-    tip.innerHTML = `<b>${esc(g.name)}</b><div class="muted small">${[g.tier && "Tier " + g.tier, g.kw && esc(mpKw(g.kw)), g.sin].filter(Boolean).join(" · ")}</div><div>${fmtDesc(g.desc)}</div>
+    tip.innerHTML = `<b>${esc(g.name)}</b><div class="muted small">${[g.tier && "Tier " + g.tier, g.kw && esc(mpKw(g.kw)), g.sin].filter(Boolean).join(" · ")}</div><div>${fmtDesc(g.desc)}</div>${mdTeamLine(id)}
       ${MIRROR.fus[id] ? `<div class="fz">Fusion: ${MIRROR.fus[id][0].map((x) => esc(mpG(x).name)).join(" + ")}</div>` : ""}${packs.length ? `<div class="gold">Only in: ${esc(packs.join(", "))}</div>` : ""}`;
   }
   tip.style.display = "block";
