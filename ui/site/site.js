@@ -1,9 +1,9 @@
 "use strict";
 // The web copy's tweaks over the app's scripts: stubs for app-only pages, hidden controls, the footer.
 (() => {
-  // the pages the site has data for: decided when the site is made (limbusdm/site.py verify)
+  // the pages the site has data for: decided when the site is made (limbusdm/site.py PAGES, verify)
   const repo = "https://github.com/Schirke/limbus-archive";
-  const OPEN = new Set(SITE.open || ["patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "community", "support"]);
+  const OPEN = new Set(SITE.open || []);
   // "?check": the app checking its site. The front page (site only): latest Identities' art, latest patch, sections
   OPEN.add("home");
   // a section page opens the app on it

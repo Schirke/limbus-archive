@@ -30,10 +30,114 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
             "project": "", "url": ""}
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
-# pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "profile", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers", "abnologs", "calc"]
-# a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
-CARD_DIRS = ("db", "enemies", "buffs", "og")
+# ------------------------------------------------------------------ the site's pages and parts: described here only
+# PAGES: route → what the site does with that page (the menu itself is ui/index.html; ui/site/site.js hides what is
+# not open, from SITE.open)
+#   title, seo  its page for search engines (<route>.html): name and description; a route without one that the menu
+#               names gets the menu's word and a guessing-game text (section_pages)
+#   open        open without the check (verify); any other page opens once the check finds nothing missing on it
+#   cards       a page per card for link previews: <route>/<…>.html (Exporter.card_pages)
+#   app         works only in the app: the check never opens it
+#   beta        open once its part was sent; no page for search engines; who sees it is beta.json
+#   part        the manifest it mainly reads (PARTS)
+PAGES = {
+    "patches": {"title": "Patch reports", "seo": "What every Limbus Company update changed, read from the game's files: new Identities "
+                "and E.G.O, changed skills and texts, new pictures, sounds and videos.", "open": True},
+    "news": {"title": "News", "seo": "Limbus Company developer notices and update announcements, each next to the report of what the "
+             "update changed.", "open": True, "part": "small"},
+    "changes": {"title": "Change history", "seo": "Buffs, nerfs and text changes of Identities, E.G.O and statuses in Limbus Company, "
+                "update by update.", "open": True, "part": "tools"},
+    "db": {"title": "Identities & E.G.O", "seo": "Every Limbus Company Identity and E.G.O: skills, coins, passives, resistances, stats "
+           "and full art.", "open": True, "cards": True, "part": "units"},
+    "enemies": {"title": "Enemies", "seo": "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by "
+                "Canto.", "open": True, "cards": True, "part": "enemies"},
+    "stages": {"title": "Story map", "seo": "Every Canto's stages in Limbus Company: who stands there and what waits."},
+    "announcers": {"title": "Announcers", "seo": "Every battle announcer of Limbus Company with all of its lines by situation: read them "
+                   "and hear them.", "open": True, "part": "announcers"},
+    "abnologs": {"title": "Abnormality logs", "seo": "Every Limbus Company Abnormality observation log, Canto by Canto: which Sinner "
+                 "wrote it and the others' replies.", "open": True, "part": "abnologs"},
+    "story": {"title": "Story", "seo": "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by "
+              "Canto.", "part": "story"},
+    "buffs": {"title": "Buff effects", "seo": "Limbus Company statuses and buffs: what each one does and how it looks in battle.",
+              "open": True, "cards": True, "part": "buffs"},
+    "anim": {"title": "Animations", "seo": "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and "
+             "Abnormalities.", "open": True, "part": "anim"},
+    "teams": {"title": "Team builder", "seo": "Put a Limbus Company team of Identities and E.G.O together and share it as a link or a "
+              "team code.", "open": True, "part": "units"},
+    "mirror": {"title": "Mirror Dungeon planner", "seo": "Limbus Company Mirror Dungeon: E.G.O gifts by keyword and tier, theme packs and "
+               "their bosses.", "open": True, "part": "tools"},
+    "calc": {"title": "Damage calculator", "seo": "Limbus Company damage calculator: any Identity or E.G.O skill against any enemy, coin "
+             "by coin, with the max damage of every skill.", "open": True, "part": "enemies"},
+    "banners": {"title": "Banner archive", "seo": "Every Limbus Company Extraction banner: when it ran and who was on it.", "open": True,
+                "part": "gacha"},
+    "gamegacha": {"title": "Extraction", "seo": "A Limbus Company Extraction simulator, paid with the lunacy the site's games give.",
+                  "open": True, "part": "gacha"},
+    "games": {"title": "Games", "seo": "Limbus Company guessing games: Identities, skills, enemies, music, Wordle, Connections and more, "
+              "alone or live with friends.", "open": True, "part": "cards"},
+    "live": {"title": "Live match", "seo": "Play the Limbus Company guessing games with friends at the same time, in one room.",
+             "open": True},
+    "community": {"title": "Community", "seo": "Who streams Limbus Company right now, and channels worth a look.", "open": True},
+    "support": {"title": "Support & credits", "seo": "Support the Limbus Archive project, and who made it.", "open": True},
+    "home": {"title": "Limbus Archive", "seo": "Limbus Company fan archive: patch highlights, Identity and E.G.O database, enemies, "
+             "animations, music and mini-games.", "open": True, "part": "units"},
+    "profile": {"open": True, "part": "units"},
+    "compare": {"open": True, "part": "units"},
+    "gameid": {"open": True, "part": "quiz"}, "gamechar": {"open": True, "part": "quiz"}, "gamecanto": {"open": True, "part": "scenes"},
+    "gamearena": {"open": True, "part": "newgames"}, "gamesound": {"open": True, "part": "newgames"},
+    **{r: {"open": True} for r in ("gameskill", "gameenemy", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas",
+                                   "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamehilo",
+                                   "gamepassive", "gameego", "gamememory", "gamewho", "gamedare")},
+    **{r: {"beta": True, "part": "biggames"} for r in ("biggames", "singingmachine", "slice")},
+    **{r: {"app": True} for r in ("versus", "vsroom", "vsmirror", "sounds", "browse", "snapshots", "scan", "settings", "sprites")},
+}
+BASE_OPEN = [r for r, p in PAGES.items() if p.get("open")]
+CARD_DIRS = tuple(r for r, p in PAGES.items() if p.get("cards")) + ("og",)  # (og/: the cards' pictures)
+
+# pack sizes
+PACK = 1 << 20  # packs are fetched whole: keep them small
+# smaller packs for what the Games fetch one at a time
+CARD_PACK = 2 << 20  # one Identity's / E.G.O's art and skill pictures: its card in one fetch
+WORD_PACK = 64 << 10  # keyword pictures, ~5 KB each
+GAME_PACK = 128 << 10  # skill pictures, ~15 KB each
+VOICE_PACK = 256 << 10  # voice lines, ~60 KB each
+SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
+# PARTS: the site's data, one manifest each (d/m/<name>.json.gz), made in this order by Exporter.pages()
+#   cfg     made only when this site setting is on
+#   taken   pull() takes it from the site when this computer can't go on from its own (langs, buffs, fx: own rules there)
+#   crawl   made by following links (Exporter.crawl): the lists to start from, and packs by request (first match wins;
+#           a tuple of patterns = one group in that order); without it: the Exporter method of the part's name
+#   by      "verify": made by the check (verify), not by pages()
+PARTS = {
+    "quiz": {"cfg": "games", "taken": True},
+    "cards": {"cfg": "games", "taken": True},
+    # Guess the Canto picks a background at random: all of them, a small one with its full-size picture
+    "scenes": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (story backgrounds)", "start": ["/api/game_pics"],
+               "packs": [(r"/api/game_pics$", PACK), (r"/api/asset_img\?", SCENE_PACK), (r"/api/asset_thumb\?", GAME_PACK)]}},
+    "gacha": {"cfg": "games", "taken": True},
+    "newgames": {"cfg": "games", "taken": True},
+    "units": {"taken": True},
+    "langs": {},
+    "small": {},
+    # the planner's gifts then theme packs with its list, the history with the rest
+    "tools": {"taken": True, "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
+              "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
+    "buffs": {},
+    "fx": {"cfg": "spine"},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
+    "anim": {"cfg": "spine", "taken": True},
+    "enemies": {"cfg": "enemies", "taken": True, "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
+                "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]}},
+    "music": {"cfg": "music", "taken": True},
+    "story": {"cfg": "story"},
+    "announcers": {"cfg": "story", "taken": True, "crawl": {"stage": "Announcers", "start": ["/api/announcers"],
+                   "packs": [(r"/api/announcers$", PACK), ((r"/api/asset_thumb\?", r"/api/asset_img\?"), GAME_PACK),
+                             (r"/api/bank\?", VOICE_PACK)]}},
+    "abnologs": {"cfg": "story", "taken": True},
+    "biggames": {"taken": True},
+    "extra": {"taken": True, "by": "verify"},  # (requests the check found unanswered: Exporter.extra)
+}
+TAKEN_PARTS = tuple(n for n, p in PARTS.items() if p.get("taken"))
+assert all(p.get("part") in PARTS for p in PAGES.values() if "part" in p)
+
 CARD_PAGE = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{full}</title>
@@ -42,31 +146,6 @@ CARD_PAGE = """<!doctype html>
 <style>body{{margin:0;background:#12100e;color:#e9e2d4;font:16px/1.55 system-ui,"Segoe UI",sans-serif}}main{{max-width:860px;margin:0 auto;padding:16px}}a{{color:#e8b33a}}</style>
 </head><body><main><h1>{title}</h1><p>{desc}</p>{body}<p><a href="/#/{route}">Open on Limbus Archive</a></p></main></body></html>
 """
-# section pages for search engines: route → (name, description)
-SECTIONS = {
-    "patches": ("Patch reports", "What every Limbus Company update changed, read from the game's files: new Identities and E.G.O, "
-                "changed skills and texts, new pictures, sounds and videos."),
-    "news": ("News", "Limbus Company developer notices and update announcements, each next to the report of what the update changed."),
-    "changes": ("Change history", "Buffs, nerfs and text changes of Identities, E.G.O and statuses in Limbus Company, update by update."),
-    "db": ("Identities & E.G.O", "Every Limbus Company Identity and E.G.O: skills, coins, passives, resistances, stats and full art."),
-    "enemies": ("Enemies", "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by Canto."),
-    "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
-    "announcers": ("Announcers", "Every battle announcer of Limbus Company with all of its lines by situation: read them and hear them."),
-    "abnologs": ("Abnormality logs", "Every Limbus Company Abnormality observation log, Canto by Canto: which Sinner wrote it and the others' replies."),
-    "story": ("Story", "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by Canto."),
-    "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
-    "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
-    "teams": ("Team builder", "Put a Limbus Company team of Identities and E.G.O together and share it as a link or a team code."),
-    "mirror": ("Mirror Dungeon planner", "Limbus Company Mirror Dungeon: E.G.O gifts by keyword and tier, theme packs and their bosses."),
-    "calc": ("Damage calculator", "Limbus Company damage calculator: any Identity or E.G.O skill against any enemy, coin by coin, with the max damage of every skill."),
-    "banners": ("Banner archive", "Every Limbus Company Extraction banner: when it ran and who was on it."),
-    "gamegacha": ("Extraction", "A Limbus Company Extraction simulator, paid with the lunacy the site's games give."),
-    "games": ("Games", "Limbus Company guessing games: Identities, skills, enemies, music, Wordle, Connections and more, alone or live with friends."),
-    "live": ("Live match", "Play the Limbus Company guessing games with friends at the same time, in one room."),
-    "community": ("Community", "Who streams Limbus Company right now, and channels worth a look."),
-    "support": ("Support & credits", "Support the Limbus Archive project, and who made it."),
-    "home": ("Limbus Archive", "Limbus Company fan archive: patch highlights, Identity and E.G.O database, enemies, animations, music and mini-games."),
-}
 # requests the check never fetches by itself
 NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchnotes|fx|mod|frame|versus|skills|skill_slots|owner_|clip|"
                      r"local_video|sprites|browse|tree|types|container|scan|bank|export|open|site_|object|blob|report|characters|"
@@ -327,8 +406,7 @@ def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
     return data, ctype
 
 
-# the big games: their pages, and what of their requests the site keeps (the rest: other parts, or the app's own)
-BIG_OPEN = ["biggames", "singingmachine", "slice"]
+# the big games (PAGES "beta"): what of their requests the site keeps (the rest: other parts, or the app's own)
 BIG_ASKS = {"/api/frames", "/api/frame_png", "/api/sounds", "/api/bank", "/api/stage_pic", "/api/asset_thumb", "/api/asset_img", "/api/enemy_thumb"}
 
 
@@ -694,8 +772,9 @@ class Exporter:
         return m
 
     def crawl(self, name: str) -> dict:
-        """A CRAWL section: its lists, then every file their answers link to (links.py), level by level."""
-        sec = CRAWL[name]
+        """A part made by following links (PARTS "crawl"): its lists, then every file their answers link to (links.py), level
+        by level."""
+        sec = PARTS[name]["crawl"]
         stage = "site: " + sec["stage"]
         have = self.kept(self.read_manifest(name), sec["start"])  # (the lists: asked every time)
         self.progress(stage, 0, 0)
@@ -1181,36 +1260,23 @@ class Exporter:
         a = admin(self.svc)
         got = _read_json(os.path.join(self.out, "d", "check.json")).get("open") or BASE_OPEN
         # (the big games: open once their data is sent; who sees them is beta.json "games")
-        big = BIG_OPEN if os.path.exists(self._manifest_path("biggames")) else []
+        big = [r for r, p in PAGES.items() if p.get("beta") and os.path.exists(self._manifest_path(p["part"]))]
         return [r for r in dict.fromkeys(got + a["on"] + big) if r not in a["off"]]
 
     def pages(self):
-        """Everything but the reports."""
-        if self.cfg["games"]:
-            self.quiz()
-            self.cards()
-            self.crawl("scenes")
-            self.gacha()
-            self.newgames()
-        self.units()
-        self.langs()
-        self.small()
-        self.crawl("tools")
-        self.buffs()
-        if self.cfg["spine"]:  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
-            from . import sitefx
-            sitefx.export(self)
-        if self.cfg["spine"]:
-            self.anim()
-        if self.cfg["enemies"]:
-            self.crawl("enemies")
-        if self.cfg["music"]:
-            self.music()
-        if self.cfg["story"]:
-            self.story()
-            self.crawl("announcers")
-            self.abnologs()
-        self.biggames()
+        """Everything but the reports: PARTS in order."""
+        for name, p in PARTS.items():
+            if p.get("by") or (p.get("cfg") and not self.cfg[p["cfg"]]):
+                continue
+            if "crawl" in p:
+                self.crawl(name)
+            else:
+                getattr(self, name)()
+
+    def fx(self) -> dict:
+        """The Animations page's "With effects" tab: limbusdm/sitefx.py."""
+        from . import sitefx
+        return sitefx.export(self)
 
     # -- the site around the data
     def shell(self):
@@ -1319,11 +1385,12 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         if "games" in open_:
             open_.add("games/track")
         pages = {}
-        for route in ["home"] + list(SECTIONS) + list(names):
-            if route in pages or route not in open_ or route in BIG_OPEN or not (route in SECTIONS or names.get(route)):  # (big games: shown only once turned on)
+        for route in ["home"] + [r for r, p in PAGES.items() if p.get("title")] + list(names):
+            p = PAGES.get(route) or {}
+            if route in pages or route not in open_ or p.get("beta") or not (p.get("title") or names.get(route)):  # (big games: shown only once turned on)
                 continue
-            title, desc = SECTIONS.get(route) or (names[route], f"{names[route]}: a Limbus Company guessing game on Limbus Archive. "
-                                                                 "Play alone or in a live match with friends.")
+            title, desc = (p["title"], p["seo"]) if p.get("title") else (names[route], f"{names[route]}: a Limbus Company guessing game on "
+                                                                                       "Limbus Archive. Play alone or in a live match with friends.")
             pages[route] = (title, desc, self._section_text(route))
         return pages
 
@@ -1591,8 +1658,6 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 
 PULL_STAGE = "site: taking from the site"
-# parts pull() takes from the site
-TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "announcers", "abnologs", "cards", "tools", "extra", "music", "biggames")
 PULL_THREADS, PULL_TRIES = 10, 3
 PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
 PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped from it
@@ -2121,31 +2186,12 @@ def size_of(root: str) -> dict:
     return {"files": n, "bytes": total}
 
 
-PACK = 1 << 20  # packs are fetched whole: keep them small
-# smaller packs for what the Games fetch one at a time
 HOST_MAX = 24 << 20  # host limit 25 MiB: bigger files go up in parts
 # videos in parts too, so the worker can answer the range a player asks for
 VIDEO_WHOLE = 4 << 20  # (a smaller one comes whole: about a second)
 VIDEO_PART = 2 << 20
-CARD_PACK = 2 << 20  # one Identity's / E.G.O's art and skill pictures: its card in one fetch
-WORD_PACK = 64 << 10  # keyword pictures, ~5 KB each
-GAME_PACK = 128 << 10  # skill pictures, ~15 KB each
-VOICE_PACK = 256 << 10
-ANNOUNCER_LINES = 8  # Guess the sound on the site: lines of each announcer  # voice lines, ~60 KB each
-SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
+ANNOUNCER_LINES = 8  # Guess the sound on the site: lines of each announcer
 FRESH_FACES = 32  # the newest Identities' pictures (two per Identity) in a pack of their own
-# sections made by following links (Exporter.crawl): the lists to start from, and packs by request (first match wins)
-CRAWL = {
-    "enemies": {"stage": "Enemies", "start": ["/api/enemies"], "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]},
-    # the planner's gifts then theme packs with its list, the history with the rest
-    "tools": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
-              "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]},
-    # Guess the Canto picks a background at random: all of them, a small one with its full-size picture
-    "scenes": {"stage": "Games (story backgrounds)", "start": ["/api/game_pics"],
-               "packs": [(r"/api/game_pics$", PACK), (r"/api/asset_img\?", SCENE_PACK), (r"/api/asset_thumb\?", GAME_PACK)]},
-    "announcers": {"stage": "Announcers", "start": ["/api/announcers"],
-                   "packs": [(r"/api/announcers$", PACK), ((r"/api/asset_thumb\?", r"/api/asset_img\?"), GAME_PACK), (r"/api/bank\?", VOICE_PACK)]},
-}
 LINK = re.compile(r"/(api|spine)/")
 # what a first visit asks whatever page it opens, each kind in its own pack: a new visitor fetches these, not the big packs they'd sit in
 START = (r"^/api/(font\?|langs$|ui_langs$|site_fx$|music$)", r"^/api/gacha_ui\?n=(icon_lunacy|%s)$", r"^/api/ui_icon\?k=(sinner|rank|st)_", r"^/api/units$")

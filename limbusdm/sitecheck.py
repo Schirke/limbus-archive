@@ -12,8 +12,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 
-# pages that can't work from files: never opened
-APP_ONLY = {"versus", "vsroom", "vsmirror", "sounds", "vslive", "browse", "snapshots", "scan", "settings", "sprites"}
+from .site import PAGES
+
+# pages that can't work from files: never opened (site.PAGES "app")
+APP_ONLY = {r for r, p in PAGES.items() if p.get("app")}
 
 
 def find_browser() -> str | None:
