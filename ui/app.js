@@ -3549,6 +3549,7 @@ function siteCheck(c) {
 // what a "Send to site" put there (limbusdm/site.py publish → "sent")
 function siteSent(x) {
   const data = Object.entries(x.data || {}).map(([k, n]) => `${esc(k)}: ${n} new`).join(" · ");
+  if (x.nothing) return "nothing changed since the last send — nothing packed, checked or uploaded";
   return (x.uploaded ? `${x.uploaded} file${x.uploaded > 1 ? "s" : ""} uploaded (${fmtSize(x.uploaded_bytes)})${x.first ? " — the first upload from the app, every file is counted" : ""}` : "nothing new to upload")
     + (x.removed ? `, ${x.removed} removed` : "") + ` · ${x.pages ? "pages updated" : "pages unchanged"}`
     + (x.report ? ` · report ${esc(fmtSnap(x.report.split("__")[1] || x.report))}` : "") + (data ? `<br>read again from the game: ${data}` : "")
@@ -3575,6 +3576,8 @@ async function drawSiteBox() {
     <div style="margin:8px 0">On the site: ${s.site ? `${build(s.site)} <span class="muted small">uploaded ${esc(when(s.site))}${s.site.game ? ` · game ${esc(fmtVer(s.site.game))}` : ""}</span>` : `<span class="muted">${esc(s.error || "nothing yet")}</span>`}<br>
       This app: ${build(s.app)}${s.app && s.app.game ? ` <span class="muted small">game ${esc(fmtVer(s.app.game))}</span>` : ""}</div>
     ${s.last ? `<div class="small" style="margin:0 0 10px"><span class="muted">Sent last, ${esc(when({ stamp: s.last.when }))}:</span> ${siteSent(s.last)}</div>` : ""}
+    <div class="row small" style="gap:8px;margin:0 0 10px"><span class="muted">The site's files (~20 GB):</span> <span class="mono" style="overflow-wrap:anywhere">${esc(s.dir || "")}</span>
+      ${s.dir_missing ? `<span class="bad">not found — connect its drive; Send to site waits for it</span>` : ""}<button id="sitemove" ${busy ? "disabled" : ""}>Move…</button></div>
     <div class="row" style="gap:8px"><button class="primary" id="sitego" ${busy ? "disabled" : ""}>Send to site</button>
       <span class="muted small">writes the pages and data out again, packs them and uploads what changed; the progress is in the status at the top</span></div>
     ${siteLog(s.log, when)}
@@ -3586,6 +3589,12 @@ async function drawSiteBox() {
       <div class="row" style="gap:8px"><code class="mono small grow" id="sitecmd" style="user-select:all;overflow-wrap:anywhere">${esc(s.command)}</code><button id="sitecopy">Copy</button></div>` : ""}`;
   $("#sitego").onclick = async () => {
     try { await api("/api/site_publish", {}); toast("Sending to the site…", 6000); refresh(); }
+    catch (e) { toast(esc(e.message)); }
+  };
+  $("#sitemove").onclick = async () => {
+    const d = prompt("Folder to keep the site's files in (e.g. D:\\LimbusArchive-site). Nothing is uploaded again. Empty: back into the app's data folder.", s.dir || "");
+    if (d === null) return;
+    try { await api("/api/site_move", { dir: d.trim() }); toast("Moving the site's files… the progress is in the status at the top.", 6000); refresh(); }
     catch (e) { toast(esc(e.message)); }
   };
   if ($("#sitefx")) $("#sitefx").onclick = async () => {

@@ -890,6 +890,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 base = f"http://127.0.0.1:{self.server.server_address[1]}"
                 svc._run_job("site", lambda progress: site.publish(svc, base, b.get("id"), progress))
                 return self._json({"ok": True})
+            if p == "/api/site_move":  # the web copy's files into another folder (limbusdm/site.py move)
+                from . import site
+                svc._run_job("sitemove", lambda progress: site.move(svc, str(b.get("dir") or ""), progress))
+                return self._json({"ok": True})
             if p == "/api/site_fx":  # the web copy: render the skills the site has no videos of (limbusdm/sitefx.py)
                 from . import sitefx
                 if b.get("stop"):

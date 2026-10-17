@@ -107,32 +107,34 @@ SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
 #   crawl   made by following links (Exporter.crawl): the lists to start from, and packs by request (first match wins;
 #           a tuple of patterns = one group in that order); without it: the Exporter method of the part's name
 #   by      "verify": made by the check (verify), not by pages()
+#   always  made every time (from the internet, or one request); any other part is skipped while what it is made from
+#           (the app, the game version, the site settings, its "uses": INPUTS) is as when it was made last (Exporter.pages)
 PARTS = {
     "quiz": {"cfg": "games", "taken": True},
-    "cards": {"cfg": "games", "taken": True},
+    "cards": {"cfg": "games", "taken": True},  # (random picks: kept until the game or the app changes)
     # Guess the Canto picks a background at random: all of them, a small one with its full-size picture
     "scenes": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (story backgrounds)", "start": ["/api/game_pics"],
                "packs": [(r"/api/game_pics$", PACK), (r"/api/asset_img\?", SCENE_PACK), (r"/api/asset_thumb\?", GAME_PACK)]}},
     "gacha": {"cfg": "games", "taken": True},
     "newgames": {"cfg": "games", "taken": True},
     "units": {"taken": True},
-    "langs": {},
-    "small": {},
+    "langs": {"always": True},
+    "small": {"always": True},
     # the planner's gifts then theme packs with its list, the history with the rest
-    "tools": {"taken": True, "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
+    "tools": {"taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
               "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
-    "buffs": {},
-    "fx": {"cfg": "spine"},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
-    "anim": {"cfg": "spine", "taken": True},
-    "enemies": {"cfg": "enemies", "taken": True, "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
+    "buffs": {"uses": ["buff videos"]},
+    "fx": {"cfg": "spine", "uses": ["skill videos"]},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
+    "anim": {"cfg": "spine", "taken": True, "uses": ["fx"]},
+    "enemies": {"cfg": "enemies", "taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
                 "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]}},
     "music": {"cfg": "music", "taken": True},
-    "story": {"cfg": "story"},
+    "story": {"cfg": "story", "uses": ["story reader"]},
     "announcers": {"cfg": "story", "taken": True, "crawl": {"stage": "Announcers", "start": ["/api/announcers"],
                    "packs": [(r"/api/announcers$", PACK), ((r"/api/asset_thumb\?", r"/api/asset_img\?"), GAME_PACK),
                              (r"/api/bank\?", VOICE_PACK)]}},
-    "abnologs": {"cfg": "story", "taken": True},
-    "biggames": {"taken": True},
+    "abnologs": {"cfg": "story", "taken": True, "uses": ["enemy pictures", "abno authors"]},
+    "biggames": {"taken": True, "uses": ["big games"]},
     "extra": {"taken": True, "by": "verify"},  # (requests the check found unanswered: Exporter.extra)
 }
 TAKEN_PARTS = tuple(n for n, p in PARTS.items() if p.get("taken"))
@@ -156,15 +158,34 @@ CJK = re.compile("[぀-ヿ㐀-鿿가-힯]")
 PREVIEW = ("Texture2D", "Sprite", "AudioClip", "VideoClip", "TextAsset", "Mesh")  # ui: previewHtml asks for these as they are
 
 
+def own_file(svc, name: str) -> str:
+    """The site's own files in the data folder (settings, what was sent, …)."""
+    return os.path.join(svc.data_dir, name)
+
+
+SITE_DIR = "site_dir.json"  # (in the data folder) {"dir": …}: the folder site/ and site_packed/ are kept in, when not the data folder
+
+
+def site_root(svc) -> str:
+    """The folder site/ and site_packed/ are in (move())."""
+    return _read_json(own_file(svc, SITE_DIR)).get("dir") or svc.data_dir
+
+
+def root_missing(svc) -> str:
+    """The site's own folder when it is set and not there (its drive not connected), else ""."""
+    d = site_root(svc)
+    return "" if d == svc.data_dir or os.path.isdir(d) else d
+
+
 def out_dir(svc) -> str:
-    return os.path.join(svc.data_dir, "site")
+    return os.path.join(site_root(svc), "site")
 
 
 def config(svc) -> dict:
     """data/site_config.json, over DEFAULTS."""
     c = dict(DEFAULTS)
     try:
-        with open(os.path.join(svc.data_dir, "site_config.json"), encoding="utf-8") as f:
+        with open(own_file(svc, "site_config.json"), encoding="utf-8") as f:
             c.update(json.load(f))
     except (OSError, ValueError):
         pass
@@ -189,7 +210,7 @@ def build_info(svc) -> dict:
 
 def worker_config(svc) -> str:
     """Writes data/site_worker (worker.js + wrangler config); returns the config's path."""
-    folder = os.path.join(svc.data_dir, "site_worker")
+    folder = own_file(svc, "site_worker")
     os.makedirs(folder, exist_ok=True)
     shutil.copyfile(os.path.join(resource_dir(), "ui", "site", "worker.js"), os.path.join(folder, "worker.js"))
     cfg = {"name": config(svc)["project"], "main": "worker.js", "compatibility_date": "2025-09-01",
@@ -221,8 +242,8 @@ def status(svc) -> dict:
     """This app's build next to the one the site is showing, for the Settings page."""
     cfg, mine = config(svc), build_info(svc)
     out = {"url": cfg["url"], "project": cfg["project"], "app": mine, "site": None, "error": None,
-           "command": deploy_command(svc) if cfg["project"] else "", "last": _read_json(os.path.join(svc.data_dir, "site_sent.json")).get("last"),
-           "log": (_read_json(os.path.join(svc.data_dir, SEND_LOG)).get("list") or [])[::-1]}
+           "command": deploy_command(svc) if cfg["project"] else "", "last": _read_json(own_file(svc, "site_sent.json")).get("last"),
+           "log": (_read_json(own_file(svc, SEND_LOG)).get("list") or [])[::-1], "dir": site_root(svc), "dir_missing": bool(root_missing(svc))}
     if cfg["url"]:
         try:
             from urllib.request import Request
@@ -251,12 +272,12 @@ ADMIN = "site_admin.json"  # (in the data folder) the owner's choices: pages tur
 
 
 def admin(svc) -> dict:
-    a = _read_json(os.path.join(svc.data_dir, ADMIN))
+    a = _read_json(own_file(svc, ADMIN))
     return {k: list(a.get(k) or []) for k in ("on", "off", "removed", "back")}
 
 
 def admin_save(svc, a: dict):
-    path = os.path.join(svc.data_dir, ADMIN)
+    path = own_file(svc, ADMIN)
     with open(path + ".tmp", "w", encoding="utf-8") as f:
         json.dump(a, f, indent=1)
     os.replace(path + ".tmp", path)
@@ -481,13 +502,88 @@ def _grouped(got: dict, first: list[tuple[list, int]]) -> tuple[dict, list]:
     return urls, groups
 
 
+_APP: list[str] = []
+
+
+def app_sig() -> str:
+    """The app's version and, run from the source, its code (one version, many edits)."""
+    if not _APP:
+        import limbusdm
+        h = hashlib.sha1(limbusdm.__version__.encode())
+        for d in limbusdm.__path__:
+            for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+                if fn.endswith(".py"):
+                    with open(os.path.join(d, fn), "rb") as f:
+                        h.update(fn.encode() + f.read())
+        _APP.append(h.hexdigest()[:16])
+    return _APP[0]
+
+
+def _files_sig(folder: str) -> list:
+    """Every file under a folder: name, size, time."""
+    out = []
+    for d, dirs, files in os.walk(folder):
+        dirs.sort()
+        for fn in sorted(files):
+            try:
+                st = os.stat(os.path.join(d, fn))
+            except OSError:
+                continue
+            out.append([os.path.relpath(os.path.join(d, fn), folder), st.st_size, int(st.st_mtime)])
+    return out
+
+
+def _file_sig(path: str) -> list:
+    try:
+        st = os.stat(path)
+        return [st.st_size, int(st.st_mtime)]
+    except OSError:
+        return []
+
+
+def _story_version():
+    try:
+        from . import story
+        return story.VERSION
+    except ImportError:
+        return None
+
+
+# what a part is made from besides the app, the game version and the site settings (PARTS "uses")
+INPUTS = {
+    "skill videos": lambda ex: _files_sig(os.path.dirname(ex.svc.fx.out_dir(0))),
+    "buff videos": lambda ex: _files_sig(ex.svc.buff_fx.folder()),
+    "fx": lambda ex: ex.manifest_hash("fx"),  # (the Animations list names enemies with videos)
+    "story reader": lambda ex: _story_version(),
+    "big games": lambda ex: _files_sig(os.path.join(resource_dir(), "ui", "big")),
+    "enemy pictures": lambda ex: _files_sig(os.path.join(ex.svc.data_dir, "enemy_thumbs")),  # (drawn by the app's pages)
+    "abno authors": lambda ex: _file_sig(os.path.join(resource_dir(), "ui", "abno_authors.json")),
+}
+MADE = "made.json"  # (d/, not uploaded) what each part was made from, what was sent last (Exporter.pages, _publish)
+EVERY_PAGE = ("langs", "extra")  # parts any page may read: a change opens all of them in the check
+
+
+def check_routes(changed: set) -> list[str] | None:
+    """The pages to open again when only these manifests changed (None: all): home, theirs, the patches for a report."""
+    if changed & set(EVERY_PAGE):
+        return None
+    want = {"home"} | {r for r, p in PAGES.items() if p.get("part") in changed}
+    if any(n.startswith("report-") for n in changed):
+        want |= {"patches", "news"}
+    return [r for r in PAGES if r in want and not PAGES[r].get("app")]
+
+
 class Exporter:
     def __init__(self, svc, base_url: str, out: str | None = None, progress=None):
+        if out is None and root_missing(svc):
+            raise RuntimeError(f"the site's folder {root_missing(svc)} isn't there — connect its drive (or move the site "
+                               "back in Settings → Website)")
         self.svc, self.base, self.out = svc, base_url.rstrip("/"), out or out_dir(svc)
         self.cfg = config(svc)
         self.progress = progress or (lambda stage, done, total, msg="": None)
         self.failed: list[tuple[str, str]] = []
         self.fresh: dict[str, int] = {}  # what was asked from the app this time (not kept from before), by part of the site
+        self.same: list[str] = []  # parts skipped: made from the same as last time
         self._same: dict[str, object] = {}  # unchanged() by the game version a manifest was made from
         os.makedirs(os.path.join(self.out, "d", "m"), exist_ok=True)
         self._jlock = threading.Lock()
@@ -557,7 +653,7 @@ class Exporter:
             list(pool.map(one, todo))
         part = stage.replace("site: ", "")  # (a crawl asks level by level)
         self.fresh[part] = self.fresh.get(part, 0) + resumed + sum(1 for k in todo if k in out)  # (the rest: the app has nothing there)
-        return out
+        return {k: out[k] for k in keys if k in out}  # (in the asked order, not as they came: the same packs next time)
 
     # a send that stops halfway goes on next time from d/fetched.txt
     def _journal_path(self) -> str:
@@ -664,6 +760,54 @@ class Exporter:
             json.dump(m, f, ensure_ascii=False)
         os.replace(tmp, self._manifest_path(name))
 
+    def manifest_hash(self, name: str) -> str:
+        """A manifest's content ("" without one)."""
+        try:
+            with gzip.open(self._manifest_path(name), "rb") as f:
+                return hashlib.sha1(f.read()).hexdigest()[:16]
+        except (OSError, EOFError):
+            return ""
+
+    # -- what the parts were made from, what was sent (d/made.json)
+    def made(self) -> dict:
+        return _read_json(os.path.join(self.out, "d", MADE))
+
+    def made_save(self, made: dict):
+        path = os.path.join(self.out, "d", MADE)
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump(made, f)
+        os.replace(path + ".tmp", path)
+
+    def _inputs(self, name: str) -> str:
+        p = PARTS[name]
+        got = {"app": app_sig(), "game": self.svc.latest_snapshot_id(), "cfg": {k: v for k, v in self.cfg.items() if isinstance(v, bool)},
+               "part": p, **{u: INPUTS[u](self) for u in p.get("uses") or []}}
+        return hashlib.sha1(json.dumps(got, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+    def _whole(self, name: str, here: set) -> bool:
+        """Every file of a manifest is here (`here`: the files in d/f, listed once)."""
+        m = self.read_manifest(name)
+        return bool(m) and all(f in here for f in m.get("urls", {}).values() if isinstance(f, str) and f)
+
+    def _listed(self) -> set:
+        root = os.path.join(self.out, "d", "f")
+        return {f"f/{d.name}/{fn}" for d in os.scandir(root) if d.is_dir() for fn in os.listdir(d.path)} if os.path.isdir(root) else set()
+
+    def state(self) -> dict:
+        """What the site is written from: every manifest, the translations, and what the pages take besides."""
+        mdir, trdir = os.path.join(self.out, "d", "m"), os.path.join(self.out, "d", "tr")
+        ms = {fn[:-8]: self.manifest_hash(fn[:-8]) for fn in sorted(os.listdir(mdir)) if fn.endswith(".json.gz")}
+        tr = {}
+        for fn in sorted(os.listdir(trdir)) if os.path.isdir(trdir) else []:
+            try:
+                with gzip.open(os.path.join(trdir, fn), "rb") as f:
+                    tr[fn] = hashlib.sha1(f.read()).hexdigest()[:16]
+            except (OSError, EOFError):
+                tr[fn] = ""
+        pages = {"build": {k: v for k, v in build_info(self.svc).items() if k != "stamp"}, "app": app_sig(), "cfg": self.cfg,
+                 "admin": admin(self.svc), "open": _read_json(os.path.join(self.out, "d", "check.json")).get("open"), "tr": tr}
+        return {"m": ms, "pages": hashlib.sha1(json.dumps(pages, sort_keys=True, default=str).encode()).hexdigest()[:16]}
+
     # -- pages
     def report(self, rid: str) -> dict | None:
         rep = public(self.svc.store.read_json(f"reports/{rid}.json.gz"))
@@ -673,6 +817,9 @@ class Exporter:
             for path in (self._manifest_path(name), os.path.join(self.out, "d", "tr", name + ".json.gz")):
                 if os.path.exists(path):
                     os.remove(path)
+            made = self.made()
+            if rid not in made.get("empty", []):  # (not read again by the next send: _publish)
+                self.made_save({**made, "empty": made.get("empty", []) + [rid]})
             return None
         old = self.read_manifest(name)
         keys = report_urls(rep, self.cfg)
@@ -1264,14 +1411,28 @@ class Exporter:
         return [r for r in dict.fromkeys(got + a["on"] + big) if r not in a["off"]]
 
     def pages(self):
-        """Everything but the reports: PARTS in order."""
+        """Everything but the reports: PARTS in order; a part made from the same as last time, with its manifest as it
+        left it and every file here, is skipped."""
+        made = self.made()
+        parts, here = made.setdefault("parts", {}), None
         for name, p in PARTS.items():
             if p.get("by") or (p.get("cfg") and not self.cfg[p["cfg"]]):
                 continue
+            sig, was = None if p.get("always") else self._inputs(name), parts.get(name) or {}
+            if sig and was.get("in") == sig and was.get("m") == self.manifest_hash(name):
+                here = self._listed() if here is None else here  # (nothing is deleted while parts are made)
+                if self._whole(name, here):
+                    self.same.append(name)
+                    continue
+            failed = len(self.failed)
             if "crawl" in p:
                 self.crawl(name)
             else:
                 getattr(self, name)()
+            # (a list the app didn't give: asked again next time; a file it has nothing for stays so)
+            ok = all("404" in e for _, e in self.failed[failed:])
+            parts[name] = {"in": sig if ok else None, "m": self.manifest_hash(name)}
+            self.made_save(made)
 
     def fx(self) -> dict:
         """The Animations page's "With effects" tab: limbusdm/sitefx.py."""
@@ -1664,7 +1825,7 @@ PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped fr
 
 
 def pack_index_path(svc) -> str:
-    return os.path.join(svc.data_dir, PACK_INDEX)
+    return own_file(svc, PACK_INDEX)
 
 
 class PackIndex:
@@ -1897,7 +2058,7 @@ def pull(ex: Exporter, url: str) -> dict:
         ex.write_manifest(name, m)
         out["reports"] += 1
     # a report this computer sent that the site has no more was taken off from another computer
-    sent = _read_json(os.path.join(svc.data_dir, "site_sent.json")).get("files") or {}
+    sent = _read_json(own_file(svc, "site_sent.json")).get("files") or {}
     for fn in os.listdir(os.path.join(ex.out, "d", "m")):
         name = fn[:-8]
         if fn.endswith(".json.gz") and name.startswith("report-") and name not in names and f"d/m/{fn}" in sent:
@@ -2045,12 +2206,12 @@ DEPLOY_TRIES = 4
 DEPLOY_FLAKY = r"\b50[234]\b|Gateway Timeout|Bad Gateway|malformed response|ECONNRESET|ETIMEDOUT|UND_ERR|fetch failed|socket hang up"
 
 
-def verify(ex: "Exporter", progress=None) -> dict:
-    """Open every page of the packed site headless, fetch what was missing, decide which pages open; leaves
-    data/site_packed ready."""
+def verify(ex: "Exporter", progress=None, routes: list[str] | None = None) -> dict:
+    """Open every page (or these routes) of the packed site headless, fetch what was missing, decide which pages open;
+    leaves data/site_packed ready. Pages not opened keep what the last check found."""
     from . import sitecheck
     packed = packed_dir(ex.svc)
-    res = sitecheck.check(packed, progress=progress)
+    res = sitecheck.check(packed, routes=routes, progress=progress)
     if res["error"]:
         return {"error": res["error"], "checked": 0, "opened": [], "healed": 0, "misses": {}}
     want = sorted({k for ks in res["misses"].values() for k in ks if not NO_HEAL.search(k)})
@@ -2062,8 +2223,12 @@ def verify(ex: "Exporter", progress=None) -> dict:
         if not again["error"]:
             res["misses"] = again["misses"]
     pages = [r for r in res["routes"] if r not in sitecheck.APP_ONLY]
+    if routes is not None:
+        was = _read_json(os.path.join(ex.out, "d", "check.json"))
+        res["misses"] = {**{r: ks for r, ks in (was.get("misses") or {}).items() if r not in routes}, **res["misses"]}
     opened = [r for r in pages if r in BASE_OPEN or r not in res["misses"]]
-    out = {"error": None, "when": int(time.time()), "checked": len(pages), "open": opened, "healed": healed,
+    out = {"error": None, "when": int(time.time()), "checked": len(pages if routes is None else [r for r in routes if r in pages]),
+           "open": opened, "healed": healed,
            "opened": [r for r in opened if r not in BASE_OPEN], "misses": res["misses"]}
     with open(os.path.join(ex.out, "d", "check.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False)
@@ -2092,7 +2257,7 @@ SEND_LOG_KEEP = 30
 
 
 def _log_send(svc, entry: dict):
-    path = os.path.join(svc.data_dir, SEND_LOG)
+    path = own_file(svc, SEND_LOG)
     rows = (_read_json(path).get("list") or []) + [entry]
     try:
         with open(path, "w", encoding="utf-8") as f:
@@ -2146,20 +2311,37 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     def there(r):
         return os.path.exists(ex._manifest_path(report_name(r["id"])))
     newest = max((taken(r) for r in svc.reports() if there(r)), default="")
+    empty = set(ex.made().get("empty") or [])
     for r in svc.reports():
-        if r["id"] != report and r["id"] not in gone and taken(r) > newest and not there(r):
+        if r["id"] != report and r["id"] not in gone | empty and taken(r) > newest and not there(r):
             ex.report(r["id"])
     ex.pages()
+    # what changed since the last send that went through: nothing → nothing to write, pack, check or upload
+    sent_path = own_file(svc, "site_sent.json")
+    st, was = ex.state(), ex.made().get("sent") or {}
+    changed = {n for n in set(st["m"]) | set(was.get("m") or {}) if st["m"].get(n) != (was.get("m") or {}).get(n)}
+    whole = st["pages"] != was.get("pages") or not os.path.exists(os.path.join(packed_dir(svc), "d", "index.json"))
+    progress("site: what changed", 0, 0, "all pages" if whole else ", ".join(sorted(changed)) or "nothing")
+    if not changed and not whole:
+        ex.forget()
+        last = _read_json(sent_path).get("last") or {}
+        same = {"when": int(time.time()), "build": build_info(svc), "report": report or "", "nothing": True, "uploaded": 0,
+                "removed": 0, "pages": False, "data": {}, "same": ex.same, "files": last.get("files"), "bytes": last.get("bytes"), "check": last.get("check")}
+        return {"site": cfg["url"] if cfg["project"] else "", "dir": packed_dir(svc), "sent": same, "files": same["files"], "bytes": same["bytes"]}
     ex.shell()
     progress("site: packing", 0, 0)
     size = pack(ex.out, packed_dir(svc), pack_index_path(svc))
-    chk = verify(ex, progress)
+    chk = verify(ex, progress, None if whole else check_routes(changed))
     size = size_of(packed_dir(svc))
+
+    def sent():  # (the next send compares with this)
+        if not chk.get("error"):
+            ex.made_save({**ex.made(), "sent": ex.state()})
     if not cfg["project"]:
+        sent()
         ex.forget()
         return {"site": "", "dir": packed_dir(svc), "check": chk, **size}
     # what this upload changes: packed files vs the last sent
-    sent_path = os.path.join(svc.data_dir, "site_sent.json")
     before, root = _read_json(sent_path).get("files") or {}, packed_dir(svc)
     now = _listing(root)
     new = [k for k, v in now.items() if before.get(k) != v]
@@ -2170,9 +2352,10 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
             "uploaded": len(new), "uploaded_bytes": sum(os.path.getsize(os.path.join(root, k)) for k in new),
             "removed": sum(1 for k in before if k not in now), "first": not before,
             "pages": any(k.startswith("ui/") or k in ("index.html", "sw.js") for k in new),
-            "data": {k: n for k, n in ex.fresh.items() if n}, "files": size["files"], "bytes": size["bytes"], "check": chk}
+            "data": {k: n for k, n in ex.fresh.items() if n}, "same": ex.same, "changed": "all" if whole else sorted(changed), "files": size["files"], "bytes": size["bytes"], "check": chk}
     with open(sent_path, "w", encoding="utf-8") as f:
         json.dump({"files": now, "last": last}, f)
+    sent()
     ex.forget()
     return {"site": url, "dir": packed_dir(svc), "sent": last, **size}
 
@@ -2228,7 +2411,7 @@ def _start_groups(src: str) -> list[list[tuple[str, int]]]:
 
 
 def packed_dir(svc) -> str:
-    return os.path.join(svc.data_dir, "site_packed")
+    return os.path.join(site_root(svc), "site_packed")
 
 
 KEY_SHARDS = 256  # the request → file table cut in this many files: the worker reads only the one a request is in
@@ -2289,6 +2472,69 @@ def _key_shards(dst: str, packed_urls: dict) -> dict:
             g += "#" + str(_fnv(k) % split[g])
         buckets[_fnv(g) % KEY_SHARDS][k] = v
     return {"f": [_put_shard(dst, b) if b else "" for b in buckets], "split": split}
+
+
+def _link(a: str, b: str):
+    """b: the same file as a — a second name, not a second copy on disk (on another drive: a copy)."""
+    if os.path.exists(b):
+        sa, sb = os.stat(a), os.stat(b)
+        if os.path.samefile(a, b) or (sa.st_dev != sb.st_dev and sa.st_size == sb.st_size):
+            return
+    tmp = b + ".tmp"
+    if os.path.exists(tmp):
+        os.remove(tmp)
+    try:
+        os.link(a, tmp)
+    except OSError:
+        shutil.copyfile(a, tmp)
+    os.replace(tmp, b)
+
+
+def move(svc, dst: str, progress=None) -> dict:
+    """site/ and site_packed/ into the folder dst ("": back into the data folder). The names in them, in the manifests and
+    in what was sent are relative: nothing goes up again. Another drive: copied, then the old ones deleted."""
+    progress = progress or (lambda stage, done, total, msg="": None)
+    cur, dst = site_root(svc), os.path.abspath(dst.strip().strip('"') or svc.data_dir)
+    if root_missing(svc):
+        raise RuntimeError(f"the site's folder {cur} isn't there — connect its drive first")
+    if os.path.normcase(dst) == os.path.normcase(cur):
+        return {"dir": cur, "moved": 0}
+    names = [n for n in ("site", "site_packed") if os.path.isdir(os.path.join(cur, n))]
+    for n in names:
+        if os.path.normcase(dst + os.sep).startswith(os.path.normcase(os.path.join(cur, n) + os.sep)):
+            raise RuntimeError(f"{dst} is inside the site's own folder")
+    os.makedirs(dst, exist_ok=True)
+    files = [(n, os.path.relpath(os.path.join(d, fn), os.path.join(cur, n))) for n in names
+             for d, _, fs in os.walk(os.path.join(cur, n)) for fn in fs]
+    moved = 0
+    for i, (n, rel) in enumerate(files):
+        a, b = os.path.join(cur, n, rel), os.path.join(dst, n, rel)
+        if i % 200 == 0:
+            progress("site: moving its files", i, len(files), dst)
+        os.makedirs(os.path.dirname(b), exist_ok=True)
+        try:
+            os.replace(a, b)  # (same drive: only the name)
+        except OSError:
+            # another drive: a packed big file is the site's own again there (pack)
+            twin = os.path.join(dst, "site", rel) if n == "site_packed" and rel.startswith(os.path.join("d", "f") + os.sep) else ""
+            if twin and os.path.exists(twin) and os.path.getsize(twin) == os.path.getsize(a):
+                _link(twin, b)
+            elif not os.path.exists(b) or os.path.getsize(b) != os.path.getsize(a):
+                shutil.copyfile(a, b + ".tmp")
+                os.replace(b + ".tmp", b)
+        moved += 1
+    path = own_file(svc, SITE_DIR)
+    if os.path.normcase(dst) == os.path.normcase(svc.data_dir):
+        if os.path.exists(path):
+            os.remove(path)
+    else:
+        with open(path + ".tmp", "w", encoding="utf-8") as f:
+            json.dump({"dir": dst}, f)
+        os.replace(path + ".tmp", path)
+    progress("site: moving its files", len(files), len(files), "removing the old copy")
+    for n in names:
+        shutil.rmtree(os.path.join(cur, n), ignore_errors=True)
+    return {"dir": dst, "moved": moved}
 
 
 def pack(src: str, dst: str, index: str | None = None) -> dict:
@@ -2378,9 +2624,8 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
     whole = {v[0] for v in parts.values()}
     for rel in loose - whole:
         full = os.path.join(dst, "d", rel)
-        if not os.path.exists(full):
-            os.makedirs(os.path.dirname(full), exist_ok=True)
-            shutil.copyfile(os.path.join(src, "d", rel), full)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        _link(os.path.join(src, "d", rel), full)
     for p, (rel, off, size) in parts.items():
         full = os.path.join(dst, "d", p)
         if os.path.exists(full) and os.path.getsize(full) == size:
