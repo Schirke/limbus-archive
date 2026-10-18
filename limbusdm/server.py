@@ -512,7 +512,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from .viewer import battle_maps
                 return self._json([m["name"] for m in battle_maps(svc)])
             if p == "/api/frames":
-                from .frames import character_frames, part_frames
+                from .frames import character_frames, look_frames, part_frames
+                if q.get("look"):  # another appearance of the Identity (Faust's "CastOff")
+                    return self._json(look_frames(svc, _fx_id(q["id"]), q["look"]))
                 out = character_frames(svc, _fx_id(q["id"]))
                 # parts=1: units drawn as GameObjects of parts get composed frames
                 return self._json(part_frames(svc, _fx_id(q["id"])) if q.get("parts") and not out["groups"] else out)

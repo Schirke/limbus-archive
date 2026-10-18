@@ -133,6 +133,49 @@ def character_frames(svc, cid) -> dict:
     return out
 
 
+LOOK_POSE = {"Default": "idle", "Move": "move", "Damaged": "dmg", "Guard": "gud", "Evade": "miss", "Dead": "dead"}
+
+
+def look_frames(svc, cid, look: str) -> dict:
+    """The frames of another appearance of an Identity (e.g. "CastOff"): groups S1… and "Poses", like character_frames."""
+    groups, poses = {}, []
+    for c in svc.owner_clips(cid):
+        if look.lower() not in c["animator"].lower() or c["kind"] not in ("skill", "pose"):
+            continue
+        path = svc.object_file(c["bundle"])
+        if not path:
+            continue
+        with _lock:
+            env = _env(path)
+            objs = {o.path_id: o for o in env.objects}
+            clip = objs.get(int(c["clip"]))
+            frames = []
+            try:
+                pp = clip.read_typetree()["m_ClipBindingConstant"]["pptrCurveMapping"] if clip is not None else []
+            except Exception:
+                pp = []
+            for p in pp:
+                o = objs.get(p.get("m_PathID")) if p.get("m_FileID", 0) == 0 else None
+                if o is None or o.type.name != "Sprite":
+                    continue
+                d = o.parse_as_dict()
+                r, pv = d["m_Rect"], d.get("m_Pivot") or {"x": 0.5, "y": 0.5}
+                w, h = round(r["width"]), round(r["height"])
+                rec = {"name": d.get("m_Name") or str(o.path_id), "bundle": c["bundle"], "pid": str(o.path_id), "w": w, "h": h,
+                       "px": round(pv["x"] * w, 2), "py": round(pv["y"] * h, 2), "ppu": d.get("m_PixelsToUnits") or 100}
+                if rec not in frames:
+                    frames.append(rec)
+        if not frames:
+            continue
+        label = c["name"].rsplit("_", 1)[-1]
+        if c["kind"] == "skill":
+            groups.setdefault(f"S{c['n']}", frames)
+        elif label in LOOK_POSE:
+            poses += [{**f, "name": LOOK_POSE[label] if i == 0 else f"{LOOK_POSE[label]}_{i}"} for i, f in enumerate(frames)]
+    out = [{"name": k, "frames": v} for k, v in sorted(groups.items())]
+    return {"groups": out + ([{"name": "Poses", "frames": poses}] if poses else [])}
+
+
 PART_GROUP = re.compile(r"^(skill\d+|s\d+|idle|default|move|dmg|damaged|dead)$", re.I)
 PART_POSE = {"default": "idle", "damaged": "dmg"}
 
