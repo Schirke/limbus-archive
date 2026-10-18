@@ -272,6 +272,31 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .ucard { position: relative; } .tbbadge { position: absolute; left: 6px; right: 32px; top: 6px; z-index: 1; font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; text-align: center; background: rgba(0,0,0,.75); }
 .tbbadge.ok { color: #7cc66a; } .tbbadge.slow { color: var(--chg); } .tbbadge.no { color: #fff; background: rgba(208,86,74,.9); }
 .mdteam { display: block; } #mptip .mdteam { margin-top: 4px; } #mptip small.ok { color: #7cc66a; } #mptip small.bad { color: #ff6a55; }
+.alfilters { flex-wrap: wrap; gap: 4px; } .alfilters .toggle { display: inline-flex; align-items: center; gap: 4px; }
+.alwrap { display: grid; grid-template-columns: minmax(280px, 380px) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 8px; }
+.algrid { max-height: calc(100vh - 330px); overflow-y: auto; display: flex; flex-direction: column; gap: 4px; margin-top: 4px; padding-right: 4px; }
+.alcard { display: flex; gap: 10px; align-items: center; padding: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); text-decoration: none; }
+.alcard:hover { border-color: var(--gold); } .alcard.on { border-color: var(--gold); background: var(--panel2); }
+.alcard > span { min-width: 0; display: flex; flex-direction: column; } .alcard small { font: 11px Consolas, monospace; letter-spacing: 1px; color: var(--muted); }
+.alcard b { font-size: 13.5px; line-height: 1.25; } .alcard em { display: flex; gap: 2px; margin-top: 2px; }
+.alpic { flex: none; background: #0c0807; border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.alpic img { width: 100%; height: 100%; object-fit: contain; } .alpic i { font: 10px Consolas, monospace; color: var(--muted); }
+.alpic.sm { width: 56px; height: 56px; } .alpic.big { width: 168px; height: 168px; position: relative; }
+.alpic .alsp { position: absolute; inset: 0; } .alpic.playing > img, .alpic.playing > i { visibility: hidden; }
+.algroup { font: 15px "LC Bebas", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: var(--gold); margin: 10px 0 2px; padding-bottom: 2px; border-bottom: 1px solid var(--line); } .algroup:first-child { margin-top: 0; }
+.alother { display: inline-block; font: 10px Consolas, monospace; padding: 1px 4px; border: 1px solid var(--line); color: var(--muted); }
+.alhead { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; } .alhead h2 { margin: 2px 0 6px; } .alhead small { font: 12px Consolas, monospace; letter-spacing: 2px; color: var(--muted); }
+.altags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; } .altags span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: var(--panel2); font-size: 12px; } .altags a { font-size: 12px; }
+.alclue { padding: 10px 14px; margin-bottom: 12px; background: #161315; border: 1px solid var(--line); border-left: 3px solid var(--gold); } .alclue small { font: 11px Consolas, monospace; letter-spacing: 2px; color: var(--muted); }
+.allog { background: #120c0b; border: 1px solid var(--line); margin-bottom: 10px; }
+.altabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin: 0 12px; }
+.altabs button { flex: 1 1 0; min-width: 120px; background: none; border: 0; border-bottom: 2px solid transparent; padding: 12px 8px 10px; font: 17px "LC Bebas", sans-serif; letter-spacing: 1px; color: #d8b98a; cursor: pointer; }
+.altabs button:hover { color: var(--gold); } .altabs button.on { color: #f0d6a6; border-bottom-color: #d8b98a; }
+.altext { padding: 16px 26px 8px; line-height: 1.65; font-size: 15px; color: #eadfcf; } .altext p, .alclue p { margin: 0 0 4px; }
+.altext .alreply { margin: 6px 0; } .alsay { opacity: .9; }
+.alfoot { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 6px; padding: 8px 16px 16px; color: #d8c8b0; }
+.alfoot b { color: #fff; } .alfoot i { color: var(--muted); font-style: normal; font-size: 12px; }
+@media (max-width: 900px) { .altext { padding: 12px 14px 6px; } .altabs button { min-width: 0; font-size: 15px; } .alwrap { grid-template-columns: minmax(0, 1fr); } .algrid { max-height: 45vh; } .alpic.big { width: 112px; height: 112px; } .alhead { align-items: flex-start; } }
 .rec { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; } ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: #3a3034; border-radius: 6px; border: 2px solid var(--bg); } ::-webkit-scrollbar-thumb:hover { background: #4d4045; }

@@ -1,0 +1,1750 @@
+{
+ "2a925cc90c5c": {
+  "who": "Yi Sang",
+  "name": "Class 3 Peccatulum Pigritiae",
+  "level": 1
+ },
+ "1566609d6579": {
+  "who": "Meursault",
+  "name": "Class 3 Peccatulum Morositatis",
+  "level": 1
+ },
+ "ac045a765bdf": {
+  "who": "Heathcliff",
+  "name": "Distorted Hohenheim",
+  "level": 1,
+  "replies": [
+   "Gregor",
+   "Rodion",
+   "Ishmael",
+   "Rodion"
+  ]
+ },
+ "c52de703f43b": {
+  "who": "Hong Lu",
+  "name": "Muddled Heishou of the Corpse Palanquin",
+  "level": 1
+ },
+ "de8987a17384": {
+  "who": "Faust",
+  "name": "The Knight of Despair",
+  "level": 0,
+  "replies": [
+   "Sinclair",
+   "Rodion",
+   "Faust",
+   "Rodion",
+   "Faust",
+   "Rodion",
+   "Gregor"
+  ]
+ },
+ "94d7c1e9e0fc": {
+  "who": "Faust",
+  "name": "The Knight of Despair",
+  "level": 1,
+  "replies": [
+   "Yi Sang",
+   "Gregor",
+   "Heathcliff",
+   "Sinclair",
+   "Ishmael",
+   "Yi Sang"
+  ]
+ },
+ "2239ac8f2d07": {
+  "who": "Faust",
+  "name": "The Knight of Despair",
+  "level": 2,
+  "replies": [
+   "Heathcliff",
+   "Gregor"
+  ]
+ },
+ "947c349f48d0": {
+  "who": "Yi Sang",
+  "name": "Mayors, the Yearning Flotsam",
+  "level": 0
+ },
+ "889c24fe207b": {
+  "who": "LCE",
+  "name": "Ebony Queen's Apple",
+  "level": 0
+ },
+ "f99b096ab511": {
+  "who": "LCE",
+  "name": "Faelantern",
+  "level": 0
+ },
+ "bcac3815fe48": {
+  "who": "LCE",
+  "name": "Wayward Passenger",
+  "level": 0
+ },
+ "aa8db64b2921": {
+  "who": "LCE",
+  "name": "Pink Shoes",
+  "level": 0
+ },
+ "43c04454c3bd": {
+  "who": "LCE",
+  "name": "Ardor Blossom Moth",
+  "level": 0
+ },
+ "4e100d13bb86": {
+  "who": "LCE",
+  "name": "Shock Centipede",
+  "level": 0
+ },
+ "d51cf79666c1": {
+  "who": "Meursault",
+  "name": "Flash Phenomenon",
+  "level": 1
+ },
+ "e16040c97727": {
+  "who": "Hong Lu",
+  "name": "???",
+  "level": 1
+ },
+ "16aee3ab8080": {
+  "who": "Hong Lu",
+  "name": "???",
+  "level": 2
+ },
+ "0b67c99e47d2": {
+  "who": "Hong Lu",
+  "name": "???",
+  "level": 3
+ },
+ "ead7b34911f6": {
+  "who": "Meursault",
+  "name": "Moulin Rouge - Jeanne-Marie Sartre",
+  "level": 0
+ },
+ "125b8bde385c": {
+  "who": "Faust",
+  "name": "Ebony Queen's Apple",
+  "level": 0
+ },
+ "6595870d2425": {
+  "who": "Faust",
+  "name": "Ebony Queen's Apple",
+  "level": 1
+ },
+ "10effe0b8a91": {
+  "who": "Faust",
+  "name": "Ebony Queen's Apple",
+  "level": 2
+ },
+ "50448b196c37": {
+  "who": "Yi Sang",
+  "name": "Doomsday Calendar",
+  "level": 0,
+  "replies": [
+   "Faust"
+  ]
+ },
+ "52ce63ea4f1c": {
+  "who": "Yi Sang",
+  "name": "Doomsday Calendar",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Faust",
+   "Heathcliff"
+  ]
+ },
+ "e57c214fb694": {
+  "who": "Yi Sang",
+  "name": "Doomsday Calendar",
+  "level": 2,
+  "replies": [
+   "Faust"
+  ]
+ },
+ "b39e09f52822": {
+  "who": "Faust",
+  "name": "Doomsday Calendar-A",
+  "level": 0
+ },
+ "41104ed174d8": {
+  "who": "Faust",
+  "name": "Doomsday Calendar-A",
+  "level": 1,
+  "replies": [
+   "Ishmael",
+   "Rodion"
+  ]
+ },
+ "c3b1a9a0b016": {
+  "who": "Faust",
+  "name": "Doomsday Calendar-A",
+  "level": 2,
+  "replies": [
+   "Gregor"
+  ]
+ },
+ "51cc2d5ef5f3": {
+  "who": "Ishmael",
+  "name": "Peccatulum Gulae",
+  "level": 0
+ },
+ "523f639097e8": {
+  "who": "Yi Sang",
+  "name": "Peccatulum Pigritiae",
+  "level": 0
+ },
+ "7f98feb1279b": {
+  "who": "Heathcliff",
+  "name": "Peccatulum Irae",
+  "level": 0,
+  "replies": [
+   "Ishmael",
+   "Heathcliff"
+  ]
+ },
+ "3b4c15bf46a7": {
+  "who": "Gregor",
+  "name": "Golden Apple",
+  "level": 0,
+  "replies": [
+   "Outis",
+   "Ishmael",
+   "Outis",
+   "Ryōshū",
+   "Gregor"
+  ]
+ },
+ "a0faec8427ec": {
+  "who": "Gregor",
+  "name": "Golden Apple",
+  "level": 1
+ },
+ "d034415da46b": {
+  "who": "Gregor",
+  "name": "Golden Apple",
+  "level": 2,
+  "replies": [
+   "Outis",
+   "Ryōshū"
+  ]
+ },
+ "5a6e480cc376": {
+  "who": "Ishmael",
+  "name": "Become Strong? Genuinely?",
+  "level": 0,
+  "replies": [
+   "Sinclair",
+   "Faust"
+  ]
+ },
+ "76ea1012008c": {
+  "who": "Ishmael",
+  "name": "Become Strong? Genuinely?",
+  "level": 1,
+  "replies": [
+   "Faust",
+   "Yi Sang",
+   "Heathcliff",
+   "Yi Sang",
+   "Heathcliff",
+   "Ryōshū"
+  ]
+ },
+ "92a6d5505919": {
+  "who": "Ishmael",
+  "name": "Become Strong? Genuinely?",
+  "level": 2,
+  "replies": [
+   "Faust"
+  ]
+ },
+ "f0af8c35db44": {
+  "who": "Hong Lu",
+  "name": "Pink Shoes-A",
+  "level": 0
+ },
+ "d6110527820f": {
+  "who": "Hong Lu",
+  "name": "Pink Shoes-A",
+  "level": 1
+ },
+ "5888d41d1433": {
+  "who": "Meursault",
+  "name": "You Want To Get Beat? Hurtily?",
+  "level": 0,
+  "replies": [
+   "Gregor"
+  ]
+ },
+ "80413bd9ea40": {
+  "who": "Meursault",
+  "name": "You Want To Get Beat? Hurtily?",
+  "level": 1
+ },
+ "3d1390de3589": {
+  "who": "Meursault",
+  "name": "You Want To Get Beat? Hurtily?",
+  "level": 2,
+  "replies": [
+   "Rodion",
+   "Sinclair",
+   "Hong Lu"
+  ]
+ },
+ "b8fdf5078cf7": {
+  "who": "Meursault",
+  "name": "Peccatulum Morositatis",
+  "level": 0
+ },
+ "664ea806d32e": {
+  "who": "Sinclair",
+  "name": "Peccatulum Luxuriae",
+  "level": 0
+ },
+ "4970c68d7874": {
+  "who": "Faust",
+  "guess": true,
+  "name": "Peccatulum Superbiae",
+  "level": 0
+ },
+ "0a4af7dba063": {
+  "who": "Rodion",
+  "name": "Baba Yaga-A",
+  "level": 0
+ },
+ "5d8c0c94c03e": {
+  "who": "Rodion",
+  "name": "Baba Yaga-A",
+  "level": 1,
+  "replies": [
+   "Faust"
+  ]
+ },
+ "589611b80e38": {
+  "who": "Heathcliff",
+  "name": "Mimicry Corroded",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Heathcliff",
+   "Faust",
+   "Heathcliff"
+  ]
+ },
+ "3ea1e898df24": {
+  "who": "Heathcliff",
+  "name": "Mimicry Corroded",
+  "level": 1,
+  "replies": [
+   "Ryōshū",
+   "Heathcliff",
+   "Ryōshū"
+  ]
+ },
+ "be8d3ce39050": {
+  "who": "Heathcliff",
+  "name": "Mimicry Corroded",
+  "level": 2
+ },
+ "5b04c876ecb3": {
+  "who": "Ishmael",
+  "guess": true,
+  "name": "Feral Mane Corroded",
+  "level": 0,
+  "replies": [
+   "Don Quixote",
+   "Ishmael",
+   "Don Quixote",
+   "Ishmael"
+  ]
+ },
+ "89dca321cbdd": {
+  "who": "Ishmael",
+  "guess": true,
+  "name": "Feral Mane Corroded",
+  "level": 1
+ },
+ "a310e3e2dd91": {
+  "who": "Ishmael",
+  "guess": true,
+  "name": "Feral Mane Corroded",
+  "level": 2
+ },
+ "e443db394b96": {
+  "who": "Rodion",
+  "name": "Coil Corroded",
+  "level": 0
+ },
+ "4bfe4ecc3908": {
+  "who": "Rodion",
+  "name": "Coil Corroded",
+  "level": 1,
+  "replies": [
+   "Faust",
+   "Outis"
+  ]
+ },
+ "8bb0b39f7a13": {
+  "who": "Rodion",
+  "name": "Coil Corroded",
+  "level": 2
+ },
+ "d6472f14c61b": {
+  "who": "Sinclair",
+  "name": "Kromer",
+  "level": 0,
+  "replies": [
+   "Meursault"
+  ]
+ },
+ "3c618caf97d9": {
+  "who": "Sinclair",
+  "name": "Kromer",
+  "level": 1
+ },
+ "9dd91febffa5": {
+  "who": "Sinclair",
+  "name": "Kromer",
+  "level": 2,
+  "replies": [
+   "Ryōshū",
+   "Faust",
+   "Sinclair"
+  ]
+ },
+ "15c5944c2c2f": {
+  "who": "Sinclair",
+  "name": "Kromer the Attempted Protoplast",
+  "level": 0
+ },
+ "80f874d52d23": {
+  "who": "Meursault",
+  "name": "Headless Ichthys",
+  "level": 0
+ },
+ "0ff1beed4cbc": {
+  "who": "Meursault",
+  "name": "Headless Ichthys",
+  "level": 1
+ },
+ "ae49a25297c5": {
+  "who": "Yi Sang",
+  "name": "Alleyway Watchdog",
+  "level": 0
+ },
+ "968ffcda4cbe": {
+  "who": "Yi Sang",
+  "name": "Alleyway Watchdog",
+  "level": 1
+ },
+ "2d438f6cb7c3": {
+  "who": "Yi Sang",
+  "name": "Alleyway Watchdog",
+  "level": 2
+ },
+ "9df93d435dc1": {
+  "who": "Don Quixote",
+  "name": "Headchicken a.k.a. Bongy",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Sinclair",
+   "Faust",
+   "Heathcliff",
+   "Meursault",
+   "Ishmael"
+  ]
+ },
+ "e24e59be7578": {
+  "who": "Don Quixote",
+  "name": "Headchicken a.k.a. Bongy",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Sinclair",
+   "Faust",
+   "Heathcliff",
+   "Meursault",
+   "Ishmael"
+  ]
+ },
+ "c5bb665c6283": {
+  "who": "Don Quixote",
+  "name": "Headchicken a.k.a. Bongy",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Sinclair",
+   "Faust",
+   "Heathcliff",
+   "Meursault",
+   "Ishmael"
+  ]
+ },
+ "3ac065b6a3ec": {
+  "who": "Don Quixote",
+  "name": "Headchicken a.k.a. Bongy",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Sinclair",
+   "Faust",
+   "Heathcliff",
+   "Meursault",
+   "Ishmael"
+  ]
+ },
+ "c3656b85b5cd": {
+  "who": "Outis",
+  "name": "Papa Bongy",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Faust"
+  ]
+ },
+ "01eba5ae89af": {
+  "who": "Outis",
+  "name": "Papa Bongy",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Outis"
+  ]
+ },
+ "049074b48c03": {
+  "who": "Outis",
+  "name": "Spiced-up Papa Bongy",
+  "level": 0,
+  "replies": [
+   "Gregor",
+   "Faust"
+  ]
+ },
+ "ef2b9ae8fce4": {
+  "who": "Outis",
+  "name": "Spiced-up Papa Bongy",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Outis"
+  ]
+ },
+ "8b630b9108fd": {
+  "who": "Meursault",
+  "name": "Brazen Bull - Tearful",
+  "level": 1,
+  "replies": [
+   "Sinclair",
+   "Heathcliff",
+   "Faust"
+  ]
+ },
+ "f963936b78bf": {
+  "who": "Yi Sang",
+  "name": "Lobotomy E.G.O::Sunshower - Dongbaek",
+  "level": 1
+ },
+ "33d7c9ead491": {
+  "who": "Yi Sang",
+  "name": "Effloresced E.G.O::Spicebush",
+  "level": 1
+ },
+ "9dedf104c330": {
+  "who": "Gregor",
+  "name": "Shock Centipede",
+  "level": 1,
+  "replies": [
+   "Hong Lu",
+   "Gregor",
+   "Hong Lu",
+   "Meursault",
+   "Heathcliff",
+   "Gregor",
+   "Rodion"
+  ]
+ },
+ "446b35b3d136": {
+  "who": "Gregor",
+  "name": "Shock Centipede",
+  "level": 2,
+  "replies": [
+   "Ishmael",
+   "Meursault",
+   "Ishmael",
+   "Gregor"
+  ]
+ },
+ "38a01848f0e8": {
+  "who": "Gregor",
+  "name": "Shock Centipede",
+  "level": 3
+ },
+ "1cda117dabfe": {
+  "who": "Sinclair",
+  "name": "Drifting Fox",
+  "level": 1
+ },
+ "7a1dd6c59072": {
+  "who": "Sinclair",
+  "name": "Drifting Fox",
+  "level": 2,
+  "replies": [
+   "Faust",
+   "Sinclair",
+   "Faust",
+   "Heathcliff"
+  ]
+ },
+ "2ef46803e6c9": {
+  "who": "Sinclair",
+  "name": "Drifting Fox",
+  "level": 3,
+  "replies": [
+   "Heathcliff",
+   "Faust"
+  ]
+ },
+ "f425314200a9": {
+  "who": "Heathcliff",
+  "name": "So That No One Will Cry",
+  "level": 1
+ },
+ "8fe1802611af": {
+  "who": "Heathcliff",
+  "name": "So That No One Will Cry",
+  "level": 2,
+  "replies": [
+   "Outis",
+   "Rodion",
+   "Faust",
+   "Gregor",
+   "Ishmael",
+   "Sinclair"
+  ]
+ },
+ "42f5f900bdaa": {
+  "who": "Heathcliff",
+  "name": "So That No One Will Cry",
+  "level": 3,
+  "replies": [
+   "Faust"
+  ]
+ },
+ "66c73d7796ca": {
+  "who": "Rodion",
+  "name": "Fairy Gentleman",
+  "level": 1,
+  "replies": [
+   "Hong Lu",
+   "Ryōshū",
+   "Faust"
+  ]
+ },
+ "21743e61eb77": {
+  "who": "Rodion",
+  "name": "Fairy Gentleman",
+  "level": 2,
+  "replies": [
+   "Gregor",
+   "Faust",
+   "Sinclair",
+   "Heathcliff"
+  ]
+ },
+ "f37b5ff893e5": {
+  "who": "Rodion",
+  "name": "Fairy Gentleman",
+  "level": 3,
+  "replies": [
+   "Outis",
+   "Gregor"
+  ]
+ },
+ "4531d9ce13ec": {
+  "who": "Yi Sang",
+  "name": "Dongrang, Who Denies All",
+  "level": 1
+ },
+ "792531f9c504": {
+  "who": "Yi Sang",
+  "name": "Effloresced E.G.O::Farmwatch",
+  "level": 1
+ },
+ "5904083a0ac6": {
+  "who": "Ishmael",
+  "name": "Fairy-Long-Legs",
+  "level": 1
+ },
+ "add00f60bc40": {
+  "who": "Ishmael",
+  "name": "Fairy-Long-Legs",
+  "level": 2
+ },
+ "6d58d2161a12": {
+  "who": "Ishmael",
+  "name": "Fairy-Long-Legs",
+  "level": 3
+ },
+ "14f369520f69": {
+  "who": "Ishmael",
+  "name": "Blubbering Toad",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Heathcliff",
+   "Sinclair",
+   "Heathcliff",
+   "Outis"
+  ]
+ },
+ "c14db84d9968": {
+  "who": "Ishmael",
+  "name": "Blubbering Toad",
+  "level": 2,
+  "replies": [
+   "Rodion",
+   "Sinclair",
+   "Rodion",
+   "Sinclair",
+   "Rodion"
+  ]
+ },
+ "a451060b9e25": {
+  "who": "Ishmael",
+  "name": "Blubbering Toad",
+  "level": 3
+ },
+ "e8cf13df5f0f": {
+  "who": "Gregor",
+  "name": "kqe-1j-23",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Gregor"
+  ]
+ },
+ "12f38d7e78cf": {
+  "who": "Gregor",
+  "name": "kqe-1j-23",
+  "level": 2
+ },
+ "90d89235d091": {
+  "who": "Gregor",
+  "name": "kqe-1j-23",
+  "level": 3
+ },
+ "723a8902a6d8": {
+  "who": "Faust",
+  "name": "My Form Empties",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Faust",
+   "Heathcliff",
+   "Meursault"
+  ]
+ },
+ "e06a1920e3db": {
+  "who": "Faust",
+  "name": "My Form Empties",
+  "level": 2,
+  "replies": [
+   "Gregor",
+   "Sinclair",
+   "Heathcliff",
+   "Sinclair",
+   "Yi Sang"
+  ]
+ },
+ "85418f81f103": {
+  "who": "Faust",
+  "name": "My Form Empties",
+  "level": 3,
+  "replies": [
+   "Sinclair",
+   "Outis"
+  ]
+ },
+ "3834c640f4e4": {
+  "who": "Sinclair",
+  "name": "Kromer",
+  "level": 0,
+  "replies": [
+   "Meursault"
+  ]
+ },
+ "b90cdb9aec0a": {
+  "who": "Sinclair",
+  "name": "Kromer the Attempted Protoplast",
+  "level": 0
+ },
+ "7c326d1e2779": {
+  "who": "Gregor",
+  "name": "Shock Centipede",
+  "level": 1,
+  "replies": [
+   "Hong Lu",
+   "Gregor",
+   "Hong Lu",
+   "Meursault",
+   "Heathcliff",
+   "Gregor",
+   "Rodion"
+  ]
+ },
+ "010eec6a9c37": {
+  "who": "Gregor",
+  "name": "Shock Centipede",
+  "level": 2,
+  "replies": [
+   "Ishmael",
+   "Meursault",
+   "Ishmael",
+   "Gregor"
+  ]
+ },
+ "71645b3b37cd": {
+  "who": "Sinclair",
+  "name": "Drifting Fox",
+  "level": 1
+ },
+ "8a6d2daa1c8d": {
+  "who": "Ishmael",
+  "name": "Fairy-Long-Legs",
+  "level": 1
+ },
+ "60786ebb1549": {
+  "who": "Outis",
+  "name": "Skin Prophet",
+  "level": 0,
+  "replies": [
+   "Heathcliff",
+   "Meursault",
+   "Outis"
+  ]
+ },
+ "fe40d91d1c5c": {
+  "who": "Outis",
+  "name": "Skin Prophet",
+  "level": 1
+ },
+ "7c8b29c1528e": {
+  "who": "Outis",
+  "name": "Skin Prophet",
+  "level": 2
+ },
+ "590cfea38431": {
+  "who": "Sinclair",
+  "name": "Ambling Pearl",
+  "level": 0,
+  "replies": [
+   "Heathcliff",
+   "Yi Sang",
+   "Heathcliff",
+   "Faust",
+   "Rodion"
+  ]
+ },
+ "27681f76fe41": {
+  "who": "Sinclair",
+  "name": "Ambling Pearl",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Sinclair",
+   "Meursault",
+   "Faust",
+   "Sinclair"
+  ]
+ },
+ "1f4cf9bc1a25": {
+  "who": "Sinclair",
+  "name": "Ambling Pearl",
+  "level": 2,
+  "replies": [
+   "Rodion",
+   "Heathcliff",
+   "Sinclair"
+  ]
+ },
+ "8d231ead28a7": {
+  "who": "Don Quixote",
+  "name": "Dream-Devouring Siltcurrent",
+  "level": 0,
+  "replies": [
+   "Faust",
+   "Yi Sang",
+   "Dante"
+  ]
+ },
+ "829e314575dc": {
+  "who": "Don Quixote",
+  "name": "Dream-Devouring Siltcurrent",
+  "level": 1
+ },
+ "c25af035d6ae": {
+  "who": "Don Quixote",
+  "name": "Dream-Devouring Siltcurrent",
+  "level": 2
+ },
+ "623bbd148b86": {
+  "who": "Ishmael",
+  "name": "Effloresced E.G.O::GasHarpoon",
+  "level": 0
+ },
+ "88b1bfef0c23": {
+  "who": "Heathcliff",
+  "name": "Peccatulum Irae?",
+  "level": 0
+ },
+ "5852c429b3cf": {
+  "who": "Meursault",
+  "name": "Peccatulum Morositatis?",
+  "level": 0
+ },
+ "83b6c8a83c51": {
+  "who": "Outis",
+  "name": "Distorted Bamboo-hatted Kim",
+  "level": 0
+ },
+ "5a9a5b4fac9c": {
+  "who": "Yi Sang",
+  "name": "Peccatulum Pigritiae?",
+  "level": 0,
+  "replies": [
+   "Ryōshū",
+   "Heathcliff",
+   "Yi Sang",
+   "Heathcliff",
+   "Yi Sang"
+  ]
+ },
+ "c65c566358d0": {
+  "who": "Ishmael",
+  "name": "Peccatulum Gulae?",
+  "level": 0,
+  "replies": [
+   "",
+   "Ishmael"
+  ]
+ },
+ "6a650582a284": {
+  "who": "Heathcliff",
+  "name": "Peccatulum Irae Type 3",
+  "level": 1
+ },
+ "de8214dbae3d": {
+  "who": "Heathcliff",
+  "name": "Hindley, The Reaved Lamenter",
+  "level": 0
+ },
+ "7db3c82c85b6": {
+  "who": "Don Quixote",
+  "name": "Heathcliff, The Heartbroken",
+  "level": 1,
+  "replies": [
+   "Sinclair",
+   "Don Quixote",
+   "Sinclair",
+   "Meursault",
+   "Sinclair"
+  ]
+ },
+ "21f95569e555": {
+  "who": "Faust",
+  "name": "Fairy Queen",
+  "level": 1,
+  "replies": [
+   "Sinclair",
+   "Ishmael",
+   "Sinclair",
+   "Heathcliff",
+   "Gregor"
+  ]
+ },
+ "3b33965fd4a7": {
+  "who": "Faust",
+  "name": "Fairy Queen",
+  "level": 2,
+  "replies": [
+   "Heathcliff",
+   "Outis",
+   "Don Quixote",
+   "Gregor"
+  ]
+ },
+ "69961046d1fd": {
+  "who": "Faust",
+  "name": "Fairy Queen",
+  "level": 3
+ },
+ "1cb688da9a46": {
+  "who": "Hong Lu",
+  "guess": true,
+  "name": "The Time Ripper",
+  "level": 0,
+  "replies": [
+   "Meursault",
+   "Gregor",
+   "Ryōshū",
+   "Hong Lu"
+  ]
+ },
+ "5ca41ff60bdb": {
+  "who": "Rodion",
+  "name": "Peccatulum Invidiae",
+  "level": 1,
+  "replies": [
+   "Dante",
+   "Gregor",
+   "Faust",
+   "Dante",
+   "Faust"
+  ]
+ },
+ "39c61742b990": {
+  "who": "Rodion",
+  "name": "Peccatulum Invidiae?",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Yi Sang",
+   "Rodion"
+  ]
+ },
+ "1ba4b2153618": {
+  "who": "Heathcliff",
+  "name": "Prosthetic Bloodbag",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Faust",
+   "Rodion",
+   "Rodion",
+   "Sinclair"
+  ]
+ },
+ "14789732156d": {
+  "who": "Gregor",
+  "name": "Sasha",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Gregor",
+   "Outis",
+   "Gregor",
+   "Outis",
+   "Faust",
+   "Faust",
+   "Gregor"
+  ]
+ },
+ "05ad1216b4d8": {
+  "who": "Heathcliff",
+  "name": "W Corp. Bloodbag",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Sinclair",
+   "Yi Sang",
+   "Rodion"
+  ]
+ },
+ "56166b3be891": {
+  "who": "Heathcliff",
+  "name": "Passenger Bloodbag",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Sinclair",
+   "Faust",
+   "Rodion"
+  ]
+ },
+ "41d9d68ae36f": {
+  "who": "Faust",
+  "name": "Cassetti",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Faust",
+   "Outis",
+   "Faust",
+   "Gregor"
+  ]
+ },
+ "cb780d2be4e6": {
+  "who": "Rodion",
+  "name": "??-??-??-??",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Faust",
+   "Sinclair",
+   "Yi Sang",
+   "Don Quixote",
+   "Gregor"
+  ]
+ },
+ "4ae3ddc1739d": {
+  "who": "Sinclair",
+  "name": "??-??-??-??",
+  "level": 1,
+  "replies": [
+   "Yi Sang",
+   "Hong Lu",
+   "Heathcliff",
+   "Ishmael"
+  ]
+ },
+ "0e2d4d9b9a97": {
+  "who": "Sinclair",
+  "name": "Peccatulum Luxuriae??",
+  "level": 1,
+  "replies": [
+   "Gregor",
+   "Rodion",
+   "Heathcliff",
+   "Dante",
+   "Faust",
+   "Sinclair"
+  ]
+ },
+ "3d42d7684b9a": {
+  "who": "Faust",
+  "guess": true,
+  "name": "Peccatulum Superbiae??",
+  "level": 1,
+  "replies": [
+   "Yi Sang",
+   "Ryōshū",
+   "Yi Sang"
+  ]
+ },
+ "ea108230a26f": {
+  "who": "Meursault",
+  "name": "Four-hundred Roses",
+  "level": 1
+ },
+ "5bd226099702": {
+  "who": "Meursault",
+  "name": "Four-hundred Roses",
+  "level": 2,
+  "replies": [
+   "Faust"
+  ]
+ },
+ "42bd517e4c57": {
+  "who": "Meursault",
+  "name": "Four-hundred Roses",
+  "level": 3,
+  "replies": [
+   "Faust",
+   "Meursault"
+  ]
+ },
+ "72eaa8e2629f": {
+  "who": "Hong Lu",
+  "name": "Rose Hunter",
+  "level": 1,
+  "replies": [
+   "Sinclair",
+   "Faust",
+   "Hong Lu",
+   "Sinclair",
+   "Ryōshū"
+  ]
+ },
+ "f85b631e2c04": {
+  "who": "Hong Lu",
+  "name": "Rose Hunter",
+  "level": 2,
+  "replies": [
+   "Heathcliff",
+   "Outis",
+   "Rodion",
+   "Gregor",
+   "Heathcliff",
+   "Dante"
+  ]
+ },
+ "ef1151e8485c": {
+  "who": "Hong Lu",
+  "name": "Rose Hunter",
+  "level": 3,
+  "replies": [
+   "Faust",
+   "Hong Lu",
+   "Sinclair",
+   "Hong Lu"
+  ]
+ },
+ "2825596e15d8": {
+  "who": "Rodion",
+  "name": "Hurting Teddy Bear",
+  "level": 1,
+  "replies": [
+   "Dante",
+   "Dante",
+   "Meursault",
+   "Rodion"
+  ]
+ },
+ "2c26989f8217": {
+  "who": "Rodion",
+  "name": "Hurting Teddy Bear",
+  "level": 2,
+  "replies": [
+   "Yi Sang",
+   "Heathcliff",
+   "Outis",
+   "Sinclair"
+  ]
+ },
+ "422f3f0853b2": {
+  "who": "Rodion",
+  "name": "Hurting Teddy Bear",
+  "level": 3,
+  "replies": [
+   "Sinclair",
+   "Faust",
+   "Rodion",
+   "Faust"
+  ]
+ },
+ "7eae04db1f60": {
+  "who": "Ishmael",
+  "name": "Blubbering Toad",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Heathcliff",
+   "Sinclair",
+   "Heathcliff",
+   "Outis"
+  ]
+ },
+ "3e5d739a5db4": {
+  "who": "Ishmael",
+  "name": "Blubbering Toad",
+  "level": 2,
+  "replies": [
+   "Rodion",
+   "Sinclair",
+   "Rodion",
+   "Sinclair",
+   "Rodion"
+  ]
+ },
+ "1b32645a6adf": {
+  "who": "Ishmael",
+  "name": "Blubbering Toad",
+  "level": 3
+ },
+ "13d9d1259071": {
+  "who": "Gregor",
+  "name": "Kqe-1j-23",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Gregor"
+  ]
+ },
+ "267947362120": {
+  "who": "Gregor",
+  "name": "Kqe-1j-23",
+  "level": 2
+ },
+ "c182e52d5be0": {
+  "who": "Gregor",
+  "name": "Kqe-1j-23",
+  "level": 3
+ },
+ "8b9f80f66a97": {
+  "who": "Faust",
+  "name": "My Form Empties",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Faust",
+   "Heathcliff",
+   "Meursault"
+  ]
+ },
+ "2cc11fa2fca8": {
+  "who": "Faust",
+  "name": "My Form Empties",
+  "level": 2,
+  "replies": [
+   "Gregor",
+   "Sinclair",
+   "Heathcliff",
+   "Sinclair",
+   "Yi Sang"
+  ]
+ },
+ "6dea7f90c6a7": {
+  "who": "Faust",
+  "name": "My Form Empties",
+  "level": 3,
+  "replies": [
+   "Sinclair",
+   "Outis"
+  ]
+ },
+ "82205b2346d8": {
+  "who": "Outis",
+  "name": "Faelantern",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Outis",
+   "Rodion",
+   "Outis"
+  ]
+ },
+ "2baca56cf866": {
+  "who": "Outis",
+  "name": "Faelantern",
+  "level": 2,
+  "replies": [
+   "Ishmael",
+   "Heathcliff",
+   "Faust"
+  ]
+ },
+ "6ea3fb1f2c57": {
+  "who": "Outis",
+  "name": "Faelantern",
+  "level": 3
+ },
+ "a87a83e6d102": {
+  "who": "Meursault",
+  "name": "Wayward Passenger",
+  "level": 1
+ },
+ "4b89c0411964": {
+  "who": "Meursault",
+  "name": "Wayward Passenger",
+  "level": 2
+ },
+ "e6de9a2c2dbc": {
+  "who": "Meursault",
+  "name": "Wayward Passenger",
+  "level": 3
+ },
+ "b5e1d63afc44": {
+  "who": "Don Quixote",
+  "name": "Steam Transport Machine",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Faust"
+  ]
+ },
+ "89fe6fccfa92": {
+  "who": "Don Quixote",
+  "name": "Steam Transport Machine",
+  "level": 2,
+  "replies": [
+   "Dante",
+   "Ishmael",
+   "Gregor"
+  ]
+ },
+ "b196af3ce51e": {
+  "who": "Don Quixote",
+  "name": "Steam Transport Machine",
+  "level": 3,
+  "replies": [
+   "Dante",
+   "Faust",
+   "Outis"
+  ]
+ },
+ "e711d99f3b6b": {
+  "who": "Hong Lu",
+  "name": "Sign of Roses",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Ryōshū"
+  ]
+ },
+ "a5ea4348b311": {
+  "who": "Hong Lu",
+  "name": "Sign of Roses",
+  "level": 2
+ },
+ "13612aba0b60": {
+  "who": "Hong Lu",
+  "name": "Sign of Roses",
+  "level": 3
+ },
+ "1150025c3da3": {
+  "who": "Yi Sang",
+  "name": "Ardor Blossom Moth",
+  "level": 1,
+  "replies": [
+   "Heathcliff",
+   "Faust",
+   "Ishmael",
+   "Yi Sang"
+  ]
+ },
+ "a026818ad700": {
+  "who": "Yi Sang",
+  "name": "Ardor Blossom Moth",
+  "level": 2
+ },
+ "5899eb24bb21": {
+  "who": "Yi Sang",
+  "name": "Ardor Blossom Moth",
+  "level": 3
+ },
+ "bb832e16a1cf": {
+  "who": "Heathcliff",
+  "name": "Drenched Gossypium",
+  "level": 1
+ },
+ "a4793cae3013": {
+  "who": "Heathcliff",
+  "name": "Drenched Gossypium",
+  "level": 2
+ },
+ "0ad35224e036": {
+  "who": "Heathcliff",
+  "name": "Drenched Gossypium",
+  "level": 3
+ },
+ "ec66e430456f": {
+  "who": "Rodion",
+  "name": "Spiral of Contempt",
+  "level": 1,
+  "replies": [
+   "Outis",
+   "Rodion",
+   "Hong Lu",
+   "Rodion"
+  ]
+ },
+ "80973b2ada2e": {
+  "who": "Rodion",
+  "name": "Spiral of Contempt",
+  "level": 2
+ },
+ "c8948df4be7f": {
+  "who": "Rodion",
+  "name": "Spiral of Contempt",
+  "level": 3,
+  "replies": [
+   "Outis",
+   "Dante",
+   "Outis",
+   "Dante",
+   "Heathcliff"
+  ]
+ },
+ "49d7790c278f": {
+  "who": "Gregor",
+  "name": "Portrait of a Certain Day",
+  "level": 1
+ },
+ "0187acb947f3": {
+  "who": "Gregor",
+  "name": "Portrait of a Certain Day",
+  "level": 2,
+  "replies": [
+   "Dante",
+   "Outis",
+   "Faust"
+  ]
+ },
+ "820982bf5561": {
+  "who": "Gregor",
+  "name": "Portrait of a Certain Day",
+  "level": 3,
+  "replies": [
+   "Sinclair",
+   "Yi Sang",
+   "Rodion",
+   "Heathcliff",
+   "Gregor"
+  ]
+ },
+ "92523ce5797e": {
+  "who": "Sinclair",
+  "name": "Dreaming Electric Sheep",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Dante"
+  ]
+ },
+ "c8198115d217": {
+  "who": "Sinclair",
+  "name": "Dreaming Electric Sheep",
+  "level": 2,
+  "replies": [
+   "Outis",
+   "Ryōshū",
+   "Meursault",
+   "Sinclair",
+   "Don Quixote"
+  ]
+ },
+ "9abce21e0077": {
+  "who": "Sinclair",
+  "name": "Dreaming Electric Sheep",
+  "level": 3,
+  "replies": [
+   "Gregor",
+   "Faust",
+   "Ishmael",
+   "Outis",
+   "Yi Sang"
+  ]
+ },
+ "f0fa7b491fff": {
+  "who": "Yi Sang",
+  "name": "The King in Binds",
+  "level": 1
+ },
+ "f69449a02056": {
+  "who": "Yi Sang",
+  "name": "The King in Binds",
+  "level": 2,
+  "replies": [
+   "Sinclair",
+   "Meursault"
+  ]
+ },
+ "928b17000903": {
+  "who": "Yi Sang",
+  "name": "The King in Binds",
+  "level": 3,
+  "replies": [
+   "Heathcliff",
+   "Outis"
+  ]
+ },
+ "5265141cfde3": {
+  "who": "Heathcliff",
+  "name": "Der Fluchschütze",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Faust",
+   "Heathcliff",
+   "Meursault",
+   "Don Quixote",
+   "Heathcliff"
+  ]
+ },
+ "368b92da34f5": {
+  "who": "Heathcliff",
+  "name": "Der Fluchschütze",
+  "level": 2,
+  "replies": [
+   "Rodion",
+   "Ishmael",
+   "Gregor",
+   "Faust",
+   "Gregor"
+  ]
+ },
+ "97c5d1189603": {
+  "who": "Heathcliff",
+  "name": "Der Fluchschütze",
+  "level": 3,
+  "replies": [
+   "Sinclair",
+   "Heathcliff",
+   "Outis",
+   "Heathcliff",
+   "Don Quixote",
+   "Heathcliff",
+   "Dante",
+   "Dante"
+  ]
+ },
+ "4eee0dbfded9": {
+  "who": "Outis",
+  "name": "Sleeping Bag of a Bygone Day",
+  "level": 1,
+  "replies": [
+   "Gregor",
+   "Outis",
+   "Ishmael",
+   "Outis",
+   "Sinclair",
+   "Yi Sang"
+  ]
+ },
+ "66e411b8a1fb": {
+  "who": "Outis",
+  "name": "Sleeping Bag of a Bygone Day",
+  "level": 2,
+  "replies": [
+   "Faust",
+   "Rodion",
+   "Gregor"
+  ]
+ },
+ "c47c64a1f420": {
+  "who": "Outis",
+  "name": "Sleeping Bag of a Bygone Day",
+  "level": 3,
+  "replies": [
+   "Dante",
+   "Rodion",
+   "Dante",
+   "Outis",
+   "Dante"
+  ]
+ },
+ "66dd5a2f917e": {
+  "who": "Don Quixote",
+  "name": "Four-hundred Roses",
+  "level": 1,
+  "replies": [
+   "Faust",
+   "Don Quixote",
+   "Faust",
+   ""
+  ]
+ },
+ "8956ee7f07c0": {
+  "who": "Don Quixote",
+  "name": "Four-hundred Roses",
+  "level": 2,
+  "replies": [
+   "Ishmael",
+   "Sinclair",
+   "Meursault",
+   "Gregor"
+  ]
+ },
+ "7509d64a9db8": {
+  "who": "Don Quixote",
+  "name": "Four-hundred Roses",
+  "level": 3,
+  "replies": [
+   "Faust",
+   "Gregor",
+   "Rodion",
+   "Sinclair",
+   "Don Quixote",
+   "Rodion",
+   "Ishmael"
+  ]
+ },
+ "a78e399a4ddb": {
+  "who": "Sinclair",
+  "name": "Will You Play?",
+  "level": 1,
+  "replies": [
+   "Don Quixote",
+   "Sinclair",
+   "Don Quixote",
+   "Heathcliff",
+   "Meursault"
+  ]
+ },
+ "5db86e9187f3": {
+  "who": "Sinclair",
+  "name": "Will You Play?",
+  "level": 2,
+  "replies": [
+   "Sinclair",
+   "Rodion",
+   "Faust",
+   "Heathcliff",
+   "Rodion",
+   "Ishmael",
+   "Outis"
+  ]
+ },
+ "515444def9f1": {
+  "who": "Sinclair",
+  "name": "Will You Play?",
+  "level": 3,
+  "replies": [
+   "Yi Sang",
+   "Hong Lu",
+   "Rodion",
+   "Dante",
+   "Ryōshū",
+   "Sinclair"
+  ]
+ },
+ "d7d9c9b275b1": {
+  "who": "Yi Sang",
+  "name": "Butterfly of Entangled Lives",
+  "level": 1,
+  "replies": [
+   "Don Quixote",
+   "Outis",
+   "Don Quixote",
+   "Sinclair",
+   "Faust",
+   "Gregor",
+   "Don Quixote"
+  ]
+ },
+ "bc0262747988": {
+  "who": "Yi Sang",
+  "name": "Butterfly of Entangled Lives",
+  "level": 2,
+  "replies": [
+   "Faust",
+   "Sinclair",
+   "Heathcliff",
+   "Dante"
+  ]
+ },
+ "740f8e9900bc": {
+  "who": "Yi Sang",
+  "name": "Butterfly of Entangled Lives",
+  "level": 3,
+  "replies": [
+   "Yi Sang",
+   "Yi Sang"
+  ]
+ },
+ "a740999319b4": {
+  "who": "Hong Lu",
+  "name": "Yinglong",
+  "level": 1,
+  "replies": [
+   "Rodion",
+   "Dante",
+   "Heathcliff",
+   "Heathcliff",
+   "Faust",
+   "Meursault"
+  ]
+ },
+ "6f2bf63d9be8": {
+  "who": "Hong Lu",
+  "name": "Yinglong",
+  "level": 2,
+  "replies": [
+   "Ryōshū",
+   "Heathcliff",
+   "Sinclair",
+   "Dante"
+  ]
+ },
+ "8583528b4cba": {
+  "who": "Hong Lu",
+  "name": "Yinglong",
+  "level": 3,
+  "replies": [
+   "Dante",
+   "Hong Lu"
+  ]
+ }
+}

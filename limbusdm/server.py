@@ -505,6 +505,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/announcers":  # Announcers page (limbusdm/announcers.py)
                 from . import announcers
                 return self._json(announcers.get(svc))
+            if p == "/api/abno_logs":  # Abnormality logs page (limbusdm/abnologs.py)
+                from . import abnologs
+                return self._json(abnologs.get(svc))
             if p == "/api/battle_maps":
                 from .viewer import battle_maps
                 return self._json([m["name"] for m in battle_maps(svc)])
