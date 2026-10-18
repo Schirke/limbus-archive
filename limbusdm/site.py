@@ -1045,6 +1045,8 @@ class Exporter:
         have = self.kept(old)
         if old.get("v") != story.VERSION:  # (the reader's output changed: ask every story file again)
             have = {k: f for k, f in have.items() if not k.startswith("/api/story_ep")}
+        if old.get("mv") != getattr(story, "MODEL_VERSION", 1):  # (standing models placed anew)
+            have = {k: f for k, f in have.items() if not k.startswith("/api/story_model")}
         try:
             idx = json.loads(self._get("/api/story")[0])
         except Exception as e:
@@ -1100,7 +1102,7 @@ class Exporter:
         got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in ("/api/story", "/api/story_lines", "/api/story_kit")}, "site: Story")
         urls, groups = _grouped(got, [(lists + models, PACK), (thumbs + sprites, GAME_PACK), (pics, SCENE_PACK),
                                       (sounds + voices, VOICE_PACK), (music + videos, PACK)])
-        m = {"kind": "story", "id": sid, "v": story.VERSION, "urls": urls, "groups": groups}
+        m = {"kind": "story", "id": sid, "v": story.VERSION, "mv": getattr(story, "MODEL_VERSION", 1), "urls": urls, "groups": groups}
         self.write_manifest("story", m)
         return m
 
