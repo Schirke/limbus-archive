@@ -1768,7 +1768,7 @@ button.sndnav:hover { color: var(--gold); }
 .pfbtns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .pfbtns .sub { flex: 1; min-width: 160px; }
 .pfin2 { display: flex; gap: 8px; } .pfin2 input { flex: 1; min-width: 0; letter-spacing: 3px; text-transform: uppercase; }
 .pftop { display: grid; grid-template-columns: 1fr 340px; gap: 18px; max-width: 1240px; margin-bottom: 18px; } .pftop > div { min-width: 0; }
-.pfquests { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 6px; }
+.pfquests { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 8px 0 6px; }
 .pfquests > div { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
 .pfquests > div .pfbar, .pfquests > div small { grid-column: 1 / -1; } .pfquests small { color: var(--muted); } .pfquests > div > i { font-style: normal; color: var(--gold); }
 .pfquests > div.done { border-color: #3d5a45; } .pfquests > div.done > i { color: var(--add); } .pfquests > div.done .pfbar i { background: var(--add); }
