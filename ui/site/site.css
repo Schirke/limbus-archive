@@ -104,8 +104,6 @@ figure:has(.sdl.black) video { background: #000; }
   .cmrow > :nth-child(4) { grid-column: 3; justify-self: start; }
   .cmtext { grid-template-columns: minmax(0, 1fr); }
 }
-/* not on the site yet: the logs aren't sent */
-body.site [data-route="abnologs"] { display: none; }
 /* Animations on the site: Spine and battle only */
 body.site #aview .an-tabs button:not([data-t^="spine"]):not([data-t="battle"]):not(.onsite), body.site .an-mod, body.site #afilters [data-f="mine"], body.site #fxgo, body.site #bfsaveall, body.site .bfcap button, body.site #fxsave, body.site .fxgrid [data-save], body.site .fxgrid [data-gif], body.site .fxgrid [data-png], body.site #agif, body.site #enanim:not(.onsite), body.site .spzip, body.site .spgif, body.site .spvid { display: none; }
 body.site .fxapp { opacity: .4; cursor: default; }

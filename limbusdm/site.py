@@ -30,7 +30,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers"]
+BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers", "abnologs"]
 # a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
 CARD_DIRS = ("db", "enemies", "buffs", "og")
 CARD_PAGE = """<!doctype html>
@@ -51,6 +51,7 @@ SECTIONS = {
     "enemies": ("Enemies", "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by Canto."),
     "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
     "announcers": ("Announcers", "Every battle announcer of Limbus Company with all of its lines by situation: read them and hear them."),
+    "abnologs": ("Abnormality logs", "Every Limbus Company Abnormality observation log, Canto by Canto: which Sinner wrote it and the others' replies."),
     "story": ("Story", "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by Canto."),
     "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
     "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
@@ -916,6 +917,35 @@ class Exporter:
         self.write_manifest("announcers", m)
         return m
 
+    def abnologs(self) -> dict:
+        """Abnormality logs page: the list, the pictures and each one's Spine look."""
+        old = self.read_manifest("abnologs")
+        sid = self.svc.latest_snapshot_id()
+        have = self.kept(old)
+        lists = ["/api/abno_logs"]
+        try:
+            ab = json.loads(self._get("/api/abno_logs")[0]).get("list") or []
+        except Exception as e:
+            self.failed.append(("/api/abno_logs", str(e)))
+            ab = []
+        pics = [url_key("/api/asset_thumb", path=a["pic"]) for a in ab if a.get("pic")]
+        pics += [url_key("/api/enemy_thumb", app=a["app"]) for a in ab if a.get("app") and not a.get("pic")]
+        spine = []
+        for x in dict.fromkeys((a["spine"]["bundle"], a["spine"]["atlas"]) for a in ab if a.get("spine")):
+            base = f"/spine/{x[0]}/{x[1]}.2/"
+            spine += [base + "skeleton.atlas", base + "skeleton.json"]
+            try:  # the atlas names its pages: a line that is a file name
+                atlas = self._text(base + "skeleton.atlas", have)
+                spine += [base + ln.strip() for ln in atlas.splitlines() if ln.strip().lower().endswith(".png")]
+            except Exception:
+                pass
+        # (the list carries the writers' guesses: asked again every time)
+        got = self.fetch_all(lists + pics + spine, {k: f for k, f in have.items() if k not in lists}, "site: Abnormality logs")
+        urls, groups = _grouped(got, [(lists, PACK), (pics, GAME_PACK)])
+        m = {"kind": "abnologs", "id": sid, "urls": urls, "groups": groups}
+        self.write_manifest("abnologs", m)
+        return m
+
     def biggames(self) -> dict:
         """The big games (ui/big): what each asks the app for, found by running them in a hidden window (bigNeeds)."""
         old = self.read_manifest("biggames")
@@ -1245,6 +1275,7 @@ class Exporter:
         if self.cfg["story"]:
             self.story()
             self.announcers()
+            self.abnologs()
         self.biggames()
 
     # -- the site around the data
@@ -1628,7 +1659,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
 
 PULL_STAGE = "site: taking from the site"
 # parts pull() takes from the site
-TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "announcers", "cards", "tools", "extra", "music", "biggames")
+TAKEN_PARTS = ("units", "enemies", "anim", "quiz", "scenes", "gacha", "newgames", "announcers", "abnologs", "cards", "tools", "extra", "music", "biggames")
 PULL_THREADS, PULL_TRIES = 10, 3
 PACK_INDEX = "site_packs.json"  # (in the data folder: not uploaded) PackIndex
 PACK_INDEX_DAYS = 60  # a pack not made or looked at for this long is dropped from it
