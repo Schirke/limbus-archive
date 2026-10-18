@@ -517,6 +517,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if q.get("look"):  # another appearance of the Identity (Faust's "CastOff")
                     return self._json(look_frames(svc, _fx_id(q["id"]), q["look"]))
                 out = character_frames(svc, _fx_id(q["id"]))
+                if q.get("parts") and any(re.search(r"_l\d+_", f["name"]) for g in out["groups"] for f in g["frames"]):
+                    from .frames import layer_marks  # frames drawn as layers: where each layer sits ("at": x, y, order)
+                    marks = {}
+                    for b in {f["bundle"] for g in out["groups"] for f in g["frames"]}:
+                        marks.update(layer_marks(svc, b))
+                    out = {"groups": [{**g, "frames": [{**f, "at": marks[f["pid"]]} if f["pid"] in marks else f for f in g["frames"]]} for g in out["groups"]]}
                 # parts=1: units drawn as GameObjects of parts get composed frames
                 return self._json(part_frames(svc, _fx_id(q["id"])) if q.get("parts") and not out["groups"] else out)
             if p == "/api/frame_png":  # a game frame (bundle + pid) or a mod's replacement (id + name + file)

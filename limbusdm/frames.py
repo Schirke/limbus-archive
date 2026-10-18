@@ -133,6 +133,76 @@ def character_frames(svc, cid) -> dict:
     return out
 
 
+def _streamed(data) -> dict:
+    """A StreamedClip's keys by curve: {curve: [(time, (c0, c1, c2, c3))]} (the value at t is a cubic in t - time)."""
+    import struct
+    b = struct.pack(f"<{len(data)}I", *data)
+    p, out = 0, {}
+    while p + 8 <= len(b):
+        t, n = struct.unpack_from("<fI", b, p)
+        p += 8
+        for _ in range(n):
+            i, c0, c1, c2, c3 = struct.unpack_from("<i4f", b, p)
+            p += 20
+            out.setdefault(i, []).append((max(t, 0.0), (c0, c1, c2, c3)))
+    return out
+
+
+def _value(keys, t: float):
+    k = None
+    for kt, c in keys:
+        if kt > t + 1e-6:
+            break
+        k = (kt, c)
+    if k is None:
+        return None
+    dt, (c0, c1, c2, c3) = t - k[0], k[1]
+    return ((c0 * dt + c1) * dt + c2) * dt + c3
+
+
+_MARKS: dict = {}
+
+
+def layer_marks(svc, bundle: str) -> dict:
+    """Where each sprite of a unit drawn as layers sits when it shows ({pid: [x, y, sorting order]}, units): read from
+    the bundle's animation clips, whose layer renderers move and reorder from frame to frame (Dawn Office)."""
+    path = svc.object_file(bundle)
+    if not path:
+        return {}
+    if path in _MARKS:
+        return _MARKS[path]
+    out = _MARKS[path] = {}
+    with _lock:
+        env = _env(path)
+        for clip in (o for o in env.objects if o.type.name == "AnimationClip"):
+            try:
+                t = clip.read_typetree()
+                keys = _streamed(t["m_MuscleClip"]["m_Clip"]["data"]["m_StreamedClip"]["data"])
+                cb = t["m_ClipBindingConstant"]
+            except Exception:
+                continue
+            pp, ci, by = cb.get("pptrCurveMapping") or [], 0, {}
+            for g in cb.get("genericBindings") or []:
+                n = 1 if g["isPPtrCurve"] or g["typeID"] != 4 else {1: 3, 2: 4, 3: 3, 4: 3}.get(g["attribute"], 1)
+                kind = "sprite" if g["isPPtrCurve"] else "pos" if g["typeID"] == 4 and g["attribute"] == 1 else "order" if g["typeID"] == 212 else None
+                if kind:
+                    by.setdefault(g["path"], {})[kind] = ci
+                ci += n
+            for b in by.values():
+                if "sprite" not in b or "pos" not in b:
+                    continue
+                for kt, c in keys.get(b["sprite"], []):
+                    i = int(round(c[3]))
+                    pid = (pp[i] or {}).get("m_PathID") if 0 <= i < len(pp) else None
+                    if not pid or str(pid) in out:
+                        continue
+                    x, y = (_value(keys.get(b["pos"] + j, []), kt) for j in (0, 1))
+                    z = _value(keys.get(b["order"], []), kt) if "order" in b else None
+                    if x is not None and y is not None:
+                        out[str(pid)] = [round(x, 4), round(y, 4), round(z) if z is not None else 0]
+    return out
+
+
 LOOK_POSE = {"Default": "idle", "Move": "move", "Damaged": "dmg", "Guard": "gud", "Evade": "miss", "Dead": "dead"}
 
 
