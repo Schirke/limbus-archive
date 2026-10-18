@@ -111,13 +111,16 @@ async function pfUnits() {
   if (pf.units) return pf.units;
   const u = await api("/api/units").catch(() => null), all = new Map(), sinners = [];
   for (const x of (u || {}).ids || []) if (x.img && x.img.thumb) {
-    all.set(x.id, { id: x.id, title: x.title, who: x.sinnerName, sinner: x.sinner, kind: "r" + x.rank, thumb: giThumb(x.img.thumb), art: gaFull(x.img.art2 || x.img.art) });
+    all.set(x.id, { id: x.id, title: x.title, who: x.sinnerName, sinner: x.sinner, kind: "r" + x.rank, thumb: giThumb(x.img.thumb), art: gaFull(x.img.art2 || x.img.art),
+      art1: gaFull(x.img.art), ...(x.img.art2 && x.img.art2 !== x.img.art ? { art3: gaFull(x.img.art2), thumb3: giThumb(x.img.art2) } : {}) });
     sinners[x.sinner - 1] = x.sinnerName;
   }
   for (const e of (u || {}).egos || []) if (e.img && e.img.thumb)
     all.set(e.id, { id: e.id, title: e.name, who: e.sinnerName, sinner: e.sinner, kind: "ego", grade: e.grade, thumb: giThumb(e.img.thumb), art: gaFull(e.img.art) });
   return (pf.units = { all, sinners });
 }
+// the card's art: before Uptie III or after it (the choice kept; an Identity without a second art has one)
+const pfLook = (f) => { const up = pf.st.up !== false && f.art3; return { art: up ? f.art3 : f.art1 || f.art, thumb: up ? f.thumb3 : f.thumb }; };
 const pfShards = () => Object.entries(pfGacha().got || {}).reduce((s, [id, n]) => s + (n - 1) * (PF_DUP[(pf.units.all.get(+id) || {}).kind] || 0), 0) - pf.st.used;
 function pfAlbum() {
   const got = pfGacha().got || {}, U = [...pf.units.all.values()], ego = pf.tab === "ego", list = U.filter((x) => (x.kind === "ego") === ego);
@@ -159,22 +162,24 @@ function pfCardData() {
   const face = pf.units.all.get(pf.st.avatar) && got[pf.st.avatar] ? pf.units.all.get(pf.st.avatar) : ids.find((x) => x.kind === "r3") || ids[0];
   const ach = GM_ACH.filter(([k]) => gmW.ach[k]).sort((a, b) => String(gmW.ach[b[0]]).localeCompare(String(gmW.ach[a[0]])));
   // (the top bar shows the face without reading every unit)
-  if (face && (pf.st.face !== face.thumb || pf.st.faceS !== face.sinner)) { pf.st.face = face.thumb; pf.st.faceS = face.sinner; pfKeep(); pfChip(); }
+  if (face && (pf.st.face !== pfLook(face).thumb || pf.st.faceS !== face.sinner)) { pf.st.face = pfLook(face).thumb; pf.st.faceS = face.sinner; pfKeep(); pfChip(); }
   return { face, ids: ids.length, all: [...pf.units.all.values()].filter((x) => x.kind !== "ego").length, ach, lv: pfLevel() };
 }
 function pfCardDraw() {
   const c = pfCardData();
   const back = pfBack(c.lv.l), title = pfTitle(c.lv);
-  $("#pfcard").innerHTML = `<div class="pfcard" style="border-color:${pfFrame(c.lv.l)};--back:${pfBackTop(back, c.lv.l)}"><div class="pfbn" style="${c.face ? `background-image:url('${c.face.art}')` : ""}"></div><div class="pfin">
+  $("#pfcard").innerHTML = `<div class="pfcard" style="border-color:${pfFrame(c.lv.l)};--back:${pfBackTop(back, c.lv.l)}"><div class="pfbn" style="${c.face ? `background-image:url('${pfLook(c.face).art}')` : ""}"></div><div class="pfin">
       <div class="pfrank">${esc(title)}</div><div class="pfsub">${title !== c.lv.rank ? "Color · " : ""}LV ${c.lv.l}${c.face ? ` · ${esc(c.face.title)}` : ""}</div>
       <div class="pfnums"><div><b>${c.ids}</b><span>Identities</span></div><div><b>${c.ach.length}</b><span>Achievements</span></div><div><b>${gmW.streak || 0}</b><span>Streak</span></div></div>
       <div class="pfbadges">${c.ach.slice(0, 3).map(([, name]) => `<span>${esc(name)}</span>`).join("") || `<span class="none">No achievements yet</span>`}</div>
       <div class="pfsite">limbus-archive.com</div></div></div>
+    ${c.face && c.face.art3 ? `<div class="pfbacks"><span class="sub">Art</span>${[[false, "Uptie I–II"], [true, "Uptie III"]].map(([up, t]) => `<button class="pfbk ${(pf.st.up !== false) === up ? "on" : ""}" data-up="${up ? 1 : 0}">${t}</button>`).join("")}</div>` : ""}
     <div class="pfbacks">${PF_BACK.map(([name, from], i) => { const open = c.lv.l >= from; return `<button class="pfbk ${back === PF_BACK[i] ? "on" : ""}" data-bk="${i}" ${open ? "" : "disabled"} style="--b:${pfBackTop(PF_BACK[i], c.lv.l)}" title="${esc(name)}${open ? "" : " · opens at " + esc(PF_RANKS[from - 1])}"><i></i>${esc(name)}${open ? "" : `<small>${esc(PF_RANKS[from - 1].replace(" Fixer", ""))}</small>`}</button>`; }).join("")}</div>
     ${c.lv.l >= PF_RANKS.length ? `<div class="pfepi"><span class="sub">Your name as a Color:</span> The <select id="pfepi0"><option value="" disabled ${pf.st.epi ? "" : "selected"}>pick</option>${PF_EPI[0].map((w, i) => `<option value="${i}" ${pf.st.epi && pf.st.epi[0] === i ? "selected" : ""}>${w}</option>`).join("")}</select>
       <select id="pfepi1"><option value="" disabled ${pf.st.epi ? "" : "selected"}>pick</option>${PF_EPI[1].map((w, i) => `<option value="${i}" ${pf.st.epi && pf.st.epi[1] === i ? "selected" : ""}>${w}</option>`).join("")}</select></div>` : ""}
     <div class="pfbtns"><span class="sub">Click an Identity you own in the album to put it here.</span><button class="primary" id="pfpng">Save picture</button></div>`;
   $("#pfpng").onclick = () => pfPng(c);
+  document.querySelectorAll("#pfcard [data-up]").forEach((b) => b.onclick = () => { pf.st.up = b.dataset.up === "1"; pfKeep(); pfSoon(); pfCardDraw(); });
   document.querySelectorAll("#pfcard [data-bk]").forEach((b) => b.onclick = () => { pf.st.back = +b.dataset.bk; pfKeep(); pfSoon(); pfCardDraw(); });
   const epi = () => { if ($("#pfepi0").value === "" || $("#pfepi1").value === "") return; pf.st.epi = [+$("#pfepi0").value, +$("#pfepi1").value]; pfKeep(); pfSoon(); pfCardDraw(); pfChip(); };
   if ($("#pfepi0")) { $("#pfepi0").onchange = epi; $("#pfepi1").onchange = epi; }
@@ -186,7 +191,7 @@ async function pfPng(c) {
   const bg = x.createLinearGradient(0, 260, 0, H); bg.addColorStop(0, pfBackTop(pfBack(c.lv.l), c.lv.l)); bg.addColorStop(1, "#0f0c0d");
   x.fillStyle = "#0f0c0d"; x.fillRect(0, 0, W, H); x.fillStyle = bg; x.fillRect(0, 260, W, H - 260);
   if (c.face) {
-    const im = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = c.face.art; });
+    const im = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = pfLook(c.face).art; });
     if (im) {  // (the art only above the text, faded out at its foot)
       const k = Math.max(W / im.width, 300 / im.height);
       x.save(); x.beginPath(); x.rect(0, 0, W, 300); x.clip();

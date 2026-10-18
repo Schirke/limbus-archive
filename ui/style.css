@@ -1813,3 +1813,4 @@ button.sndnav:hover { color: var(--gold); }
 .glrow .glwho .glnm { flex: 1; display: flex; flex-direction: column; line-height: 1.15; } .glrow .glwho .glnm small { font: 11px Consolas, monospace; color: #f3d77a; overflow: hidden; text-overflow: ellipsis; }
 #glpanel .glrow .glwho .pfava { width: 24px; height: 24px; font-size: 11px; }
 @media (max-width: 900px) { #glpanel .glrow .glwho .glnm small { display: none; } #glpanel .glrow .glwho .pfava { width: 18px; height: 18px; } }
+.pfbacks > .sub { align-self: center; margin-right: 4px; }
