@@ -30,7 +30,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers", "abnologs"]
+BASE_OPEN = ["home", "profile", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers", "abnologs"]
 # a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
 CARD_DIRS = ("db", "enemies", "buffs", "og")
 CARD_PAGE = """<!doctype html>
@@ -277,6 +277,8 @@ def unit_urls(units: dict) -> list[str]:
                 walk(v, key)
         elif isinstance(o, str) and o.startswith("Assets/"):
             (full if key in ("art", "art2") else thumbs).add(o)
+            if key == "art2":  # (Profile: the Uptie III face)
+                thumbs.add(o)
     walk(units)
     for u in units.get("ids", []):
         # skill pictures by `icon`, defense skills too (E.G.O skills have none: the page draws the E.G.O's picture)
