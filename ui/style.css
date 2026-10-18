@@ -760,6 +760,11 @@ button.gihint { cursor: pointer; } button.gihint:hover { border-color: var(--gol
 /* Patches -> News: the developers' update notices from Steam (news.js) */
 .nwfeed { display: grid; grid-template-columns: 400px 1fr; border: 1px solid var(--line); background: var(--panel); height: calc(100vh - 250px); min-height: 420px; }
 .nwlist { overflow-y: auto; border-right: 1px solid var(--line); }
+.nwtop { flex-wrap: wrap; gap: 8px 16px; } .nwtop > .grow { flex: 1 1 340px; } .nwchk { gap: 10px; }
+@media (max-width: 900px) {
+  .nwfeed { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+  .nwlist { max-height: 45vh; border-right: 0; border-bottom: 1px solid var(--line); } .nwread { padding: 16px 14px 24px; }
+}
 .nwitem, .nwitem:hover, .nwopen, .nwopen:hover { text-decoration: none; }
 .nwitem { display: block; padding: 11px 14px; border-bottom: 1px solid var(--line); border-left: 3px solid transparent; color: var(--text); }
 .nwitem:hover { background: var(--panel2); } .nwitem.on { background: var(--panel2); border-left-color: var(--gold); }
@@ -1462,6 +1467,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .hvnums span { background: var(--panel2); padding: 2px 9px; }
 .hvnums .dn { color: #ff6a55; } .hvnums .up { color: #7cc66a; }
 .hvtxt { margin-top: 7px; line-height: 1.55; }
+@media (max-width: 900px) { .hvcols { grid-template-columns: minmax(0, 1fr); } .hvlist { max-height: 45vh; } .hvhead .row { margin-left: 0; flex-wrap: wrap; } }
 .hvtxt em { font-style: normal; color: var(--muted); font-size: 12px; display: block; }
 .hvtxt del { background: #5a1f1a; color: #ffb9ae; margin-right: 2px; }
 .hvtxt ins { background: #22451f; color: #c5f0b8; text-decoration: none; }

@@ -42,9 +42,9 @@ routes.news = async ([day]) => {
   const draw = () => {
     const ps = d.patches, cur = ps.find((p) => p.day === day) || ps[0];
     if (!cur) { main.innerHTML = `<h1>News</h1><div class="empty">No notices yet${d.error ? ": Steam didn't answer (" + esc(d.error) + ")" : ""}.</div>`; return; }
-    main.innerHTML = `<div class="row"><div class="grow"><h1>News</h1>
+    main.innerHTML = `<div class="row nwtop"><div class="grow"><h1>News</h1>
         <div class="sub">The developers' update notices from Steam: posted on Monday, the patch lands on Thursday. Each one next to its patch in your archive.</div></div>
-      <div class="row" style="gap:10px"><span class="nwmeta">${d.error ? "STEAM DIDN'T ANSWER · SAVED LIST" : d.checked ? "CHECKED " + nwDay(d.checked).toUpperCase() + " " + nwTime(d.checked) : ""}</span><button id="nwre">Refresh</button></div></div>
+      <div class="row nwchk"><span class="nwmeta">${d.error ? "STEAM DIDN'T ANSWER · SAVED LIST" : d.checked ? "CHECKED " + nwDay(d.checked).toUpperCase() + " " + nwTime(d.checked) : ""}</span><button id="nwre">Refresh</button></div></div>
       <div class="nwfeed"><div class="nwlist">${ps.map((p) => `<a class="nwitem ${p === cur ? "on" : ""}" href="#/news/${p.day}">
           <span class="nwmeta"><b>${nwDay(p.time).toUpperCase()}</b>${nwState(p)}</span>
           <span class="nwt">${esc(p.notice.title)}</span>${p.extra.length ? `<span class="nwx">+ ${p.extra.map((x) => esc(x.title)).join(" · ")}</span>` : ""}</a>`).join("")}</div>
@@ -60,6 +60,8 @@ routes.news = async ([day]) => {
     };
   };
   draw();
+  // one column on phones: the picked notice is below the list
+  if (day && innerWidth <= 900) { const r = main.querySelector(".nwread"); if (r) r.scrollIntoView({ block: "start" }); }
 };
 
 // on a patch's report: a line with the developers' notice for that patch, opened in place

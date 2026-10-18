@@ -17,6 +17,8 @@ routes.changes = async (args) => {
     if (!HISTORY.patches[hv.patch].cards[hv.key]) hv.patch = HISTORY.patches.findIndex((p) => p.cards[hv.key]);
   }
   hvDraw();
+  // one column on phones: a picked card is below the list
+  if (args[0] && innerWidth <= 900) { const h = $(".hvhead"); if (h) h.scrollIntoView({ block: "start" }); }
 };
 
 // word diff of two texts ([Keyword]s whole)
