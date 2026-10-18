@@ -238,18 +238,26 @@ const PF_EVERY = 60e3;
 let pfTimer = 0;
 function pfSoon() { if (!pfTimer) pfTimer = setTimeout(() => { pfTimer = 0; pfPush(); }, PF_EVERY); }
 const pfHash = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = (h * 33 ^ t.charCodeAt(i)) >>> 0; return h.toString(36) + "." + t.length; };
+// the codes live on the site's Worker (worker.js /save); the app asks the site; a test may point it elsewhere
+const pfServer = () => (localStorage.getItem("games_live_host") || (document.body.classList.contains("site") ? location.origin : GM_SITE)).replace(/\/$/, "") + "/save";
+// force: this browser's progress stays even if another device saved under the code since
 async function pfPush(force) {
-  if (pf.busy) return;
+  if (pf.busy || (pf.clash && !force)) return;
   const data = pfSave(), hash = pfHash(JSON.stringify(Object.entries(data).filter(([k]) => k !== PF_KEEP).sort()));
   if (!force && hash === pf.st.ph) return;
   if (!pf.st.code && !Object.keys(data).some((k) => k !== PF_KEEP)) return;  // (no progress yet: no code)
   pf.busy = true;
   try {
     if (!pf.st.code) navigator.storage?.persist?.().catch(() => {});
-    const r = await fetch("/api/pfsave", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", "X-Limbus-Datamine": "1" }, body: JSON.stringify({ code: pf.st.code || "", data, drop: pf.drop || "" }) }).then((x) => x.ok ? x.json() : null);
-    if (!r || !r.code) return;
-    pf.st.code = r.code; pf.st.saved = Date.now(); pf.st.ph = hash; pf.drop = "";
-    pfKeep();
+    const x = await fetch(pfServer(), { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: pf.st.code || "", base: pf.st.at || 0, force: !!force, data, drop: pf.drop || "" }) });
+    const r = await x.json().catch(() => ({}));
+    pf.off = x.status === 503;
+    if (x.status === 409) pf.clash = r.at || 1;
+    if (x.ok && r.code) {
+      pf.st.code = r.code; pf.st.at = r.at; pf.st.saved = Date.now(); pf.st.ph = hash; pf.drop = ""; pf.clash = 0;
+      pfKeep();
+    }
     if (location.hash.startsWith("#/profile")) pfSaveDraw();
   } catch { /* offline: next time */ } finally { pf.busy = false; }
 }
@@ -261,7 +269,9 @@ async function pfSaveDraw() {
   $("#pfsave").innerHTML = `<div><span class="pflbl">Your save code</span>
       <span class="pfcode">${!pf.st.code ? "—" : pf.show ? esc(pf.st.code) : "••••-••••"}</span>
       <span class="sub">${pf.st.code ? "The code holds your games' progress and nothing else. Anyone with it can load it, so keep it to yourself." : "The code appears after your first game."}</span>
-      ${pf.st.saved ? `<div class="pfok"><i></i>Saved ${pfAgo(pf.st.saved)}</div>` : ""}
+      ${pf.clash ? `<div class="pfclash">This code was saved from another device ${pfAgo(pf.clash)} — after this browser. Which progress stays?
+        <div class="pfbtns"><button class="primary" id="pftheirs">Load the other device's</button><button id="pfmine">Keep this browser's</button></div></div>` : ""}
+      ${pf.off ? `<div class="pfok warn"><i></i>Saving is paused for now — your progress is still in this browser</div>` : pf.st.saved && !pf.clash ? `<div class="pfok"><i></i>Saved ${pfAgo(pf.st.saved)}</div>` : ""}
       <div class="pfok ${kept ? "" : "warn"}"><i></i>${kept ? "This browser is asked to keep your progress" : "This browser may still clear it on its own — keep the code"}</div>
       <div class="pfbtns"><button class="primary" id="pfcopy" ${pf.st.code ? "" : "disabled"}>Copy code</button><button id="pfshow" ${pf.st.code ? "" : "disabled"}>${pf.show ? "Hide" : "Show"}</button><button id="pfnew" title="Your progress moves to a fresh code; the old one stops working">New code</button></div></div>
     <div><span class="pflbl">Load progress</span>
@@ -270,17 +280,23 @@ async function pfSaveDraw() {
       <span class="sub" id="pfloadmsg">Loading replaces what this browser has now.</span></div>`;
   $("#pfcopy").onclick = () => navigator.clipboard.writeText(pf.st.code).then(() => toast("Code copied."), () => { pf.show = true; pfSaveDraw(); toast("Copy it by hand from the page."); });
   $("#pfshow").onclick = () => { pf.show = !pf.show; pfSaveDraw(); };
+  if ($("#pftheirs")) { $("#pftheirs").onclick = () => pfLoad(pf.st.code); $("#pfmine").onclick = () => pfPush(true); }
   $("#pfnew").onclick = async () => { pf.drop = pf.st.code; pf.st.code = ""; pfKeep(); await pfPush(true); toast("A new code is made — the old one no longer loads."); };
   $("#pfcodein").oninput = (e) => { let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8); if (v.length > 4) v = v.slice(0, 4) + "-" + v.slice(4); e.target.value = v; pf.sure = false; $("#pfload").textContent = "Load"; };
   $("#pfload").onclick = pfLoad;
 }
-async function pfLoad() {
-  const code = $("#pfcodein").value.trim(), msg = $("#pfloadmsg");
+// own: the newer progress under this browser's own code (no asking twice)
+async function pfLoad(own) {
+  const code = typeof own === "string" ? own : $("#pfcodein").value.trim(), msg = $("#pfloadmsg");
   if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) { msg.textContent = "A code looks like K7QM-2XRP."; return; }
-  if (code === pf.st.code) { msg.textContent = "That is this browser's own code."; return; }
+  if (code === pf.st.code && typeof own !== "string") { msg.textContent = "That is this browser's own code."; return; }
   let r;
-  try { r = await api("/api/pfsave?code=" + code); } catch { msg.textContent = "No progress under that code. Check the letters."; return; }
-  if (!pf.sure) {
+  try {
+    const x = await fetch(pfServer() + "?code=" + code);
+    r = await x.json().catch(() => ({}));
+    if (!x.ok) { msg.textContent = x.status === 404 ? "No progress under that code. Check the letters." : x.status === 429 ? "Too many tries — wait a minute." : "Couldn't reach the save service. Try again later."; return; }
+  } catch { msg.textContent = "Couldn't reach the save service. Try again later."; return; }
+  if (!pf.sure && typeof own !== "string") {
     const w = JSON.parse(r.data.games_wallet || "{}"), g = JSON.parse(r.data.games_gacha || "{}");
     msg.innerHTML = `Found: <b>${(w.lunacy || 0).toLocaleString("en")}</b> lunacy, <b>${Object.keys(g.got || {}).length}</b> extracted, saved ${pfAgo(r.at)}. Click <b>Replace</b> to load it here.`;
     pf.sure = true; $("#pfload").textContent = "Replace";
@@ -290,7 +306,7 @@ async function pfLoad() {
     for (const k of Object.keys(pfSave())) localStorage.removeItem(k);
     for (const [k, v] of Object.entries(r.data)) if (pfMine(k)) localStorage.setItem(k, v);
     const p = JSON.parse(localStorage.getItem(PF_KEEP) || "{}");
-    p.code = code; p.saved = r.at;
+    p.code = code; p.saved = r.at; p.at = r.at; p.ph = "";
     localStorage.setItem(PF_KEEP, JSON.stringify(p));
   } catch { msg.textContent = "This browser refused to store it (private window?)."; return; }
   location.hash = "#/profile";

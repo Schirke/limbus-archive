@@ -1,5 +1,5 @@
 // The site's Worker: static files, /room/<code> live-match rooms (a Durable Object relaying messages in one order with
-// its clock), and /stat/* visitor counts (daily sums, salted daily hashes).
+// its clock), /stat/* visitor counts (daily sums, salted daily hashes), and /save: the games' progress under a code (D1).
 import { DurableObject } from "cloudflare:workers";
 
 const MOST = 8, ROOM_KEEP = 12 * 3600e3;
@@ -119,6 +119,7 @@ export class Stats extends DurableObject {
     this.sql.exec("CREATE TABLE IF NOT EXISTS s (h TEXT PRIMARY KEY, day TEXT, at INTEGER, p TEXT)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS salt (day TEXT PRIMARY KEY, v TEXT)");
     this.sql.exec("CREATE TABLE IF NOT EXISTS u (period TEXT PRIMARY KEY, w INTEGER, d INTEGER, r INTEGER)");
+    try { this.sql.exec("ALTER TABLE u ADD COLUMN s INTEGER DEFAULT 0"); } catch { /* there already */ }
     this.sql.exec("CREATE TABLE IF NOT EXISTS r (code TEXT PRIMARY KEY, since INTEGER, at INTEGER, players TEXT, what TEXT)");
   }
 
@@ -128,17 +129,17 @@ export class Stats extends DurableObject {
   add(day, k, n) { this.put("INSERT INTO c VALUES (?, ?, ?) ON CONFLICT (day, k) DO UPDATE SET n = n + excluded.n", day, k, n); }
 
   // this period's usage
-  spent(w, d) {
+  spent(w, d, s = 0) {
     const now = Date.now(), b = this.budget, [period, until] = periodOf(now, (b && +b.day) || 1);
-    let u = this.sql.exec("SELECT w, d, r FROM u WHERE period = ?", period).toArray()[0];
+    let u = this.sql.exec("SELECT w, d, r, s FROM u WHERE period = ?", period).toArray()[0];
     if (!u) {
-      u = { w: (b && b.used && +b.used[period]) || 0, d: 0, r: 0 };
+      u = { w: (b && b.used && +b.used[period]) || 0, d: 0, r: 0, s: 0 };
       this.sql.exec("DELETE FROM u WHERE period < ?", dayOf(now - 400 * DAY));
     }
-    u = { w: u.w + w, d: u.d + d, r: u.r + this.rows + 2 };
+    u = { w: u.w + w, d: u.d + d, r: u.r + this.rows + 2, s: (u.s || 0) + s };
     this.rows = 0;
-    this.sql.exec("INSERT OR REPLACE INTO u VALUES (?, ?, ?, ?)", period, u.w, u.d, u.r);
-    const off = !!b && ((b.requests > 0 && u.w >= b.requests) || (b.objects > 0 && u.d >= b.objects) || (b.rows > 0 && u.r >= b.rows));
+    this.sql.exec("INSERT OR REPLACE INTO u (period, w, d, r, s) VALUES (?, ?, ?, ?, ?)", period, u.w, u.d, u.r, u.s);
+    const off = !!b && ((b.requests > 0 && u.w >= b.requests) || (b.objects > 0 && u.d >= b.objects) || (b.rows > 0 && u.r >= b.rows) || (b.saves > 0 && u.s >= b.saves));
     return { period, until, ...u, off };
   }
 
@@ -177,7 +178,7 @@ export class Stats extends DurableObject {
     const sums = new Map(), day = dayOf(Date.now());
     for (const x of Array.isArray(m.hits) ? m.hits.slice(0, MOST_HITS) : []) await this.hit(x || {}, sums);
     for (const [k, n] of sums) this.add(day, k, n);
-    const u = this.spent(Math.max(0, +m.w || 0), 1 + Math.max(0, +m.d || 0));
+    const u = this.spent(Math.max(0, +m.w || 0), 1 + Math.max(0, +m.d || 0), Math.max(0, +m.s || 0));
     return { off: u.off, until: u.until };
   }
 
@@ -204,7 +205,7 @@ export class Stats extends DurableObject {
       now, today: dayOf(now), sets: { day: sum(1), prev: sum(2), week: sum(7), month: sum(30) },
       days: Array.from({ length: 14 }, (_, i) => dayOf(now - (13 - i) * DAY)).map((d) => [d, by[d] || 0]),
       online: this.sql.exec("SELECT p FROM s WHERE at > ?", now - NOW).toArray().map((r) => r.p),
-      spent: { ...u, most: b ? { w: +b.requests || 0, d: +b.objects || 0, r: +b.rows || 0 } : null },
+      spent: { ...u, most: b ? { w: +b.requests || 0, d: +b.objects || 0, r: +b.rows || 0, s: +b.saves || 0 } : null },
       rooms: this.sql.exec("SELECT code, since, at, players, what FROM r WHERE at > ? ORDER BY since", now - ROOM_KEEP).toArray()
         .map((r) => ({ ...r, players: JSON.parse(r.players || "[]") })),
     };
@@ -218,16 +219,73 @@ export class Stats extends DurableObject {
 }
 
 // per-isolate state between requests
-const G = { hits: [], w: 0, d: 0, at: 0, off: 0, ips: new Map(), min: 0, got: null };
+const G = { hits: [], w: 0, d: 0, s: 0, at: 0, off: 0, ips: new Map(), min: 0, got: null, saves: new Map(), smin: 0, db: false };
 
 async function flush(env) {
-  const body = JSON.stringify({ hits: G.hits, w: G.w, d: G.d });
-  G.hits = []; G.w = 0; G.d = 0; G.at = Date.now();
+  const body = JSON.stringify({ hits: G.hits, w: G.w, d: G.d, s: G.s });
+  G.hits = []; G.w = 0; G.d = 0; G.s = 0; G.at = Date.now();
   try {
     const r = await env.STATS.get(env.STATS.idFromName("site")).fetch("https://stats/take", { method: "POST", body });
     const a = await r.json();
     G.off = a.off ? a.until : 0;
   } catch { /* the hits kept since the last time are lost */ }
+}
+
+// Save codes: one row per code (the games' storage as text, and a copy a day old); no name, no address, nothing else.
+const SAVE_MAX = 300e3, SAVE_KEYS = /^(games[a-z_]{0,20}|rf_best|rf_camp|sl_best)$/, SAVE_PER_MIN = 30, SAVE_NEW_PER_MIN = 10;
+const SAVE_KEEP = 180 * DAY, SAVE_ABC = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const saveCode = () => { const b = crypto.getRandomValues(new Uint8Array(8)); const c = [...b].map((x) => SAVE_ABC[x & 31]).join(""); return c.slice(0, 4) + "-" + c.slice(4); };
+// the app (127.0.0.1) and the site itself may ask
+function saveCors(req, u) {
+  const o = req.headers.get("Origin") || "";
+  return o === u.origin || /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(o) ? { "Access-Control-Allow-Origin": o, "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Allow-Methods": "GET, POST", Vary: "Origin" } : null;
+}
+async function saves(req, u, env, ctx) {
+  const cors = saveCors(req, u), out = (body, status = 200) => Response.json(body, { status, headers: { ...(cors || {}), "Cache-Control": "no-store" } });
+  if (req.method === "OPTIONS") return cors ? new Response(null, { status: 204, headers: cors }) : new Response(null, { status: 403 });
+  if (!cors && req.headers.get("Origin")) return out({ error: "no" }, 403);
+  if (!env.SAVES) return out({ error: "off" }, 503);
+  // a few asks a minute per address (a code can't be guessed by trying)
+  const now = Date.now(), ip = req.headers.get("CF-Connecting-IP") || "";
+  if (Math.floor(now / 60e3) !== G.smin) { G.smin = Math.floor(now / 60e3); G.saves.clear(); }
+  const mine = G.saves.get(ip) || { n: 0, fresh: 0 };
+  G.saves.set(ip, mine);
+  if (++mine.n > SAVE_PER_MIN) return out({ error: "slow" }, 429);
+  const db = env.SAVES, wrote = (r) => { G.s += (r && r.meta && r.meta.rows_written) || 0; };
+  if (!G.db) { await db.exec("CREATE TABLE IF NOT EXISTS saves (code TEXT PRIMARY KEY, data TEXT NOT NULL, at INTEGER NOT NULL, prev TEXT, prev_at INTEGER)"); G.db = true; }
+  const ok = (c) => typeof c === "string" && /^[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}$/.test(c);
+  if (req.method === "GET") {
+    const code = String(u.searchParams.get("code") || "").toUpperCase();
+    if (!ok(code)) return out({ error: "code" }, 400);
+    const row = await db.prepare("SELECT data, at FROM saves WHERE code = ?").bind(code).first();
+    return row ? out({ data: JSON.parse(row.data), at: row.at }) : out({ error: "none" }, 404);
+  }
+  if (req.method !== "POST") return out({ error: "no" }, 405);
+  if (+(req.headers.get("Content-Length") || 0) > SAVE_MAX) return out({ error: "big" }, 413);
+  const text = await req.text();
+  if (text.length > SAVE_MAX) return out({ error: "big" }, 413);
+  let m;
+  try { m = JSON.parse(text); } catch { return out({ error: "json" }, 400); }
+  const data = {};
+  for (const [k, v] of Object.entries((m && typeof m.data === "object" && m.data) || {})) if (SAVE_KEYS.test(k) && typeof v === "string") data[k] = v;
+  if (!Object.keys(data).length) return out({ error: "empty" }, 400);
+  let code = ok(m.code) ? m.code : "";
+  const row = code ? await db.prepare("SELECT at FROM saves WHERE code = ?").bind(code).first() : null;
+  // saved from somewhere else since this browser last saw it: the browser asks its player which one stays
+  if (row && !m.force && +m.base !== row.at) return out({ error: "newer", at: row.at }, 409);
+  if (!row) {
+    if (++mine.fresh > SAVE_NEW_PER_MIN) return out({ error: "slow" }, 429);
+    code = saveCode();
+  }
+  if (ok(m.drop) && m.drop !== code) wrote(await db.prepare("DELETE FROM saves WHERE code = ?").bind(m.drop).run());  // (a new code: the old one goes)
+  const body = JSON.stringify(data);
+  wrote(await db.prepare(`INSERT INTO saves (code, data, at) VALUES (?, ?, ?) ON CONFLICT (code) DO UPDATE SET
+      prev = CASE WHEN saves.prev_at IS NULL OR saves.prev_at < excluded.at - ${DAY} THEN saves.data ELSE saves.prev END,
+      prev_at = CASE WHEN saves.prev_at IS NULL OR saves.prev_at < excluded.at - ${DAY} THEN saves.at ELSE saves.prev_at END,
+      data = excluded.data, at = excluded.at`).bind(code, body, now).run());
+  // now and then: codes nobody saved to for half a year go
+  if (Math.random() < 0.002) ctx.waitUntil(db.prepare("DELETE FROM saves WHERE at < ?").bind(now - SAVE_KEEP).run().then(wrote).catch(() => {}));
+  return out({ code, at: now });
 }
 
 // old addresses move for good to the site's own (a browser first carries its storage over)
@@ -274,6 +332,10 @@ export default {
         G.d += 3;  // (the connection, and its messages: twenty of them count as a request)
         return await env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(req);
       }
+      if (u.pathname === "/save") {
+        if (closed) return new Response(JSON.stringify({ error: "off" }), { status: 503, headers: saveCors(req, u) || {} });
+        return await saves(req, u, env, ctx);
+      }
       if (env.STATS && u.pathname === "/stat/hit" && req.method === "POST") {
         if (closed) return new Response(null, { status: 410 });  // (the page stops telling)
         const ua = req.headers.get("User-Agent") || "", ip = req.headers.get("CF-Connecting-IP") || "";
@@ -300,7 +362,7 @@ export default {
       return env.ASSETS ? await env.ASSETS.fetch(req) : new Response("not found", { status: 404 });
     } finally {
       // the first hit after a quiet while goes at once
-      if (env.STATS && !closed && (G.hits.length || G.w > 50) && (now - G.at >= FLUSH || G.hits.length >= MOST_HITS)) ctx.waitUntil(flush(env));
+      if (env.STATS && !closed && (G.hits.length || G.w > 50 || G.s > 0) && (now - G.at >= FLUSH || G.hits.length >= MOST_HITS)) ctx.waitUntil(flush(env));
     }
   },
 };

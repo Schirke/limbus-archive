@@ -115,6 +115,9 @@ def worker_config(svc) -> str:
            "assets": {"directory": packed_dir(svc), "binding": "ASSETS"},
            "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "Room"}, {"name": "STATS", "class_name": "Stats"}]},
            "migrations": [{"tag": "v1", "new_sqlite_classes": ["Room"]}, {"tag": "v2", "new_sqlite_classes": ["Stats"]}]}
+    saves = config(svc).get("saves_db")
+    if isinstance(saves, dict) and saves.get("id"):  # the games' save codes (worker.js /save)
+        cfg["d1_databases"] = [{"binding": "SAVES", "database_name": saves.get("name") or "limbus-saves", "database_id": saves["id"]}]
     cfg["vars"] = {}
     if isinstance(config(svc).get("budget"), dict):  # what a period of the Cloudflare plan may spend (worker.js)
         cfg["vars"]["BUDGET"] = json.dumps(config(svc)["budget"])
