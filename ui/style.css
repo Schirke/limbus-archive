@@ -1814,3 +1814,5 @@ button.sndnav:hover { color: var(--gold); }
 #glpanel .glrow .glwho .pfava { width: 24px; height: 24px; font-size: 11px; }
 @media (max-width: 900px) { #glpanel .glrow .glwho .glnm small { display: none; } #glpanel .glrow .glwho .pfava { width: 18px; height: 18px; } }
 .pfbacks > .sub { align-self: center; margin-right: 4px; }
+@media (max-width: 700px) { .glcols { grid-template-columns: minmax(0, 1fr); gap: 16px; } }
+@media (max-width: 900px) { #glpanel .glrow span.glwho { max-width: 130px; gap: 5px; } #glpanel .glrow .glwho .glnm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; } }
