@@ -512,8 +512,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from .viewer import battle_maps
                 return self._json([m["name"] for m in battle_maps(svc)])
             if p == "/api/frames":
-                from .frames import character_frames
-                return self._json(character_frames(svc, _fx_id(q["id"])))
+                from .frames import character_frames, part_frames
+                out = character_frames(svc, _fx_id(q["id"]))
+                # parts=1: units drawn as GameObjects of parts get composed frames
+                return self._json(part_frames(svc, _fx_id(q["id"])) if q.get("parts") and not out["groups"] else out)
             if p == "/api/frame_png":  # a game frame (bundle + pid) or a mod's replacement (id + name + file)
                 import io as _io
                 from . import frames, mods
@@ -521,9 +523,12 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     f = os.path.join(mods.mod_dir(svc, _fx_id(q["id"]), q["name"]), "frames", os.path.basename(q["file"]))
                     with open(f, "rb") as fh:
                         return self._send(200, fh.read(), "image/png", {"Cache-Control": "no-store"})
-                rec = {"bundle": q["bundle"], "pid": q["pid"], "w": int(q["w"]), "h": int(q["h"])}
                 b = _io.BytesIO()
-                frames.frame_png(svc, rec).save(b, "PNG")
+                if "v" in q:
+                    frames.part_png(svc, _fx_id(q["id"]), q["pid"], q["v"]).save(b, "PNG")
+                else:
+                    rec = {"bundle": q["bundle"], "pid": q["pid"], "w": int(q["w"]), "h": int(q["h"])}
+                    frames.frame_png(svc, rec).save(b, "PNG")
                 return self._send(200, b.getvalue(), "image/png", {"Cache-Control": "max-age=86400"})
             if p == "/api/skill_timeline":  # what happens when in a skill's video (Edit mod → Timing)
                 from .viewer import skill_timeline
