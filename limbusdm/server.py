@@ -667,6 +667,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 lang = q.get("lang", "en")
                 ep = story.episode_of(svc, q.get("id", ""), lang if lang in story.LANGS else "en")
                 return self._json(ep) if ep else self._json({"error": "no such story"}, 404)
+            if p == "/api/story_kit":  # Story workshop's catalog: people, backgrounds, pictures, music of the stories
+                from . import story
+                return self._json(story.kit(svc))
             if p == "/api/story_lines":  # the line search: every line in English as [story, line, speaker, text]
                 return self._send(200, _story_lines(svc), "application/json; charset=utf-8")
             if p == "/api/story_model":  # a layered standing picture: where its body and faces sit

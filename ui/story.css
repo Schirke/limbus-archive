@@ -202,3 +202,8 @@
 .stidhead { display: flex; align-items: baseline; gap: 14px; margin: 12px 0; flex-wrap: wrap; }
 .stidhead h2 { margin: 0; }
 @media (max-width: 560px) { .stidgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } .stidgrid .utitle { font-size: 15px; } .stidgrid .uarch { font-size: 11px; } .stidhead h2 { font-size: 22px; } }
+/* Story workshop's line effects */
+#streader .rstage.fxshake .rcam { animation: rshake .5s; }
+@keyframes rshake { 0%, 100% { translate: 0 0; } 20% { translate: -1.4% .7%; } 40% { translate: 1.4% -.7%; } 60% { translate: -.9% .4%; } 80% { translate: .9% 0; } }
+#streader .rstage.fxflash::after { content: ""; position: absolute; inset: 0; z-index: 3; background: #fff; pointer-events: none; animation: rflash .7s forwards; }
+@keyframes rflash { from { opacity: .95; } to { opacity: 0; } }

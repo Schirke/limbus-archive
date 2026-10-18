@@ -289,6 +289,20 @@ async function rLoad(file, at) {
   if (R.file !== file) return;
   rShow(Math.min(at, Math.max(0, ep.lines.length - 1)));
 }
+// a scene made in Story workshop, played as a story file is
+async function stPlayEp(ep, title, at = 0) {
+  rEnsure();
+  st.list = []; st.back = location.hash;
+  R.el.classList.toggle("alt", !!R.ui);
+  R.el.classList.add("on"); R.open = true; R.fit();
+  R.log = []; R.auto = false; $("#rauto").classList.remove("on");
+  const file = "workshop:" + Date.now();
+  R.file = file; R.ep = ep; R.states = rFold(ep.lines);
+  R.meta = { title, n: "" }; R.pos = -1;
+  $("#rend").classList.remove("on"); $("#rask").classList.remove("on");
+  await rPreload(ep, file);
+  if (R.file === file) rShow(Math.min(at, Math.max(0, ep.lines.length - 1)));
+}
 // every line's state (what the scene shows) from the changes the lines carry
 function rFold(lines) {
   const s = { bg: "", cg: "", chars: [], feel: {}, cam: {} }, out = [];
@@ -400,6 +414,7 @@ function rShow(i) {
   const cam = s.cam, z = cam.z || 1, rc = $("#rcam");
   rc.style.transition = `transform ${l.cam ? cam.d || 0 : 0}s ease-in-out`;
   rc.style.transform = cam.z ? `translate(${cam.h * z * 50}%, ${cam.v * z * 50}%) scale(${z})` : "none";
+  for (const x of l.fx || []) { const s = $("#rstage"); s.classList.remove("fx" + x); void s.offsetWidth; s.classList.add("fx" + x); }  // (Story workshop's shake / flash)
   // text
   $("#rwho").textContent = l.who || "";
   $("#rrole").textContent = l.role || "";

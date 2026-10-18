@@ -52,6 +52,7 @@ SECTIONS = {
     "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
     "announcers": ("Announcers", "Every battle announcer of Limbus Company with all of its lines by situation: read them and hear them."),
     "abnologs": ("Abnormality logs", "Every Limbus Company Abnormality observation log, Canto by Canto: which Sinner wrote it and the others' replies."),
+    "workshop": ("Story workshop", "Make your own Limbus Company scene with the story's characters, faces, backgrounds and music, play it like the story and share it as a link."),
     "story": ("Story", "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by Canto."),
     "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
     "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
@@ -1053,8 +1054,13 @@ class Exporter:
         files = list(dict.fromkeys([p[0] for c in chapters for e in c["eps"] for p in e["parts"]]
                                    + [it["story"] for s in idx["ident"] for it in s["items"]]))
         files = [f for f in files if f]
-        lists = ["/api/story", "/api/story_lines", url_key("/api/ui_sprite", n="SettingIcon")] + [url_key("/api/story_ep", id=f) for f in files]
+        lists = ["/api/story", "/api/story_lines", "/api/story_kit", url_key("/api/ui_sprite", n="SettingIcon")] + [url_key("/api/story_ep", id=f) for f in files]
         thumbs = [url_key("/api/asset_thumb", path=c["pic"]) for c in chapters if c.get("pic")]
+        try:  # Story workshop's people: their story portraits
+            kit = json.loads(self._get("/api/story_kit")[0])
+            thumbs += [url_key("/api/asset_thumb", path=c.get("face") or c["img"]) for c in kit["chars"] if c.get("face") or c.get("img")]
+        except Exception as e:
+            self.failed.append(("/api/story_kit", str(e)))
         banners = {p[2] for c in chapters for e in c["eps"] for p in e["parts"] if p[2]} | {c["pic"] for c in chapters if c.get("pic")}
         pics = [url_key("/api/story_pic", path=b, m=1280) for b in sorted(banners)]
         models, sprites, sounds, voices, music, videos = [], [], [], [], [], []
@@ -1091,7 +1097,7 @@ class Exporter:
             self.failed.append(("/api/stages", str(e)))
         # (voices in reading order: a pack holds the next lines)
         keys = list(dict.fromkeys(lists + thumbs + pics + models + sprites + sounds + voices + music + videos))
-        got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in ("/api/story", "/api/story_lines")}, "site: Story")
+        got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in ("/api/story", "/api/story_lines", "/api/story_kit")}, "site: Story")
         urls, groups = _grouped(got, [(lists + models, PACK), (thumbs + sprites, GAME_PACK), (pics, SCENE_PACK),
                                       (sounds + voices, VOICE_PACK), (music + videos, PACK)])
         m = {"kind": "story", "id": sid, "v": story.VERSION, "urls": urls, "groups": groups}
