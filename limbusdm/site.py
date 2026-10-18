@@ -30,7 +30,7 @@ DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "e
 # old site addresses → the current one
 MOVED = {"https://limbus.shpep.workers.dev": "https://limbus-archive.com"}
 # pages the site is written for; others open only when the check finds nothing missing
-BASE_OPEN = ["home", "profile", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers", "abnologs"]
+BASE_OPEN = ["home", "profile", "patches", "news", "db", "enemies", "anim", "teams", "games", "gameid", "gameskill", "gamechar", "gameenemy", "gamecanto", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas", "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamearena", "gamehilo", "gamepassive", "gameego", "gamesound", "gamememory", "gamewho", "gamegacha", "gamedare", "live", "community", "support", "buffs", "mirror", "changes", "banners", "compare", "announcers", "abnologs", "calc"]
 # a page per card for link previews (Exporter.card_pages): <route>/<…>.html, pictures in og/
 CARD_DIRS = ("db", "enemies", "buffs", "og")
 CARD_PAGE = """<!doctype html>
@@ -57,6 +57,7 @@ SECTIONS = {
     "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
     "teams": ("Team builder", "Put a Limbus Company team of Identities and E.G.O together and share it as a link or a team code."),
     "mirror": ("Mirror Dungeon planner", "Limbus Company Mirror Dungeon: E.G.O gifts by keyword and tier, theme packs and their bosses."),
+    "calc": ("Damage calculator", "Limbus Company damage calculator: any Identity or E.G.O skill against any enemy, coin by coin, with the max damage of every skill."),
     "banners": ("Banner archive", "Every Limbus Company Extraction banner: when it ran and who was on it."),
     "gamegacha": ("Extraction", "A Limbus Company Extraction simulator, paid with the lunacy the site's games give."),
     "games": ("Games", "Limbus Company guessing games: Identities, skills, enemies, music, Wordle, Connections and more, alone or live with friends."),

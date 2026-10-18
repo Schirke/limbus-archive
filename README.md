@@ -30,7 +30,7 @@ when the app runs (none of them is in this repository).
 
 **[limbus-archive.com](https://limbus-archive.com)** is a copy of the app that runs in a browser:
 patch reports, news and the change history, Identities & E.G.O, the enemy handbook, battle animations, the team
-builder, the Mirror Dungeon planner, the music player, the games with Extraction and its banner archive, and the live
+builder, the Mirror Dungeon planner, the damage calculator, the music player, the games with Extraction and its banner archive, and the live
 streams. The rest (skill renders with effects, Versus,
 files) needs the game on your PC, so it is only in the app.
 
@@ -157,6 +157,12 @@ as possible is reachable, adds the ingredients of fusions by itself and warns ab
 5, 10 or 15 floors; click a floor to see the other packs worth taking there and pin one.
 
 <p align="center"><a href="docs/mirror.webp"><img src="docs/mirror.webp" width="760" alt="Mirror Dungeon planner"></a></p>
+
+### Damage calculator
+
+Any Identity or E.G.O skill against any enemy (or a dummy with the resistances you set), coin by coin: heads or tails,
+crits, damage up, clashes and bonus rows. The formula and every skill's max damage come from
+[BaTyANl calc](https://github.com/BaTyANl/ElderCalc); the max damage is also shown under the skills on Identity cards.
 
 ### Music player
 

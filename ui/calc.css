@@ -1,0 +1,63 @@
+/* More → Damage calc (calc.js) */
+.dcpage { max-width: 1200px; }
+.dccredit { margin: -6px 0 12px; }
+.dcpage .cqpick select { max-width: 100%; margin-top: 3px; }
+.dcpage .cqpick > img.sp, .dcnopic { width: 64px; height: 64px; object-fit: contain; }
+.dcdummy { display: inline-grid; place-items: center; width: 64px; height: 64px; font-size: 34px; background: rgba(255, 255, 255, .04); }
+.cqlist .dcdummy { width: 32px; height: 32px; font-size: 18px; }
+.dcnum { width: 70px; }
+.dcresrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -6px 0 14px; }
+.dcres { display: inline-flex; align-items: center; gap: 3px; }
+.dcres input { width: 54px; }
+.dcslots { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.dcslots button { display: inline-flex; align-items: center; gap: 6px; text-align: left; padding: 6px 10px; }
+.dcslots button span { display: flex; flex-direction: column; line-height: 1.15; }
+.dcslots button small { color: var(--muted); font-size: 11px; }
+.dcslots button.on { border-color: var(--gold); background: rgba(201, 162, 39, .1); }
+.dcgrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.dcpresets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.dcpresets button.on { color: var(--gold); border-color: var(--gold); }
+.dcpresets button.dim { opacity: .6; }
+.dctabwrap { overflow-x: auto; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; }
+.dctab { border-collapse: collapse; min-width: 100%; }
+.dctab th, .dctab td { padding: 5px 8px; border-bottom: 1px solid #2a201a; text-align: center; white-space: nowrap; }
+.dctab tr > th:first-child { text-align: left; color: var(--muted); font-weight: 400; font-size: 13px; position: sticky; left: 0; background: #17110d; }
+.dctab input[type=number] { width: 58px; text-align: center; }
+.dctab .dcsep > * { border-top: 2px solid #4a3424; }
+.dctab .dcout { color: var(--muted); }
+.dctab .dcdmg td { color: var(--text); font: 22px/1 "LC Bebas", Impact, sans-serif; }
+.dctab .dcdmg small { font: 12px sans-serif; color: var(--muted); }
+.dctab .dcbon th { display: flex; gap: 4px; align-items: center; }
+.dctab .dcbon select { max-width: 86px; }
+.dctab .dcbon button { padding: 0 6px; }
+.dccoin { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 8px; background: none; border-color: transparent; opacity: .4; filter: grayscale(1); }
+.dccoin.on { opacity: 1; filter: none; }
+.dccoin small { color: var(--muted); font-size: 11px; }
+.dccoin .ico.coin, .dccoin .coinico { width: 26px; height: 26px; }
+.dcbtns { display: flex; gap: 6px; margin-top: 8px; }
+.dcresult { padding: 14px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; margin-bottom: 12px; }
+.dctotal { display: flex; flex-direction: column; }
+.dctotal small { color: var(--muted); }
+.dctotal b { font: 60px/1 "LC Bebas", Impact, sans-serif; color: var(--gold); }
+.dcrange { display: flex; justify-content: space-between; margin: 8px 0; color: var(--muted); font-size: 13px; }
+.dcrange b { color: var(--text); }
+.dcchips { display: flex; gap: 10px; margin-bottom: 8px; }
+.dcchip { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.dcchip small { color: var(--muted); }
+.dcmods { display: grid; gap: 6px; }
+.dcmods label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.dcmods input, .dcmods select { width: 90px; }
+@media (max-width: 900px) {
+  .dcgrid { grid-template-columns: 1fr; }
+  .dcside { order: -1; }
+}
+@media (max-width: 600px) {
+  .dcpage .cqpicks { grid-template-columns: 1fr; gap: 6px; }
+  .dcpage .cqvs { text-align: center; font-size: 22px; }
+  .dcpage .cqin { width: 100px; }
+  .dctotal b { font-size: 48px; }
+}
+.dcskline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 8px; padding: 6px 10px; background: rgba(0, 0, 0, .3); border-left: 2px solid var(--sin, #4a3424); }
+.dcskline b { color: var(--gold); font: 20px/1 "LC Bebas", Impact, sans-serif; letter-spacing: .03em; }
+.dcskline .dcskmax { display: inline-flex; align-items: center; gap: 6px; }
+.dcskline a.toggle { margin-left: auto; font-size: 12.5px; }

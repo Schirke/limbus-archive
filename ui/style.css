@@ -348,7 +348,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .coin { display: flex; gap: 6px; align-items: flex-start; } .coin .pip { margin-top: 4px; flex: none; } .coin .cn { min-width: 10px; color: #f2c541; font-weight: 700; font-size: 12px; }
 .passive { background: #17110d; border: 1px solid #3a281b; border-radius: 8px; }
 .pcost { display: inline-flex; align-items: center; gap: 4px; }
-@media (max-width: 900px) { .udcols { flex-direction: column; } .udleft { flex-basis: auto; width: 100%; } }
+@media (max-width: 900px) { .udcols { flex-direction: column; } .udleft, .udright { flex-basis: auto; width: 100%; } }
 
 /* ---------- keywords in text, tooltip, skill tabs and level slider (like the game) */
 .kw { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; white-space: nowrap; }
@@ -1821,3 +1821,13 @@ button.sndnav:hover { color: var(--gold); }
   .pfslots { display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); } .pfslot { width: auto; height: auto; aspect-ratio: 1; }
 }
 .pfclash { padding: 10px 12px; border: 1px solid #8f6a20; background: #2a2010; color: #f3d77a; font-size: 13px; display: flex; flex-direction: column; gap: 8px; }
+/* Identity / E.G.O card on phones: the box and its rows fit the screen */
+@media (max-width: 700px) {
+  .modal-box { min-width: 0; }
+  .modal-box:has(.ud) { width: 100vw; max-width: 100vw; padding: 6px; }
+  .ud .udhead { flex-wrap: wrap; margin-right: 26px; }
+  .ud .lvpanel { flex-wrap: wrap; }
+  .ud .panels { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .ud .panels > .panel:last-child:nth-child(3) { grid-column: 1 / -1; }
+  .ud .sktabs { flex-wrap: wrap; gap: 6px 16px; }
+  .ud .skvmeta { flex-wrap: wrap; row-gap: 4px; } .ud .panels .panel h4 { padding-right: 14px; max-width: 100%; }
+}

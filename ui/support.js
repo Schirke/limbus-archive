@@ -62,6 +62,7 @@ routes.support = () => {
       <p><b>Limbus Company</b> and everything from it — characters, art, music, voices, texts — belong to ProjectMoon. Limbus Archive is unofficial and not affiliated with ProjectMoon; the game's content is shown for reference only. ${out("https://limbuscompany.com", "limbuscompany.com ↗")}</p>
       <p><b>Spine</b> skeletons are played with the official Spine web player by Esoteric Software, used under the ${out("https://esotericsoftware.com/spine-runtimes-license", "Spine Runtimes License ↗")}.</p>
       <p><b>Built with</b> ${out("https://github.com/K0lb3/UnityPy", "UnityPy")} (reading the game's files), ${out("https://ffmpeg.org", "FFmpeg")} (sound and video), ${out("https://pywebview.flowrl.com", "pywebview")} (the app's window) and Unity (skills with the game's effects).</p>
+      <p><b>Damage calculator</b>: the damage formula and the max damage of every skill are from ${out("https://github.com/BaTyANl/ElderCalc", "BaTyANl calc ↗")} by BaTyANl. Thank you.</p>
       <p><b>News</b> are the developers' notices from the game's Steam page; <b>Community</b> lists live streams from Twitch and YouTube. Both belong to their authors.</p>
       <p class="muted small">Are you from ProjectMoon and want something taken down? Write on Discord: ${esc(SUP.discord)}.</p>
     </div></div>`;

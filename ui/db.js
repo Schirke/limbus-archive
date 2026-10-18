@@ -319,7 +319,8 @@ function openUnit(id) {
        ...((x.defense || []).length ? [["Defense", x.defense, "Defense"]] : [])]
     : x.skills.map((s) => [s.label || "Skill", [s], s.label || ""]);
   const panel = () => { const [, list, label] = tabs[tab] || [null, []];
-    return list.map((s, i) => skillView(s, up, level, label || (i ? "Extra" : ""), isId ? null : (s.label === "Corrosion" && x.img.art2) || x.img.thumb, true)).join(`<div class="sksep"></div>`); };
+    return list.map((s, i) => skillView(s, up, level, label || (i ? "Extra" : ""), isId ? null : (s.label === "Corrosion" && x.img.art2) || x.img.thumb, true)
+      + (typeof dcSkillLine === "function" ? dcSkillLine(x, s, up, level) : "")).join(`<div class="sksep"></div>`); };
   const left = () => {
     let h = `<div class="udart"><img src="${imgFull(art2 && x.img.art2 ? x.img.art2 : x.img.art)}" onerror="this.src='${imgThumb(x.img.thumb)}'">
         ${x.img.art2 ? `<button class="artbtn ${art2 ? "on" : ""}" id="art2" title="${isId ? "Art after uptie 3" : "Corrosion art"}">⟳</button>` : ""}</div>`;
