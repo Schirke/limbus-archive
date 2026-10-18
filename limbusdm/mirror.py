@@ -41,10 +41,28 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
             if c.get("resultEgoGiftId") and c.get("requiredEgoGiftIds") and c["requiredEgoGiftIds"] not in fus.get(c["resultEgoGiftId"], []):
                 fus.setdefault(c["resultEgoGiftId"], []).append(c["requiredEgoGiftIds"])
     ids = {g for p in packs for g in p["pool"] + p["excl"]} | set(fus) | {g for rs in fus.values() for r in rs for g in r} | set(how)
+    nm = lambda g: gname.get(((gdata.get(g) or {}).get("upgradeDataList") or [{}])[0].get("localizeID") or g) or gname.get(g) or {}  # noqa: E731
+    # the rest of the game's gift list: a cursed gift's changed form (next id), the fusion-only EX
+    adj = {x.get("reqEgogiftId") for t in (tables.get("mirror-dungeon-common-data") or {}).values() if isinstance(t, dict) for x in t.get("egogiftCombineProbAdjust") or []}
+    for t in (tables.get("mirrordungeon-egogift-droppool") or {}).values():
+        for x in (t.get("list") if isinstance(t, dict) else None) or []:
+            for g in (x.get("egoGifts") or []) + (x.get("globalExcludeEgoGifts") or []):
+                if g in ids or g in how or g not in gdata or g in hid:
+                    continue
+                m = re.search(r"changes after (\d+) Encounter wins", nm(g - 1).get("desc") or "")
+                if m and g - 1 in ids:
+                    how[g] = {"how": f"{nm(g - 1).get('name')} turns into it after {m[1]} Encounter wins", "min": (how.get(g - 1) or {}).get("min", 0)}
+                    if g - 1 in how:
+                        how[g - 1]["how"] += f" · turns into {nm(g).get('name')}"
+                elif g in adj:
+                    how[g] = {"how": "From a fusion"}
+                else:
+                    how[g] = {"how": "Mirror Dungeon"}
+                ids.add(g)
     gifts = {}
     for g in sorted(ids):
         d = gdata.get(g) or {}
-        n = gname.get(((d.get("upgradeDataList") or [{}])[0]).get("localizeID") or g) or gname.get(g) or {}
+        n = nm(g)
         tier = next((t[5:] for t in d.get("tag") or [] if str(t).startswith("TIER_")), "")
         kw = d.get("keyword")
         gifts[g] = {"name": n.get("name") or f"Gift {g}", "kw": kw if kw and kw != "None" else "", "tier": int(tier) if tier.isdigit() else 0,
