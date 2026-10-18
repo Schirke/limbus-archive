@@ -241,6 +241,7 @@ async function refresh() {
     STATE = await api("/api/state");
   } catch (e) { return; }
   renderStatus();
+  if (typeof bigSync === "function") bigSync();  // (admins see the hidden pages)
   const had = new Set(Object.keys(routes));
   if (!window.bigLoaded) {  // the big games (ui/big, built: biggames.js); true once all are in
     let left = (STATE.big || []).length;

@@ -6,6 +6,8 @@ const big = { on: new Set() };
 try { big.on = new Set(JSON.parse(localStorage.getItem("big_on") || "[]")); } catch (e) { /* none until beta.json is read */ }
 const bigAdmin = () => typeof STATE !== "undefined" && STATE && Array.isArray(STATE.ext) && STATE.ext.length > 0;
 const bigSeen = (k) => big.on.has(k) || bigAdmin();
+// pages hidden the same way until the owner turns them on (Admin → Pages → Hidden pages): [key = route, name]
+const BIG_PAGES = [["workshop", "Story workshop"]];
 
 // called by a big game's script: its tile ([key, page, name, about, icon, toy]), whether it has a Daily, and a function
 // that asks the app for everything the game can use
@@ -42,7 +44,11 @@ function bigSync() {
   const nav = document.querySelector('#subnav a[data-route="biggames"]');
   if (nav) nav.hidden = !BIG.some((g) => bigSeen(g.key));
   const page = location.hash.split("/")[1] || "";
-  if (changed && ((page === "games" && !location.hash.startsWith("#/games/")) || page === "biggames")) route();
+  for (const [k] of BIG_PAGES) {
+    const a = document.querySelector(`#subnav a[data-route="${k}"]`);
+    if (a && a.hidden === bigSeen(k)) { a.hidden = !bigSeen(k); if (page === k) changed = true; }
+  }
+  if (changed && ((page === "games" && !location.hash.startsWith("#/games/")) || page === "biggames" || BIG_PAGES.some(([k]) => k === page))) route();
 }
 
 // every request the big games make (Send to site runs this in a hidden window: site.py Exporter.biggames)

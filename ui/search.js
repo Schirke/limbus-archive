@@ -75,7 +75,7 @@ async function sxData() {
   for (const g of GM_GAMES) rows.push({ g: "Games", t: g[2], s: g[3], icon: "🎲", go: g[1], k: [g[2], g[3], "game"] });
   for (const a of document.querySelectorAll("#nav a[href^='#/'], #subnav a[href^='#/']")) {
     const t = a.textContent.trim().replace(/\s+/g, " ");
-    if (t && !a.classList.contains("apponly")) rows.push({ g: "Pages", t, s: "Page", icon: "↗", go: a.getAttribute("href"), k: [t] });
+    if (t && !a.hidden && !a.classList.contains("apponly")) rows.push({ g: "Pages", t, s: "Page", icon: "↗", go: a.getAttribute("href"), k: [t] });
   }
   for (const r of rows) { r.en = sxEn(r.t); r.nt = sxNorm(r.t); r.nk = sxNorm(r.k.join(" ") + " " + r.k.map(sxEn).join(" ")); }
   rows.lang = LANG.id;

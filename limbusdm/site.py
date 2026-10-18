@@ -52,7 +52,6 @@ SECTIONS = {
     "stages": ("Story map", "Every Canto's stages in Limbus Company: who stands there and what waits."),
     "announcers": ("Announcers", "Every battle announcer of Limbus Company with all of its lines by situation: read them and hear them."),
     "abnologs": ("Abnormality logs", "Every Limbus Company Abnormality observation log, Canto by Canto: which Sinner wrote it and the others' replies."),
-    "workshop": ("Story workshop", "Make your own Limbus Company scene with the story's characters, faces, backgrounds and music, play it like the story and share it as a link."),
     "story": ("Story", "Read the Limbus Company story scene by scene: backgrounds, characters, voices and music, Canto by Canto."),
     "buffs": ("Buff effects", "Limbus Company statuses and buffs: what each one does and how it looks in battle."),
     "anim": ("Animations", "Limbus Company battle animations and Spine models of Identities, E.G.O, enemies and Abnormalities."),
