@@ -99,9 +99,9 @@ function glLobby() {
     const res = s.status === "over" && s.results ? Object.entries(s.results).map(([id, x]) => ({ id, ...x })).sort((a, b) => b.rank - a.rank) : null;
     $("#main").innerHTML = `${head}
       ${res ? `<div class="glres"><div class="gmkick">THE LAST MATCH · ${esc((glGameOf(s.game) || [])[2] || "")} · ${s.mode === "first" ? "FIRST TO ANSWER" : "RACE"}</div>
-        ${res.map((x, i) => `<div class="glrow ${x.id === gl.id ? "me" : ""} ${i ? "" : "win"}"><b>${i + 1}</b><span>${esc(x.name)}</span><i>${esc(String(x.score))}</i><em>${esc(x.grade || "")}</em></div>`).join("")}</div>` : ""}
+        ${res.map((x, i) => `<div class="glrow ${x.id === gl.id ? "me" : ""} ${i ? "" : "win"}"><b>${i + 1}</b>${glWho(x.id, x.name)}<i>${esc(String(x.score))}</i><em>${esc(x.grade || "")}</em></div>`).join("")}</div>` : ""}
       <div class="glcols"><div><div class="gmgrp">Players <small>${r.players.length} / ${max}</small></div>
-        ${r.players.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""}"><span>${esc(p.name)}</span>${p.id === r.host ? "<em>HOST</em>" : ""}${p.id === gl.id ? `<button class="toggle" id="glrename">rename</button>` : ""}</div>`).join("")}
+        ${r.players.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""}">${glWho(p.id, p.name)}${p.id === r.host ? "<em>HOST</em>" : ""}${p.id === gl.id ? `<button class="toggle" id="glrename">rename</button>` : ""}</div>`).join("")}
         ${s.status === "play" ? `<p class="muted">A match is on${(s.ids || []).includes(gl.id) ? "" : " — the next one takes you in"}.</p>` : ""}</div>
       <div><div class="gmgrp">The match</div>
         ${host ? `<div class="dbrow">${GM_SCORED.map((g) => chip(g[0] === game[0], `data-game="${g[0]}"`, esc(g[2]))).join("")}</div>
@@ -160,6 +160,8 @@ function glGot(m) {
   if (d.k === "next" && m.from === gl.room.host) glNext(d.r);
   glPanel();
 }
+// a player in the room's lists (profile.js adds the rank)
+function glWho(id, name) { return `<span>${esc(name)}</span>`; }
 const glName = (id) => ((gl.room ? gl.room.players : []).find((p) => p.id === id) || {}).name || "—";
 // the players of the match who are still in the room
 const glIn = () => gl.match.ids.filter((id) => gl.room.players.some((p) => p.id === id));
@@ -214,5 +216,5 @@ function glPanel() {
     .sort((a, b) => (+b.score || 0) - (+a.score || 0));
   el.innerHTML = `<div class="glhead">${GM_SWORDS}LIVE · ${x.mode === "first" ? "FIRST TO ANSWER" : "RACE"}</div>
     ${x.mode === "first" ? `<div class="gltime"><i></i></div><div class="glsaid">${esc(x.said || "The first right answer takes the round.")}</div>` : ""}
-    ${rows.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""} ${p.gone ? "gone" : ""}"><span>${esc(p.name)}</span><small>${p.done ? "done" : p.gone ? "left" : `${p.at || 0} / ${p.of || "…"}`}</small><i>${esc(String(p.score))}</i></div>`).join("")}`;
+    ${rows.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""} ${p.gone ? "gone" : ""}">${glWho(p.id, p.name)}<small>${p.done ? "done" : p.gone ? "left" : `${p.at || 0} / ${p.of || "…"}`}</small><i>${esc(String(p.score))}</i></div>`).join("")}`;
 }

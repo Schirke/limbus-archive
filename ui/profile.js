@@ -342,7 +342,7 @@ routes.profile = () => { gmStop(); pfDraw(); };
 
 // ------------------------------------------------------------------ Live rooms: everybody's rank by the name
 // (the room only knows names: each player says its rank as a message when somebody comes in)
-const pfLive = {}, pfGlGot = glGot, pfGlLobby = glLobby;
+const pfLive = {}, pfGlGot = glGot;
 let pfLiveWho = "";
 const pfMineLive = () => { const lv = pfLevel(); return { l: lv.l, e: lv.l >= PF_RANKS.length && pf.st.epi ? pf.st.epi : null, s: pf.st.faceS || 0, f: pf.st.face || "" }; };
 glGot = function (m) {
@@ -350,7 +350,7 @@ glGot = function (m) {
   if (m && m.t === "msg" && d && d.pf && typeof d.pf === "object") {
     const p = d.pf, l = Math.max(1, Math.min(99, +p.l || 1)), e = Array.isArray(p.e) && PF_EPI[0][p.e[0]] && PF_EPI[1][p.e[1]] ? [+p.e[0], +p.e[1]] : null;
     pfLive[m.from] = { l, e, s: +p.s || 0, f: typeof p.f === "string" && p.f.startsWith("/api/asset_thumb?path=") && p.f.length < 400 ? p.f : "" };
-    if (location.hash.startsWith("#/live/")) glLobby();
+    if (gl.match) glPanel(); else if (location.hash.startsWith("#/live/")) glLobby();
     return;
   }
   if (m && m.t === "room") {
@@ -359,14 +359,12 @@ glGot = function (m) {
   }
   return pfGlGot(m);
 };
-glLobby = function () {
-  pfGlLobby();
-  const rows = document.querySelectorAll(".glcols .glrow"), players = gl.room ? gl.room.players : [];
-  rows.forEach((row, i) => {
-    const p = players[i], r = p && (p.id === gl.id ? pfMineLive() : pfLive[p.id]);
-    if (!r || row.querySelector(".glpf")) return;
-    const rank = r.l >= PF_RANKS.length && r.e ? `The ${PF_EPI[0][r.e[0]]} ${PF_EPI[1][r.e[1]]}` : PF_RANKS[Math.min(r.l, PF_RANKS.length) - 1];
-    const frame = r.l <= PF_FRAME.length ? PF_FRAME[r.l - 1] : GA_SINNER[r.s - 1] || "#ffffff";
-    row.insertAdjacentHTML("afterbegin", `<span class="glpf" title="LV ${r.l}"><span class="pfava" style="border-color:${frame};${r.f ? `background-image:url('${esc(r.f)}')` : ""}"></span><small>${esc(rank)}</small></span>`);
-  });
+// the face (or the level) in the rank's frame, the name, the rank under it
+const pfGlWho = glWho;
+glWho = function (id, name) {
+  const r = id === gl.id ? pfMineLive() : pfLive[id];
+  if (!r) return pfGlWho(id, name);
+  const rank = r.l >= PF_RANKS.length && r.e ? `The ${PF_EPI[0][r.e[0]]} ${PF_EPI[1][r.e[1]]}` : PF_RANKS[Math.min(r.l, PF_RANKS.length) - 1];
+  const frame = r.l <= PF_FRAME.length ? PF_FRAME[r.l - 1] : GA_SINNER[r.s - 1] || "#ffffff";
+  return `<span class="glwho" title="${esc(rank)} · LV ${r.l}"><span class="pfava" style="border-color:${frame};${r.f ? `background-image:url('${esc(r.f)}')` : ""}">${r.f ? "" : r.l}</span><span class="glnm">${esc(name)}<small>${esc(rank)}</small></span></span>`;
 };
