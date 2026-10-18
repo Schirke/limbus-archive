@@ -1795,3 +1795,9 @@ button.sndnav:hover { color: var(--gold); }
 .pfslot.ask { outline: 2px solid var(--gold); }
 @media (max-width: 1000px) { .pfstrip { grid-template-columns: 48px 1fr; } .pfqs, .pfgo { grid-column: 1 / -1; } .pftop { grid-template-columns: 1fr; } .pftop #pfcard { max-width: 420px; } }
 @media (max-width: 700px) { .pfsave { grid-template-columns: 1fr; } .pfquests { grid-template-columns: 1fr; } .pfrow { grid-template-columns: 1fr; gap: 4px; } .pfwho { flex-direction: row; gap: 8px; align-items: baseline; } .pfslot { width: 40px; height: 40px; } }
+#pfchip { display: flex; align-items: center; gap: 7px; margin: 0 2px 0 8px; padding: 2px 8px 2px 2px; border: 1px solid var(--line); background: #150d0a; text-decoration: none; color: var(--text); flex: none; }
+#pfchip:hover { border-color: #c8862a; }
+#pfchip .pfava { width: 30px; height: 30px; border-width: 2px; }
+.pfct { display: flex; flex-direction: column; line-height: 1.05; } .pfct b { font: 14px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; font-weight: normal; color: #fff; white-space: nowrap; } .pfct small { font: 11px Consolas, monospace; color: var(--muted); }
+.pfup { color: #f3d77a; }
+@media (max-width: 900px) { #pfchip { padding: 2px; margin: 0 2px; } #pfchip .pfct { display: none; } #pfchip .pfava { width: 26px; height: 26px; } }

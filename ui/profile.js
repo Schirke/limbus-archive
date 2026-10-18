@@ -12,10 +12,17 @@ if (pf.st.xp == null) { pf.st.xp = GM_ACH.filter(([k]) => gmW.ach[k]).reduce((s,
 // level: the City's ranks, then Color
 const PF_RANKS = ["Rat", "Grade 9 Fixer", "Grade 8 Fixer", "Grade 7 Fixer", "Grade 6 Fixer", "Grade 5 Fixer", "Grade 4 Fixer", "Grade 3 Fixer", "Grade 2 Fixer", "Grade 1 Fixer", "Color"];
 const pfAt = (l) => 250 * l * (l - 1);  // xp a level starts at
+// the frame by rank: grey, bronze, silver, gold, red; a Color takes the colour of the card's Sinner
+const PF_FRAME = ["#6d6359", "#a86b3c", "#a86b3c", "#a86b3c", "#b9c0c8", "#b9c0c8", "#b9c0c8", "#c9a227", "#c9a227", "#e0503a"];
+const PF_RANKUP = 1300;  // lunacy for a new rank: a ten-pull
 function pfLevel(xp = pf.st.xp) {
   let l = 1;
   while (pfAt(l + 1) <= xp) l++;
   return { l, rank: PF_RANKS[Math.min(l, PF_RANKS.length) - 1], from: pfAt(l), to: pfAt(l + 1) };
+}
+function pfFrame(l = pfLevel().l) {
+  if (l <= PF_FRAME.length) return PF_FRAME[l - 1];
+  return GA_SINNER[pf.st.faceS - 1] || "#ffffff";
 }
 
 // quests: three a day from the list, the same for everybody that day
@@ -69,9 +76,11 @@ gmPay = function (got, ach = []) {
     pf.st.xp += earned;
     pfKeep();
     const lv = pfLevel(), up = lv.l > before;
+    if (up) { gmW.lunacy += PF_RANKUP * (lv.l - before); gmWKeep(); }
     const box = $("#toast");
-    if (box && !box.classList.contains("hidden")) box.insertAdjacentHTML("beforeend", `<div class="pftoast">${notes.map((t) => `<div>${esc(t)}</div>`).join("")}<div><b>+${earned}</b> XP · LV ${lv.l}${up ? ` — <b>new rank: ${esc(lv.rank)}</b>` : ""} · <a href="#/profile">Profile</a></div></div>`);
+    if (box && !box.classList.contains("hidden")) box.insertAdjacentHTML("beforeend", `<div class="pftoast">${notes.map((t) => `<div>${esc(t)}</div>`).join("")}<div><b>+${earned}</b> XP · LV ${lv.l} · <a href="#/profile">Profile</a></div>${up ? `<div class="pfup">New rank: <b>${esc(lv.rank)}</b> · +${PF_RANKUP * (lv.l - before)} lunacy</div>` : ""}</div>`);
   }
+  pfChip();
   pfSoon();
 };
 // a pull is a quest step too
@@ -79,7 +88,7 @@ const pfGot = gaGot;
 gaGot = function (id) { const r = pfGot(id); pfStep(["pull"], []); pfSoon(); return r; };
 
 // ------------------------------------------------------------------ the album
-const PF_DUP = { r1: 1, r2: 10, r3: 50, ego: 50 }, PF_COST = { r1: 20, r2: 150, r3: 400, ego: 400 };
+const PF_DUP = { r1: 0, r2: 5, r3: 25, ego: 25 }, PF_COST = { r1: 20, r2: 150, r3: 400, ego: 400 };
 const pfGacha = () => { if (ga.st) return ga.st; try { return { ...gaNew(), ...JSON.parse(localStorage.getItem(GA_KEEP) || "{}") }; } catch { return gaNew(); } };
 async function pfUnits() {
   if (pf.units) return pf.units;
@@ -132,11 +141,13 @@ function pfCardData() {
   const got = pfGacha().got || {}, ids = [...pf.units.all.values()].filter((x) => x.kind !== "ego" && got[x.id]);
   const face = pf.units.all.get(pf.st.avatar) && got[pf.st.avatar] ? pf.units.all.get(pf.st.avatar) : ids.find((x) => x.kind === "r3") || ids[0];
   const ach = GM_ACH.filter(([k]) => gmW.ach[k]).sort((a, b) => String(gmW.ach[b[0]]).localeCompare(String(gmW.ach[a[0]])));
+  // (the top bar shows the face without reading every unit)
+  if (face && (pf.st.face !== face.thumb || pf.st.faceS !== face.sinner)) { pf.st.face = face.thumb; pf.st.faceS = face.sinner; pfKeep(); pfChip(); }
   return { face, ids: ids.length, all: [...pf.units.all.values()].filter((x) => x.kind !== "ego").length, ach, lv: pfLevel() };
 }
 function pfCardDraw() {
   const c = pfCardData();
-  $("#pfcard").innerHTML = `<div class="pfcard"><div class="pfbn" style="${c.face ? `background-image:url('${c.face.art}')` : ""}"></div><div class="pfin">
+  $("#pfcard").innerHTML = `<div class="pfcard" style="border-color:${pfFrame(c.lv.l)}"><div class="pfbn" style="${c.face ? `background-image:url('${c.face.art}')` : ""}"></div><div class="pfin">
       <div class="pfrank">${esc(c.lv.rank)}</div><div class="pfsub">LV ${c.lv.l}${c.face ? ` · ${esc(c.face.title)}` : ""}</div>
       <div class="pfnums"><div><b>${c.ids}</b><span>Identities</span></div><div><b>${c.ach.length}</b><span>Achievements</span></div><div><b>${gmW.streak || 0}</b><span>Streak</span></div></div>
       <div class="pfbadges">${c.ach.slice(0, 3).map(([, name]) => `<span>${esc(name)}</span>`).join("") || `<span class="none">No achievements yet</span>`}</div>
@@ -151,11 +162,16 @@ async function pfPng(c) {
   x.fillStyle = "#0f0c0d"; x.fillRect(0, 0, W, H);
   if (c.face) {
     const im = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = c.face.art; });
-    if (im) { const k = Math.max(W / im.width, 300 / im.height); x.drawImage(im, (W - im.width * k) / 2, (300 - im.height * k) / 3, im.width * k, im.height * k); }
+    if (im) {  // (the art only above the text, faded out at its foot)
+      const k = Math.max(W / im.width, 300 / im.height);
+      x.save(); x.beginPath(); x.rect(0, 0, W, 300); x.clip();
+      x.drawImage(im, (W - im.width * k) / 2, (300 - im.height * k) / 3, im.width * k, im.height * k);
+      x.restore();
+    }
   }
-  const fade = x.createLinearGradient(0, 160, 0, 300); fade.addColorStop(0, "rgba(15,12,13,0)"); fade.addColorStop(1, "#0f0c0d");
-  x.fillStyle = fade; x.fillRect(0, 0, W, 300);
-  x.strokeStyle = "#c9a227"; x.lineWidth = 3; x.strokeRect(1.5, 1.5, W - 3, H - 3);
+  const fade = x.createLinearGradient(0, 170, 0, 300); fade.addColorStop(0, "rgba(15,12,13,0)"); fade.addColorStop(1, "#0f0c0d");
+  x.fillStyle = fade; x.fillRect(0, 0, W, 301);
+  x.strokeStyle = pfFrame(c.lv.l); x.lineWidth = 4; x.strokeRect(2, 2, W - 4, H - 4);
   await document.fonts.load('40px "LC Bebas"').catch(() => {});
   x.fillStyle = "#fff"; x.font = '56px "LC Bebas", "Segoe UI", sans-serif'; x.fillText(c.lv.rank.toUpperCase(), 32, 330);
   x.fillStyle = "#f3d77a"; x.font = '20px "Segoe UI", sans-serif'; x.fillText(`LV ${c.lv.l}${c.face ? " · " + c.face.title : ""}`, 34, 362);
@@ -241,15 +257,23 @@ async function pfLoad() {
 
 // ------------------------------------------------------------------ the page and the hub's strip
 function pfStrip() {
-  const lv = pfLevel(), qs = pfQuests(), done = qs.filter((q) => q.n >= q.need).length, got = pfGacha().got || {};
-  const face = pf.units && pf.units.all.get(pf.st.avatar);
-  return `<a class="pfstrip" href="#/profile"><span class="pfava" ${face && got[face.id] ? `style="background-image:url('${face.thumb}')"` : ""}></span>
+  const lv = pfLevel(), qs = pfQuests(), done = qs.filter((q) => q.n >= q.need).length;
+  return `<a class="pfstrip" href="#/profile"><span class="pfava" style="border-color:${pfFrame(lv.l)};${pf.st.face ? `background-image:url('${pf.st.face}')` : ""}"></span>
     <span class="pflv"><b>LV ${lv.l} · ${esc(lv.rank)}</b><small>${(pf.st.xp - lv.from).toLocaleString("en")} / ${(lv.to - lv.from).toLocaleString("en")} XP</small><span class="pfbar"><i style="width:${Math.round(100 * (pf.st.xp - lv.from) / (lv.to - lv.from))}%"></i></span></span>
     <span class="pfqs">${qs.map((q) => `<span class="${q.n >= q.need ? "done" : ""}" title="${esc(q.name)} · +${q.pay} lunacy">${esc(q.name)} <i>${q.n}/${q.need}</i></span>`).join("")}</span>
     <span class="pfgo">Quests ${done}/3 · Profile →</span></a>`;
 }
+// the top bar: the card's face and rank, next to the lunacy (on a phone the face only)
+function pfChip() {
+  let el = $("#pfchip");
+  if (!el) { el = document.createElement("a"); el.id = "pfchip"; el.href = "#/profile"; $("#hstack")?.before(el); }
+  const lv = pfLevel();
+  el.title = `${lv.rank} · LV ${lv.l} — your profile`;
+  el.innerHTML = `<span class="pfava" style="border-color:${pfFrame(lv.l)};${pf.st.face ? `background-image:url('${pf.st.face}')` : ""}"></span><span class="pfct"><b>${esc(lv.rank)}</b><small>LV ${lv.l}</small></span>`;
+}
+pfChip();
 const pfHub = gmHub;
-gmHub = function () { pfHub(); $(".gmhubhead")?.insertAdjacentHTML("afterend", pfStrip()); if (!pf.units) pfUnits().then(() => { const s = $(".pfstrip"); if (s) s.outerHTML = pfStrip(); }); };
+gmHub = function () { pfHub(); $(".gmhubhead")?.insertAdjacentHTML("afterend", pfStrip()); };
 
 function pfDraw() {
   const lv = pfLevel(), qs = pfQuests();
