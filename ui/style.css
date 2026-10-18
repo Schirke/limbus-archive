@@ -1462,7 +1462,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 #mptip .fz { color: #c9a8f5; margin-top: 4px; } #mptip .gold { color: var(--gold); margin-top: 4px; }
 #mptip .mphint { margin-top: 6px; }
 #mppage [data-info] { cursor: pointer; } #mppage b[data-info]:hover, #mppage a[data-info]:hover { color: var(--gold); }
-.mpcardx { width: min(520px, 86vw); }
+.mpcardx { width: min(520px, 86vw); max-width: 100%; overflow-wrap: anywhere; }
 .mpchead { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; } .mpchead img { width: 72px; height: 72px; object-fit: contain; }
 .mpchead h2 { margin: 0 28px 2px 0; color: var(--gold); }
 .mpcdesc { line-height: 1.55; } .mpcdesc .kw[data-kw] { cursor: pointer; }
