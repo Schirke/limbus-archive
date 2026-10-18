@@ -104,7 +104,7 @@ function pfXp(n, notes = [], own = true) {
 const pfGot = gaGot;
 gaGot = function (id) { const r = pfGot(id); pfStep(["pull"], []); if (r.fresh) pfNew(r.kind); pfSoon(); return r; };
 // a new Identity or E.G.O in the collection: xp, told once for a whole ten-pull
-const PF_NEWXP = { r1: 50, r2: 200, r3: 600, ego: 500 }, pfFresh = { xp: 0, n: 0, t: 0 };
+const PF_NEWXP = { r1: 15, r2: 70, r3: 200, ego: 170 }, pfFresh = { xp: 0, n: 0, t: 0 };
 function pfNew(kind) {
   pfFresh.xp += PF_NEWXP[kind] || 0; pfFresh.n++;
   clearTimeout(pfFresh.t);
@@ -233,41 +233,44 @@ function pfSave() {
   try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (pfMine(k)) out[k] = localStorage.getItem(k); } } catch {}
   return out;
 }
-// what changed is sent a few seconds later; the first progress makes the code
+// at most one save a minute while playing, and one when the tab is left; nothing when nothing changed (also over reloads)
+const PF_EVERY = 60e3;
 let pfTimer = 0;
-function pfSoon() { clearTimeout(pfTimer); pfTimer = setTimeout(pfPush, 4000); }
+function pfSoon() { if (!pfTimer) pfTimer = setTimeout(() => { pfTimer = 0; pfPush(); }, PF_EVERY); }
+const pfHash = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = (h * 33 ^ t.charCodeAt(i)) >>> 0; return h.toString(36) + "." + t.length; };
 async function pfPush(force) {
   if (pf.busy) return;
-  const data = pfSave(), text = JSON.stringify(Object.entries(data).filter(([k]) => k !== PF_KEEP).sort());
-  if (!force && text === pf.pushed) return;
+  const data = pfSave(), hash = pfHash(JSON.stringify(Object.entries(data).filter(([k]) => k !== PF_KEEP).sort()));
+  if (!force && hash === pf.st.ph) return;
+  if (!pf.st.code && !Object.keys(data).some((k) => k !== PF_KEEP)) return;  // (no progress yet: no code)
   pf.busy = true;
   try {
     if (!pf.st.code) navigator.storage?.persist?.().catch(() => {});
-    const r = await api("/api/pfsave", { code: pf.st.code || "", data });
-    pf.pushed = text;
-    pf.st.code = r.code; pf.st.saved = Date.now();
+    const r = await fetch("/api/pfsave", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json", "X-Limbus-Datamine": "1" }, body: JSON.stringify({ code: pf.st.code || "", data, drop: pf.drop || "" }) }).then((x) => x.ok ? x.json() : null);
+    if (!r || !r.code) return;
+    pf.st.code = r.code; pf.st.saved = Date.now(); pf.st.ph = hash; pf.drop = "";
     pfKeep();
     if (location.hash.startsWith("#/profile")) pfSaveDraw();
   } catch { /* offline: next time */ } finally { pf.busy = false; }
 }
-document.addEventListener("visibilitychange", () => { if (document.hidden) pfPush(); });
-setTimeout(() => pfPush(), 3000);
+document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(pfTimer); pfTimer = 0; pfPush(); } });
 
 const pfAgo = (t) => { const s = (Date.now() - t) / 1000; return s < 60 ? "just now" : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : new Date(t).toISOString().slice(0, 10); };
 async function pfSaveDraw() {
   const kept = await navigator.storage?.persisted?.().catch(() => false);
   $("#pfsave").innerHTML = `<div><span class="pflbl">Your save code</span>
-      <span class="pfcode">${pf.st.code ? esc(pf.st.code) : "—"}</span>
+      <span class="pfcode">${!pf.st.code ? "—" : pf.show ? esc(pf.st.code) : "••••-••••"}</span>
       <span class="sub">${pf.st.code ? "The code holds your games' progress and nothing else. Anyone with it can load it, so keep it to yourself." : "The code appears after your first game."}</span>
       ${pf.st.saved ? `<div class="pfok"><i></i>Saved ${pfAgo(pf.st.saved)}</div>` : ""}
       <div class="pfok ${kept ? "" : "warn"}"><i></i>${kept ? "This browser is asked to keep your progress" : "This browser may still clear it on its own — keep the code"}</div>
-      <div class="pfbtns"><button class="primary" id="pfcopy" ${pf.st.code ? "" : "disabled"}>Copy code</button><button id="pfnew" title="Your progress moves to a fresh code; the old one stops working">New code</button></div></div>
+      <div class="pfbtns"><button class="primary" id="pfcopy" ${pf.st.code ? "" : "disabled"}>Copy code</button><button id="pfshow" ${pf.st.code ? "" : "disabled"}>${pf.show ? "Hide" : "Show"}</button><button id="pfnew" title="Your progress moves to a fresh code; the old one stops working">New code</button></div></div>
     <div><span class="pflbl">Load progress</span>
       <span class="sub">New phone, cleared browser, or playing on PC too? Enter your code — the collection, lunacy, level and achievements come back.</span>
       <div class="pfin2"><input id="pfcodein" placeholder="XXXX-XXXX" maxlength="9" autocomplete="off" spellcheck="false"><button class="primary" id="pfload">Load</button></div>
       <span class="sub" id="pfloadmsg">Loading replaces what this browser has now.</span></div>`;
-  $("#pfcopy").onclick = () => navigator.clipboard.writeText(pf.st.code).then(() => toast("Code copied."), () => toast("Copy it by hand: " + esc(pf.st.code)));
-  $("#pfnew").onclick = async () => { pf.st.code = ""; pfKeep(); await pfPush(true); toast(`Your new code: <b>${esc(pf.st.code)}</b>`); };
+  $("#pfcopy").onclick = () => navigator.clipboard.writeText(pf.st.code).then(() => toast("Code copied."), () => { pf.show = true; pfSaveDraw(); toast("Copy it by hand from the page."); });
+  $("#pfshow").onclick = () => { pf.show = !pf.show; pfSaveDraw(); };
+  $("#pfnew").onclick = async () => { pf.drop = pf.st.code; pf.st.code = ""; pfKeep(); await pfPush(true); toast("A new code is made — the old one no longer loads."); };
   $("#pfcodein").oninput = (e) => { let v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8); if (v.length > 4) v = v.slice(0, 4) + "-" + v.slice(4); e.target.value = v; pf.sure = false; $("#pfload").textContent = "Load"; };
   $("#pfload").onclick = pfLoad;
 }
