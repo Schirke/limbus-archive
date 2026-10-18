@@ -5,18 +5,23 @@ import re
 
 from .units import _load
 
-VERSION = 4
+VERSION = 5
 SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gluttony", "AZURE": "Gloom", "INDIGO": "Pride", "VIOLET": "Envy"}
 
 
 def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
     """{packs, gifts, fus, modes}"""
     gname, pname = _load(loc_dir, r"EN_EGOgift.*\.json$"), _load(loc_dir, r"EN_MirrorDungeonTheme.*\.json$")
-    gdata = {}
+    gdata, hid, rank = {}, set(), {}
     for fold in ("ego-gift", "ego-gift-mirrordungeon"):
-        for t in (tables.get(fold) or {}).values():
+        for name, t in (tables.get(fold) or {}).items():
             for g in (t.get("list") if isinstance(t, dict) else None) or []:
-                gdata.setdefault(g.get("id"), g)
+                # a gift listed twice (story copy without tags): the Mirror Dungeon one wins
+                r = 2 * name.startswith("ego-gift-mirrordungeon") + any(str(x).startswith("TIER_") for x in g.get("tag") or [])
+                if r > rank.get(g.get("id"), -1):
+                    gdata[g.get("id")], rank[g.get("id")] = g, r
+                if name.startswith("hidden"):
+                    hid.add(g.get("id"))
     packs = []
     for t in (tables.get("mirrordungeon-theme-floor") or {}).values():
         for p in (t.get("list") if isinstance(t, dict) else None) or []:
@@ -26,14 +31,16 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
             ui = p.get("uiConfigs") or {}
             packs.append({"id": p["id"], "name": (pname.get(p["id"]) or {}).get("name") or str(p["id"]), "floors": floors,
                           "pool": p.get("egoGiftPool") or [], "excl": p.get("specificEgoGiftPool") or [],
-                          "hard": p.get("difficulty") == "DIFFICULT", "pic": pack_pics.get(str(ui.get("packSpriteId") or "")) or ""})
+                          "hard": p.get("difficulty") == "DIFFICULT", "pic": pack_pics.get(str(ui.get("packSpriteId") or "")) or "",
+                          "_gen": [p.get("mapGenOption"), p.get("mapGenSequence")]})
     packs.sort(key=lambda p: p["id"])
+    _extra(tables, packs, set(gdata) - hid, how := {})
     fus: dict[int, list] = {}
     for t in (tables.get("mirror-dungeon-common-data") or {}).values():
         for c in ((t.get("egoGiftCombineFixedTable") or {}).get("combineFixed") if isinstance(t, dict) else None) or []:
             if c.get("resultEgoGiftId") and c.get("requiredEgoGiftIds") and c["requiredEgoGiftIds"] not in fus.get(c["resultEgoGiftId"], []):
                 fus.setdefault(c["resultEgoGiftId"], []).append(c["requiredEgoGiftIds"])
-    ids = {g for p in packs for g in p["pool"] + p["excl"]} | set(fus) | {g for rs in fus.values() for r in rs for g in r}
+    ids = {g for p in packs for g in p["pool"] + p["excl"]} | set(fus) | {g for rs in fus.values() for r in rs for g in r} | set(how)
     gifts = {}
     for g in sorted(ids):
         d = gdata.get(g) or {}
@@ -43,12 +50,57 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
         gifts[g] = {"name": n.get("name") or f"Gift {g}", "kw": kw if kw and kw != "None" else "", "tier": int(tier) if tier.isdigit() else 0,
                     "sin": SINS.get(d.get("attributeType"), ""), "desc": re.sub(r"\[TabExplain\]", "", n.get("desc") or ""),
                     "pic": gift_pics.get(str(d.get("iconId") or g)) or gift_pics.get(str(g)) or "", "team": team_conds(n.get("desc") or "")}
+        if g in how:
+            gifts[g].update(how[g])
     modes = {}
     for t in (tables.get("mirrordungeon") or {}).values():
         for d in (t.get("list") if isinstance(t, dict) else None) or []:
             if d.get("typeIndex") is not None:
                 modes[str(d["typeIndex"])] = len(d.get("floors") or d.get("basicEnemyLevelPerFloor") or [])
     return {"packs": packs, "gifts": gifts, "fus": fus, "modes": modes}
+
+
+def _rewards(o) -> set:
+    """EGO_GIFT reward ids anywhere inside a battle / event."""
+    if isinstance(o, dict):
+        got = {o["rewardId"]} if o.get("type") == "EGO_GIFT" and o.get("rewardId") else set()
+        return got.union(*(_rewards(v) for v in o.values()))
+    return set().union(*(_rewards(v) for v in o)) if isinstance(o, list) else set()
+
+
+def _extra(tables: dict, packs: list, real: set, how: dict) -> None:
+    """Gifts outside the packs' pools: rewards of a pack's fights / events (pack-only when 3 packs or fewer, e.g. the
+    extreme bosses' gifts), the hidden fight of floors 11-15, events of many packs ({id: {how, min}} into `how`)."""
+    src: dict[int, set] = {}
+    for fold in ("battle-mirrordungeon", "abnormality-event"):
+        for t in (tables.get(fold) or {}).values():
+            for x in (t.get("list") if isinstance(t, dict) else None) or []:
+                if isinstance(x, dict) and x.get("id"):
+                    src.setdefault(x["id"], set()).update(_rewards(x))
+    for t in (tables.get("acquirable-egogifts-in-event") or {}).values():
+        for x in (t.get("list") if isinstance(t, dict) else None) or []:
+            src.setdefault(x.get("eventId"), set()).update(x.get("egoGiftList") or [])
+    known = {g for p in packs for g in p["pool"] + p["excl"]}
+    owners: dict[int, list] = {}
+    for p in packs:
+        refs = {int(n) for n in re.findall(r"\d{5,7}", str([p.pop("_gen")]))}
+        for g in set().union(*(src.get(r, set()) for r in refs)) - known:
+            if g in real:
+                owners.setdefault(g, []).append(p)
+    for g, ps in owners.items():
+        if len(ps) <= 3:
+            for p in ps:
+                p["excl"].append(g)
+        else:
+            how[g] = {"how": "From a random event"}
+    for t in (tables.get("mirror-dungeon-common-data") or {}).values():
+        hb = (t.get("hiddenBattleInfo") if isinstance(t, dict) else None) or {}
+        lo = hb.get("minFloorCondition") or 11
+        pr = max((x.get("prob") or 0 for x in hb.get("probInfo") or []), default=0)
+        for b in hb.get("pool") or []:
+            for g in src.get(b, set()) - known:
+                if g in real:
+                    how[g] = {"how": f"Hidden fight on floors {lo}–15" + (f" ({pr:.0%} a floor)" if pr else ""), "min": lo - 1}
 
 
 def users(db: dict, units: dict) -> dict:

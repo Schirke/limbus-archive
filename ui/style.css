@@ -1460,6 +1460,16 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 #mptip { position: fixed; z-index: 200; max-width: 340px; background: #0c0807; border: 1px solid var(--gold); padding: 9px 11px; pointer-events: none; display: none; font-size: 13px; }
 #mptip > b { color: var(--gold); display: block; }
 #mptip .fz { color: #c9a8f5; margin-top: 4px; } #mptip .gold { color: var(--gold); margin-top: 4px; }
+#mptip .mphint { margin-top: 6px; }
+#mppage [data-info] { cursor: pointer; } #mppage b[data-info]:hover, #mppage a[data-info]:hover { color: var(--gold); }
+.mpcardx { width: min(520px, 86vw); }
+.mpchead { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; } .mpchead img { width: 72px; height: 72px; object-fit: contain; }
+.mpchead h2 { margin: 0 28px 2px 0; color: var(--gold); }
+.mpcdesc { line-height: 1.55; } .mpcdesc .kw[data-kw] { cursor: pointer; }
+.mpcardx h4 { margin: 14px 0 6px; } .mpcardx .mdteam { margin-top: 6px; }
+.mpcrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; } .mpcrow > b { color: var(--muted); }
+.mpcchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); background: #0c0807; cursor: pointer; font-size: 13px; }
+.mpcchip:hover { border-color: var(--gold); } .mpcchip img { width: 26px; height: 26px; object-fit: contain; }
 
 /* ---- Patches → Change history (ui/history.js) ---- */
 .hvcols { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
