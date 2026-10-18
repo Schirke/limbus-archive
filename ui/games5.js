@@ -117,7 +117,7 @@ function gaHome() {
     return (100 * b.groups.filter((x) => x.g === g || x.g === g + "_pickup").reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) / all).toFixed(1) + "%"; };
   const up = b.groups.filter((x) => String(x.g).endsWith("_pickup")).flatMap((x) => x.ids).map(gaU);
   // TEMPORARY test button (+1300 lunacy)
-  $("#gehome").innerHTML = `<div class="gewallet">${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b><button id="getest" title="For testing: lunacy for nothing. To be removed.">+ 1300 · test</button></div>
+  $("#gehome").innerHTML = `<div class="gewallet">${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b>${typeof ADM_PAGES === "undefined" ? "" : `<button id="getest" title="For testing: lunacy for nothing (admin only)">+ 1300 · test</button>`}</div>
     <div class="getiles">${ga.data.banners.map((x) => `<div class="getile"><img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">${ga.old.has(x.id) ? `<button data-drop="${x.id}" title="Remove this banner from the list">×</button>` : ""}</div>`).join("")}</div>
     <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.illust ? gaFull(b.illust) : ""}')"></div>${b.typo ? `<img class="getypo" src="${gaFull(b.typo)}">` : ""}
       <div class="geinfo">${b.end ? `<div class="geend">Until ${esc(b.end.slice(0, 10))}</div>` : ""}
@@ -135,7 +135,7 @@ function gaHome() {
     if (b.id === id) { ga.banner = ga.data.banners[0]; st.banner = ga.banner.id; gaKeep(); }
     history.replaceState(null, "", "#/gamegacha");
     gaHome(); });
-  $("#getest").onclick = () => { gmW.lunacy += 10 * GA_COST; gmWKeep(); gaHome(); };
+  if ($("#getest")) $("#getest").onclick = () => { gmW.lunacy += 10 * GA_COST; gmWKeep(); gaHome(); };
   $("#ge1").onclick = () => gaPull(1);
   $("#ge10").onclick = () => gaPull(10);
   $("#geall").onchange = (e) => { st.all = e.target.checked; gaKeep(); };

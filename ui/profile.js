@@ -11,7 +11,7 @@ if (pf.st.xp == null) { pf.st.xp = GM_ACH.filter(([k]) => gmW.ach[k]).reduce((s,
 
 // level: the City's ranks, then Color
 const PF_RANKS = ["Rat", "Grade 9 Fixer", "Grade 8 Fixer", "Grade 7 Fixer", "Grade 6 Fixer", "Grade 5 Fixer", "Grade 4 Fixer", "Grade 3 Fixer", "Grade 2 Fixer", "Grade 1 Fixer", "Color"];
-const pfAt = (l) => 250 * l * (l - 1);  // xp a level starts at
+const pfAt = (l) => 100 * l * (l - 1);  // xp a level starts at
 // the frame by rank: grey, bronze, silver, gold, red; a Color takes the colour of the card's Sinner
 const PF_FRAME = ["#6d6359", "#a86b3c", "#a86b3c", "#a86b3c", "#b9c0c8", "#b9c0c8", "#b9c0c8", "#c9a227", "#c9a227", "#e0503a"];
 const PF_RANKUP = 1300;  // lunacy for a new rank: a ten-pull
@@ -34,9 +34,9 @@ function pfFrame(l = pfLevel().l) {
 }
 
 // quests: three a day from the list, the same for everybody that day
-const PF_QUESTS = [["daily1", "Play a Daily challenge", 1, 100], ["daily3", "Finish 3 Daily challenges", 3, 200], ["play5", "Finish 5 games", 5, 150],
-  ["ear", "Finish 2 games By ear", 2, 120], ["eye", "Finish 2 games By eye", 2, 120], ["puz", "Finish 2 Puzzles", 2, 120],
-  ["grade", "Get “Limbus enjoyer” or better", 1, 150], ["top", "Get “Dantehhh”", 1, 250], ["pull", "Extract 10 times", 10, 100]];
+const PF_QUESTS = [["daily1", "Play a Daily challenge", 1, 200], ["daily3", "Finish 3 Daily challenges", 3, 400], ["play5", "Finish 5 games", 5, 300],
+  ["ear", "Finish 2 games By ear", 2, 240], ["eye", "Finish 2 games By eye", 2, 240], ["puz", "Finish 2 Puzzles", 2, 240],
+  ["grade", "Get “Limbus enjoyer” or better", 1, 300], ["top", "Get “Dantehhh”", 1, 500], ["pull", "Extract 10 times", 10, 200]];
 const PF_Q4 = 6;  // the level of a fourth quest
 function pfQuests() {
   const day = gmDay() + (pf.st.qs || ""), want = pfLevel().l >= PF_Q4 ? 4 : 3;
@@ -102,7 +102,14 @@ function pfXp(n, notes = [], own = true) {
 }
 // a pull is a quest step too
 const pfGot = gaGot;
-gaGot = function (id) { const r = pfGot(id); pfStep(["pull"], []); pfSoon(); return r; };
+gaGot = function (id) { const r = pfGot(id); pfStep(["pull"], []); if (r.fresh) pfNew(r.kind); pfSoon(); return r; };
+// a new Identity or E.G.O in the collection: xp, told once for a whole ten-pull
+const PF_NEWXP = { r1: 50, r2: 200, r3: 600, ego: 500 }, pfFresh = { xp: 0, n: 0, t: 0 };
+function pfNew(kind) {
+  pfFresh.xp += PF_NEWXP[kind] || 0; pfFresh.n++;
+  clearTimeout(pfFresh.t);
+  pfFresh.t = setTimeout(() => { const { xp, n } = pfFresh; pfFresh.xp = pfFresh.n = 0; if (xp) pfXp(xp, [`New in your collection: ${n}`]); }, 1200);
+}
 
 // ------------------------------------------------------------------ the album
 const PF_DUP = { r1: 1, r2: 10, r3: 50, ego: 50 }, PF_COST = { r1: 10, r2: 40, r3: 100, ego: 100 };
@@ -150,6 +157,7 @@ function pfSlot(id) {
   if (ga.st) gaKeep(); else try { localStorage.setItem(GA_KEEP, JSON.stringify(st)); } catch {}
   pf.st.used += cost;
   pfKeep();
+  pfNew(x.kind);
   pfSoon();
   toast(`<b>${esc(x.title)}</b> joins your collection.`);
   pfAlbum();
@@ -218,7 +226,8 @@ async function pfPng(c) {
 
 // ------------------------------------------------------------------ the save code
 // What goes under the code: the games' own storage, and nothing else (live rooms left out).
-const pfMine = (k) => k.startsWith("games") && !k.startsWith("games_live");
+const PF_BIG = ["rf_best", "rf_camp", "sl_best"];  // big games' records
+const pfMine = (k) => (k.startsWith("games") && !k.startsWith("games_live")) || PF_BIG.includes(k);
 function pfSave() {
   const out = {};
   try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (pfMine(k)) out[k] = localStorage.getItem(k); } } catch {}
@@ -313,11 +322,11 @@ function pfDraw() {
       <ul><li>iPhone / Safari clears it after 7 days away from the site</li><li>clearing browser data, private windows, another device</li></ul>
       <p>Keep your save code below and nothing is lost.</p></div>
     <div class="pfsave" id="pfsave"></div>
-    <div class="pftest"><b>TEST · not for release</b>${[["xp1", "+1,000 XP"], ["up", "Next rank"], ["down", "Rank down"], ["color", "Color"], ["rat", "Back to Rat"],
-      ["lun", "+1,300 lunacy"], ["shard", "+100 Egoshards"], ["quests", "Finish quests"], ["newq", "New quests"]].map(([k, t]) => `<button data-test="${k}">${t}</button>`).join("")}</div>
+    ${typeof ADM_PAGES === "undefined" ? "" : `<div class="pftest"><b>TEST · admin only</b>${[["xp1", "+1,000 XP"], ["up", "Next rank"], ["down", "Rank down"], ["color", "Color"], ["rat", "Back to Rat"],
+      ["lun", "+1,300 lunacy"], ["shard", "+100 Egoshards"], ["quests", "Finish quests"], ["newq", "New quests"]].map(([k, t]) => `<button data-test="${k}">${t}</button>`).join("")}</div>`}
     <div class="pftop"><div><span class="pflbl">LV ${lv.l} · ${esc(pfTitle(lv))}</span>
         <div class="pfbar big"><i style="width:${Math.round(100 * (pf.st.xp - lv.from) / (lv.to - lv.from))}%"></i></div>
-        <span class="sub">${(pf.st.xp - lv.from).toLocaleString("en")} / ${(lv.to - lv.from).toLocaleString("en")} XP to ${esc(pfLevel(lv.to).rank)} · every lunacy the games pay is XP too</span>
+        <span class="sub">${(pf.st.xp - lv.from).toLocaleString("en")} / ${(lv.to - lv.from).toLocaleString("en")} XP to ${esc(pfLevel(lv.to).rank)} · every lunacy the games pay is XP, and every new Identity or E.G.O</span>
         <span class="pflbl" style="margin-top:14px">Today's quests</span>
         <div class="pfquests">${qs.map((q) => `<div class="${q.n >= q.need ? "done" : ""}"><span>${esc(q.name)}</span><i>${q.n >= q.need ? "Done" : `${q.n}/${q.need}`}</i><div class="pfbar"><i style="width:${100 * q.n / q.need}%"></i></div><small>+${q.pay} lunacy</small></div>`).join("")}</div>
         <span class="sub">New quests with the Daily challenge${lv.l < PF_Q4 ? ` · a fourth one from ${esc(PF_RANKS[PF_Q4 - 1])}` : ""}.</span></div>
@@ -329,7 +338,7 @@ function pfDraw() {
   pfSaveDraw();
   pfUnits().then(() => { if (!location.hash.startsWith("#/profile")) return; pfCardDraw(); pfAlbum(); });
 }
-// TEMPORARY test buttons
+// test buttons (admin only)
 function pfTest(k) {
   const lv = pfLevel();
   if (k === "xp1") pfXp(1000);
