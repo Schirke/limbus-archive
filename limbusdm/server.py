@@ -524,8 +524,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     with open(f, "rb") as fh:
                         return self._send(200, fh.read(), "image/png", {"Cache-Control": "no-store"})
                 b = _io.BytesIO()
-                if "v" in q:
-                    frames.part_png(svc, _fx_id(q["id"]), q["pid"], q["v"]).save(b, "PNG")
+                if "v" in q or "bundle" not in q:  # (a part frame; parse_qs drops an empty v)
+                    frames.part_png(svc, _fx_id(q["id"]), q["pid"], q.get("v", "")).save(b, "PNG")
                 else:
                     rec = {"bundle": q["bundle"], "pid": q["pid"], "w": int(q["w"]), "h": int(q["h"])}
                     frames.frame_png(svc, rec).save(b, "PNG")
