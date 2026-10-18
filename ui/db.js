@@ -184,10 +184,10 @@ const TAG_COLOR = { WhenUse: "#26cfff", WhenUse_Force: "#26cfff", WinDuel: "#ff7
 // skill / passive text like the game: [Keyword] → icon + name with tooltip; plain: also plain-word statuses
 function fmtDesc(text, plain = false) {
   if (!text) return "";
-  const marks = [];
+  const marks = [], gl = (UNITS && UNITS.glossary) || {}, tags = (UNITS && UNITS.tags) || {};  // (games that never load /api/units: plain words)
   const mark = (html) => { marks.push(html); return `\u0001${marks.length - 1}\u0002`; };
   const kwSpan = (k, label) => {
-    const g = UNITS.glossary[k];
+    const g = gl[k];
     if (!g) return mark(`<span class="kw neu">${esc(label || k)}</span>`);
     return mark(`<span class="kw ${g.type}" data-kw="${esc(k)}">${g.icon ? `<img class="kwico" src="${imgThumb(g.icon)}" onerror="this.remove()">` : ""}${esc(label || g.name)}</span>`);
   };
@@ -198,11 +198,11 @@ function fmtDesc(text, plain = false) {
     .replace(/<(color|mark)[= ](?:color=)?"?(#[0-9a-fA-F]{6,8})"?>/g, (_, t, c) => mark(`<span style="${t === "mark" ? "background" : "color"}:${c}">`))
     .replace(/<b>/g, () => mark(`<span style="font-weight:700">`)).replace(/<\/(color|mark|b)>/g, () => mark("</span>"))
     .replace(/<[^>]+>/g, "");
-  const pk = plain && kwPlainOf();
+  const pk = plain && UNITS && kwPlainOf();
   if (pk && pk.rx) s = s.split(/("[^"\n]*"|“[^”\n]*”|(?<![A-Za-z])'[^'\n]*'(?![A-Za-z]))/)
     .map((part, i) => i % 2 ? part : part.replace(pk.rx, (n) => kwSpan(pk.key[n], n))).join("");
-  s = esc(s).replace(/\[([A-Za-z0-9_]+)\]/g, (m, k) => UNITS.tags[k]
-    ? mark(`<span class="tg" style="color:${TAG_COLOR[k] || "#93f13e"}">${esc(UNITS.tags[k].replace(/<[^>]*>/g, ""))}</span>`) : kwSpan(k));
+  s = esc(s).replace(/\[([A-Za-z0-9_]+)\]/g, (m, k) => tags[k]
+    ? mark(`<span class="tg" style="color:${TAG_COLOR[k] || "#93f13e"}">${esc(tags[k].replace(/<[^>]*>/g, ""))}</span>`) : kwSpan(k));
   // unbalanced spans dropped / closed
   let open = 0;
   s = s.replace(/\u0001(\d+)\u0002|[\u0006\u0007]/g, (m, i) => {
@@ -218,7 +218,7 @@ document.addEventListener("click", (e) => {
   const kw = e.target.closest && e.target.closest(".kw[data-kw]");
   if (!kw) { if (tip && !e.target.closest("#kwtip")) tip.remove(); return; }
   e.stopPropagation();
-  const g = UNITS.glossary[kw.dataset.kw];
+  const g = UNITS && UNITS.glossary[kw.dataset.kw];
   if (!g) return;
   let t = tip || Object.assign(document.createElement("div"), { id: "kwtip" });
   t.innerHTML = `<div class="kwhead">${g.icon ? `<img src="${imgThumb(g.icon)}">` : ""}<b class="${g.type}">${esc(g.name)}</b></div>
