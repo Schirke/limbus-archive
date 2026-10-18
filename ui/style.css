@@ -1747,3 +1747,51 @@ button.sndnav:hover { color: var(--gold); }
 .ncline:hover, .ncline.on { border-color: var(--gold); } .ncline.on { background: #3a3013; } .ncline.mute { cursor: default; opacity: .7; } .ncline.mute:hover { border-color: var(--line); }
 .ncline .ncplay { flex: none; width: 16px; font-style: normal; color: var(--gold); } .ncline.on .ncplay { visibility: hidden; position: relative; } .ncline.on .ncplay::after { content: "■"; visibility: visible; position: absolute; left: 0; }
 .ncline span { flex: 1; min-width: 0; } .ncline em { flex: none; font: 11px Consolas, monospace; font-style: normal; color: var(--muted); }
+/* Profile (profile.js): level, quests, save code, card, album */
+.pflbl { display: block; font: 18px/1.1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; text-transform: uppercase; color: #fff; }
+.pfbar { display: block; height: 6px; background: #2c2528; border-radius: 3px; overflow: hidden; } .pfbar i { display: block; height: 100%; background: var(--gold); }
+.pfbar.big { height: 9px; margin: 8px 0 6px; }
+.pfstrip { display: grid; grid-template-columns: 48px minmax(150px, 230px) 1fr auto; gap: 14px; align-items: center; max-width: 1240px; margin: 0 0 16px; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.pfstrip:hover { border-color: var(--gold); }
+.pfava { width: 48px; height: 48px; border: 1px solid var(--gold); background: #2a2226 center / cover; }
+.pflv { display: flex; flex-direction: column; gap: 3px; min-width: 0; } .pflv b { font: 18px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; font-weight: normal; color: #fff; } .pflv small { color: var(--muted); font-size: 11.5px; }
+.pfqs { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; } .pfqs span { padding: 4px 9px; border: 1px solid var(--line); background: var(--panel2); font-size: 12px; } .pfqs span.done { border-color: #3d5a45; color: #8fd6a8; } .pfqs i { font-style: normal; color: var(--gold); margin-left: 4px; } .pfqs span.done i { color: var(--add); }
+.pfgo { color: var(--gold); font-size: 12.5px; white-space: nowrap; }
+.pftoast { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); } .pftoast b { color: var(--text); }
+.pfpriv { max-width: 1240px; border: 1px solid #8f2a20; background: #2a1212; padding: 14px 16px; margin: 6px 0 14px; }
+.pfpriv b { display: block; font: 22px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.2px; color: #ff6b5b; font-weight: normal; margin-bottom: 6px; }
+.pfpriv p { margin: 0 0 4px; color: #f2c4bd; max-width: 80ch; } .pfpriv ul { margin: 2px 0 6px; padding-left: 18px; color: #e7a79e; font-size: 12.5px; }
+.pfsave { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 1240px; margin-bottom: 18px; }
+.pfsave > div { min-width: 0; background: var(--panel); border: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 9px; }
+.pfcode { font: 36px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 5px; color: #f3d77a; }
+.pfok { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); } .pfok i { width: 8px; height: 8px; border-radius: 50%; background: var(--add); flex: none; } .pfok.warn i { background: var(--chg); }
+.pfbtns { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .pfbtns .sub { flex: 1; min-width: 160px; }
+.pfin2 { display: flex; gap: 8px; } .pfin2 input { flex: 1; min-width: 0; letter-spacing: 3px; text-transform: uppercase; }
+.pftop { display: grid; grid-template-columns: 1fr 340px; gap: 18px; max-width: 1240px; margin-bottom: 18px; } .pftop > div { min-width: 0; }
+.pfquests { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 8px 0 6px; }
+.pfquests > div { display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); font-size: 13px; }
+.pfquests > div .pfbar, .pfquests > div small { grid-column: 1 / -1; } .pfquests small { color: var(--muted); } .pfquests > div > i { font-style: normal; color: var(--gold); }
+.pfquests > div.done { border-color: #3d5a45; } .pfquests > div.done > i { color: var(--add); } .pfquests > div.done .pfbar i { background: var(--add); }
+.pfcard { border: 1px solid var(--gold); background: #0f0c0d; }
+.pfbn { height: 170px; background: #2a2226 center 20% / cover; position: relative; } .pfbn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 55%, #0f0c0d); }
+.pfin { padding: 2px 14px 12px; display: flex; flex-direction: column; gap: 7px; }
+.pfrank { font: 28px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1.5px; color: #fff; } .pfsub { color: #f3d77a; font-size: 12.5px; margin-top: -4px; }
+.pfnums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; } .pfnums div { background: var(--panel2); padding: 6px 8px; } .pfnums b { display: block; font: 22px/1 "LC Bebas", "Segoe UI", sans-serif; font-weight: normal; } .pfnums span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; }
+.pfbadges { display: flex; gap: 5px; flex-wrap: wrap; } .pfbadges span { font-size: 11px; padding: 2px 7px; border: 1px solid var(--gold); color: #f3d77a; background: #2f2a12; } .pfbadges span.none { border-color: var(--line); color: var(--muted); background: none; }
+.pfsite { color: var(--muted); font-size: 11px; text-align: right; }
+#pfcard .pfbtns { margin-top: 8px; }
+.pfalbum { max-width: 1240px; background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.pfhead { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; } .pftabs { display: flex; gap: 6px; }
+.pfshard { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 9px 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.pfshard b { font: 24px/1 "LC Bebas", "Segoe UI", sans-serif; color: #f3d77a; font-weight: normal; letter-spacing: 1px; } .pfshard span { flex: 1; min-width: 180px; }
+.pfrows { display: flex; flex-direction: column; gap: 8px; }
+.pfrow { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: start; }
+.pfwho { font-size: 13px; color: var(--c); display: flex; flex-direction: column; padding-top: 4px; } .pfwho small { color: var(--muted); font-size: 11px; }
+.pfslots { display: flex; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.pfslot { position: relative; width: 46px; height: 46px; padding: 0; border: 1px solid var(--line); background: #191416; border-radius: 0; overflow: hidden; }
+.pfslot img { width: 100%; height: 100%; object-fit: cover; display: block; filter: grayscale(1) brightness(.28); }
+.pfslot.own img { filter: none; } .pfslot.own { border-color: #6d6359; } .pfslot.own.r3 { border-color: var(--gold); } .pfslot.own.ego { border-color: #5b8cff; }
+.pfslot i { position: absolute; right: 2px; bottom: 1px; font: 11px Consolas, monospace; font-style: normal; color: #fff; text-shadow: 0 0 3px #000, 0 0 3px #000; }
+.pfslot.ask { outline: 2px solid var(--gold); }
+@media (max-width: 1000px) { .pfstrip { grid-template-columns: 48px 1fr; } .pfqs, .pfgo { grid-column: 1 / -1; } .pftop { grid-template-columns: 1fr; } .pftop #pfcard { max-width: 420px; } }
+@media (max-width: 700px) { .pfsave { grid-template-columns: 1fr; } .pfquests { grid-template-columns: 1fr; } .pfrow { grid-template-columns: 1fr; gap: 4px; } .pfwho { flex-direction: row; gap: 8px; align-items: baseline; } .pfslot { width: 40px; height: 40px; } }
