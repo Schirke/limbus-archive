@@ -1801,3 +1801,11 @@ button.sndnav:hover { color: var(--gold); }
 .pfct { display: flex; flex-direction: column; line-height: 1.05; } .pfct b { font: 14px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 1px; font-weight: normal; color: #fff; white-space: nowrap; } .pfct small { font: 11px Consolas, monospace; color: var(--muted); }
 .pfup { color: #f3d77a; }
 @media (max-width: 900px) { #pfchip { padding: 2px; margin: 0 2px; } #pfchip .pfct { display: none; } #pfchip .pfava { width: 26px; height: 26px; } }
+.pfin { background: linear-gradient(var(--back, #0f0c0d), #0f0c0d 85%); }
+.pfbacks { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.pfbk { display: flex; align-items: center; gap: 6px; padding: 4px 8px; font-size: 12px; border-radius: 0; } .pfbk i { width: 14px; height: 14px; background: linear-gradient(var(--b), #0f0c0d); border: 1px solid var(--line); }
+.pfbk.on { border-color: var(--gold); color: #f3d77a; } .pfbk small { color: var(--muted); font-size: 10.5px; }
+.pfepi { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; } .pfepi select { padding: 4px 6px; }
+.pftest { max-width: 1240px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 10px; margin-bottom: 18px; border: 1px dashed #6a5a2a; background: #1a1608; }
+.pftest b { font: 12px Consolas, monospace; color: #d9a441; margin-right: 6px; } .pftest button { padding: 4px 10px; font-size: 12.5px; }
+.glpf { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; vertical-align: middle; } .glpf .pfava { width: 24px; height: 24px; border-width: 2px; } .glpf small { font: 11px Consolas, monospace; color: #f3d77a; }

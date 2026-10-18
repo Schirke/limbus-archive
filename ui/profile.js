@@ -20,6 +20,14 @@ function pfLevel(xp = pf.st.xp) {
   while (pfAt(l + 1) <= xp) l++;
   return { l, rank: PF_RANKS[Math.min(l, PF_RANKS.length) - 1], from: pfAt(l), to: pfAt(l + 1) };
 }
+// a Color names itself: "The <colour> <thing>", from two fixed lists
+const PF_EPI = [["Red", "Blue", "Purple", "Black", "Amber", "Crimson", "Azure", "Violet", "Silver", "Golden", "Scarlet", "Ivory", "Jade", "Ashen", "Pale", "Iron"],
+  ["Mist", "Pupil", "Tear", "Fang", "Blade", "Flame", "Gale", "Thorn", "Shadow", "Lantern", "Hound", "Dawn", "Silence", "Wake", "Bell", "Spear"]];
+const pfTitle = (lv = pfLevel()) => lv.l >= PF_RANKS.length && pf.st.epi ? `The ${PF_EPI[0][pf.st.epi[0]]} ${PF_EPI[1][pf.st.epi[1]]}` : lv.rank;
+// card backgrounds, opened by rank: [name, from level, colour at the top]
+const PF_BACK = [["Plain", 1, "#0f0c0d"], ["Backstreets", 2, "#2a2420"], ["Workshop", 4, "#3a2412"], ["Association", 5, "#2a3036"], ["Wing", 8, "#3d3210"], ["Grade 1", 10, "#4a1410"], ["Color", 11, ""]];
+const pfBack = (l = pfLevel().l) => { const b = PF_BACK[pf.st.back || 0]; return !b || b[1] > l ? PF_BACK[0] : b; };
+const pfBackTop = (b, l) => b[2] || pfFrame(l) + "55";
 function pfFrame(l = pfLevel().l) {
   if (l <= PF_FRAME.length) return PF_FRAME[l - 1];
   return GA_SINNER[pf.st.faceS - 1] || "#ffffff";
@@ -29,10 +37,13 @@ function pfFrame(l = pfLevel().l) {
 const PF_QUESTS = [["daily1", "Play a Daily challenge", 1, 100], ["daily3", "Finish 3 Daily challenges", 3, 200], ["play5", "Finish 5 games", 5, 150],
   ["ear", "Finish 2 games By ear", 2, 120], ["eye", "Finish 2 games By eye", 2, 120], ["puz", "Finish 2 Puzzles", 2, 120],
   ["grade", "Get “Limbus enjoyer” or better", 1, 150], ["top", "Get “Dantehhh”", 1, 250], ["pull", "Extract 10 times", 10, 100]];
+const PF_Q4 = 6;  // the level of a fourth quest
 function pfQuests() {
-  if (!pf.st.q || pf.st.q.day !== gmDay()) {
-    const rnd = gmSeed("quests" + gmDay()), keys = PF_QUESTS.map((q) => [rnd(), q[0]]).sort((a, b) => a[0] - b[0]).map((x) => x[1]).slice(0, 3);
-    pf.st.q = { day: gmDay(), n: Object.fromEntries(keys.map((k) => [k, 0])), paid: {} };
+  const day = gmDay() + (pf.st.qs || ""), want = pfLevel().l >= PF_Q4 ? 4 : 3;
+  if (!pf.st.q || pf.st.q.day !== day) { pf.st.q = { day, n: {}, paid: {} }; pfKeep(); }
+  if (Object.keys(pf.st.q.n).length < want) {
+    const rnd = gmSeed("quests" + day);
+    for (const k of PF_QUESTS.map((q) => [rnd(), q[0]]).sort((a, b) => a[0] - b[0]).map((x) => x[1])) if (Object.keys(pf.st.q.n).length < want && !(k in pf.st.q.n)) pf.st.q.n[k] = 0;
     pfKeep();
   }
   return Object.keys(pf.st.q.n).map((k) => { const [, name, need, pay] = PF_QUESTS.find((q) => q[0] === k); return { k, name, need, pay, n: Math.min(need, pf.st.q.n[k]) }; });
@@ -69,26 +80,32 @@ gmPay = function (got, ach = []) {
     got.push(...steps.filter(([n]) => n > 0));
     notes.push(...steps.filter(([n]) => !n).map(([, t]) => t));
   }
-  const before = pfLevel().l, n0 = gmW.lunacy;
+  const n0 = gmW.lunacy;
   pfPay(got, ach);
   const earned = gmW.lunacy - n0;
-  if (earned > 0) {
-    pf.st.xp += earned;
-    pfKeep();
-    const lv = pfLevel(), up = lv.l > before;
-    if (up) { gmW.lunacy += PF_RANKUP * (lv.l - before); gmWKeep(); }
-    const box = $("#toast");
-    if (box && !box.classList.contains("hidden")) box.insertAdjacentHTML("beforeend", `<div class="pftoast">${notes.map((t) => `<div>${esc(t)}</div>`).join("")}<div><b>+${earned}</b> XP · LV ${lv.l} · <a href="#/profile">Profile</a></div>${up ? `<div class="pfup">New rank: <b>${esc(lv.rank)}</b> · +${PF_RANKUP * (lv.l - before)} lunacy</div>` : ""}</div>`);
-  }
+  if (earned > 0) pfXp(earned, notes, false);
   pfChip();
   pfSoon();
 };
+// xp gained: a new rank pays a ten-pull; told in the open toast (or a new one)
+function pfXp(n, notes = [], own = true) {
+  const before = pfLevel().l;
+  pf.st.xp = Math.max(0, pf.st.xp + n);
+  pfKeep();
+  const lv = pfLevel(), up = lv.l - before;
+  if (up > 0) { gmW.lunacy += PF_RANKUP * up; gmWKeep(); }
+  const html = `<div class="pftoast">${notes.map((t) => `<div>${esc(t)}</div>`).join("")}<div><b>${n >= 0 ? "+" : ""}${n.toLocaleString("en")}</b> XP · LV ${lv.l} · <a href="#/profile">Profile</a></div>${up > 0 ? `<div class="pfup">New rank: <b>${esc(lv.rank)}</b> · +${PF_RANKUP * up} lunacy</div>` : ""}</div>`;
+  const box = $("#toast");
+  if (!own && box && !box.classList.contains("hidden")) box.insertAdjacentHTML("beforeend", html); else toast(html, 6000);
+  pfChip();
+  pfSoon();
+}
 // a pull is a quest step too
 const pfGot = gaGot;
 gaGot = function (id) { const r = pfGot(id); pfStep(["pull"], []); pfSoon(); return r; };
 
 // ------------------------------------------------------------------ the album
-const PF_DUP = { r1: 0, r2: 5, r3: 25, ego: 25 }, PF_COST = { r1: 20, r2: 150, r3: 400, ego: 400 };
+const PF_DUP = { r1: 1, r2: 10, r3: 50, ego: 50 }, PF_COST = { r1: 10, r2: 40, r3: 100, ego: 100 };
 const pfGacha = () => { if (ga.st) return ga.st; try { return { ...gaNew(), ...JSON.parse(localStorage.getItem(GA_KEEP) || "{}") }; } catch { return gaNew(); } };
 async function pfUnits() {
   if (pf.units) return pf.units;
@@ -147,19 +164,27 @@ function pfCardData() {
 }
 function pfCardDraw() {
   const c = pfCardData();
-  $("#pfcard").innerHTML = `<div class="pfcard" style="border-color:${pfFrame(c.lv.l)}"><div class="pfbn" style="${c.face ? `background-image:url('${c.face.art}')` : ""}"></div><div class="pfin">
-      <div class="pfrank">${esc(c.lv.rank)}</div><div class="pfsub">LV ${c.lv.l}${c.face ? ` · ${esc(c.face.title)}` : ""}</div>
+  const back = pfBack(c.lv.l), title = pfTitle(c.lv);
+  $("#pfcard").innerHTML = `<div class="pfcard" style="border-color:${pfFrame(c.lv.l)};--back:${pfBackTop(back, c.lv.l)}"><div class="pfbn" style="${c.face ? `background-image:url('${c.face.art}')` : ""}"></div><div class="pfin">
+      <div class="pfrank">${esc(title)}</div><div class="pfsub">${title !== c.lv.rank ? "Color · " : ""}LV ${c.lv.l}${c.face ? ` · ${esc(c.face.title)}` : ""}</div>
       <div class="pfnums"><div><b>${c.ids}</b><span>Identities</span></div><div><b>${c.ach.length}</b><span>Achievements</span></div><div><b>${gmW.streak || 0}</b><span>Streak</span></div></div>
       <div class="pfbadges">${c.ach.slice(0, 3).map(([, name]) => `<span>${esc(name)}</span>`).join("") || `<span class="none">No achievements yet</span>`}</div>
       <div class="pfsite">limbus-archive.com</div></div></div>
+    <div class="pfbacks">${PF_BACK.map(([name, from], i) => { const open = c.lv.l >= from; return `<button class="pfbk ${back === PF_BACK[i] ? "on" : ""}" data-bk="${i}" ${open ? "" : "disabled"} style="--b:${pfBackTop(PF_BACK[i], c.lv.l)}" title="${esc(name)}${open ? "" : " · opens at " + esc(PF_RANKS[from - 1])}"><i></i>${esc(name)}${open ? "" : `<small>${esc(PF_RANKS[from - 1].replace(" Fixer", ""))}</small>`}</button>`; }).join("")}</div>
+    ${c.lv.l >= PF_RANKS.length ? `<div class="pfepi"><span class="sub">Your name as a Color:</span> The <select id="pfepi0"><option value="" disabled ${pf.st.epi ? "" : "selected"}>pick</option>${PF_EPI[0].map((w, i) => `<option value="${i}" ${pf.st.epi && pf.st.epi[0] === i ? "selected" : ""}>${w}</option>`).join("")}</select>
+      <select id="pfepi1"><option value="" disabled ${pf.st.epi ? "" : "selected"}>pick</option>${PF_EPI[1].map((w, i) => `<option value="${i}" ${pf.st.epi && pf.st.epi[1] === i ? "selected" : ""}>${w}</option>`).join("")}</select></div>` : ""}
     <div class="pfbtns"><span class="sub">Click an Identity you own in the album to put it here.</span><button class="primary" id="pfpng">Save picture</button></div>`;
   $("#pfpng").onclick = () => pfPng(c);
+  document.querySelectorAll("#pfcard [data-bk]").forEach((b) => b.onclick = () => { pf.st.back = +b.dataset.bk; pfKeep(); pfSoon(); pfCardDraw(); });
+  const epi = () => { if ($("#pfepi0").value === "" || $("#pfepi1").value === "") return; pf.st.epi = [+$("#pfepi0").value, +$("#pfepi1").value]; pfKeep(); pfSoon(); pfCardDraw(); pfChip(); };
+  if ($("#pfepi0")) { $("#pfepi0").onchange = epi; $("#pfepi1").onchange = epi; }
 }
 // the card as a PNG, drawn on a canvas
 async function pfPng(c) {
   const W = 900, H = 500, cv = document.createElement("canvas"), x = cv.getContext("2d");
   cv.width = W; cv.height = H;
-  x.fillStyle = "#0f0c0d"; x.fillRect(0, 0, W, H);
+  const bg = x.createLinearGradient(0, 260, 0, H); bg.addColorStop(0, pfBackTop(pfBack(c.lv.l), c.lv.l)); bg.addColorStop(1, "#0f0c0d");
+  x.fillStyle = "#0f0c0d"; x.fillRect(0, 0, W, H); x.fillStyle = bg; x.fillRect(0, 260, W, H - 260);
   if (c.face) {
     const im = await new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = c.face.art; });
     if (im) {  // (the art only above the text, faded out at its foot)
@@ -173,8 +198,8 @@ async function pfPng(c) {
   x.fillStyle = fade; x.fillRect(0, 0, W, 301);
   x.strokeStyle = pfFrame(c.lv.l); x.lineWidth = 4; x.strokeRect(2, 2, W - 4, H - 4);
   await document.fonts.load('40px "LC Bebas"').catch(() => {});
-  x.fillStyle = "#fff"; x.font = '56px "LC Bebas", "Segoe UI", sans-serif'; x.fillText(c.lv.rank.toUpperCase(), 32, 330);
-  x.fillStyle = "#f3d77a"; x.font = '20px "Segoe UI", sans-serif'; x.fillText(`LV ${c.lv.l}${c.face ? " · " + c.face.title : ""}`, 34, 362);
+  x.fillStyle = "#fff"; x.font = '56px "LC Bebas", "Segoe UI", sans-serif'; x.fillText(pfTitle(c.lv).toUpperCase(), 32, 330);
+  x.fillStyle = "#f3d77a"; x.font = '20px "Segoe UI", sans-serif'; x.fillText(`${pfTitle(c.lv) !== c.lv.rank ? "Color · " : ""}LV ${c.lv.l}${c.face ? " · " + c.face.title : ""}`, 34, 362);
   [[c.ids, "IDENTITIES"], [c.ach.length, "ACHIEVEMENTS"], [gmW.streak || 0, "DAY STREAK"]].forEach(([n, t], i) => {
     const bx = 32 + i * 200;
     x.fillStyle = "#231e21"; x.fillRect(bx, 386, 186, 74);
@@ -259,17 +284,17 @@ async function pfLoad() {
 function pfStrip() {
   const lv = pfLevel(), qs = pfQuests(), done = qs.filter((q) => q.n >= q.need).length;
   return `<a class="pfstrip" href="#/profile"><span class="pfava" style="border-color:${pfFrame(lv.l)};${pf.st.face ? `background-image:url('${pf.st.face}')` : ""}"></span>
-    <span class="pflv"><b>LV ${lv.l} · ${esc(lv.rank)}</b><small>${(pf.st.xp - lv.from).toLocaleString("en")} / ${(lv.to - lv.from).toLocaleString("en")} XP</small><span class="pfbar"><i style="width:${Math.round(100 * (pf.st.xp - lv.from) / (lv.to - lv.from))}%"></i></span></span>
+    <span class="pflv"><b>LV ${lv.l} · ${esc(pfTitle(lv))}</b><small>${(pf.st.xp - lv.from).toLocaleString("en")} / ${(lv.to - lv.from).toLocaleString("en")} XP</small><span class="pfbar"><i style="width:${Math.round(100 * (pf.st.xp - lv.from) / (lv.to - lv.from))}%"></i></span></span>
     <span class="pfqs">${qs.map((q) => `<span class="${q.n >= q.need ? "done" : ""}" title="${esc(q.name)} · +${q.pay} lunacy">${esc(q.name)} <i>${q.n}/${q.need}</i></span>`).join("")}</span>
-    <span class="pfgo">Quests ${done}/3 · Profile →</span></a>`;
+    <span class="pfgo">Quests ${done}/${qs.length} · Profile →</span></a>`;
 }
 // the top bar: the card's face and rank, next to the lunacy (on a phone the face only)
 function pfChip() {
   let el = $("#pfchip");
   if (!el) { el = document.createElement("a"); el.id = "pfchip"; el.href = "#/profile"; $("#hstack")?.before(el); }
   const lv = pfLevel();
-  el.title = `${lv.rank} · LV ${lv.l} — your profile`;
-  el.innerHTML = `<span class="pfava" style="border-color:${pfFrame(lv.l)};${pf.st.face ? `background-image:url('${pf.st.face}')` : ""}"></span><span class="pfct"><b>${esc(lv.rank)}</b><small>LV ${lv.l}</small></span>`;
+  el.title = `${pfTitle(lv)} · LV ${lv.l} — your profile`;
+  el.innerHTML = `<span class="pfava" style="border-color:${pfFrame(lv.l)};${pf.st.face ? `background-image:url('${pf.st.face}')` : ""}"></span><span class="pfct"><b>${esc(pfTitle(lv))}</b><small>LV ${lv.l}</small></span>`;
 }
 pfChip();
 const pfHub = gmHub;
@@ -283,17 +308,65 @@ function pfDraw() {
       <ul><li>iPhone / Safari clears it after 7 days away from the site</li><li>clearing browser data, private windows, another device</li></ul>
       <p>Keep your save code below and nothing is lost.</p></div>
     <div class="pfsave" id="pfsave"></div>
-    <div class="pftop"><div><span class="pflbl">LV ${lv.l} · ${esc(lv.rank)}</span>
+    <div class="pftest"><b>TEST · not for release</b>${[["xp1", "+1,000 XP"], ["up", "Next rank"], ["down", "Rank down"], ["color", "Color"], ["rat", "Back to Rat"],
+      ["lun", "+1,300 lunacy"], ["shard", "+100 Egoshards"], ["quests", "Finish quests"], ["newq", "New quests"]].map(([k, t]) => `<button data-test="${k}">${t}</button>`).join("")}</div>
+    <div class="pftop"><div><span class="pflbl">LV ${lv.l} · ${esc(pfTitle(lv))}</span>
         <div class="pfbar big"><i style="width:${Math.round(100 * (pf.st.xp - lv.from) / (lv.to - lv.from))}%"></i></div>
         <span class="sub">${(pf.st.xp - lv.from).toLocaleString("en")} / ${(lv.to - lv.from).toLocaleString("en")} XP to ${esc(pfLevel(lv.to).rank)} · every lunacy the games pay is XP too</span>
         <span class="pflbl" style="margin-top:14px">Today's quests</span>
         <div class="pfquests">${qs.map((q) => `<div class="${q.n >= q.need ? "done" : ""}"><span>${esc(q.name)}</span><i>${q.n >= q.need ? "Done" : `${q.n}/${q.need}`}</i><div class="pfbar"><i style="width:${100 * q.n / q.need}%"></i></div><small>+${q.pay} lunacy</small></div>`).join("")}</div>
-        <span class="sub">New quests with the Daily challenge.</span></div>
+        <span class="sub">New quests with the Daily challenge${lv.l < PF_Q4 ? ` · a fourth one from ${esc(PF_RANKS[PF_Q4 - 1])}` : ""}.</span></div>
       <div id="pfcard"><div class="sub">Reading…</div></div></div>
     <div id="pfalbum" class="pfalbum"><div class="sub">Reading the collection…</div></div>
     <div class="gmgrp gmachhead">Achievements <small>${GM_ACH.filter(([k]) => gmW.ach[k]).length} / ${GM_ACH.length}</small></div>
     <div class="gmach">${GM_ACH.map(([k, name, what, n]) => `<span class="${gmW.ach[k] ? "done" : ""}" title="${esc(what)}"><b>${esc(name)}</b><small>${esc(what)}</small><i>${gmW.ach[k] ? "✓" : "+" + n}</i></span>`).join("")}</div>`;
+  document.querySelectorAll("[data-test]").forEach((b) => b.onclick = () => { pfTest(b.dataset.test); pfDraw(); });
   pfSaveDraw();
   pfUnits().then(() => { if (!location.hash.startsWith("#/profile")) return; pfCardDraw(); pfAlbum(); });
 }
+// TEMPORARY test buttons
+function pfTest(k) {
+  const lv = pfLevel();
+  if (k === "xp1") pfXp(1000);
+  if (k === "up") pfXp(lv.to - pf.st.xp);
+  if (k === "down") pfXp(pfAt(Math.max(1, lv.l - 1)) - pf.st.xp);
+  if (k === "color") pfXp(pfAt(PF_RANKS.length) - pf.st.xp);
+  if (k === "rat") { pf.st.xp = 0; pf.st.back = 0; pfKeep(); pfChip(); }
+  if (k === "lun") { gmW.lunacy += 1300; gmWKeep(); }
+  if (k === "shard") { pf.st.used -= 100; pfKeep(); }
+  if (k === "quests") { const got = []; for (const q of pfQuests()) { pf.st.q.n[q.k] = q.need; if (!pf.st.q.paid[q.k]) { pf.st.q.paid[q.k] = 1; got.push([q.pay, "Quest done: " + q.name]); } } pfKeep(); if (got.length) gmPay(got); }
+  if (k === "newq") { pf.st.qs = Math.random().toString(36).slice(2, 6); pf.st.q = null; pfKeep(); }
+  pfSoon();
+}
 routes.profile = () => { gmStop(); pfDraw(); };
+
+// ------------------------------------------------------------------ Live rooms: everybody's rank by the name
+// (the room only knows names: each player says its rank as a message when somebody comes in)
+const pfLive = {}, pfGlGot = glGot, pfGlLobby = glLobby;
+let pfLiveWho = "";
+const pfMineLive = () => { const lv = pfLevel(); return { l: lv.l, e: lv.l >= PF_RANKS.length && pf.st.epi ? pf.st.epi : null, s: pf.st.faceS || 0, f: pf.st.face || "" }; };
+glGot = function (m) {
+  const d = m && m.data;
+  if (m && m.t === "msg" && d && d.pf && typeof d.pf === "object") {
+    const p = d.pf, l = Math.max(1, Math.min(99, +p.l || 1)), e = Array.isArray(p.e) && PF_EPI[0][p.e[0]] && PF_EPI[1][p.e[1]] ? [+p.e[0], +p.e[1]] : null;
+    pfLive[m.from] = { l, e, s: +p.s || 0, f: typeof p.f === "string" && p.f.startsWith("/api/asset_thumb?path=") && p.f.length < 400 ? p.f : "" };
+    if (location.hash.startsWith("#/live/")) glLobby();
+    return;
+  }
+  if (m && m.t === "room") {
+    const who = (m.players || []).map((p) => p.id).sort().join(",");
+    if (who !== pfLiveWho) { pfLiveWho = who; setTimeout(() => glSay({ pf: pfMineLive() }), 300); }
+  }
+  return pfGlGot(m);
+};
+glLobby = function () {
+  pfGlLobby();
+  const rows = document.querySelectorAll(".glcols .glrow"), players = gl.room ? gl.room.players : [];
+  rows.forEach((row, i) => {
+    const p = players[i], r = p && (p.id === gl.id ? pfMineLive() : pfLive[p.id]);
+    if (!r || row.querySelector(".glpf")) return;
+    const rank = r.l >= PF_RANKS.length && r.e ? `The ${PF_EPI[0][r.e[0]]} ${PF_EPI[1][r.e[1]]}` : PF_RANKS[Math.min(r.l, PF_RANKS.length) - 1];
+    const frame = r.l <= PF_FRAME.length ? PF_FRAME[r.l - 1] : GA_SINNER[r.s - 1] || "#ffffff";
+    row.insertAdjacentHTML("afterbegin", `<span class="glpf" title="LV ${r.l}"><span class="pfava" style="border-color:${frame};${r.f ? `background-image:url('${esc(r.f)}')` : ""}"></span><small>${esc(rank)}</small></span>`);
+  });
+};
