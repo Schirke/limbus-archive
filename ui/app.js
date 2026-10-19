@@ -278,6 +278,12 @@ async function refresh() {
         toast(j.result.site ? `On the site — <a href="${esc(j.result.site)}" target="_blank">open</a>${j.result.sent ? `<br><span class="small">${siteSent(j.result.sent)}</span>` : ""}` : "Site files are ready (no upload is set up).", 20000);
         if ($("#sitebox")) drawSiteBox();
       }
+      else if (j.kind === "sitefx") {
+        const f = j.result && j.result.fx;
+        toast(!f ? "Rendering stopped." : f.made || f.failed || f.left ? `Rendering ${f.left ? "stopped" : "done"}: ${f.made} made${f.left ? `, ${f.left} left` : ""}. Then Send to site.`
+          : "Nothing to render: the site has every video.", 8000);
+        if ($("#sitebox")) drawSiteBox();
+      }
     }
     refresh.lastJob = j.finished;
   } else if (refresh.lastJob === undefined) refresh.lastJob = j ? j.finished : null;

@@ -172,17 +172,23 @@ def _apps(svc) -> list[str]:
 
 def counts(svc) -> dict:
     """How many Identities / E.G.O (and enemies) have videos on the site."""
-    from .site import Exporter
+    from .site import Exporter, _game, url_key
+    ex = Exporter(svc, "")
     try:
-        m = _read(Exporter(svc, ""))
+        m = _read(ex)
         units = sum(1 for c in m["have"] if c.isdigit())
         out = {"have": units, "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False,
                "enemies": {"have": len(m["have"]) - units, "total": len(_apps(svc))}}
     except Exception:
         out = {"have": 0, "total": 0, "videos": 0, "running": False}
     try:
-        st = svc.buff_fx.status()
-        out["buffs"] = {"have": len(st["have"]), "total": len(svc.buff_fx.db()["fx"]), "failed": len(st["failed"])}
+        from .buffs import viewer
+        bf = svc.buff_fx
+        st, names, site = bf.status(), bf.db()["fx"], ex.read_manifest("buffs")
+        on = site.get("urls", {}) if _game(site.get("id")) == _game(os.path.basename(bf.folder())) else {}
+        here = {viewer._safe_name(n) for n in st["have"]}  # (made here, or already on the site)
+        have = sum(1 for n in names if viewer._safe_name(n) in here or url_key("/api/buff_video", name=n) in on)
+        out["buffs"] = {"have": have, "total": len(names), "failed": len(st["failed"])}
     except Exception:
         pass
     return out

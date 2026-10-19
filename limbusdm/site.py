@@ -923,7 +923,10 @@ class Exporter:
         by level."""
         sec = PARTS[name]["crawl"]
         stage = "site: " + sec["stage"]
-        have = self.kept(self.read_manifest(name), sec["start"])  # (the lists: asked every time)
+        old, app = self.read_manifest(name), __import__("limbusdm").__version__
+        have = self.kept(old, sec["start"])  # (the lists: asked every time)
+        if old.get("app") != app:  # (another app may answer differently: its answers asked again, pictures kept)
+            have = {k: f for k, f in have.items() if ".json" not in f}
         self.progress(stage, 0, 0)
         got, todo = {}, list(sec["start"])
         seen = set(todo)
@@ -933,7 +936,7 @@ class Exporter:
             todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen]
             seen.update(todo)
         urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in got if re.match(p, k)], size) for pat, size in sec["packs"]])
-        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "urls": urls, "groups": groups}
+        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups}
         self.write_manifest(name, m)
         return m
 
