@@ -433,11 +433,11 @@ BIG_ASKS = {"/api/frames", "/api/frame_png", "/api/sounds", "/api/bank", "/api/s
 
 def _big_needs(base: str, progress=None) -> list[str]:
     """Every request the big games make, from the app at `base`, run in a hidden window."""
-    from .sitecheck import _Tab, _free_port, find_browser
+    from .sitecheck import _Tab, _free_port, close_browser, find_browser, new_profile
     exe = find_browser()
     if not exe:
         raise RuntimeError("no Edge or Chrome to run the games in")
-    port, prof = _free_port(), tempfile.mkdtemp(prefix="limbus-big-")
+    port, prof = _free_port(), new_profile("limbus-big-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
                              "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-background-timer-throttling",
                              "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", "about:blank"],
@@ -478,11 +478,7 @@ def _big_needs(base: str, progress=None) -> list[str]:
             tab and tab.call("Browser.close")
         except Exception:
             pass
-        try:
-            proc.wait(5)
-        except Exception:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
-        shutil.rmtree(prof, ignore_errors=True)
+        close_browser(proc, prof)
 
 
 def _grouped(got: dict, first: list[tuple[list, int]]) -> tuple[dict, list]:

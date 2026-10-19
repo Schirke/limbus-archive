@@ -33,6 +33,30 @@ def _free_port() -> int:
         return s.getsockname()[1]
 
 
+def new_profile(prefix: str) -> str:
+    """A fresh browser profile folder; ones of the same kind left by a killed run over a day ago go first."""
+    tmp, old = tempfile.gettempdir(), time.time() - 86400
+    for n in os.listdir(tmp):
+        p = os.path.join(tmp, n)
+        if n.startswith(prefix) and os.path.isdir(p) and os.path.getmtime(p) < old:
+            shutil.rmtree(p, ignore_errors=True)
+    return tempfile.mkdtemp(prefix=prefix)
+
+
+def close_browser(proc, prof: str) -> None:
+    """Stop the browser with its helper processes and remove its profile (the helpers hold files a moment longer)."""
+    try:
+        proc.wait(5)
+    except Exception:
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    for _ in range(20):
+        shutil.rmtree(prof, ignore_errors=True)
+        if not os.path.exists(prof):
+            return
+        time.sleep(0.5)
+
+
 class _Tab:
     """One browser tab over the DevTools protocol."""
 
@@ -66,7 +90,7 @@ def check(root: str, routes: list[str] | None = None, progress=None, settle: flo
         return out
     httpd = serve_dir(root)
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
-    port, prof = _free_port(), tempfile.mkdtemp(prefix="limbus-sitecheck-")
+    port, prof = _free_port(), new_profile("limbus-sitecheck-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
                              "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-background-timer-throttling",
                              "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "about:blank"],
@@ -135,11 +159,6 @@ def check(root: str, routes: list[str] | None = None, progress=None, settle: flo
                 tab.call("Browser.close")
         except Exception:
             pass
-        try:
-            proc.wait(5)
-        except Exception:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        close_browser(proc, prof)
         httpd.shutdown()
-        shutil.rmtree(prof, ignore_errors=True)
     return out

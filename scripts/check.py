@@ -352,12 +352,12 @@ class Cdp:
 
 
 def check_pages(rep, base, only=None, shots=False):
-    from limbusdm.sitecheck import _free_port, find_browser
+    from limbusdm.sitecheck import _free_port, close_browser, find_browser, new_profile
     exe = find_browser()
     if not exe:
         rep.warn("pages", "browser", "no Edge or Chrome: pages not opened")
         return
-    port, prof = _free_port(), tempfile.mkdtemp(prefix="limbus-check-")
+    port, prof = _free_port(), new_profile("limbus-check-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
                              "--window-size=1600,1000", "--remote-allow-origins=*", "--mute-audio", "--no-first-run",
                              "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE cdn.jsdelivr.net",
@@ -405,11 +405,7 @@ def check_pages(rep, base, only=None, shots=False):
             tab and tab.call("Browser.close")
         except Exception:
             pass
-        try:
-            proc.wait(5)
-        except Exception:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True)
-        shutil.rmtree(prof, ignore_errors=True)
+        close_browser(proc, prof)
 
 
 # pictures a page drew with no address (a link missing from an answer) or that didn't load

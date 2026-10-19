@@ -308,15 +308,13 @@ def import_csv(svc, lang: str, text: str) -> dict:
 def crawl(svc, port: int, routes: list | None = None):
     """Open the app's pages in headless Edge / Chrome and collect what they show (sections and their named sub-pages;
     `routes`: only these)."""
-    import shutil
     import subprocess
-    import tempfile
     from urllib.request import urlopen
-    from .sitecheck import _Tab, _free_port, find_browser
+    from .sitecheck import _Tab, _free_port, close_browser, find_browser, new_profile
     exe = find_browser()
     if not exe:
         raise RuntimeError("no Edge or Chrome")
-    dbg, prof = _free_port(), tempfile.mkdtemp(prefix="limbus-ui-")
+    dbg, prof = _free_port(), new_profile("limbus-ui-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={dbg}", f"--user-data-dir={prof}",
                              "--window-size=1600,1000", "--remote-allow-origins=*", "--mute-audio", "--no-first-run",
                              "--lang=en-US", "about:blank"],
@@ -362,9 +360,4 @@ def crawl(svc, port: int, routes: list | None = None):
                 tab.call("Browser.close")
         except Exception:
             pass
-        try:
-            proc.wait(5)
-        except Exception:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
-                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        shutil.rmtree(prof, ignore_errors=True)
+        close_browser(proc, prof)
