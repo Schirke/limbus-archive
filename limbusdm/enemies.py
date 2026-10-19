@@ -7,7 +7,7 @@ import re
 
 from . import content, units
 
-VERSION = 4  # bump when the layout changes (cached per snapshot)
+VERSION = 5  # bump when the layout changes (cached per snapshot)
 SIN_KEYS = [k for k in units.SINS if k not in ("WHITE", "BLACK", "NEUTRAL")]
 EVENT = (3, 0, "Event")  # stages content.stage_label can't place (their ids overlap the main story's)
 

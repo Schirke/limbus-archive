@@ -158,9 +158,9 @@ def stage_label(table: str, fname: str, stage_id: int, chapters: dict) -> tuple[
 
 def load_unit_names(loc_dir: str) -> dict[int, str]:
     out = {}
-    for fn in sorted(os.listdir(loc_dir)) if os.path.isdir(loc_dir) else []:
-        if not re.match(r"EN_(Enemies|Abnormalit).*\.json$", fn):
-            continue
+    files = sorted(os.listdir(loc_dir)) if os.path.isdir(loc_dir) else []
+    # the battle name first; the abnormality log's title only where the battle has none
+    for fn in [f for f in files if re.match(r"EN_Enemies.*\.json$", f)] + [f for f in files if re.match(r"EN_Abnormalit.*\.json$", f)]:
         try:
             with open(os.path.join(loc_dir, fn), encoding="utf-8-sig") as f:
                 for r in json.load(f).get("dataList", []):

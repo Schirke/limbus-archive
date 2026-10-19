@@ -18,7 +18,11 @@ routes.enemies = async (args) => {
     try { [ENEMIES] = await Promise.all([api("/api/enemies"), units()]); } catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   }
   if (!ENEMIES.list.length) { ENEMIES = null; main.innerHTML = `<div class="empty">Take a snapshot first — the handbook is read from it.</div>`; return; }
-  if (args[0] && +args[0] !== env.sel) Object.assign(env, { sel: +args[0], variant: 0, level: 0 });
+  if (args[0] && +args[0] !== env.sel) {
+    // (an old link can name another variant's id)
+    const e = ENEMIES.list.find((x) => x.id === +args[0]) || ENEMIES.list.find((x) => x.variants.some((v) => v.ids.includes(+args[0])));
+    Object.assign(env, { sel: e ? e.id : +args[0], variant: e ? Math.max(0, e.variants.findIndex((v) => v.ids.includes(+args[0]))) : 0, level: 0 });
+  }
   if (!$("#engrid")) drawEnemies();
   else { markEnemy(); drawEnemy(); }
 };
