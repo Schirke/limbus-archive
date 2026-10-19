@@ -194,9 +194,26 @@ routes.gamebuff = async (args = []) => {
       const name = (b.name || "").replace(/<[^>]+>/g, "").trim();  // (the game's own marks: "[<s>Great Brother</s>]")
       if (!name || !fx.length) continue;
       const x = by.get(name) || { key: name, name, title: name, sub: GB_TYPE[b.type] || "", type: b.type, id: b.id, icon: b.icon, desc: b.desc || "", fx: [], who: [] };
-      x.fx.push(...fx);
+      for (const n of fx) if (!x.fx.includes(n)) x.fx.push(n);
       for (const w of b.who) if (!x.who.includes(w.name) && !/^\?+$/.test(w.name)) x.who.push(w.name);
       by.set(name, x);
+    }
+    // one effect under several names: one answer by their shared name ("Shin (心) - Ezra" -> "Shin (心)"), else not asked
+    const base = (n) => n.replace(/\s*(\[[^\]]*\]|\s-\s.*)$/, "").replace(/\s*\(/, " (").trim(), names = new Map();
+    for (const x of by.values()) for (const n of x.fx) names.set(n, (names.get(n) || new Set()).add(x.name));
+    for (const x of [...by.values()]) {
+      const shared = x.fx.filter((n) => names.get(n).size > 1);
+      x.fx = x.fx.filter((n) => names.get(n).size === 1);
+      for (const n of shared) {
+        const b = new Set([...names.get(n)].map(base));
+        if (b.size > 1) continue;
+        const name = [...b][0], m = by.get(name) || { ...x, key: name, name, title: name, fx: [], who: [] };
+        if (m.desc !== x.desc) m.desc = "";
+        if (!m.fx.includes(n)) m.fx.push(n);
+        for (const w of x.who) if (!m.who.includes(w)) m.who.push(w);
+        by.set(name, m);
+      }
+      if (!x.fx.length && by.get(x.name) === x) by.delete(x.name);
     }
     gb.pool = [...by.values()];
     if (!r) setTimeout(() => { gb.pool = null; });  // (not read: asked again the next time)
