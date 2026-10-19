@@ -23,7 +23,6 @@ ICONS = {
     # skill coins: plain, Unbreakable, purple / green
     "coin": "BattleUI_NewCoin_0", "coin_super": "BattleUI_NewCoin_3", "coin_purple": "BattleUI_NewCoin_14",
     "coin_green": "BattleUI_NewCoin_11",
-    "item_thread": "icon_twine", "item_module": "icon_enkephalin_module",
 }
 
 _lock = threading.Lock()

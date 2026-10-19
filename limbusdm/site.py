@@ -1398,7 +1398,9 @@ class Exporter:
 
     def small(self) -> dict:
         """One-list pages asked every time: News, Upgrade calc."""
-        urls = self.fetch_all(["/api/news", "/api/growth"], {}, "site: News")
+        from .growth import icons
+        pics = [url_key("/api/object", bundle=v["b"], pid=v["p"]) for v in icons(self.svc).values()]
+        urls = self.fetch_all(["/api/news", "/api/growth"] + pics, {}, "site: News")
         m = {"kind": "small", "id": self.svc.latest_snapshot_id(), "urls": urls}
         self.write_manifest("small", m)
         return m

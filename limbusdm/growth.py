@@ -5,6 +5,10 @@ VERSION = 1
 FOLDERS = ["common-data", "exp-dungeon", "battle-exp-dungeon", "thread-dungeon", "battle-thread-dungeon", "mirrordungeon",
            "battlepass", "vending-machine", "item"]
 TICKETS = (211, 212, 213, 214)  # Identity Training Ticket I-IV
+# the page's item pictures: sprites of the UI bundle (training tickets I-IV = the shop's single-ticket icons)
+ICONS = {"t1": "MainUI_CommonIcon_2_11", "t2": "MainUI_CommonIcon_2_29", "t3": "MainUI_CommonIcon_2_30", "t4": "MainUI_CommonIcon_2_17",
+         "thread": "icon_twine", "module": "icon_enkephalin_module", "enk": "icon_enkephalin", "lunacy": "icon_lunacy"}
+ICON_BUNDLE = "uispritecontainers_assets_all"
 THREAD, MODULE = 201, 11
 
 
@@ -91,6 +95,24 @@ def _craft(tabs) -> dict:
     return out
 
 
+def icons(svc) -> dict:
+    """{key: {b, p}} for /api/object; shard_<n> = Sinner n's Egoshard."""
+    import sqlite3
+    path = svc.ensure_browse()
+    if not path:
+        return {}
+    con = sqlite3.connect(path)
+    rows = con.execute("select name, bundle, pid from o where type = 'Sprite' and bundle like ? and (name in (%s) or name like 'icon_piece-5%%')"
+                       % ",".join("?" * len(ICONS)), (ICON_BUNDLE + "%", *ICONS.values())).fetchall()
+    con.close()
+    by = {n: {"b": b, "p": str(pid)} for n, b, pid in rows}
+    out = {k: by[n] for k, n in ICONS.items() if n in by}
+    for n, v in by.items():
+        if n.startswith("icon_piece-5") and n[12:14].isdigit():
+            out[f"shard_{int(n[12:14])}"] = v
+    return out
+
+
 def build(svc) -> dict:
     tabs = svc.static_tables(FOLDERS)
     cd = _one(tabs, "common-data")
@@ -128,6 +150,7 @@ def build(svc) -> dict:
         "md": _md(tabs),
         "pass": _pass(tabs),
         "craft": _craft(tabs),
+        "icons": icons(svc),
     }
 
 

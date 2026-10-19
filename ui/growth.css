@@ -1,44 +1,85 @@
 /* More → Upgrade calc (growth.js) */
-.upgpage { max-width: 1200px; }
-.upggrid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
-.upgmain h3, .upgside h3 { margin: 16px 0 8px; font-size: 15px; }
-.upgpick { margin-bottom: 10px; }
-.upgform { display: flex; flex-direction: column; gap: 8px; }
-.upgrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
-.upgrow .lvlabel { min-width: 92px; }
-.upgups { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-.upgups .upbtn.on { border-color: var(--gold); background: rgba(201, 162, 39, .1); }
-.upgups .upbtn:disabled { opacity: .3; }
+.upgpage { max-width: 1240px; }
+.upgpage h3 { margin: 18px 0 8px; font: 18px/1 "LC Bebas", Impact, sans-serif; letter-spacing: .04em; color: var(--gold); }
+.upggrid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: start; }
+.upgtabs button { padding: 7px 18px; }
+
+/* item pictures */
+.upgi { width: 40px; height: 40px; object-fit: contain; flex: none; }
+.upgi.s { width: 20px; height: 20px; vertical-align: -5px; margin-right: 3px; }
+.upgi.wide { width: 56px; }
+.upgtix .upgi.wide, .upgset .upgi.wide { width: 48px; }
+.upgtk { display: inline-grid; place-items: center; font: 14px/1 "LC Bebas", Impact, sans-serif; color: var(--gold);
+  border: 1px solid #6b4f2a; background: rgba(201, 162, 39, .08); }
+.upgdays { display: inline-grid; place-items: center; font: 15px/1 "LC Bebas", Impact, sans-serif; color: var(--gold);
+  border: 1px solid #6b4f2a; border-radius: 50%; }
+
+/* the list */
+.upglist { display: flex; flex-direction: column; gap: 6px; }
+.upgunit { display: grid; grid-template-columns: 52px minmax(0, 1.2fr) auto minmax(0, 1fr) 28px; gap: 12px; align-items: center;
+  padding: 8px 10px; background: linear-gradient(90deg, rgba(60, 38, 22, .55), rgba(0, 0, 0, .35)); border: 1px solid #4a3424; }
+.upgthumb { width: 52px; height: 52px; object-fit: cover; border: 1px solid #6b4f2a; }
+.upgname { display: flex; flex-direction: column; min-width: 0; }
+.upgname b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.upgname small { color: var(--muted); font-size: 12px; }
+.upgctl { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.upgctl label { display: inline-flex; align-items: center; gap: 5px; }
+.upgctl span { color: var(--muted); font-size: 12px; min-width: 22px; }
+.upgctl i { color: var(--muted); font-style: normal; }
+.upgctl input { width: 52px; text-align: center; }
+.upgctl select { min-width: 54px; }
+.upgcost { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: flex-end; font: 17px/1.2 "LC Bebas", Impact, sans-serif; color: var(--text); }
+.upgdel { width: 28px; height: 28px; padding: 0; color: var(--muted); background: none; border-color: transparent; }
+.upgdel:hover { color: #e06a5a; border-color: #6b3a2a; }
+.upgadd { margin-top: 6px; padding: 6px 10px; gap: 8px; border-style: dashed; }
+.upgadd .cqin { flex: 1; width: auto; }
+.upgplus { font: 24px/1 "LC Bebas", Impact, sans-serif; color: var(--gold); width: 52px; text-align: center; }
+
+/* what you have */
+.upghave { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px; background: rgba(0, 0, 0, .3); border: 1px solid #3a2a1e; }
+.upghave .lvlabel { margin: 10px 0 0; min-width: 72px; }
+.upghave > div { display: flex; flex-wrap: wrap; gap: 6px 12px; }
 .upgtix { display: inline-flex; align-items: center; gap: 4px; }
-.upgtix input { width: 64px; }
-.upgtk { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 3px; font: 12px/1 "LC Bebas", Impact, sans-serif;
-  color: var(--gold); border: 1px solid #6b4f2a; background: rgba(201, 162, 39, .08); }
-.upgtk.big { min-width: 36px; height: 36px; font-size: 16px; }
-.upgtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
-.upgtile { display: flex; gap: 10px; align-items: center; padding: 10px 12px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; }
-.upgtile > .ico, .upgtile > img, .upgtile > .icofb { width: 36px; height: 36px; object-fit: contain; flex: none; }
+.upgtix .upgi { width: 36px; height: 36px; }
+.upgtix input { width: 66px; }
+
+/* results */
+.upgtiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.upgtile { display: flex; gap: 12px; align-items: center; padding: 10px 12px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424;
+  border-left: 3px solid #8a6a2a; }
 .upgtile > div { display: flex; flex-direction: column; min-width: 0; }
-.upgtile b { font: 24px/1.05 "LC Bebas", Impact, sans-serif; color: var(--text); }
+.upgtile b { font: 26px/1.05 "LC Bebas", Impact, sans-serif; color: var(--text); }
 .upgtile span { font-size: 13px; }
 .upgtile small { color: var(--muted); font-size: 12px; }
-.upgdays { display: inline-grid; place-items: center; width: 36px; height: 36px; flex: none; font: 15px/1 "LC Bebas", Impact, sans-serif;
-  color: var(--gold); border: 1px solid #6b4f2a; border-radius: 50%; overflow: hidden; }
-.upgbar { position: relative; height: 26px; margin: 12px 0 4px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; }
-.upgbar i { position: absolute; inset: 0 auto 0 0; background: rgba(201, 162, 39, .35); }
-.upgbar span { position: relative; display: block; text-align: center; line-height: 24px; font-size: 13px; }
-.upgside { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; }
+.upgbar { position: relative; height: 28px; margin: 12px 0 4px; background: rgba(0, 0, 0, .35); border: 1px solid #4a3424; }
+.upgbar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, rgba(201, 162, 39, .25), rgba(201, 162, 39, .5)); }
+.upgbar span { position: relative; display: block; text-align: center; line-height: 26px; font: 16px/26px "LC Bebas", Impact, sans-serif; }
+
+/* settings */
+.upgside { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; background: rgba(0, 0, 0, .4); border: 1px solid #4a3424; }
 .upgside h3:first-child { margin-top: 0; }
-.upgside label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.upgside label select { max-width: 170px; }
-.upgside p { margin: -2px 0 4px; }
-.upgside .cqkind { align-self: flex-start; }
-.upgside .cqkind button { white-space: nowrap; }
-.upgside .upgcheck { justify-content: flex-start; }
-@media (max-width: 900px) {
+.upgset { display: flex; gap: 10px; align-items: center; }
+.upgset .upgi { width: 32px; height: 32px; }
+.upgset > div { flex: 1; min-width: 0; }
+.upgset label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.upgset select { max-width: 150px; }
+.upgset small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.upgpass { align-self: flex-start; }
+.upgpass button { white-space: nowrap; }
+.upgcheck { display: flex; align-items: center; gap: 6px; }
+
+.upgcost > span { white-space: nowrap; }
+@media (max-width: 1000px) {
   .upggrid { grid-template-columns: 1fr; }
 }
-@media (max-width: 500px) {
-  .upgrow .lvlabel { min-width: 0; width: 100%; margin-left: 0; }
+@media (max-width: 640px) {
+  .upgunit { grid-template-columns: 44px minmax(0, 1fr) 28px; gap: 4px 10px; }
+  .upgthumb { width: 44px; height: 44px; grid-row: span 2; }
+  .upgctl { grid-column: 2 / 4; }
+  .upgcost { grid-column: 1 / 4; justify-content: flex-start; }
+  .upgdel { grid-row: 1; grid-column: 3; }
+  .upgplus { width: 30px; }
+  .upghave { flex-direction: column; gap: 6px; }
+  .upghave .lvlabel { margin: 0; }
   .upgtiles { grid-template-columns: 1fr; }
-  .upgpage .cqin { width: 100px; }
 }
