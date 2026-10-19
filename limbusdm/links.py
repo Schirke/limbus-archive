@@ -3,6 +3,7 @@
 from urllib.parse import parse_qsl, quote, unquote
 
 SKILL_ICON = "Assets/Resources_moved/Sprite/SkillIcon/{}.png"
+PREVIEW = ("Texture2D", "Sprite", "AudioClip", "VideoClip", "TextAsset", "Mesh")  # shown as they are; any other type as its properties
 
 
 def _q(s) -> str:
@@ -67,6 +68,36 @@ def lang_table(lid: str, group: str) -> str:
 def ui_lang(code: str) -> str:
     """The interface's dictionary of a language."""
     return f"/api/ui_lang?lang={_q(code)}"
+
+
+def report_thumb(h: str) -> str:
+    """A report's stored preview of a texture, by its hash."""
+    return f"/api/thumb?h={_q(h)}" if h else ""
+
+
+def obj(bundle: str, pid, type: str = "Texture2D") -> str:
+    """What the page shows of a game object: itself, or its properties when it is no picture / sound / text."""
+    return f"/api/object?bundle={_q(bundle)}&pid={pid}" + ("" if type in PREVIEW else "&fmt=props")
+
+
+def blob(h: str) -> str:
+    """A stored file by its hash."""
+    return f"/api/blob?h={_q(h)}" if h else ""
+
+
+def container(path: str) -> str:
+    """The objects a catalog path holds."""
+    return f"/api/container?path={_q(path)}"
+
+
+def tree(prefix: str) -> str:
+    """A folder's listing."""
+    return f"/api/tree?prefix={_q(prefix)}"
+
+
+def patchnotes(rid: str) -> str:
+    """A report's short "what's new"."""
+    return f"/api/patchnotes?id={_q(rid)}"
 
 
 def spine(bundle: str, atlas) -> dict:

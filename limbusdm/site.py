@@ -167,7 +167,6 @@ NO_HEAL = re.compile(r"^/api/(_|state|settings|disk|check|update|appnotes|patchn
 JOURNAL = "fetched.txt"  # (Exporter._journal_add)
 NO_JOURNAL = re.compile(r"^/api/(fx_video|buff_video|enemy_thumb)\b")
 CJK = re.compile("[぀-ヿ㐀-鿿가-힯]")
-PREVIEW = ("Texture2D", "Sprite", "AudioClip", "VideoClip", "TextAsset", "Mesh")  # ui: previewHtml asks for these as they are
 
 
 def own_file(svc, name: str) -> str:
@@ -335,46 +334,6 @@ def public(rep: dict) -> dict:
 
 
 # ------------------------------------------------------------------ what a page asks for
-def report_urls(rep: dict, cfg: dict) -> list[str]:
-    """Every request the report page can make."""
-    S, urls = rep["sections"], []
-    obj = lambda it, **x: url_key("/api/object", bundle=it["bundle"], pid=it["pid"], **x)
-    urls += [url_key("/api/report", id=rep["id"]), url_key("/api/patchnotes", id=rep["id"])]
-    for it in S.get("images", []):
-        o, n = it.get("old"), it.get("new")
-        for side in (o, n):
-            h = side and (side.get("h") if side.get("type") == "Texture2D" else side.get("tex"))
-            if h:
-                urls.append(url_key("/api/thumb", h=h))
-        # full pictures of every image with a game path; a player file's sprites always (no preview of their own)
-        if n and (it.get("path") and cfg["full_images"]
-                  or n.get("type") == "Sprite" and str(it.get("bundle")).startswith("install:")):
-            urls.append(obj(it))
-    for sec in ("texts", "data", "video", "code"):
-        for it in S.get(sec, []):
-            n = it.get("new")
-            if not n:
-                continue
-            if it.get("type") == "file":
-                if n.get("blob") and not it.get("records") and not it.get("lines"):
-                    urls.append(url_key("/api/blob", h=n["blob"]))
-            elif it.get("bundle") and (it.get("type") != "VideoClip" or cfg["video"]):
-                urls.append(obj(it) if it.get("type") in PREVIEW else obj(it, fmt="props"))
-    if cfg["audio"]:
-        for it in S.get("audio", []):
-            sd = it.get("sounds") or {}
-            for s in sd.get("added", []) + sd.get("changed", []):
-                urls.append(url_key("/api/bank", path=it["path"], i=s[2]))
-    for it in S.get("leaks", []):
-        if it.get("kind") == "removed":
-            continue
-        if it.get("path"):
-            urls += [url_key("/api/asset_thumb", path=it["path"]), "container:" + it["path"]]
-        elif it.get("bundle") and it.get("pid"):
-            urls.append(obj(it) if it.get("type") in PREVIEW else obj(it, fmt="props"))
-    return list(dict.fromkeys(urls))
-
-
 def unit_urls(units: dict) -> list[str]:
     """Requests of the Identities & E.G.O page (ui/db.js)."""
     from .uiicons import FONTS, ICONS
@@ -552,6 +511,28 @@ def _langs_hold(ex) -> bool:
 
 
 HOLDS = {"langs": _langs_hold}
+
+
+def _report_order(ex, r: dict, got: dict) -> list[str]:
+    """A report's files in reading order: notes, pictures, objects, sounds, notable names, then what their folders hold."""
+    S, out, later = r["sections"], [r["notes"]], []
+    for it in S.get("images", []):
+        out += [it["pics"]["old"], it["pics"]["new"], it.get("open")]
+    for sec in ("texts", "data", "video", "code"):
+        for it in S.get(sec, []):
+            out += [it.get("blob"), it.get("open")]
+    for it in S.get("audio", []):
+        sd = it.get("sounds") or {}
+        out += [s[3] for k in ("added", "changed") for s in sd.get(k, []) if len(s) > 3]
+    for it in S.get("leaks", []):
+        out.append(it.get("thumb") or it.get("open"))
+        if it.get("container"):
+            later += [it["container"], it["tree"]]
+            try:
+                later += [x["url"] for x in ex._stored(got[links.key(it["container"])])]
+            except (KeyError, OSError, ValueError):
+                pass
+    return list(dict.fromkeys(links.key(u) for u in out + later if u))
 
 
 def _buffs_final(ex, got: dict, old: dict):
@@ -897,35 +878,26 @@ class Exporter:
             if rid not in made.get("empty", []):  # (not read again by the next send: _publish)
                 self.made_save({**made, "empty": made.get("empty", []) + [rid]})
             return None
-        old = self.read_manifest(name)
-        keys = report_urls(rep, self.cfg)
-        keys.remove(url_key("/api/report", id=rid))  # the site gets the report as cleaned above, not the app's file
-        # a highlighted path: its folder listing, then its contents
-        extra = []
-        for k in [k for k in keys if k.startswith("container:")]:
-            path = k[10:]
-            keys.remove(k)
-            c = url_key("/api/container", path=path)
-            extra += [c, url_key("/api/tree", prefix=path.rpartition("/")[0])]
-            try:
-                rows = json.loads(self._get(c)[0])
-            except Exception:
-                rows = []
-            for r in rows[:20]:
-                o = {"bundle": r["bundle"], "pid": r["pid"]}
-                extra.append(url_key("/api/object", **o) if r.get("type") in PREVIEW else url_key("/api/object", fmt="props", **o))
-        urls = self.fetch_all(list(dict.fromkeys(keys + extra)), old.get("urls", {}), "site: " + rid[-15:])
-        urls[url_key("/api/report", id=rid)] = self._store(json.dumps(rep, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
+        key = url_key("/api/report", id=rid)
+        flags = "".join(f"&{k}=1" for k in ("full_images", "video", "audio") if self.cfg[k])
         meta = next((dict(r, summary=rep["summary"]) for r in self.svc.reports() if r["id"] == rid), None)
-        # a texture without its full picture on the site opens as its stored preview
-        for it in rep["sections"].get("images", []):
-            n = it.get("new")
-            k = n and url_key("/api/object", bundle=it["bundle"], pid=it["pid"])
-            t = n and urls.get(url_key("/api/thumb", h=n.get("h")))
-            if k and k not in urls and t and n.get("type") == "Texture2D":
-                urls[k] = t
-        m = {"kind": "report", "id": rid, "urls": urls, "meta": meta}
-        self.write_manifest(name, m)
+
+        def final(ex, got, old):
+            r = ex._stored(got[key])
+            gone = [it for it in r["sections"].get("images", []) if it.get("open") and links.key(it["open"]) not in got]
+            for it in gone:  # (a picture's full size the app could not give: the page shows its preview)
+                del it["open"]
+            rel = ex._store(json.dumps(r, ensure_ascii=False).encode("utf-8"), "application/json", gz=True) if gone else got[key]
+            rest = {k: f for k, f in got.items() if k != key}
+            keep = {k: rest[k] for k in _report_order(ex, r, got) if k in rest}  # (a pack holds its files in this order)
+            keep.update((k, f) for k, f in rest.items() if k not in keep)
+            keep[key] = rel
+            got.clear()
+            got.update(keep)
+        sec = {"stage": rid[-15:], "start": [key], "packs": [], "keep_all": True, "final": final,
+               "sources": lambda svc, keys: {key: key + "&site=1" + flags},  # (the web copy's own answer: cleaned, with the files it holds)
+               "manifest": {"kind": "report", "id": rid, "meta": meta}}
+        m = self.crawl(name, sec)
         self._translations(name, rep)
         return m
 
@@ -994,16 +966,16 @@ class Exporter:
         self.write_manifest("units", m)
         return m
 
-    def crawl(self, name: str) -> dict:
+    def crawl(self, name: str, sec: dict | None = None) -> dict:
         """A part made by following links (PARTS "crawl"): its lists, then every file their answers link to (links.py), level
-        by level."""
-        sec = PARTS[name]["crawl"]
+        by level. sec: a manifest that is no part (a report) brings its own."""
+        sec = sec or PARTS[name]["crawl"]
         stage = "site: " + sec["stage"]
         old, app = self.read_manifest(name), __import__("limbusdm").__version__
         if old and sec.get("hold") and HOLDS[sec["hold"]](self):
             return old
-        have = self.kept(old, sec["start"])  # (the lists: asked every time)
-        if old.get("app") != app:  # (another app may answer differently: its answers asked again, pictures kept)
+        have = {k: f for k, f in (old.get("urls") or {}).items() if k not in sec["start"]} if sec.get("keep_all") else self.kept(old, sec["start"])  # (the lists: asked every time)
+        if old.get("app") != app and not sec.get("keep_all"):  # (another app may answer differently: its answers asked again, pictures kept)
             have = {k: f for k, f in have.items() if ".json" not in f}
         if sec.get("fresh"):  # …and these
             have = {k: f for k, f in have.items() if not any(re.match(p, k) for p in sec["fresh"])}
@@ -1013,7 +985,7 @@ class Exporter:
         while todo:
             level_have = have
             if sec.get("sources"):  # a file made from another request: kept while that request is the same
-                src = SOURCES[sec["sources"]](self.svc, todo)
+                src = (SOURCES[sec["sources"]] if isinstance(sec["sources"], str) else sec["sources"])(self.svc, todo)
                 srcs.update(src)
                 level_have = {k: f for k, f in have.items() if k not in src}
                 level_have.update((k, old["urls"][k]) for k, s in src.items() if (old.get("src") or {}).get(k) == s and k in (old.get("urls") or {}) and k not in sec["start"])
@@ -1026,10 +998,10 @@ class Exporter:
                 got[key] = self._prune(key, got)
         inline = {field: self._stored(got.pop(key)) for field, key in (sec.get("inline") or {}).items() if key in got}  # (the answer goes into the manifest: the index gives it)
         if sec.get("final"):  # the part's own last touch
-            FINALS[sec["final"]](self, got, old)
+            (FINALS[sec["final"]] if isinstance(sec["final"], str) else sec["final"])(self, got, old)
         order = sorted if sec.get("sort") else list  # (a pack holds its files in this order)
         urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in order(k for k in got if re.match(p, k))], size) for pat, size in sec["packs"]])
-        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups}
+        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups, **(sec.get("manifest") or {})}
         if srcs:
             m["src"] = {k: s for k, s in srcs.items() if k in urls}
         m.update(inline)

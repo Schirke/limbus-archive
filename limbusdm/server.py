@@ -309,7 +309,13 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/report":
                 if not re.fullmatch(r"[\w.-]+", q["id"]):
                     return self._send(404, b"", "text/plain")
-                return self._gz_json_file(os.path.join(svc.data_dir, "reports", q["id"] + ".json.gz"))
+                rep = svc.store.read_json(f"reports/{q['id']}.json.gz")
+                if rep is None:
+                    return self._send(404, b"", "text/plain")
+                if q.get("site"):  # as the web copy keeps it: the player's own files out, only the files it holds
+                    from . import site
+                    rep = site.public(rep)
+                return self._json(_report_links(rep, {k: bool(q.get(k)) for k in ("full_images", "video", "audio")} if q.get("site") else None))
             if p == "/api/scan":
                 if not q.get("id"):
                     return self._json({"error": "no snapshot named"}, 404)
@@ -640,7 +646,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/tree":
                 return self._json(svc.tree(q.get("prefix", "")))
             if p == "/api/container":
-                return self._json(svc.lookup_container(q["path"]))
+                return self._json([{**r, "url": links.obj(r["bundle"], r["pid"], r.get("type"))} for r in svc.lookup_container(q["path"])])
             if p == "/api/marks":
                 return self._json(svc.marks)
             if p == "/api/units":
@@ -1284,6 +1290,47 @@ def _mirror_links(db: dict) -> dict:
     """The planner's gifts and theme packs with their picture's link."""
     return {**db, "gifts": {k: {**g, "tile": links.thumb(g.get("pic"))} for k, g in (db.get("gifts") or {}).items()},
             "packs": [{**p, "tile": links.thumb(p.get("pic"))} for p in db.get("packs") or []]}
+
+
+def _report_links(rep: dict, site: dict | None = None) -> dict:
+    """A report with the files its page shows as links on the items: images `pics` {old, new} (stored previews) and `open`
+    (the object), other items `open` / `blob`, sounds a link last in the row, notable names `thumb` / `tree` / `container`.
+    site: what the web copy keeps ({full_images, video, audio}); None: everything."""
+    keep = lambda flag: site is None or site.get(flag)  # noqa: E731
+    S = {k: [dict(it) for it in v] for k, v in rep["sections"].items()}
+    for it in S.get("images", []):
+        o, n = it.get("old"), it.get("new")
+        side = lambda s: links.report_thumb(s and (s.get("h") if s.get("type") == "Texture2D" else s.get("tex")))  # noqa: E731
+        it["pics"] = {"old": side(o), "new": side(n)}
+        # (the web copy: named pictures only; a player file's sprites always, no preview of their own)
+        if n and it.get("bundle") and (site is None or (it.get("path") and keep("full_images"))
+                                       or n.get("type") == "Sprite" and str(it["bundle"]).startswith("install:")):
+            it["open"] = links.obj(it["bundle"], it["pid"], it.get("type"))
+    for sec in ("texts", "data", "video", "code"):
+        for it in S.get(sec, []):
+            n = it.get("new")
+            if not n:
+                continue
+            if it.get("type") == "file":
+                if n.get("blob") and not it.get("records") and not it.get("lines"):
+                    it["blob"] = links.blob(n["blob"])
+            elif it.get("bundle") and (it.get("type") != "VideoClip" or keep("video")):
+                it["open"] = links.obj(it["bundle"], it["pid"], it.get("type"))
+    for it in S.get("audio", []):
+        if not keep("audio") or not it.get("sounds"):
+            continue
+        sd = dict(it["sounds"])
+        for k in ("added", "changed"):
+            sd[k] = [[*s, links.bank(it["path"], s[2])] for s in sd.get(k, [])]
+        it["sounds"] = sd
+    for it in S.get("leaks", []):
+        if it.get("kind") == "removed":
+            continue
+        if it.get("path"):
+            it.update(thumb=links.thumb(it["path"]), tree=links.tree(it["path"].rpartition("/")[0]), container=links.container(it["path"]))
+        elif it.get("bundle") and it.get("pid"):
+            it["open"] = links.obj(it["bundle"], it["pid"], it.get("type"))
+    return {"notes": links.patchnotes(rep["id"]), **rep, "sections": S}
 
 
 def _history_links(svc, db: dict) -> dict:

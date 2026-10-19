@@ -211,22 +211,20 @@ const SUMMARY_LABELS = [["leaks", "highlights"], ["foreign_only", "KR/JP-only li
   ["audio", "audio"], ["video", "video"], ["code", "code"], ["catalog_added", "new paths"], ["other", "other"]];
 const summaryChips = (s) => s ? `<div class="chips">${SUMMARY_LABELS.filter(([k]) => s[k]).map(([k, l]) =>
   `<span class="chip ${k === "leaks" || k === "foreign_only" ? "leak" : ""}"><b>${s[k]}</b> ${l}</span>`).join("") || `<span class="chip">no content changes</span>`}</div>` : "";
-const thumb = (h) => h ? `/api/thumb?h=${h}` : "";
-const live = (it, extra = "") => `/api/object?bundle=${encodeURIComponent(it.bundle)}&pid=${it.pid}${extra}`;
 const badge = (k) => `<span class="badge ${k}">${k}</span>`;
 const fmtMs = (ms) => ms == null ? "" : `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")}`;
 // audio is decoded only when the user presses play
-const soundPlayer = (bank, i, name) => `<span class="row"><button class="toggle" onclick='playSound(this, ${JSON.stringify(bank)}, ${i})'>▶ play</button>
+const soundPlayer = (bank, i, name, url = "") => `<span class="row"><button class="toggle" onclick='playSound(this, ${JSON.stringify(bank)}, ${i}, ${JSON.stringify(url)})'>▶ play</button>
   <button class="toggle" onclick='exportObj(${JSON.stringify({ bank, i })})'>export WAV</button></span>`;
 function filterNames(input) {
   const q = input.value.trim().toLowerCase();
   input.nextElementSibling.querySelectorAll("div").forEach((d) => d.style.display = !q || d.textContent.toLowerCase().includes(q) ? "" : "none");
 }
-function playSound(btn, bank, i) {
+function playSound(btn, bank, i, url) {
   const a = document.createElement("audio");
   a.controls = true;
   a.autoplay = true;
-  a.src = `/api/bank?path=${encodeURIComponent(bank)}&i=${i}`;
+  a.src = url || `/api/bank?path=${encodeURIComponent(bank)}&i=${i}`;
   btn.replaceWith(a);
 }
 const FLAG_LABELS = { leak: "next update", suspicious: "test / dummy" };
@@ -300,9 +298,9 @@ async function refresh() {
   if (typeof refresh.hook === "function") refresh.hook();
 }
 // a report's short "What's new"; pops up once per patch
-async function showNotes(rid) {
+async function showNotes(rid, url) {
   let n;
-  try { n = await api(`/api/patchnotes?id=${encodeURIComponent(rid)}`); } catch (e) { toast(esc(e.message)); return; }
+  try { n = await api(url || `/api/patchnotes?id=${encodeURIComponent(rid)}`); } catch (e) { toast(esc(e.message)); return; }
   modal(`<h2 style="margin-top:0">What's new</h2><div class="small muted">Ready to paste into Discord or Telegram (**bold** works in both). You can edit it here first.</div>
     <textarea id="notes" rows="14" style="width:min(720px,86vw);margin:8px 0">${esc(n.text)}</textarea>
     <div class="row" style="gap:8px"><button class="primary" id="ncopy">Copy</button><a href="#/patches/${encodeURIComponent(rid)}" id="nopen">Open the report</a>
@@ -538,7 +536,7 @@ async function renderReport(id, keepTab) {
   main.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => { view.tab = b.dataset.tab; view.shown = PAGE; renderReport(id, true); });
   main.querySelectorAll("[data-kind]").forEach((b) => b.onclick = () => { const k = b.dataset.kind; view.kinds.has(k) ? view.kinds.delete(k) : view.kinds.add(k); b.classList.toggle("on"); view.shown = PAGE; drawSection(); });
   $("#starred").onclick = (e) => { view.starred = !view.starred; e.target.classList.toggle("on"); drawSection(); };
-  $("#rnotes").onclick = () => showNotes(id);
+  $("#rnotes").onclick = () => showNotes(id, REPORT.notes);
   if ($("#rsite")) $("#rsite").onclick = async () => {
     try { await api("/api/site_publish", { id }); toast("Sending to the site… the progress is in the status at the top.", 8000); refresh(); }
     catch (e) { toast(esc(e.message)); }
@@ -672,8 +670,8 @@ function fillItemBody(body, it) {
   if (it.records) h += recordsHtml(it.records);
   if (it.lines) h += `<pre class="mono">${it.lines.map((l) => `<span style="color:${l[0] === "+" ? "var(--add)" : l[0] === "-" ? "var(--rem)" : "inherit"}">${esc(l)}</span>`).join("\n")}</pre>`;
   const n = it.new, o = it.old;
-  if (it.type === "AudioClip" && n) h += `<audio controls preload="none" src="${live(it)}"></audio>`;
-  if (it.type === "VideoClip" && n) h += `<video controls preload="none" src="${live(it)}" style="max-width:100%"></video>`;
+  if (it.type === "AudioClip" && n && it.open) h += `<audio controls preload="none" src="${it.open}"></audio>`;
+  if (it.type === "VideoClip" && n && it.open) h += `<video controls preload="none" src="${it.open}" style="max-width:100%"></video>`;
   if (it.names) {
     const nm = it.names;
     const list = (arr, k) => arr.map((x) => `<div class="mono small">${badge(k)} ${esc(x)}</div>`).join("");
@@ -686,15 +684,15 @@ function fillItemBody(body, it) {
   if (it.sounds) {
     const sd = it.sounds;
     const row = (s, k) => `<tr><td>${badge(k)}</td><td class="mono">${esc(s[0])}</td><td class="muted small">${fmtMs(s[1])}</td>
-      <td>${k !== "removed" ? soundPlayer(it.path, s[2], s[0]) : ""}</td></tr>`;
+      <td>${k !== "removed" ? soundPlayer(it.path, s[2], s[0], s[3]) : ""}</td></tr>`;
     h += `<div class="small muted" style="margin-bottom:6px">${sd.total} sounds in this bank</div><table>${sd.added.map((s) => row(s, "added")).join("")}${sd.changed.map((s) => row(s, "changed")).join("")}${sd.removed.map((s) => row(s, "removed")).join("")}</table>`;
     if (!sd.added.length && !sd.changed.length && !sd.removed.length) h += `<div class="muted small">Same sound names and lengths — the bank changed internally.</div>`;
   }
   if (it.type === "file") {
     h += `<div class="small muted">size ${fmtSize(o && o.size)} → ${fmtSize(n && n.size)}</div>`;
-    if (!it.records && !it.lines && n && n.blob) h += `<button onclick="showBlob('${n.blob}')">Show content</button>`;
+    if (it.blob) h += `<button onclick="showBlob('${it.blob}')">Show content</button>`;
   } else if (n && it.bundle) {
-    h += `<div class="row" style="margin-top:8px"><button onclick='showObject(${JSON.stringify({ bundle: it.bundle, pid: it.pid, type: it.type, name: it.name || "" })})'>Open</button>
+    h += `<div class="row" style="margin-top:8px"><button onclick='showObject(${JSON.stringify({ bundle: it.bundle, pid: it.pid, type: it.type, name: it.name || "", url: it.open })})'>Open</button>
       <button onclick='exportObj(${JSON.stringify({ bundle: it.bundle, pid: it.pid })})'>Export</button></div>`;
   }
   body.innerHTML = h || `<div class="muted">No preview.</div>`;
@@ -739,10 +737,8 @@ async function translateIn(root) {
 
 // ---------- images
 function imgPair(it) {
-  const o = it.old, n = it.new;
-  const oldSrc = o && (o.type === "Texture2D" ? thumb(o.h) : o.tex ? thumb(o.tex) : "");
-  const newSrc = n ? (n.type === "Texture2D" ? thumb(n.h) : live(it)) : "";
-  return { oldSrc, newSrc };
+  const n = it.new;
+  return { oldSrc: it.old ? it.pics.old : "", newSrc: n ? (n.type === "Texture2D" ? it.pics.new : it.open || it.pics.new) : "" };  // (no full size: its preview)
 }
 // Images grouped by what they are, from the folder the game keeps them in
 const NOPATH_CAT = "Without a path";
@@ -801,11 +797,11 @@ function openImage(it) {
   const n = it.new, both = !!(it.old && n);
   let h = `<h2 style="margin-top:0">${esc(it.name || "")}</h2><div class="small muted mono" style="margin-bottom:10px">${esc(it.path || "")} · ${esc(it.bundle)} · ${esc(it.type)}</div>`;
   if (both) h += `<div class="seg imgmode">${[["slide", "Slider"], ["side", "Side by side"]].map(([k, l]) => `<button class="toggle ${IMG_MODE === k ? "on" : ""}" data-im="${k}">${l}</button>`).join("")}</div>
-    <div class="imgslide ${IMG_MODE === "slide" ? "" : "hidden"}" style="--x:50%"><img src="${live(it)}"><img class="was" src="${oldSrc}"><i></i>
+    <div class="imgslide ${IMG_MODE === "slide" ? "" : "hidden"}" style="--x:50%"><img src="${it.open || it.pics.new}"><img class="was" src="${oldSrc}"><i></i>
       <input type="range" min="0" max="100" step="0.1" value="50" aria-label="Before / now"><span class="l">before</span><span class="r">now</span></div>`;
   h += `<div class="compare ${both && IMG_MODE === "slide" ? "hidden" : ""}">`;
   if (it.old) h += `<figure><img src="${oldSrc}"><figcaption>before (stored preview)</figcaption></figure>`;
-  if (n) h += `<figure><img src="${live(it)}"><figcaption>now (full size from the game cache)</figcaption></figure>`;
+  if (n) h += `<figure><img src="${it.open || it.pics.new}"><figcaption>now (full size from the game cache)</figcaption></figure>`;
   h += `</div>`;
   if (n) h += `<div class="row" style="margin-top:12px"><button onclick='exportObj(${JSON.stringify({ bundle: it.bundle, pid: it.pid })})'>Export PNG</button></div>`;
   modal(h);
@@ -833,8 +829,8 @@ function byFileType(arr, pathOf) {
 }
 const IMG_EXT = new Set(["png", "jpg", "jpeg", "tga", "psd", "webp"]);
 // inline preview for image assets, so the list can be skimmed without clicking
-const thumbFor = (path, types) => path && (IMG_EXT.has(fileExt(path)) || (types || []).some((t) => t === "Texture2D" || t === "Sprite")) && !/^(install|locallow)\//.test(path)
-  ? `<img loading="lazy" src="/api/asset_thumb?path=${encodeURIComponent(path)}" onerror="this.remove()">` : "";
+const thumbFor = (path, types, url) => path && url && (IMG_EXT.has(fileExt(path)) || (types || []).some((t) => t === "Texture2D" || t === "Sprite")) && !/^(install|locallow)\//.test(path)
+  ? `<img loading="lazy" src="${url}" onerror="this.remove()">` : "";
 function groupHeader(arr, i, pathOf, wrap) {
   const e = fileExt(pathOf(arr[i]));
   if (i > 0 && fileExt(pathOf(arr[i - 1])) === e) return "";
@@ -842,9 +838,9 @@ function groupHeader(arr, i, pathOf, wrap) {
   return wrap(`${e ? "." + esc(e) : "no extension"} <span class="muted small">${n}</span>`);
 }
 function leakThumb(it) {
-  if (it.path) return thumbFor(it.path, [it.type]);
-  return (it.type === "Texture2D" || it.type === "Sprite") && it.bundle && it.pid
-    ? `<img loading="lazy" src="${live(it)}" onerror="this.remove()">` : "";
+  if (it.path) return thumbFor(it.path, [it.type], it.thumb);
+  return (it.type === "Texture2D" || it.type === "Sprite") && it.open
+    ? `<img loading="lazy" src="${it.open}" onerror="this.remove()">` : "";
 }
 function drawLeaks(el) {
   const r = REPORT;
@@ -863,8 +859,8 @@ function drawLeaks(el) {
   el.querySelectorAll("[data-leak]").forEach((c) => c.onclick = () => {
     const it = items[+c.dataset.leak];
     if (it.kind === "removed") return toast("Removed in this patch — only the name is left.");
-    if (it.path) openPath(it.path);
-    else if (it.bundle && it.pid) showObject({ bundle: it.bundle, pid: it.pid, type: it.type, name: it.name });
+    if (it.path) openPath(it.path, it);
+    else if (it.bundle && it.pid) showObject({ bundle: it.bundle, pid: it.pid, type: it.type, name: it.name, url: it.open });
     else toast("This report was built by an older version — open it from Browse files.");
   });
   bindMore();
@@ -885,11 +881,11 @@ function drawCatalog(el) {
 
 // ------------------------------------------------------------------ object preview / export (shared)
 async function previewHtml(o) {
-  const src = `/api/object?bundle=${encodeURIComponent(o.bundle)}&pid=${o.pid}`;
+  const src = o.url || `/api/object?bundle=${encodeURIComponent(o.bundle)}&pid=${o.pid}`;  // (the page's own link, else the app's)
   if (o.type === "Texture2D" || o.type === "Sprite") return `<img src="${src}">`;
   if (o.type === "AudioClip") return `<audio controls src="${src}"></audio>`;
   if (o.type === "VideoClip") return `<video controls src="${src}"></video>`;
-  const r = await fetch(o.type === "TextAsset" || o.type === "Mesh" ? src : src + "&fmt=props");
+  const r = await fetch(o.url || (o.type === "TextAsset" || o.type === "Mesh" ? src : src + "&fmt=props"));
   if (!r.ok) return `<div class="empty">${esc((await r.json().catch(() => ({}))).error || r.statusText)}</div>`;
   let text = await r.text();
   try { text = JSON.stringify(JSON.parse(text), null, 1); } catch (e) { /* not json */ }
@@ -903,8 +899,8 @@ async function showObject(o) {
     <div class="preview">${body}</div><div class="row" style="margin-top:12px"><button onclick='exportObj(${JSON.stringify({ bundle: o.bundle, pid: o.pid })})'>Export</button>
     <button onclick='exportObj(${JSON.stringify({ bundle: o.bundle, pid: o.pid, fmt: "props" })})'>Export properties (JSON)</button></div>`);
 }
-async function showBlob(h) {
-  const r = await fetch(`/api/blob?h=${h}`);
+async function showBlob(url) {
+  const r = await fetch(url);
   let text = await r.text();
   try { text = JSON.stringify(JSON.parse(text), null, 1); } catch (e) { /* plain text */ }
   modal(`<div class="preview"><pre>${esc(text.slice(0, 400000))}</pre></div>`);
@@ -955,15 +951,15 @@ async function loadTree(prefix) {
   el.querySelectorAll("[data-f]").forEach((d) => d.onclick = () => openTreeFile(t.files[+d.dataset.f]));
 }
 // open any catalog path ("Assets/...") or file ("install/...", "locallow/...") in a popup
-async function openPath(path) {
+async function openPath(path, u = {}) {
   modal(`<div class="preview" id="mpv" style="min-width:60vw"><div class="muted">Loading…</div></div>`);
   const target = $("#mpv");
   const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-  const t = await api(`/api/tree?prefix=${encodeURIComponent(dir)}`).catch(() => ({ files: [] }));
+  const t = await api(u.tree || `/api/tree?prefix=${encodeURIComponent(dir)}`).catch(() => ({ files: [] }));
   const f = t.files.find((x) => x.path === path) || { path, types: ["asset"] };
-  await openTreeFile(f, target);
+  await openTreeFile(f, target, u);
 }
-async function openTreeFile(f, target) {
+async function openTreeFile(f, target, u = {}) {
   const pv = target || $("#pv");
   if (f.pid) {  // an object of a player file (resources.assets…)
     const head = `<div class="mono small" style="margin-bottom:8px">${esc(f.name || f.pid)} · ${esc(f.type)} · ${esc(f.bundle)}${f.w ? ` · ${f.w}×${f.hgt}` : ""}</div>`;
@@ -989,7 +985,7 @@ async function openTreeFile(f, target) {
       <div class="row" style="margin-top:8px"><button onclick='exportObj(${JSON.stringify({ blob: f.blob, name: f.path.split("/").pop() })})'>Export</button></div>`;
     return;
   }
-  const objs = await api(`/api/container?path=${encodeURIComponent(f.path)}`);
+  const objs = await api(u.container || `/api/container?path=${encodeURIComponent(f.path)}`);
   if (!objs.length) { pv.innerHTML = `<div class="mono small">${esc(f.path)}</div><div class="muted">Not loaded as a separate object (sub-asset of a bundle). Try search.</div>`; return; }
   pv.innerHTML = `<div class="mono small" style="margin-bottom:8px">${esc(f.path)}</div><div class="row">${objs.map((o, i) => `<button data-o="${i}">${esc(o.type)} ${esc(o.name || "")}</button>`).join("")}</div><div class="pvb" style="margin-top:10px"></div>`;
   const open = async (o) => {
