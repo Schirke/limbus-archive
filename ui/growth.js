@@ -97,6 +97,7 @@ function upgSim(need) {
   const nb = md.normal.bonus[0] || { bp: 0, lun: 0, mod: 0 }, hb = md.hard ? md.hard.bonus[0] : nb;
   const b = c.bonus === "hard" ? hb : c.bonus === "normal" ? nb : null;
   let enk = 0, exp = need.exp, th = need.th, sh = crate > 0 ? need.sh : 0, days = 0, er = 0, tr = 0, tb = 0, runs = 0, weeks = 0, mods = 0, lun = 0;
+  let mer = 0, mtr = 0;  // mission runs once that EXP / those Threads were already there: only for the pass points
   let lv = 0, pts = 0, all = 0, waiting = false, bonus = 0;
   const spend = (n) => { if (enk < n * mod) return false; enk -= n * mod; mods += n; return true; };
   const gain = (n) => { pts += n; all += n; while (pts >= p.need) { pts -= p.need; lv++; sh -= crate; } };
@@ -104,7 +105,11 @@ function upgSim(need) {
   while ((exp > 0 || th > 0 || sh > 0) && days < UPG_DAYS) {
     if (days % 7 === 0) { waiting = !!b && sh > 0; if (c.missions && sh > 0) gain(p.weekly); }
     days++; enk += day.enk; bonus = UPG_THREAD_BONUS;
-    if (c.missions && sh > 0 && enk >= (es.cost + ts.cost) * mod) { spend(es.cost); spend(ts.cost); exp -= per; er++; thRun(); gain(p.daily); }
+    if (c.missions && sh > 0 && enk >= (es.cost + ts.cost) * mod) {
+      spend(es.cost); spend(ts.cost); gain(p.daily);
+      if (exp > 0) { exp -= per; er++; } else mer++;
+      if (th > 0) thRun(); else { mtr++; bonus--; }
+    }
     if (waiting && sh > 0 && spend(3 * b.mod)) { gain(3 * b.bp); lun += 3 * b.lun; weeks++; waiting = false; }
     // (modules for the next weekly bonus run are kept back: it gives the most points per module)
     const keep = sh > 0 && b ? 3 * b.mod * mod : 0;
@@ -113,7 +118,7 @@ function upgSim(need) {
     while (exp > 0 && spend(es.cost)) { exp -= per; er++; }
     while (th > 0 && spend(ts.cost)) thRun();
   }
-  return { days, er, tr, tb, runs, weeks, mods, lun, lv, all, refill: day.lun * days, never: days >= UPG_DAYS, noPass: need.sh > 0 && !crate };
+  return { days, er, tr, tb, mer, mtr, runs, weeks, mods, lun, lv, all, refill: day.lun * days, never: days >= UPG_DAYS, noPass: need.sh > 0 && !crate };
 }
 // the farming tiles of a result
 function upgFarmTiles(r, need, label) {
@@ -122,6 +127,7 @@ function upgFarmTiles(r, need, label) {
     ${upgTile(upgDays(r.days, r.never), r.never ? "Never" : `${upgFmt(r.days)} day${r.days === 1 ? "" : "s"}`, label,
       r.never ? "" : r.days >= 14 ? `≈ ${upgFmt(r.days / 7 * 10) / 10} weeks` : "")}
     ${need.exp ? upgTile(upgPic("t4", "Ticket IV", "wide"), upgFmt(r.er), "EXP Luxcavation runs", `Lv ${es.lv}: ${upgFmt(upgExpRun(es))} EXP for ${es.cost} modules`) : ""}
+    ${r.mer || r.mtr ? upgTile(`<span class="upgi upgtk">+</span>`, upgFmt(r.mer + r.mtr), "runs only for the pass missions", `${r.mer} EXP and ${r.mtr} Thread Luxcavation, once the EXP / Threads were there`) : ""}
     ${need.th ? upgTile(upgPic("thread", "Threads"), upgFmt(r.tr), "Thread Luxcavation runs", `${r.tb} with the daily bonus · Lv ${ts.lv}: ${ts.n} / ${ts.bonus} for ${ts.cost} modules`) : ""}
     ${need.sh && !r.noPass ? upgTile(`<span class="upgi upgtk">MD</span>`, upgFmt(r.weeks + r.runs), "Mirror Dungeon runs", `${r.weeks} with the weekly bonus, ${r.runs} without`) : ""}
     ${need.sh && !r.noPass ? upgTile(`<span class="upgi upgtk">LV</span>`, `+${upgFmt(r.lv)}`, `pass levels past ${d.pass.max}`, `${upgFmt(r.all)} points · ${upgFmt(r.lv * upgShardsAt())} Egoshards`) : ""}
