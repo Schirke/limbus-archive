@@ -221,7 +221,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             try:
                 fn()
             except Exception as e:
-                vs = isinstance(e, ImportError) and re.search(r"versus_|viewer|battle_ui|\bstory\b|release build", str(e))  # (a copy without the private code)
+                vs = isinstance(e, ImportError) and re.search(r"versus_|viewer|battle_ui|\bstory\b|\bcollection\b|release build", str(e))  # (a copy without the private code)
                 if not vs:
                     traceback.print_exc()
                 self.close_connection = True  # (the answer may have been cut half-way)
@@ -686,6 +686,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/story_kit":  # Story workshop's catalog: people, backgrounds, pictures, music of the stories
                 from . import story
                 return self._json(story.kit(svc))
+            if p == "/api/collection_refs":  # Collection: what screenshots of the game's lists are compared with
+                from . import collection
+                return self._json(collection.refs(svc))
             if p == "/api/story_lines":  # the line search: every line in English as [story, line, speaker, text]
                 return self._send(200, _story_lines(svc), "application/json; charset=utf-8")
             if p == "/api/story_model":  # a layered standing picture: where its body and faces sit

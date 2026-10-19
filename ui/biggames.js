@@ -7,7 +7,8 @@ try { const kept = localStorage.getItem("big_on"); big.on = new Set(JSON.parse(k
 const bigAdmin = () => typeof STATE !== "undefined" && STATE && Array.isArray(STATE.ext) && STATE.ext.length > 0;
 const bigSeen = (k) => big.on.has(k) || bigAdmin();
 // pages hidden the same way until the owner turns them on (Admin → Pages → Hidden pages): [key = route, name]
-const BIG_PAGES = [["workshop", "Story workshop"]];
+const BIG_PAGES = [["workshop", "Story workshop"], ["collection", "Collection"]];
+const BIG_ASK = [];  // other shipped pages: a function that asks the app for what the page uses (Send to site)
 
 // called by a big game's script: its tile ([key, page, name, about, icon, toy]), whether it has a Daily, and a function
 // that asks the app for everything the game can use
@@ -60,6 +61,7 @@ async function bigNeeds() {
   performance.setResourceTimingBufferSize(1e6);
   performance.clearResourceTimings();
   for (const g of BIG) if (g.need) try { await g.need(); } catch (e) { console.warn(g.key, e); }
+  for (const f of BIG_ASK) try { await f(); } catch (e) { console.warn(e); }
   const own = location.origin + "/api/";
   return [...new Set(performance.getEntriesByType("resource").map((e) => e.name).filter((u) => u.startsWith(own)).map((u) => u.slice(location.origin.length)))];
 }

@@ -87,7 +87,7 @@ PAGES = {
     **{r: {"open": True} for r in ("gameskill", "gameenemy", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas",
                                    "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamehilo",
                                    "gamepassive", "gameego", "gamememory", "gamewho", "gamedare")},
-    **{r: {"beta": True, "part": "biggames"} for r in ("biggames", "singingmachine", "slice", "survivors")},
+    **{r: {"beta": True, "part": "biggames"} for r in ("biggames", "singingmachine", "slice", "survivors", "collection")},
     **{r: {"app": True} for r in ("versus", "vsroom", "vsmirror", "sounds", "browse", "snapshots", "scan", "settings", "sprites")},
 }
 BASE_OPEN = [r for r, p in PAGES.items() if p.get("open")]
@@ -430,7 +430,7 @@ def _shrink(data: bytes, ctype: str, key: str = "") -> tuple[bytes, str]:
 
 # the big games (PAGES "beta"): what of their requests the site keeps (the rest: other parts, or the app's own)
 BIG_ASKS = {"/api/frames", "/api/frame_png", "/api/sounds", "/api/bank", "/api/stage_pic", "/api/asset_thumb", "/api/asset_img", "/api/enemy_thumb",
-            "/api/char_icon", "/api/ui_icon", "/api/scene_sprite", "/api/object", "/api/owner_videos"}
+            "/api/char_icon", "/api/ui_icon", "/api/scene_sprite", "/api/object", "/api/owner_videos", "/api/collection_refs"}
 
 
 def _big_needs(base: str, progress=None) -> list[str]:
