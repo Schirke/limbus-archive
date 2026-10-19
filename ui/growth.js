@@ -57,7 +57,7 @@ function upgLoad() {
   } catch (e) {}
 }
 function upgSave() {
-  const { db, shLeft, ...keep } = upg;
+  const { db, ...keep } = upg;
   try { localStorage.setItem(UPG_KEY, JSON.stringify(keep)); } catch (e) {}
 }
 
@@ -117,7 +117,8 @@ function upgShardsAt() {
   return p.ex ? r(p.ex.f) + (upg.cfg.paid ? r(p.ex.p) : 0) : 0;
 }
 // day by day until the EXP, Threads and Egoshards are there. Enkephalin goes, in this order, to the pass missions (one EXP and
-// one Thread run: their loot counts), the weekly bonus run, the Mirror Dungeon runs (pass points → crates), then Luxcavation
+// one Thread run: their loot counts) and the weekly bonus run (both every day / week of it), the plain Mirror Dungeon runs (only
+// while Egoshards are short: pass points → crates), then Luxcavation
 function upgSim(need) {
   const d = upg.db, c = upg.cfg, day = upgDay(), mod = d.stamina.module, p = d.pass, md = d.md;
   const es = d.exp[c.exp], ts = d.thread[c.thr], per = upgExpRun(es), crate = upgShardsAt();
@@ -130,16 +131,16 @@ function upgSim(need) {
   const gain = (n) => { pts += n; all += n; while (pts >= p.need) { pts -= p.need; lv++; sh -= crate; } };
   const thRun = () => { th -= bonus > 0 ? ts.bonus : ts.n; if (bonus-- > 0) tb++; tr++; };
   while ((exp > 0 || th > 0 || sh > 0) && days < UPG_DAYS) {
-    if (days % 7 === 0) { waiting = !!b && sh > 0; if (c.missions && sh > 0) gain(p.weekly); }
+    if (days % 7 === 0) { waiting = !!b; if (c.missions) gain(p.weekly); }
     days++; enk += day.enk; bonus = UPG_THREAD_BONUS;
-    if (c.missions && sh > 0 && enk >= (es.cost + ts.cost) * mod) {
+    if (c.missions && enk >= (es.cost + ts.cost) * mod) {
       spend(es.cost); spend(ts.cost); gain(p.daily);
       if (exp > 0) { exp -= per; er++; } else mer++;
       if (th > 0) thRun(); else { mtr++; bonus--; }
     }
-    if (waiting && sh > 0 && spend(3 * b.mod)) { gain(3 * b.bp); lun += 3 * b.lun; weeks++; waiting = false; }
+    if (waiting && spend(3 * b.mod)) { gain(3 * b.bp); lun += 3 * b.lun; weeks++; waiting = false; }
     // (modules for the next weekly bonus run are kept back: it gives the most points per module)
-    const keep = sh > 0 && b ? 3 * b.mod * mod : 0;
+    const keep = b ? 3 * b.mod * mod : 0;
     for (let i = 0; i < c.md && sh > 0 && !waiting && enk - keep >= md.normal.plain.mod * mod; i++) { spend(md.normal.plain.mod); gain(md.normal.plain.bp); runs++; }
     while (th > 0 && bonus > 0 && spend(ts.cost)) thRun();
     while (exp > 0 && spend(es.cost)) { exp -= per; er++; }
@@ -159,7 +160,7 @@ function upgFarmTiles(r, need, label) {
     ${need.sh && !r.noPass ? upgTile(`<span class="upgi upgtk">MD</span>`, upgFmt(r.weeks + r.runs), "Mirror Dungeon runs", `${r.weeks} with the weekly bonus, ${r.runs} without`) : ""}
     ${need.sh && !r.noPass ? upgTile(`<span class="upgi upgtk">LV</span>`, `+${upgFmt(r.lv)}`, `pass levels past ${d.pass.max}`, `${upgFmt(r.all)} points · ${upgFmt(r.lv * upgShardsAt())} Egoshards`) : ""}
     ${upgTile(upgPic("module", "Modules"), upgFmt(r.mods), "Enkephalin Modules", `${upgFmt(r.mods * d.stamina.module)} Enkephalin`)}
-    ${r.lun || r.refill ? upgTile(upgPic("lunacy", "Lunacy"), upgFmt(r.lun - r.refill), "Lunacy on the way", [r.lun && `${upgFmt(r.lun)} from the weekly bonus`, r.refill && `${upgFmt(r.refill)} on refills`].filter(Boolean).join(", ")) : ""}
+    ${r.lun || r.refill ? upgTile(upgPic("lunacy", "Lunacy"), `${r.lun - r.refill > 0 ? "+" : ""}${upgFmt(r.lun - r.refill)}`, "Lunacy in all", [r.lun && `+${upgFmt(r.lun)} from ${r.weeks} weekly bonus runs`, r.refill && `−${upgFmt(r.refill)} on Enkephalin refills`].filter(Boolean).join(", ")) : ""}
   </div>
   ${r.noPass ? `<p class="empty">No pass in this snapshot: Egoshards not counted.</p>` : need.sh ? `<p class="muted small">Egoshards come from the pass past level ${d.pass.max} (the levels before it taken as done): every ${d.pass.need} points ${upgFmt(upgShardsAt() / UPG_CRATE)} crate(s) of choice with the ${upg.cfg.paid ? "Limbus Pass" : "free pass"}, 1–3 Egoshards each, counted as 2. The weekly bonus is used on all 3 at once.</p>` : ""}`;
 }
@@ -198,7 +199,6 @@ const upgIn = (icon, attr, v) => `<label class="upgtix">${icon}<input type="numb
 
 function upgUp() {
   const d = upg.db, n = upgNeed(), f = upgSim({ exp: n.expLeft, th: n.thLeft, sh: n.shLeft });
-  upg.shLeft = n.shLeft;
   const sins = Object.keys(n.sh).map(Number).sort((a, b) => a - b), anyId = upg.list.some((r) => unitById(r.id).title);
   const shTotal = sins.reduce((a, s) => a + n.sh[s], 0);
   return `<div class="upglist">${upg.list.map(upgUpRow).join("") || `<p class="muted">Add what you want to level up.</p>`}</div>
@@ -233,7 +233,7 @@ function upgCraft() {
 }
 
 function upgSide() {
-  const d = upg.db, c = upg.cfg, day = upgDay(), craft = upg.tab === "craft";
+  const d = upg.db, c = upg.cfg, day = upgDay();
   const reset = new Date(Date.UTC(2000, 0, 1, 21)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const nb = d.md.normal.bonus[0] || { bp: 0 }, hb = d.md.hard ? d.md.hard.bonus[0] : nb;
   const row = (icon, label, ctl, sub = "") => `<div class="upgset">${icon}<div><label><span>${label}</span>${ctl}</label>${sub ? `<small>${sub}</small>` : ""}</div></div>`;
@@ -245,7 +245,7 @@ function upgSide() {
     ${row(upgPic("t4", "Ticket IV", "wide"), "EXP Luxcavation", `<select data-c="exp">${d.exp.map((s, i) => `<option value="${i}" ${c.exp === i ? "selected" : ""}>Lv ${s.lv} · ${upgFmt(upgExpRun(s))}</option>`).join("")}</select>`)}
     ${row(upgPic("thread", "Threads"), "Thread Luxcavation", `<select data-c="thr">${d.thread.map((s, i) => `<option value="${i}" ${c.thr === i ? "selected" : ""}>Lv ${s.lv} · ${s.n} / ${s.bonus}</option>`).join("")}</select>`,
       `the first ${UPG_THREAD_BONUS} a day give ${d.thread[c.thr].bonus}; a day starts at ${reset} your time`)}
-    ${(craft || upg.shLeft) && d.pass.ex ? `<h3>Pass and Mirror Dungeon</h3>
+    ${d.pass.ex ? `<h3>Pass and Mirror Dungeon</h3>
     <span class="cqkind upgpass"><button class="${c.paid ? "" : "on"}" data-paid="0">Free pass</button><button class="${c.paid ? "on" : ""}" data-paid="1">Limbus Pass</button></span>
     ${row(`<span class="upgi upgtk">MD</span>`, "Weekly bonus", `<select data-c="bonus">${[["hard", `Hard ×3 · ${3 * hb.bp}`], ["normal", `Normal ×3 · ${3 * nb.bp}`], ["none", "Not used"]].map(([k, t]) => `<option value="${k}" ${c.bonus === k ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
     ${row(`<span class="upgi upgtk">MD</span>`, "Runs a day", `<input type="number" class="dcnum" min="0" max="5" data-c="md" value="${c.md}">`, `${d.md.normal.plain.bp} points for ${d.md.normal.plain.mod} modules without the bonus`)}
