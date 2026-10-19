@@ -2,8 +2,8 @@
 // owner turns it on for everyone (Admin → Pages, beta.json "games"); admins see them all the time.
 "use strict";
 const BIG = [];  // {key, route, tile, scored, need}
-const big = { on: new Set() };
-try { big.on = new Set(JSON.parse(localStorage.getItem("big_on") || "[]")); } catch (e) { /* none until beta.json is read */ }
+const big = { on: new Set(), read: false };  // (read: the owner's list is known, kept from before or fetched now)
+try { const kept = localStorage.getItem("big_on"); big.on = new Set(JSON.parse(kept || "[]")); big.read = kept !== null; } catch (e) { /* none until beta.json is read */ }
 const bigAdmin = () => typeof STATE !== "undefined" && STATE && Array.isArray(STATE.ext) && STATE.ext.length > 0;
 const bigSeen = (k) => big.on.has(k) || bigAdmin();
 // pages hidden the same way until the owner turns them on (Admin → Pages → Hidden pages): [key = route, name]
@@ -16,15 +16,19 @@ function bigGame(tile, scored, need) {
   if (BIG.some((g) => g.key === key)) return;
   BIG.push({ key, route, tile, scored, need });
   const play = routes[route];
-  routes[route] = (args) => bigSeen(key) ? play(args) : (location.hash = "#/games");
+  routes[route] = (args) => bigSeen(key) ? play(args) : big.read ? (location.hash = "#/games") : ($("#main").innerHTML = `<div class="empty">Loading…</div>`);
   bigSync();
   if (typeof muGameCheck === "function") muGameCheck();
 }
 // the owner's list from beta.json
 function bigOn(list) {
   big.on = new Set(Array.isArray(list) ? list.filter((k) => typeof k === "string") : []);
+  const first = !big.read;
+  big.read = true;
   try { localStorage.setItem("big_on", JSON.stringify([...big.on])); } catch (e) { /* read again next time */ }
   bigSync();
+  const page = location.hash.split("/")[1];
+  if (first && (page === "biggames" || BIG.some((g) => g.route === page))) route();  // (a link opened before the list came)
 }
 function bigSync() {
   let changed = false;
@@ -63,7 +67,7 @@ async function bigNeeds() {
 routes.biggames = () => {
   const seen = BIG.filter((g) => bigSeen(g.key));
   if (!seen.length) {
-    if (window.bigLoaded === true) location.hash = "#/games";
+    if (window.bigLoaded === true && (big.read || bigAdmin())) location.hash = "#/games";
     else $("#main").innerHTML = `<h1>Big games</h1><div class="empty">Loading…</div>`;
     return;
   }

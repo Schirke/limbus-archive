@@ -7,8 +7,9 @@ const BETA_URL = "https://raw.githubusercontent.com/Schirke/limbus-archive/commu
 const beta = { routes: new Set(), human: new Set(), edited: new Set(), raf: 0 };
 const langMark = (id) => beta.human.has(id) ? "human" : beta.edited.has(id) ? "edited" : "";
 document.head.insertAdjacentHTML("beforeend", `<style>
-.betatag { display: inline-block; font: 11px/1 "LC Bebas", Impact, sans-serif; letter-spacing: .08em; color: #120e0b; background: #f8b400; padding: 3px 5px 2px; margin-left: 6px; vertical-align: middle; }
-#nav .betatag, #subnav .betatag { font-size: 9px; padding: 2px 3px 1px; margin-left: 4px; vertical-align: 1px; }
+.betatag, .newtag { display: inline-block; font: 11px/1 "LC Bebas", Impact, sans-serif; letter-spacing: .08em; color: #120e0b; background: #f8b400; padding: 3px 5px 2px; margin-left: 6px; vertical-align: middle; }
+.newtag { color: #fff; background: #d8382c; }
+#nav .betatag, #subnav .betatag, #subnav .newtag { font-size: 9px; padding: 2px 3px 1px; margin-left: 4px; vertical-align: 1px; }
 h1 .betatag { font-size: 14px; vertical-align: 6px; }
 [data-off~="lunatest"] #getest { display: none; }
 </style>`);

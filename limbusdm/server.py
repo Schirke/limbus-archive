@@ -1205,6 +1205,8 @@ CARD_PRESET = {
                        "Assets/Resources_moved/Sprite/Unit/Profile/Ego/21009_erosion_profile.png"],
     "slice": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10401_normal.png", "Assets/Resources_moved/Story/StoryPortrait/Ep9_2/StoryLog_MiddleFather.png",
               "Assets/Resources_moved/Story/StoryPortrait/Ep9_1/StoryLog_PinkyFather.png"],
+    "surv": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10101_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10201_normal.png",
+             "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10301_normal.png"],
     "hilo": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10404_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11006_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10712_normal.png"],
     "passive": ["Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10508_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/10813_normal.png", "Assets/Resources_moved/Sprite/UnitCgThumbnail/Default/11103_normal.png"],
     "ego": ["Assets/Resources_moved/Sprite/Unit/Profile/Ego/20104_awaken_profile.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20202_awaken_profile.png", "Assets/Resources_moved/Sprite/Unit/Profile/Ego/20305_awaken_profile.png"],
