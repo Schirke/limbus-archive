@@ -71,7 +71,7 @@ const LANG_FIELDS = new Set(["name", "title", "desc", "flavor", "coindescs", "pa
 const LANG_MAPS = new Set(["keywords", "tags"]);  // {key: its name} lists (as lists of keys they stay)
 async function langTable(g) {
   const k = LANG.id + "/" + g;
-  if (!LANG.tables[k]) LANG.tables[k] = fetch(`/api/lang?id=${encodeURIComponent(LANG.id)}&g=${g}`).then((r) => r.ok ? r.json() : {}).catch(() => ({}));
+  if (!LANG.tables[k]) LANG.tables[k] = langList().then((l) => { const u = ((l.find((x) => x.id === LANG.id) || {}).tables || {})[g]; return u && fetch(u); }).then((r) => r && r.ok ? r.json() : {}).catch(() => ({}));
   return LANG.tables[k];
 }
 // a translated text's English (the games take answers typed in either)
@@ -118,7 +118,7 @@ async function langSet(id) {
     document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.disabled = true);
     const l = (await langList()).find((x) => x.id === id);
     toast(`Loading ${esc(l ? l.label : id)}…`, 60000);
-    const ok = await fetch(`/api/lang?id=${encodeURIComponent(id)}&g=core`).then((r) => r.ok && r.arrayBuffer()).catch(() => false);
+    const ok = l && await fetch(l.tables.core).then((r) => r.ok && r.arrayBuffer()).catch(() => false);
     if (!ok) {
       toast("This language could not be loaded. Try again later.");
       document.querySelectorAll("#modal-body [data-lang]").forEach((b) => b.disabled = false);

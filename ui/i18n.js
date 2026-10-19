@@ -168,7 +168,7 @@ function uiMissing() {
   if (!LANG.id || off) return;
   try { admin = !site && ((await fetch("/api/state").then((r) => r.json())).ext || []).length > 0; } catch {}
   const l = (await langList()).find((x) => x.id === LANG.id);
-  const have = await fetch("/api/ui_langs").then((r) => r.ok ? r.json() : {}).then((o) => o.langs || []).catch(() => []);
+  const ui = await fetch("/api/ui_langs").then((r) => r.ok ? r.json() : {}).catch(() => ({})), have = ui.langs || [];
   const code = l && [l.lang, l.lang.split("-")[0]].find((c) => have.includes(c));
   if (!code) return;
   // the owner's switch (Admin → Translations): the last one read, or the fresh one if it comes quickly
@@ -179,7 +179,7 @@ function uiMissing() {
     if (j && Array.isArray(j.ui)) on = j.ui;
   }
   if (!admin && !on.includes(code)) return;
-  UI.dict = await fetch(`/api/ui_lang?lang=${encodeURIComponent(code)}`).then((r) => r.ok ? r.json() : null).catch(() => null);
+  UI.dict = ui.urls && ui.urls[code] ? await fetch(ui.urls[code]).then((r) => r.ok ? r.json() : null).catch(() => null) : null;
   if (!UI.dict || !Object.keys(UI.dict).length) { UI.dict = null; return; }
   UI.lang = code;
   document.documentElement.lang = code;

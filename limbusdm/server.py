@@ -367,7 +367,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json(uilang.dictionary(svc, q.get("lang", "")))
             if p == "/api/ui_langs":
                 from . import uilang
-                return self._json({"langs": uilang.available(svc)})
+                have = uilang.available(svc)
+                return self._json({"langs": have, "urls": {c: links.ui_lang(c) for c in have}})
             if p == "/api/ui_lang/status":
                 from . import uilang
                 return self._json(uilang.status(svc))

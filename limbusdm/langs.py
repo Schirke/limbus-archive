@@ -12,7 +12,7 @@ import threading
 import time
 import urllib.request
 
-from . import REPO
+from . import REPO, links
 
 VERSION = 4
 PUB_BRANCH = "lang-data"
@@ -512,7 +512,7 @@ def listing(svc) -> dict:
         if cover is None and s.get("pub"):
             cover = s["pub"].get("cover")
         out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link", "license")}
-                   | {"cover": cover, "fonts": _fonts(svc, s, modes.get(s["id"]))})
+                   | {"cover": cover, "fonts": _fonts(svc, s, modes.get(s["id"])), "tables": {g: links.lang_table(s["id"], g) for g in GROUPS}})
     return {"langs": out}
 
 

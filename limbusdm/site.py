@@ -127,7 +127,9 @@ PARTS = {
                  "sources": "voices", "prune": ["/api/game_voices"],
                  "packs": [((r"/api/game_arenas$", r"/api/stage_pics$"), PACK), (r"/api/stage_pic\?", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
     "units": {"taken": True},
-    "langs": {"always": True},
+    "langs": {"always": True, "crawl": {"stage": "Languages", "start": ["/api/langs", "/api/ui_langs"], "sources": "langs",
+              "fresh": [r"/api/ui_lang\?"], "packs": [((r"/api/lang\?", r"/api/langfont\?", r"/api/langs$", r"/api/ui_langs$", r"/api/ui_lang\?"), PACK)],
+              "hold": "langs"}},  # (hold: a computer with no translations of its own leaves the site's as they are)
     "small": {"always": True, "crawl": {"stage": "News", "start": ["/api/news", "/api/growth"], "packs": []}},  # (one-list pages asked every time)
     # the planner's gifts then theme packs with its list, the history with the rest
     "tools": {"taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
@@ -527,7 +529,29 @@ def _voices_sources(svc, keys: list[str]) -> dict:
 
 
 # PARTS "sources": a file made from another request than its own (key → request)
-SOURCES = {"music": _music_sources, "voices": _voices_sources}
+def _lang_sources(svc, keys: list[str]) -> dict:
+    """A table as it is now: its request carries the table file's name (the same file = the same table)."""
+    from . import langs
+    out = {}
+    for k in keys:
+        m = re.fullmatch(r"/api/lang\?g=(\w+)&id=(.+)", k)
+        if m:
+            try:
+                out[k] = k + "&v=" + os.path.basename(langs.table_file(svc, m.group(2), m.group(1)) or "")
+            except Exception:
+                pass  # (asked as it is: fails there)
+    return out
+
+
+SOURCES = {"music": _music_sources, "voices": _voices_sources, "langs": _lang_sources}
+
+
+def _langs_hold(ex) -> bool:
+    from . import langs
+    return not langs.own(ex.svc)
+
+
+HOLDS = {"langs": _langs_hold}
 
 
 def _buffs_final(ex, got: dict, old: dict):
@@ -976,9 +1000,13 @@ class Exporter:
         sec = PARTS[name]["crawl"]
         stage = "site: " + sec["stage"]
         old, app = self.read_manifest(name), __import__("limbusdm").__version__
+        if old and sec.get("hold") and HOLDS[sec["hold"]](self):
+            return old
         have = self.kept(old, sec["start"])  # (the lists: asked every time)
         if old.get("app") != app:  # (another app may answer differently: its answers asked again, pictures kept)
             have = {k: f for k, f in have.items() if ".json" not in f}
+        if sec.get("fresh"):  # …and these
+            have = {k: f for k, f in have.items() if not any(re.match(p, k) for p in sec["fresh"])}
         self.progress(stage, 0, 0)
         got, todo, srcs = {}, list(sec["start"]), {}
         seen = set(todo)
@@ -1290,35 +1318,6 @@ class Exporter:
         urls.update(got)
         self.write_manifest("extra", {"kind": "extra", "id": sid, "urls": urls})
         return len(got)
-
-    def langs(self) -> dict:
-        """Language tables and their list; a table is kept while its source is the same."""
-        from . import langs
-        old = self.read_manifest("langs")
-        if old and not langs.own(self.svc):
-            return old
-        src, keys = {}, []
-        for lang in langs.sources(self.svc):
-            for g in langs.GROUPS:
-                k = url_key("/api/lang", id=lang["id"], g=g)
-                try:
-                    src[k] = os.path.basename(langs.table_file(self.svc, lang["id"], g) or "")
-                except Exception as e:
-                    self.failed.append((k, str(e)))
-                    continue
-                keys.append(k)
-        for lang in langs.listing(self.svc)["langs"]:  # the packs' own fonts
-            for f in (lang.get("fonts") or {}).values():
-                if f["url"].startswith("/api/"):  # (/ui/ ones go with the pages)
-                    src[f["url"]] = f["url"]
-                    keys.append(f["url"])
-        have = {k: f for k, f in (old.get("urls") or {}).items() if k in src and (old.get("src") or {}).get(k) == src[k]}
-        from . import uilang  # interface dictionaries: small, asked every time
-        ui = ["/api/ui_langs"] + [url_key("/api/ui_lang", lang=c) for c in uilang.available(self.svc)]
-        files = self.fetch_all(keys + ["/api/langs"] + ui, have, "site: Languages")
-        m = {"kind": "langs", "id": self.svc.latest_snapshot_id(), "urls": files, "src": src}
-        self.write_manifest("langs", m)
-        return m
 
     def open_routes(self) -> list[str]:
         a = admin(self.svc)
