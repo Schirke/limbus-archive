@@ -161,9 +161,9 @@ function rEnsure() {
   const el = document.createElement("div");
   el.id = "streader";
   el.innerHTML = `<div class="rstage" id="rstage"><div class="rcam" id="rcam"><div class="rbgimg" id="rbg"></div><div class="rchars" id="rchars"></div><div class="rcgimg" id="rcg"></div></div><div class="rvig"></div><div class="rfade" id="rfade"></div><div class="rplace" id="rplace"></div>
-    <div class="rhex" id="rhex"><button type="button" class="rhx" data-h="skip" title="Skip this story"><svg viewBox="0 0 24 24"><path d="M3 5l9 7-9 7zM12 5l9 7-9 7z"/></svg></button><button type="button" class="rhx" data-h="auto" title="Auto"><b>AUTO</b></button><button type="button" class="rhx" data-h="log" title="Log"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zM14 3v5h5M9 11h8M9 14h8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button><button type="button" class="rhx" data-h="hide" title="Hide the interface"><b>UI</b></button><button type="button" class="rhx" data-h="set" title="Settings"><i class="ico set"></i></button><button type="button" class="rhx" data-h="more" title="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.6"/></svg></button></div>
+    <div class="rhex" id="rhex"><button type="button" class="rhx" data-h="skip" title="Skip this story"><svg viewBox="0 0 24 24"><path d="M3 5l9 7-9 7zM12 5l9 7-9 7z"/></svg></button><button type="button" class="rhx" data-h="auto" title="Auto"><b>AUTO</b></button><button type="button" class="rhx" data-h="log" title="Log"><svg viewBox="0 0 24 24"><path d="M6 2h9l5 5v15H6zM14 3v5h5M9 11h8M9 14h8M9 17h6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></button><button type="button" class="rhx" data-h="hide" title="Hide the interface"><b>UI</b></button><button type="button" class="rhx" data-h="set" title="Settings"><i class="ico set"></i></button><button type="button" class="rhx" data-h="full" title="Full screen, sideways (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button><button type="button" class="rhx" data-h="more" title="Menu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2.6"/></svg></button></div>
     <div class="rbar"><i id="rbar"></i></div><div class="rinfo" id="rinfo"></div>
-    <div class="rhud"><button type="button" id="rauto">Auto</button><button type="button" id="rmenubtn">Menu</button></div>
+    <div class="rhud"><button type="button" id="rauto">Auto</button><button type="button" id="rfullbtn" title="Full screen, sideways (F)"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="2.4"/></svg></button><button type="button" id="rmenubtn">Menu</button></div>
     <div class="rmenu" id="rmenu"><button data-a="log">Log</button><button data-a="voice"></button><button data-a="ui"></button><button data-a="skip">Skip this story</button><button data-a="exit">Exit to list</button></div>
     <div class="rbox" id="rbox"><div class="rplates" id="rplates"><div class="rtitle" id="rtitle"></div><div class="rname" id="rname"></div></div><div class="rwho"><b id="rwho"></b><i id="rrole"></i><button type="button" class="rrep" id="rrep" title="Replay voice">▶ voice</button></div><div class="rtxt" id="rtxt"></div><div class="rnext">▼</div></div>
     <div class="rspeed" id="rspeed"></div><div class="rvid" id="rvid"></div>
@@ -179,6 +179,7 @@ function rEnsure() {
     const w = s.clientWidth, u = tall ? Math.min(w / 700, 0.8) : w / 1920;
     el.style.setProperty("--u", u.toFixed(4)); el.style.setProperty("--k", (w / ST_W).toFixed(5));
     el.classList.toggle("small", !tall && u < 0.5);
+    rLift();
   };
   new ResizeObserver(R.fit).observe(el);
   window.addEventListener("resize", R.fit);
@@ -211,11 +212,16 @@ function rEnsure() {
   $("#rauto").onclick = (e) => { e.stopPropagation(); R.auto = !R.auto; e.currentTarget.classList.toggle("on", R.auto); $('.rhx[data-h=auto]').classList.toggle("on", R.auto); };
   $("#rmenubtn").onclick = (e) => { e.stopPropagation(); rMenuSync(); $("#rmenu").classList.toggle("on"); };
   $("#rrep").onclick = (e) => { e.stopPropagation(); rVoice(R.i); };
+  $("#rfullbtn").onclick = (e) => { e.stopPropagation(); rFull(); };
+  // (left full screen by Back / Esc: sideways off too)
+  const fsOut = () => { if (R.full && R.fs && !(document.fullscreenElement || document.webkitFullscreenElement)) rFull(false); };
+  document.addEventListener("fullscreenchange", fsOut); document.addEventListener("webkitfullscreenchange", fsOut);
   // the game's row of buttons, folded behind the menu one
   $("#rhex").onclick = (e) => {
     e.stopPropagation();
     const h = e.target.closest(".rhx")?.dataset.h;
     if (h === "more") $("#rhex").classList.toggle("open");
+    if (h === "full") rFull();
     if (h === "skip") rSkip();
     if (h === "auto") $("#rauto").click();
     if (h === "log") rLogShow();
@@ -247,6 +253,7 @@ function rEnsure() {
     else if (e.key === "Escape") { e.stopPropagation(); if ($("#rlog").classList.contains("on") || $("#rmenu").classList.contains("on")) { $("#rlog").classList.remove("on"); $("#rmenu").classList.remove("on"); } else rExit(); }
     else if (e.key === "l" || e.key === "L") rLogShow();
     else if (e.key === "a" || e.key === "A") $("#rauto").click();
+    else if (e.key === "f" || e.key === "F") rFull();
   }, true);
   R.timer = setInterval(rTick, 30);
 }
@@ -254,6 +261,27 @@ function rMenuSync() {
   const m = $("#rmenu");
   m.querySelector('[data-a=voice]').textContent = "Voice: " + (R.voiceOn ? "on" : "off");
   m.querySelector('[data-a=ui]').textContent = "Reader look: " + (R.ui ? "Archive" : "Game");
+}
+// full screen, sideways: the screen locked sideways where it can (Android); where not (iPhone) the reader is turned on
+// an upright screen by story.css
+async function rFull(on = !R.full) {
+  const el = R.el, d = document, root = d.documentElement;  // (the page, not the reader: a full screen element can't be turned)
+  R.full = on;
+  $(".rhx[data-h=full]").classList.toggle("on", on); $("#rfullbtn").classList.toggle("on", on);
+  let locked = false;
+  if (on) {
+    const go = root.requestFullscreen || root.webkitRequestFullscreen;
+    try { if (go) await go.call(root, { navigationUI: "hide" }); } catch {}
+    R.fs = !!(d.fullscreenElement || d.webkitFullscreenElement);
+    if (R.fs) try { await screen.orientation.lock("landscape"); locked = true; } catch {}
+  } else {
+    R.fs = false;
+    try { screen.orientation.unlock(); } catch {}
+    const out = d.exitFullscreen || d.webkitExitFullscreen;
+    if (d.fullscreenElement || d.webkitFullscreenElement) try { await out.call(d); } catch {}
+  }
+  el.classList.toggle("turn", R.full && !locked);
+  R.fit();
 }
 function rRate(r, show) {
   R.rate = r;
@@ -381,6 +409,14 @@ function rLayout(path, L = R.ep?.links) {
 }
 
 // typed letters; only color / b / i tags kept
+// a long line on a small screen: the text band grows upward until it fits (letters keep their least size)
+function rLift() {
+  const b = $("#rbox"), t = $("#rtxt");
+  if (!b || !t) return;
+  R.el.style.setProperty("--lift", "0px");
+  const over = t.offsetTop + t.offsetHeight - b.clientHeight;
+  if (over > 0) R.el.style.setProperty("--lift", Math.ceil(over + 4) + "px");
+}
 function rHtml(text) {
   text = text.replace(/�/g, "’");
   const letters = (t) => [...t].map((ch) => `<span class="rc">${esc(ch)}</span>`).join("");
@@ -434,6 +470,7 @@ function rShow(i) {
   $("#rplace").textContent = R.meta.place || ""; $("#rplace").style.display = R.meta.place ? "" : "none";
   $("#rtxt").innerHTML = rHtml(l.text || "");
   R.spans = [...$("#rtxt").querySelectorAll(".rc")];
+  rLift();
   R.typed = 0; R.wait = 0; R.done = !R.spans.length;
   $("#rrep").style.display = R.ui && l.v ? "block" : "none";
   $("#rinfo").textContent = `${R.meta.n ? R.meta.n + " · " : ""}${R.meta.title} · ${i + 1}/${ep.lines.length}`;
@@ -624,6 +661,7 @@ function rSkip() {
 }
 function rExit() {
   R.open = false;
+  if (R.full) rFull(false);
   R.el.classList.remove("on");
   R.voice?.pause(); R.bgm?.pause(); R.bgm = null; R.bgmName = "";
   $("#rvid").innerHTML = ""; $("#rvid").style.display = "none";
@@ -632,4 +670,4 @@ function rExit() {
   location.hash = st.back && !st.back.includes("/read/") ? st.back : "#/story";
 }
 
-window.addEventListener("hashchange", () => { if (R.open && !location.hash.startsWith("#/story/read/")) { R.open = false; R.el.classList.remove("on"); R.voice?.pause(); R.bgm?.pause(); R.bgm = null; R.bgmName = ""; } });
+window.addEventListener("hashchange", () => { if (R.open && !location.hash.startsWith("#/story/read/")) { R.open = false; if (R.full) rFull(false); R.el.classList.remove("on"); R.voice?.pause(); R.bgm?.pause(); R.bgm = null; R.bgmName = ""; } });

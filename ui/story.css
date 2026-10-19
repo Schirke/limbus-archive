@@ -93,6 +93,8 @@
 #streader .rhud { position: absolute; top: calc(var(--u) * 28px); right: calc(var(--u) * 30px); display: flex; gap: calc(var(--u) * 14px); z-index: 3; }
 #streader .rhud button { background: linear-gradient(#fff, #e9edf2); color: #1b3f78; border: 0; font: italic 700 max(calc(var(--u) * 38px), 14px) "Noto Sans", system-ui, sans-serif; padding: calc(var(--u) * 10px) calc(var(--u) * 44px); border-radius: 5px; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); cursor: pointer; }
 #streader .rhud button.on { outline: 3px solid #f8b400; }
+#streader #rfullbtn { padding-inline: calc(var(--u) * 22px); line-height: 0; }
+#streader #rfullbtn svg { width: max(calc(var(--u) * 46px), 18px); height: max(calc(var(--u) * 46px), 18px); }
 #streader .rmenu { position: absolute; z-index: 6; right: calc(var(--u) * 30px); top: calc(var(--u) * 52px + max(var(--u) * 80px, 34px)); background: #0e1a24; border: 1px solid #2d4a60; display: none; flex-direction: column; min-width: max(calc(var(--u) * 480px), 220px); max-height: calc(100% - var(--u) * 140px - 34px); overflow-y: auto; box-shadow: 0 8px 30px #000; }
 #streader .rmenu.on { display: flex; }
 #streader .rmenu button { background: none; border: 0; border-bottom: 1px solid #1c2f3e; text-align: left; padding: max(calc(var(--u) * 16px), 9px) max(calc(var(--u) * 24px), 14px); font-size: max(calc(var(--u) * 28px), 14px); color: #dce6ef; cursor: pointer; }
@@ -139,13 +141,13 @@
 #streader .rvig { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, #000 0, rgba(0, 0, 0, .75) 8%, transparent 20%, transparent 80%, rgba(0, 0, 0, .75) 92%, #000 100%), linear-gradient(#000 0, rgba(0, 0, 0, .6) 8%, transparent 18%), radial-gradient(ellipse at 50% 45%, transparent 60%, rgba(0, 0, 0, .55) 100%); }
 #streader.alt .rvig, #streader.alt .rplace, #streader.alt .rhex, #streader.alt .rplates { display: none; }
 #streader:not(.alt) .rhud, #streader:not(.alt) .rwho { display: none; }
-#streader:not(.alt) .rfade { left: calc(var(--u) * 150px); right: calc(var(--u) * 150px); top: calc(var(--u) * 832px); bottom: calc(var(--u) * 34px); height: auto;
+#streader:not(.alt) .rfade { left: calc(var(--u) * 150px); right: calc(var(--u) * 150px); top: calc(var(--u) * 832px - var(--lift, 0px)); bottom: calc(var(--u) * 34px); height: auto;
   background: repeating-linear-gradient(transparent 0 3px, rgba(255, 255, 255, .025) 3px 4px), linear-gradient(90deg, transparent, rgba(14, 11, 8, .82) 10%, rgba(14, 11, 8, .82) 90%, transparent);
   border-top: calc(var(--u) * 2px) solid; border-image: linear-gradient(90deg, transparent, rgba(120, 95, 65, .5) 15%, rgba(120, 95, 65, .5) 85%, transparent) 1; }
-#streader:not(.alt) .rbox { top: calc(var(--u) * 902px); left: calc(var(--u) * 377px); right: calc(var(--u) * 380px); bottom: 0; padding: 0; }
+#streader:not(.alt) .rbox { top: calc(var(--u) * 902px - var(--lift, 0px)); left: calc(var(--u) * 377px); right: calc(var(--u) * 380px); bottom: 0; padding: 0; }
 #streader:not(.alt) .rtxt { font: max(calc(var(--u) * 27px), 13px) / 1.55 "LC Pretendard", "Pretendard", "Noto Sans", sans-serif; color: #e9dcc2; letter-spacing: -.01em; min-height: 0; }
 #streader:not(.alt) .rnext { right: calc(var(--u) * -40px); bottom: calc(var(--u) * 60px); color: #c9a77a; font-size: calc(var(--u) * 20px); }
-#streader.mono:not(.alt) .rbox { top: calc(var(--u) * 902px); display: block; text-align: left; }
+#streader.mono:not(.alt) .rbox { top: calc(var(--u) * 902px - var(--lift, 0px)); display: block; text-align: left; }
 #streader.mono:not(.alt) .rfade { top: 0; bottom: 0; left: 0; right: 0; background: rgba(0, 0, 0, .7); border: 0; }
 #streader .rplates { position: absolute; left: calc(var(--u) * -297px); top: calc(var(--u) * -108px); width: calc(var(--u) * 260px); font-family: "LC Mikodacs", "LC Bebas", sans-serif; text-align: center; }
 #streader .rtitle { width: calc(var(--u) * 200px); padding: calc(var(--u) * 8px) 0 calc(var(--u) * 4px); rotate: -3deg; background: linear-gradient(#4c3726, #2e2117); border-top: calc(var(--u) * 2px) solid #6e5338; border-bottom: calc(var(--u) * 2px) solid #6e5338; color: #c9a77a; font-size: max(calc(var(--u) * 24px), 10px); line-height: 1; box-shadow: 0 calc(var(--u) * 4px) calc(var(--u) * 8px) rgba(0, 0, 0, .5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -160,13 +162,13 @@
 #streader .rhx i.set { -webkit-mask-image: url(/api/ui_sprite?n=SettingIcon); mask-image: url(/api/ui_sprite?n=SettingIcon); }
 #streader .rhx b { font: max(calc(var(--u) * 26px), 11px) / 1 "LC Bebas", sans-serif; letter-spacing: .02em; }
 #streader .rhx[data-h=auto] b { font-size: max(calc(var(--u) * 19px), 8px); }
-#streader .rhx[data-h=more], #streader .rhex.open .rhx { display: grid; place-items: center; }
+#streader .rhx[data-h=more], #streader .rhx[data-h=full], #streader .rhex.open .rhx { display: grid; place-items: center; }
 #streader .rhex.open .rhx[data-h=more], #streader .rhx.on { background: #d4a72c; color: #f5c84a; }
 #streader .rhx:hover { color: #fff; }
 #streader.noui .rbox, #streader.noui .rfade, #streader.noui .rplace, #streader.noui .rhex, #streader.noui .rhud { display: none; }
 /* a phone held sideways: the text takes more of the band, so the bigger letters fit */
-#streader.small:not(.alt) .rfade { top: calc(var(--u) * 790px); left: calc(var(--u) * 60px); right: calc(var(--u) * 60px); bottom: 0; }
-#streader.small:not(.alt) .rbox { top: calc(var(--u) * 860px); left: calc(var(--u) * 330px); right: calc(var(--u) * 200px); }
+#streader.small:not(.alt) .rfade { top: calc(var(--u) * 790px - var(--lift, 0px)); left: calc(var(--u) * 60px); right: calc(var(--u) * 60px); bottom: 0; }
+#streader.small:not(.alt) .rbox { top: calc(var(--u) * 860px - var(--lift, 0px)); left: calc(var(--u) * 330px); right: calc(var(--u) * 200px); }
 #streader.small:not(.alt) .rtxt { line-height: 1.4; }
 #streader.small:not(.alt) .rplates { top: calc(var(--u) * -130px); }
 #streader.small:not(.alt) .rnext { right: calc(var(--u) * -120px); bottom: calc(var(--u) * 30px); }
@@ -175,15 +177,22 @@
 #streader.tall { --pt: calc(36% - 28.125vw); --pb: calc(36% + 28.125vw); }
 #streader.tall .rstage { left: 0; top: 0; translate: none; width: 100%; height: 100%; aspect-ratio: auto; }
 #streader.tall .rcam, #streader.tall .rvig { inset: auto 0; top: var(--pt); height: 56.25vw; }
-#streader.tall .rfade { top: var(--pb); bottom: 0; left: 0; right: 0; height: auto; }
-#streader.tall .rbox { top: calc(var(--pb) + 16px); bottom: 16px; padding: 0 20px; }
+#streader.tall .rfade { top: calc(var(--pb) - var(--lift, 0px)); bottom: 0; left: 0; right: 0; height: auto; }
+#streader.tall .rbox { top: calc(var(--pb) + 16px - var(--lift, 0px)); bottom: 16px; padding: 0 20px; }
 #streader.tall .rnext { right: 20px; bottom: 0; }
-#streader.tall:not(.alt) .rfade { top: var(--pb); bottom: 0; left: 0; right: 0; border-image: none; border-top: 1px solid rgba(120, 95, 65, .5); }
-#streader.tall:not(.alt) .rbox { top: calc(var(--pb) + 30px + var(--u) * 112px); left: 20px; right: 20px; bottom: 16px; padding: 0; }
-#streader.tall:not(.alt) .rplates { position: fixed; left: 12px; top: calc(var(--pb) + 18px); }
+#streader.tall:not(.alt) .rfade { top: calc(var(--pb) - var(--lift, 0px)); bottom: 0; left: 0; right: 0; border-image: none; border-top: 1px solid rgba(120, 95, 65, .5); }
+#streader.tall:not(.alt) .rbox { top: calc(var(--pb) + 30px + var(--u) * 112px - var(--lift, 0px)); left: 20px; right: 20px; bottom: 16px; padding: 0; }
+#streader.tall:not(.alt) .rplates { position: fixed; left: 12px; top: calc(var(--pb) + 18px - var(--lift, 0px)); }
 #streader.tall:not(.alt) .rnext { right: 0; bottom: 0; }
 #streader.tall.mono:not(.alt) .rfade { top: 0; border: 0; }
 #streader.tall .rinfo { top: auto; bottom: calc(100% - var(--pt) + 10px); right: calc(var(--u) * 30px); width: fit-content; }
+
+/* full screen on a screen that stays upright (iPhone): the reader turned sideways */
+@media (orientation: portrait) {
+  #streader.turn { inset: auto; left: 0; top: 0; width: 100vh; width: 100dvh; height: 100vw; transform-origin: 0 0; transform: rotate(90deg) translateY(-100%); }
+  #streader.turn .rstage { width: min(100vh, 177.78vw); width: min(100dvh, 177.78vw); }
+  #streader.turn .rlogb { touch-action: pan-x pan-y; }
+}
 
 /* Identity Archive: the Sinners' badges hung on a wall (sizes follow the badge's own width: cqw) */
 .stboard { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: clamp(22px, 3.4vw, 40px) clamp(8px, 1.6vw, 22px); padding: clamp(22px, 3vw, 30px) clamp(8px, 2vw, 26px) clamp(14px, 2vw, 26px);
