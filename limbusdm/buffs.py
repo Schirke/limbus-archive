@@ -20,7 +20,8 @@ class _Viewer:
 
 viewer = _Viewer()
 
-VERSION = 1  # bump to remake the list or the videos
+VERSION = 2  # bump to remake the videos
+LIST = 2  # bump to remake the list
 HOST = 10101  # the battle prefab the effects are loaded next to (the player needs one; it is not drawn)
 SIZE = (960, 540)
 BATCH = 6  # effects per run of the player
@@ -54,6 +55,7 @@ def build(svc) -> dict:
     fx: dict[str, dict] = {}        # effect name → where the player finds it
     links: dict[str, list] = {}     # buff → effect names
     db = sqlite3.connect(svc.ensure_browse())
+    icons: dict[str, str] = {}      # buff → its Buf/ picture where the glossary has none
     try:
         for doc in t.get("battle-effect", {}).values():
             for e in (doc.get("list") if isinstance(doc, dict) else doc) or []:
@@ -73,15 +75,23 @@ def build(svc) -> dict:
                     fx[name] = {"asset": row[1], "bundle": row[0]}
                 for b in owners:
                     links.setdefault(b, []).append(name)
+        for label, name, bundle, pid in viewer.effect_lists(svc):
+            owners = ({label} & set(buffs)) | by_ability.get(label, set()) | by_ability.get(label + "Effect", set())
+            if not name or name == "?" or not owners:
+                continue
+            fx.setdefault(name, {"asset": f"Assets/Prefab/Effect/Added/{name}.prefab", "bundle": bundle, "pid": pid})
+            for b in owners:
+                links.setdefault(b, []).append(name)
+        # a picture by the buff's iconId, its id, its first stage (NetherseaBrand_1) or its effect (…Buff_KAmpouleA1C94TH)
+        for b, names in links.items():
+            keys = [buffs[b].get("iconId"), b, f"{b}_1"] + [n.rsplit("Buff_", 1)[-1] for n in names if "Buff_" in n]
+            for k in filter(None, keys):
+                row = db.execute("select c from o where lower(c) = lower(?) limit 1", (f"Assets/Resources_moved/Buf/{k}.png",)).fetchone()
+                if row:
+                    icons[b] = row[0]
+                    break
     finally:
         db.close()
-    for label, name, bundle, pid in viewer.effect_lists(svc):
-        owners = ({label} & set(buffs)) | by_ability.get(label, set()) | by_ability.get(label + "Effect", set())
-        if not name or name == "?" or not owners:
-            continue
-        fx.setdefault(name, {"asset": f"Assets/Prefab/Effect/Added/{name}.prefab", "bundle": bundle, "pid": pid})
-        for b in owners:
-            links.setdefault(b, []).append(name)
 
     # who has it: the rows and texts of each one's skills and passives
     wanted = set(links)
@@ -128,12 +138,12 @@ def build(svc) -> dict:
     kinds = {"Positive": "pos", "Negative": "neg"}
     out = []
     for b, names in links.items():
-        g = glossary.get(b) or {}
+        g = glossary.get(b) or glossary.get(buffs[b].get("iconId")) or {}  # (Honglu_Ai_Mirror: Honglu_Ai's words)
         out.append({"id": b, "name": g.get("name") or "", "desc": g.get("desc") or "", "flavor": g.get("flavor") or "",
-                    "type": kinds.get(buffs[b].get("buffType"), "neu"), "icon": g.get("icon"),
+                    "type": kinds.get(buffs[b].get("buffType"), "neu"), "icon": g.get("icon") or icons.get(b),
                     "fx": list(dict.fromkeys(names)), "who": who.get(b) or []})
     out.sort(key=lambda x: (not x["name"], (x["name"] or x["id"]).lower()))
-    return {"v": VERSION, "list": out, "fx": fx}
+    return {"v": LIST, "list": out, "fx": fx}
 
 
 def effect_bundles(svc, extra: list[dict]) -> list[str]:
@@ -275,6 +285,18 @@ def versus_effects(svc, spec: dict, groups: tuple) -> list[dict]:
     return out
 
 
+def _blank(ff: str, path: str) -> bool:
+    """A video with nothing drawn: every pixel (nearly) see-through."""
+    import subprocess
+    try:
+        out = subprocess.run([ff, "-v", "error", "-c:v", "libvpx-vp9", "-i", path, "-vf", "alphaextract,scale=96:-2",
+                              "-f", "rawvideo", "-pix_fmt", "gray", "-"], capture_output=True, timeout=120,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+    except Exception:
+        return False
+    return bool(out) and max(out) < 26
+
+
 class BuffFx:
     """Effect videos: made on request, kept until the next patch."""
 
@@ -295,7 +317,7 @@ class BuffFx:
             return cached[1]
         rel = f"buff_db/{sid}.json.gz"
         db = self.svc.store.read_json(rel)
-        if db is None or db.get("v") != VERSION:
+        if db is None or db.get("v") != LIST:
             db = build(self.svc)
             self.svc.store.write_json(rel, db)
         self._db = (sid, db)
@@ -395,7 +417,7 @@ class BuffFx:
             made = set()
             for n in names:
                 src = os.path.join(work, viewer._safe_name(n) + ".webm")
-                if os.path.isfile(src):
+                if os.path.isfile(src) and not _blank(ff, src):
                     os.replace(src, os.path.join(self.folder(), viewer._safe_name(n) + ".webm"))
                     made.add(n)
             return made

@@ -9,6 +9,7 @@ const bfName = (b) => b.name || b.id;
 const bfSafe = (n) => n.replace(/[^\w.-]/g, "_");  // (the video's file name, as the app writes it)
 const bfHas = (n) => BUFFS.have.includes(bfSafe(n));
 const bfFailed = (n) => BUFFS.failed.includes(n);
+const bfShown = () => BUFFS.list.filter((b) => !b.fx.every(bfFailed));  // (none of its effects can be drawn: left out)
 
 routes.buffs = async (args) => {
   const main = $("#main");
@@ -25,7 +26,7 @@ routes.buffs = async (args) => {
 
 function bfFiltered() {
   const q = bfv.q.trim().toLowerCase();
-  const arr = BUFFS.list.filter((b) => (!bfv.type || b.type === bfv.type) && (!bfv.who || b.who.some((w) => w.k === bfv.who))
+  const arr = bfShown().filter((b) => (!bfv.type || b.type === bfv.type) && (!bfv.who || b.who.some((w) => w.k === bfv.who))
     && (!q || `${b.name} ${b.id} ${b.fx.join(" ")} ${b.who.map((w) => w.name).join(" ")}`.toLowerCase().includes(q)));
   const order = { pos: 0, neg: 1, neu: 2 };
   if (bfv.sort === "type") arr.sort((a, b) => order[a.type] - order[b.type]);  // (the list comes sorted by name)
@@ -55,7 +56,7 @@ function drawBuffs() {
 
 function drawBuffGrid() {
   const arr = bfFiltered();
-  $("#bfcount").textContent = `${arr.length} of ${BUFFS.list.length}`;
+  $("#bfcount").textContent = `${arr.length} of ${bfShown().length}`;
   $("#bfgrid").innerHTML = arr.map((b) => `<a class="entile bftile ${b.type}" href="#/buffs/${encodeURIComponent(b.id)}" data-b="${esc(b.id)}" title="${esc(`${bfName(b)} · ${BF_WORD[b.type]}`)}">
       ${b.icon ? `<img loading="lazy" src="${imgThumb(b.icon)}" onerror="this.remove()">` : ""}<span>${BF_WORD[b.type]}</span><b>${esc(bfName(b))}</b></a>`).join("")
     || `<div class="empty">Nothing matches.</div>`;
@@ -103,7 +104,7 @@ function bfVideo(n) {
 function drawBuff() {
   const box = $("#bfcard"), b = BUFFS.list.find((x) => x.id === bfv.sel);
   if (!box || !b) { if (box) box.innerHTML = ""; return; }
-  const same = BUFFS.list.filter((x) => x !== b && x.fx.some((n) => b.fx.includes(n)));
+  const same = bfShown().filter((x) => x !== b && x.fx.some((n) => b.fx.includes(n)));
   const link = (w) => w.k === "enemy" ? `#/enemies/${w.id}` : `#/db/${w.k === "ego" ? "ego" : "id"}/${w.id}`;
   // enemy by its handbook picture, else portrait
   const pic = (w) => { const p = w.pic ? imgThumb(w.pic) : "", t = w.app ? `/api/enemy_thumb?app=${encodeURIComponent(w.app)}` : "";
