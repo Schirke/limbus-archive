@@ -103,6 +103,8 @@
 .dcbfx > span { font-size: 12.5px; padding: 1px 7px; border: 1px solid var(--line); background: var(--panel); }
 .dcbwhy { font-size: 12px; color: #d9a441; margin-top: 3px; }
 .dcbrow.off .dcbwhy { color: #5e5046; }
+.dcbnote { font-style: italic; margin-top: 2px; }
+.dcbunk { font-size: 11px; color: #d9a441; border: 1px solid #d9a44166; padding: 0 5px; white-space: nowrap; }
 .dcbbar { height: 3px; background: var(--gold); margin-top: 5px; opacity: .65; transition: width .2s; }
 .dcbbar.pass { background: #7fb3c9; } .dcbbar.sloth { background: #c48cd8; }
 .dcbrow.zero .dcbbar, .dcbrow.off .dcbbar { background: #5e5046; }

@@ -78,6 +78,7 @@ async function langTable(g) {
 const langEn = (s) => LANG.back.get(s) ?? s;
 async function langApply(path, data) {
   if (!LANG_PAGES.test(path) || /^\/api\/sounds\/?$/.test(path)) return data;  // (the Sounds folders' names are their addresses)
+  if (/^\/api\/units$/.test(path) && data && data.ids) Object.defineProperty(data, "en", { value: unitsEn(data) });  // calc reads English
   const ts = [await langTable("core")];
   if (LANG_STORY.test(path)) ts.push(await langTable("story"));
   const look = (s) => {
@@ -107,6 +108,16 @@ async function langApply(path, data) {
   if (data && data.pics && typeof data.pics === "object" && !Array.isArray(data.pics))
     for (const [k, v] of Object.entries(data.pics)) { const x = put(k, ""); if (x !== null && !(x in data.pics)) data.pics[x] = v; }
   return data;
+}
+// the English skill, passive and status texts, before the translation goes over them (ui/calc.js dcaModel)
+function unitsEn(d) {
+  const sk = {}, ps = {}, gl = {};
+  for (const x of [...d.ids, ...d.egos]) {
+    for (const s of [...x.skills, ...(x.defense || [])]) sk[s.id] = Object.fromEntries(Object.entries(s.up).map(([k, u]) => [k, { desc: u.desc, coindescs: (u.coindescs || []).map((c) => [...c]) }]));
+    for (let p of x.passives || []) for (; p; p = p.prev) ps[p.id] = p.desc;
+  }
+  for (const [k, g] of Object.entries(d.glossary || {})) gl[k] = g.desc;
+  return { sk, ps, gl };
 }
 async function langList() {
   if (!LANG.list) LANG.list = fetch("/api/langs").then((r) => r.json()).then((o) => o.langs || []).catch(() => []);

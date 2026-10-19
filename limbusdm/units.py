@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 14  # bump when the database layout changes (cached per snapshot)
+VERSION = 15  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -82,6 +82,43 @@ def coin_kind(c: dict) -> str:
     return col if col in ("purple", "green") else ""
 
 
+# coin scripts that put a status on the target this turn, for the damage breakdown: name → when ("" any hit, H heads, T tails)
+GIVE_ON_HIT = {"GiveBuffOnSucceedAttack": "", "GiveBuffOnSucceedAttackHead": "H", "GiveBuffOnSucceedAttackTail": "T",
+               "GiveBuffOnSucceedAttackIfUsableInDuel": ""}
+
+
+def _inflicts(d: dict) -> list:
+    """[[coin (-1 = every coin), status, Potency, Count, when]] from the skill's scripts."""
+    out = []
+
+    def take(i, lst):
+        for a in lst or []:
+            n, b = re.sub(r"\[.*$", "", a.get("scriptName") or ""), a.get("buffData") or {}
+            if n in GIVE_ON_HIT and b.get("target") == "Target" and b.get("buffKeyword") and not b.get("activeRound"):
+                out.append([i, b["buffKeyword"], b.get("stack") or 0, b.get("turn") or 0, GIVE_ON_HIT[n]])
+    take(-1, d.get("abilityScriptList"))
+    for i, c in enumerate(d.get("coinList") or []):
+        take(i, c.get("abilityScriptList"))
+    return out
+
+
+# status abilities the breakdown reads: game name → short kind (dmg % / Offense Level / Final Power / Coin Power, target side: takes % / Defense)
+BUFF_AB = {"AtkDamageMultiplierByStack": "dmg", "AtkDamageMultiplier": "dmg1", "AttackDmgMultiplier": "dmg1",
+           "AtkAdderByStack": "ol", "AtkAdder": "ol1", "SkillPowerResultAdderAsStack": "fp", "SkillPowerResultAdder": "fp1",
+           "CoinScaleAdderByStack": "cp", "TakeAtkDamageMultiplierByStack": "take", "TakeAtkDamageMultiplier": "take1",
+           "DefAdderByStack": "def", "DefAdder": "def1"}
+
+
+def _buff_fx(b: dict) -> list:
+    """[[kind, value, Slash/Pierce/Blunt or sin or ""]] of a status."""
+    out = []
+    for a in b.get("list") or []:
+        k = BUFF_AB.get(a.get("ability"))
+        if k and a.get("coinOperator", "ADD") == "ADD":
+            out.append([k, a.get("value") or 0, ATK.get(a.get("atk"), "") or SINS.get(a.get("attribute"), "")])
+    return out
+
+
 def skill_info(sid: int, skills: dict, loc_skills: dict, copies: int | None = None) -> dict | None:
     rec = skills.get(sid)
     if not rec:
@@ -104,6 +141,8 @@ def skill_info(sid: int, skills: dict, loc_skills: dict, copies: int | None = No
             "name": _one_line(t.get("name")) or str(sid), "desc": t.get("desc") or "",
             "coindescs": [[c.get("desc", "") for c in (cl.get("coindescs") or [])] for cl in (t.get("coinlist") or [])],
         }
+        if d.get("atkType") not in (None, "NONE") and (inf := _inflicts(d)):
+            ups[n]["inf"] = inf
     out = {"id": sid, "type": rec.get("skillType"), "tier": rec.get("skillTier"), "up": ups}
     # enemies' skills mostly share another skill's picture (SkillIcon/<iconID>.png)
     icon = next((d.get("iconID") or d.get("iconId") for d in rec.get("skillData") or [] if d.get("iconID") or d.get("iconId")), None)
@@ -270,6 +309,13 @@ def build(tables: dict, loc_dir: str) -> dict:
         b = buffs.get(k) or {}
         glossary[k] = {"name": _one_line(v.get("name")), "desc": v.get("desc") or "", "flavor": v.get("flavor") or "",
                        "type": kinds.get(b.get("buffType"), "neu"), "icon": b.get("iconId") or b.get("iconID") or k}
+        # for the damage breakdown: a status at all, Potency + Count, its cap, what it does to damage
+        if b:
+            glossary[k]["st"] = 2 if "SinBuff" in str(b.get("buffClass")) or b.get("maxTurn") else 1
+            if b.get("maxStack"):
+                glossary[k]["max"] = b["maxStack"]
+            if fx := _buff_fx(b):
+                glossary[k]["fx"] = fx
     return {"ids": ids, "egos": egos, "keywords": kw, "statuses": STATUSES, "tags": tag_names,
             "glossary": glossary, "sins": [v for k, v in SINS.items() if k not in ("WHITE", "BLACK", "NEUTRAL")],
             "sinners": SINNERS}
