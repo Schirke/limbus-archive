@@ -116,8 +116,9 @@ function unitsEn(d) {
     for (const s of [...x.skills, ...(x.defense || [])]) sk[s.id] = Object.fromEntries(Object.entries(s.up).map(([k, u]) => [k, { desc: u.desc, coindescs: (u.coindescs || []).map((c) => [...c]) }]));
     for (let p of x.passives || []) for (; p; p = p.prev) ps[p.id] = p.desc;
   }
-  for (const [k, g] of Object.entries(d.glossary || {})) gl[k] = g.desc;
-  return { sk, ps, gl };
+  const gn = {};
+  for (const [k, g] of Object.entries(d.glossary || {})) { gl[k] = g.desc; gn[k] = g.name; }
+  return { sk, ps, gl, gn };
 }
 async function langList() {
   if (!LANG.list) LANG.list = fetch("/api/langs").then((r) => r.json()).then((o) => o.langs || []).catch(() => []);

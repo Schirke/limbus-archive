@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 15  # bump when the database layout changes (cached per snapshot)
+VERSION = 16  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -56,7 +56,8 @@ def skill_levels(rec: dict) -> dict[int, dict]:
     """{uptie level: merged skill data}: each level of skillData only lists what changed."""
     out, cur = {}, {}
     for lv in sorted(rec.get("skillData") or [], key=lambda d: d.get("gaksungLevel", 1)):
-        cur = {**cur, **{k: v for k, v in lv.items() if k != "gaksungLevel"}}
+        # an empty coinList at a later level means "unchanged" (Cinq East Hong Lu S2 / Counter at Uptie 4)
+        cur = {**cur, **{k: v for k, v in lv.items() if k != "gaksungLevel" and not (k == "coinList" and not v and cur.get(k))}}
         out[lv.get("gaksungLevel", 1)] = cur
     for n in range(1, 5):  # fill the gaps (levels without changes)
         if n not in out and n - 1 in out:
