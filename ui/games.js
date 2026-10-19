@@ -223,7 +223,7 @@ const gmWorth = () => Math.max(100, GM_WORTH[gm.game.step] - GM_HINT * Object.ke
 // Next rounds' tracks prefetched while one plays (gmWarm: number → object URL promise).
 const GM_AHEAD = 2, gmWarm = new Map();
 function gmFetch(n) {
-  if (!gmWarm.has(n)) gmWarm.set(n, fetch("/api/music_audio?n=" + n).then((r) => r.ok ? r.blob() : null).then((b) => b && URL.createObjectURL(b)).catch(() => null));
+  if (!gmWarm.has(n)) gmWarm.set(n, fetch(muUrl(n)).then((r) => r.ok ? r.blob() : null).then((b) => b && URL.createObjectURL(b)).catch(() => null));
   return gmWarm.get(n);
 }
 function gmWarmDrop(keep = []) {
@@ -461,10 +461,10 @@ function gmRound() {
   gmAudio.onloadedmetadata = () => { g.loading = false; gmPlay(); };
   const mine = () => gm.game === g && g.ans === ans;
   gmFetch(ans.n).then(async (u) => {
-    g.real = u || "/api/music_audio?n=" + ans.n;
+    g.real = u || muUrl(ans.n);
     if (gm.how === "rev" || gm.how === "two") {  // (the other track of "Two at once": any but this one, from a spot of its own)
       const over = gm.how === "two" && g.pool[(at + 1 + Math.floor(Math.random() * (g.pool.length - 1))) % g.pool.length];
-      const clip = await gmClip(g.real, g.start, gm.how === "rev", over && "/api/music_audio?n=" + over.n, over && 5 + Math.random() * Math.max(1, over.t.ms / 1000 - 30));
+      const clip = await gmClip(g.real, g.start, gm.how === "rev", over && muUrl(over.n), over && 5 + Math.random() * Math.max(1, over.t.ms / 1000 - 30));
       if (!mine()) return clip && URL.revokeObjectURL(clip);
       gm.clip = clip;
     }

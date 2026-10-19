@@ -16,6 +16,9 @@ def _place(label: str) -> str:
 
 def arenas(svc) -> list[dict]:
     """[{name, places: [story chapter, …] (first = where it is first fought), abno: [entry id, name] | None}]"""
+    sid, cached = svc.latest_snapshot_id(), getattr(svc, "_arenas", None)
+    if cached and cached[0] == sid:
+        return cached[1]
     places: dict[str, list[str]] = {}
     for c in svc.stage_db().get("chapters") or []:
         for n in c.get("nodes") or []:
@@ -54,6 +57,7 @@ def arenas(svc) -> list[dict]:
                     break
         if got or abno:
             out.append({"name": m, "places": got, "abno": abno})
+    svc._arenas = (sid, out)
     return out
 
 

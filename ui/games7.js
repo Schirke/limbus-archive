@@ -378,7 +378,7 @@ async function gyRound() {
   let buf = null;
   try {
     gmCtx = gmCtx || new (window.AudioContext || window.webkitAudioContext)();
-    const url = await gmFetch(ans.n) || "/api/music_audio?n=" + ans.n;
+    const url = await gmFetch(ans.n) || muUrl(ans.n);
     buf = await gmCtx.decodeAudioData(await (await fetch(url)).arrayBuffer());
   } catch {}
   if (gy.game !== g || g.ans !== ans) return;

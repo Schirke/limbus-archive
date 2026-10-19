@@ -9,6 +9,7 @@ if (mu.v !== 2) { mu.v = 2; mu.min = true; }  // (the new look starts with the p
 const muAudio = new Audio();
 muAudio.preload = "none";
 
+const muUrl = (n) => (mu.tracks[n] && mu.tracks[n].url) || "/api/music_audio?n=" + n;
 const muKeep = () => { try { localStorage.setItem(MUSIC_KEEP, JSON.stringify({ battle: mu.battle, shuffle: mu.shuffle, vol: mu.vol, min: mu.min, v: mu.v, repeat: mu.repeat, fav: mu.fav, favs: mu.favs, last: mu.tracks[mu.n]?.event })); } catch {} };
 const muTime = (s) => isFinite(s) ? Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0") : "0:00";
 // a theme heard in few fights names who is fought
@@ -59,7 +60,7 @@ function muPlay(n, back) {
   if (!back && mu.n >= 0 && mu.n !== n) mu.history.push(mu.n);
   mu.n = n;
   mu.loading = true;
-  muAudio.src = "/api/music_audio?n=" + n;
+  muAudio.src = muUrl(n);
   muAudio.volume = mu.vol;
   muAudio.play().catch(() => {});
   muKeep();

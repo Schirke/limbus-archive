@@ -30,7 +30,7 @@ const alSid = (who) => al.data.sinners.indexOf(who) + 1;
 const alFace = (who, cls = "s22") => alSid(who) ? ico(`sinner_${alSid(who)}`, cls, who, who.slice(0, 2)) : `<span class="alother" title="${esc(who)}">${esc(who || "?")}</span>`;
 // a portrait, else the enemy handbook's drawn battle look, else the code
 function alPic(a, cls) {
-  const src = a.pic ? imgThumb(a.pic) : a.app ? `/api/enemy_thumb?app=${encodeURIComponent(a.app)}` : "";
+  const src = a.tile;
   const code = `<i>${esc(a.code || "?")}</i>`;
   return `<div class="alpic ${cls}">${src ? `<img loading="lazy" src="${src}" onerror="this.outerHTML=this.dataset.no" data-no="${esc(code)}">` : code}</div>`;
 }
@@ -44,7 +44,7 @@ async function alSpine(a) {
   try { sp = await loadSpinePlayer(); } catch { return; }
   const host = Object.assign(document.createElement("div"), { className: "alsp" });
   box.appendChild(host);
-  const p = await addSpinePlayer(sp, host, a.spine.bundle, a.spine.atlas, null, {}).catch(() => null);
+  const p = await addSpinePlayer(sp, host, a.spine.bundle, a.spine.atlas, null, { files: a.spine.files }).catch(() => null);
   if (!host.isConnected || al.sel !== a.id) { if (p) p.dispose(); return; }
   if (!p) { host.remove(); return; }
   al.player = p;

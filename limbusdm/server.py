@@ -23,7 +23,7 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 KEEP = "max-age=3600"
 # lists only a new snapshot changes: kept in memory after the first time
 PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror",
-                "/api/game_arenas", "/api/game_voices", "/api/announcers", "/api/growth"}
+                "/api/game_voices", "/api/announcers", "/api/growth"}
 
 
 def _etag(svc) -> str:
@@ -499,19 +499,20 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._file(os.path.join(stage_pic_dir(svc), name + ".jpg"), "image/jpeg")
             if p == "/api/game_arenas":  # Guess the arena: where each stage is from (limbusdm/gamedata.py)
                 from .gamedata import arenas
-                return self._json(arenas(svc))
+                have = set(svc.fx.stage_pics().get("have") or [])
+                return self._json([{**a, "tile": links.stage_pic(a["name"]) if a["name"] in have else ""} for a in arenas(svc)])
             if p == "/api/game_voices":  # Guess the sound: announcers' and E.G.O voice lines
                 from .gamedata import voices
-                return self._json(voices(svc))
+                return self._json(_voices_links(voices(svc), int(q.get("n") or 0)))
             if p == "/api/announcers":  # Announcers page (limbusdm/announcers.py)
                 from . import announcers
                 return self._json(_announcer_links(announcers.get(svc)))
             if p == "/api/growth":  # Upgrade calc page (limbusdm/growth.py)
                 from . import growth
-                return self._json(growth.get(svc))
+                return self._json(_growth_links(growth.get(svc)))
             if p == "/api/abno_logs":  # Abnormality logs page (limbusdm/abnologs.py)
                 from . import abnologs
-                return self._json(abnologs.get(svc))
+                return self._json(_abno_links(abnologs.get(svc)))
             if p == "/api/battle_maps":
                 from .viewer import battle_maps
                 return self._json([m["name"] for m in battle_maps(svc)])
@@ -653,7 +654,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import bilibili
                 return self._json(bilibili.videos(q.get("period", "week"), q.get("sort", "views"), svc.translator))
             if p == "/api/quiz":  # voice lines for Games -> Guess the Identity
-                return self._json(_quiz_twins(svc, svc.quiz()))
+                return self._json(_quiz_links(_quiz_twins(svc, svc.quiz())))
             if p == "/api/game_pics":  # pictures of the Games: the jukebox covers (the track's card), the story's
                 # story backgrounds by Canto (paths from the folder on)
                 import re as _re
@@ -755,7 +756,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json(_history_links(svc, {k: v for k, v in svc.history_db().items() if k != "stamp"}))
             if p == "/api/gacha":  # Games → Extraction: the game's banners, pools, lines and sounds
                 from . import gacha
-                return self._json(gacha.build(svc))
+                return self._json(_gacha_links(gacha.build(svc)))
             if p == "/api/gacha_ui":  # one picture of the extraction's screens, cut from the game's main build
                 from . import gacha
                 got = gacha.ui_png(q.get("n", ""), svc.game.data, svc.ui_cache_dir())
@@ -766,7 +767,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import news
                 return self._json(news.patches(svc, bool(q.get("force"))))
             if p == "/api/music":  # the corner player's track list
-                return self._json([{k: v for k, v in t.items() if k not in ("bank", "i")} for t in svc.music()["tracks"]])
+                return self._json([{**{k: v for k, v in t.items() if k not in ("bank", "i")}, "url": links.music_audio(n)} for n, t in enumerate(svc.music()["tracks"])])
             if p == "/api/music_audio":
                 from . import music
                 tracks = svc.music()["tracks"]
@@ -1292,6 +1293,42 @@ def _history_links(svc, db: dict) -> dict:
     return {**db, "cards": {k: card(c) for k, c in (db.get("cards") or {}).items()},
             "patches": [{**p, "cards": {k: {**c, "groups": [{**g, "rows": [row(r) for r in g["rows"]]} for g in c["groups"]]} for k, c in p["cards"].items()}}
                         for p in db.get("patches") or []]}
+
+
+def _voices_links(v: dict, n: int = 0) -> dict:
+    """Guess the sound's lines with their sounds as links (last in a row); n: only that many of each announcer's lines."""
+    ann = {name: (sorted(ls, key=lambda ln: (ln[2] > 6000, ln[1]))[:n] if n else ls) for name, ls in (v.get("announcers") or {}).items()}
+    row = lambda ln: [*ln, links.bank(ln[0], ln[1])]  # noqa: E731
+    return {"announcers": {k: [row(ln) for ln in ls] for k, ls in ann.items()},
+            "egos": {k: [row(ln) for ln in ls] for k, ls in (v.get("egos") or {}).items()}}
+
+
+def _quiz_links(q: dict) -> dict:
+    """Every voice line's sound and a character's picture, as links (after the row's own fields)."""
+    row = lambda r: [*r, links.quiz_audio(r[0])]  # noqa: E731
+    return {**q, "ids": [row(r) for r in q.get("ids") or []], "bosses": [row(r) for r in q.get("bosses") or []],
+            "chars": [{**c, "tile": links.thumb(c.get("pic")), "lines": [row(ln) for ln in c.get("lines") or []]} for c in q.get("chars") or []]}
+
+
+def _gacha_links(g: dict) -> dict:
+    """The screens' pictures, each banner's pictures, the sounds and the lines' voices, as links."""
+    from . import gacha
+    banner = lambda b: {**b, "pics": {k: links.img(b[k]) for k in ("tile", "typo", "illust") if b.get(k)}}  # noqa: E731
+    return {"ui": {n: links.gacha_ui(n) for n in gacha.UI_USED}, **g, "banners": [banner(b) for b in g.get("banners") or []],
+            "archive": [banner(b) for b in g.get("archive") or []], "lines": {k: [*v, links.quiz_audio(v[0])] for k, v in (g.get("lines") or {}).items()},
+            "sndUrl": {k: links.quiz_audio(v) for k, v in (g.get("snd") or {}).items()}}
+
+
+def _abno_links(db: dict) -> dict:
+    """An entry's picture (its portrait, else the enemy handbook's drawn look) and its Spine look's files, as links."""
+    return {**db, "list": [{**a, "tile": links.thumb(a["pic"]) if a.get("pic") else links.enemy_thumb(a.get("app")),
+                            **({"spine": {**a["spine"], "files": links.spine(a["spine"]["bundle"], a["spine"]["atlas"])}} if a.get("spine") else {})}
+                           for a in db.get("list") or []]}
+
+
+def _growth_links(db: dict) -> dict:
+    """Upgrade calc icons with their picture links."""
+    return {**db, "icons": {k: {**v, "url": links.obj(v["b"], v["p"])} for k, v in (db.get("icons") or {}).items()}} if db.get("icons") else db
 
 
 def _announcer_links(db: dict) -> dict:

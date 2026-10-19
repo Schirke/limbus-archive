@@ -42,12 +42,12 @@ async function giOpen(page, daily) {  // daily: start at once
     const thumbs = new Set((en || {}).thumbs || []);
     const bosses = new Map(((en || {}).list || []).map((e) => [e.id, { key: "b" + e.id, id: e.id, name: e.name, title: e.name, sub: e.group, boss: true,
       pic: thumbs.has(e.app) && (e.spine || !e.pic) ? `/api/enemy_thumb?app=${encodeURIComponent(e.app)}` : e.pic ? giThumb(e.pic) : "", lines: [] }]));
-    for (const [s, id, when, text] of (q || {}).ids || []) ids.get(id)?.lines.push({ s, when, text });
-    for (const [s, id, text] of (q || {}).bosses || []) bosses.get(id)?.lines.push({ s, when: "", text });
+    for (const [s, id, when, text, u] of (q || {}).ids || []) ids.get(id)?.lines.push({ s, when, text, u });
+    for (const [s, id, text, u] of (q || {}).bosses || []) bosses.get(id)?.lines.push({ s, when: "", text, u });
     // story characters by their log picture (fallbacks: handbook / base Identity)
     const chars = ((q || {}).chars || []).map((c, i) => { const b = c.boss && bosses.get(c.boss), s = c.sinner && ids.get(10001 + c.sinner * 100);
       return { key: "c" + i, id: c.boss || 0, name: c.name, title: c.name, sub: c.where, role: c.role, boss: !!c.boss, char: true, order: c.order, twin: c.twin != null,
-        pic: c.pic ? giThumb(c.pic) : b ? b.pic : s ? s.pic : "", lines: c.lines.map(([sm, text, where]) => ({ s: sm, when: where, text })) }; }).filter((c) => !c.twin && c.pic);  // (without any picture: left out)
+        pic: c.tile || (b ? b.pic : s ? s.pic : ""), lines: c.lines.map(([sm, text, where, u]) => ({ s: sm, when: where, text, u })) }; }).filter((c) => !c.twin && c.pic);  // (without any picture: left out)
     gi.data = { chars, all: [...ids.values()], ids: [...ids.values()].filter((x) => x.lines.length), bosses: [...bosses.values()].filter((x) => x.lines.length),
       sinners: (units || {}).sinners || [] };
   }
@@ -133,7 +133,7 @@ function giRound() {
   if (near.length < 3) near = all.filter((x) => x !== ans);
   Object.assign(g, { ans, line, opts: gmShuffle([ans, ...gmShuffle(near.slice()).slice(0, 3)]), hints: {}, done: null });
   if (giSkill()) return giDraw();
-  giAudio.src = "/api/quiz_audio?s=" + encodeURIComponent(line.s);
+  giAudio.src = line.u;
   giAudio.volume = gmVol();
   giAudio.onerror = () => toast("This line could not be read from the game's files.");
   if (!gi.text) giAudio.play().catch(() => {});
@@ -235,9 +235,9 @@ function giResult() {
       <span class="grow"></span>${g.daily ? `<span class="gmscore">${tag}</span><button class="toggle" id="gicopy">${gmCopyLabel(g)}</button>` : ""}<button class="toggle" id="giback">Settings</button><button class="gmbtn" id="giagain">Play again</button></div>
     <table class="gmlog"><tr><th>#</th><th>WHO</th><th>${giSkill() ? "SKILL" : "LINE"}</th><th>YOUR ANSWER</th><th>HINTS</th><th>POINTS</th><th></th></tr>
     ${g.log.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.ans.name)}</td><td class="giline">${esc(r.line.text || "—")}<i>${esc(r.line.when)}</i></td>
-      <td class="${r.ok ? "ok" : "bad"}">${esc(r.said)}</td><td>${r.hints || ""}</td><td>${r.points}</td><td>${giSkill() ? `<img class="gilogpic" src="${r.line.pic}">` : `<button class="toggle" data-say="${esc(r.line.s)}">▶</button>`}</td></tr>`).join("")}</table>`;
+      <td class="${r.ok ? "ok" : "bad"}">${esc(r.said)}</td><td>${r.hints || ""}</td><td>${r.points}</td><td>${giSkill() ? `<img class="gilogpic" src="${r.line.pic}">` : `<button class="toggle" data-say="${esc(r.line.u)}">▶</button>`}</td></tr>`).join("")}</table>`;
   $("#giagain").onclick = () => giNew();
   if ($("#gicopy")) $("#gicopy").onclick = () => gmCopyResult(game, g, () => gmShare(giTitle(), g.score, g.log.map((r) => ({ ok: r.ok, clean: !r.hints }))));
   $("#giback").onclick = () => { gi.game = null; giDrawStart(); };
-  document.querySelectorAll("[data-say]").forEach((b) => b.onclick = () => { giAudio.src = "/api/quiz_audio?s=" + encodeURIComponent(b.dataset.say); giAudio.play().catch(() => {}); });
+  document.querySelectorAll("[data-say]").forEach((b) => b.onclick = () => { giAudio.src = b.dataset.say; giAudio.play().catch(() => {}); });
 }

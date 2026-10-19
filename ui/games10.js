@@ -62,8 +62,8 @@ routes.gamearena = async (args = []) => {
     const [list, pics] = await Promise.all([api("/api/game_arenas").catch(() => []), api("/api/stage_pics").catch(() => null)]);
     const have = new Set((pics || {}).have || []);
     ka.pool = (list || []).filter((x) => have.has(x.name)).map((x) => x.abno
-      ? { key: "a:" + x.name, name: x.abno[1], abno: x.abno, map: x.name, sub: "Abnormality" }
-      : { key: "p:" + x.name, name: x.places[0], places: x.places, map: x.name, sub: x.places.slice(1).join(" · ") });
+      ? { key: "a:" + x.name, name: x.abno[1], abno: x.abno, map: x.name, pic: x.tile, sub: "Abnormality" }
+      : { key: "p:" + x.name, name: x.places[0], places: x.places, map: x.name, pic: x.tile, sub: x.places.slice(1).join(" · ") });
     if (!list || !pics) setTimeout(() => { ka.pool = null; });
   }
   if (!location.hash.startsWith("#/gamearena")) return;
@@ -110,7 +110,7 @@ function kaRound() {
   const im = new Image();
   im.onload = () => { if (ka.game === g && g.ans.map === ans.map) { g.img = im; kaPaint(); } };
   im.onerror = () => { if (ka.game !== g) return; g.list = g.list.filter((x) => x !== ans); g.round--; kaRound(); };
-  im.src = `/api/stage_pic?name=${encodeURIComponent(ans.map)}`;
+  im.src = ans.pic;
   kaDraw();
 }
 
@@ -147,7 +147,7 @@ function kaPaint() {
 function kaResult() {
   const g = ka.game;
   gzResult("arena", "Guess the arena", g, (g.what || "all") + (g.hard ? "h" : "e"), ["", "ARENA OF", "YOUR ANSWER", "OPENED", "POINTS"],
-    (r) => `<td><img class="gplogpic" src="/api/stage_pic?name=${encodeURIComponent(r.ans.map)}"></td><td>${esc(r.ans.name)}</td><td class="${r.ok ? "ok" : "bad"}">${esc(r.said || "—")}</td><td>${r.step + 1} / ${KQ_STEPS.length}</td><td>${r.points}</td>`,
+    (r) => `<td><img class="gplogpic" src="${r.ans.pic}"></td><td>${esc(r.ans.name)}</td><td class="${r.ok ? "ok" : "bad"}">${esc(r.said || "—")}</td><td>${r.step + 1} / ${KQ_STEPS.length}</td><td>${r.points}</td>`,
     () => kaNew(), () => { ka.game = null; kaDrawStart(); });
 }
 
@@ -473,14 +473,14 @@ function ksRound() {
 
 function ksPlay() {
   const l = ks.game.line;
-  ks.audio.src = `/api/bank?path=${encodeURIComponent(l[0])}&i=${l[1]}`;
+  ks.audio.src = l[l.length - 1];
   ks.audio.volume = gmVol();
   ks.audio.play().catch(() => {});
 }
 
 const ksWorth = (g) => Math.max(100, KQ_WORTH - KQ_HINT * Object.keys(g.hints).length) * (g.hard ? 2 : 1);
 function ksDraw() {
-  const g = ks.game, a = g.ans, d = g.done, text = g.line[g.line.length - 1] || "";
+  const g = ks.game, a = g.ans, d = g.done, text = g.line[g.line.length - 2] || "";
   $("#main").innerHTML = `<h1>Guess the sound</h1>${gzTop(g)}
     <div class="gmstage"><div><button id="ksplay" class="gmdisc" title="Play it again"><div>▶</div></button>
       <label class="gmvol">Volume <input id="ksvol" type="range" min="0" max="1" step="0.01" value="${gmVol()}"></label>
@@ -498,10 +498,10 @@ function ksDraw() {
 function ksResult() {
   const g = ks.game;
   gzResult("sound", "Guess the sound", g, (g.what || "all") + (g.hard ? "h" : "e"), ["WHO", "THE LINE", "YOUR ANSWER", "HINTS", "POINTS", ""],
-    (r) => `<td>${esc(r.ans.title)}<i>${esc(r.ans.sub)}</i></td><td class="small">${esc(r.line[r.line.length - 1] || "")}</td><td class="${r.ok ? "ok" : "bad"}">${esc(r.said || "—")}</td><td>${r.hints || ""}</td><td>${r.points}</td>
-      <td><button class="toggle" data-ksplay="${esc(r.line[0])}|${r.line[1]}">▶ play</button></td>`,
+    (r) => `<td>${esc(r.ans.title)}<i>${esc(r.ans.sub)}</i></td><td class="small">${esc(r.line[r.line.length - 2] || "")}</td><td class="${r.ok ? "ok" : "bad"}">${esc(r.said || "—")}</td><td>${r.hints || ""}</td><td>${r.points}</td>
+      <td><button class="toggle" data-ksplay="${esc(r.line[r.line.length - 1])}">▶ play</button></td>`,
     () => ksNew(), () => { ks.game = null; ksDrawStart(); });
-  document.querySelectorAll("[data-ksplay]").forEach((b) => b.onclick = () => { const [p, i] = b.dataset.ksplay.split("|"); ks.audio.src = `/api/bank?path=${encodeURIComponent(p)}&i=${i}`; ks.audio.play().catch(() => {}); });
+  document.querySelectorAll("[data-ksplay]").forEach((b) => b.onclick = () => { ks.audio.src = b.dataset.ksplay; ks.audio.play().catch(() => {}); });
 }
 
 // ------------------------------------------------------------------ Memory

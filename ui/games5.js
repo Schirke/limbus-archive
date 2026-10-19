@@ -13,7 +13,7 @@ const GA_GLOW = { r1: [150, 150, 160], r2: [235, 70, 45], r3: [255, 205, 60], eg
 const ga = { st: null, data: null, banner: null, run: 0, skip: null, voice: null, pics: {}, old: new Set() };
 const gaNew = () => ({ pulls: 0, n: { r3: 0, r2: 0, r1: 0, ego: 0 }, since: 0, got: {}, pity: {}, banner: 0, all: true });
 const gaKeep = () => { try { localStorage.setItem(GA_KEEP, JSON.stringify(ga.st)); } catch {} };
-const gaUi = (n) => "/api/gacha_ui?n=" + n;
+const gaUi = (n) => (ga.data && ga.data.ui[n]) || "/api/gacha_ui?n=" + n;
 const gaFull = (p) => `/api/asset_img?path=${encodeURIComponent(p)}`;
 const gaU = (id) => ga.data.units.get(id);
 const gaKind = (id) => gaU(id).ego ? "ego" : "r" + gaU(id).rank;
@@ -21,7 +21,7 @@ const gaWait = (ms) => new Promise((r) => setTimeout(r, ms));
 function gaSnd(k, vol = 0.7) {
   const s = ga.data.snd[k];
   if (!s) return null;
-  const a = new Audio("/api/quiz_audio?s=" + encodeURIComponent(s));
+  const a = new Audio(s);
   a.volume = Math.min(1, vol * (typeof gmVol === "function" ? gmVol() / 0.6 : 1));
   a.play().catch(() => {});
   return a;
@@ -52,18 +52,18 @@ routes.gamegacha = async (args = []) => {
   if (!ga.st) { try { ga.st = { ...gaNew(), ...JSON.parse(localStorage.getItem(GA_KEEP) || "{}") }; } catch { ga.st = gaNew(); } ga.st.pity = ga.st.pity || {}; }
   if (!ga.data) {
     const [g, u, q] = await Promise.all([api("/api/gacha"), api("/api/units"), api("/api/quiz")].map((p) => p.catch(() => null)));
-    const said = new Map(((q || {}).ids || []).filter((r) => r[2] === "Identity Acquisition").map((r) => [r[1], [r[0], r[3]]]));
+    const said = new Map(((q || {}).ids || []).filter((r) => r[2] === "Identity Acquisition").map((r) => [r[1], [r[0], r[3], r[4]]]));
     const units = new Map();
     for (const x of (u || {}).ids || []) if (x.img && x.img.thumb) units.set(x.id, { id: x.id, title: x.title, who: x.sinnerName, sinner: x.sinner, rank: x.rank, season: giSeason(u, x.season),
       tint: ((u.seasons || {})[x.season == null ? "8000" : x.season > 9100 && x.season < 9200 ? "9100" : String(x.season)] || {}).color || "",
-      thumb: giThumb(x.img.thumb), art: gaFull(x.img.art2 || x.img.art), line: said.get(x.id) || ["", ""], pan: ((g || {}).pan || {})[x.id] || [] });
+      thumb: giThumb(x.img.thumb), art: gaFull(x.img.art2 || x.img.art), line: said.get(x.id) || ["", "", ""], pan: ((g || {}).pan || {})[x.id] || [] });
     for (const e of (u || {}).egos || []) if (e.img && e.img.thumb) units.set(e.id, { id: e.id, title: e.name, who: e.sinnerName, sinner: e.sinner, ego: e.grade, season: giSeason(u, e.season),
       tint: ((u.seasons || {})[e.season == null ? "8000" : e.season > 9100 && e.season < 9200 ? "9100" : String(e.season)] || {}).color || "",
-      thumb: giThumb(e.img.thumb), art: gaFull(e.img.art), line: ((g || {}).lines || {})[e.id] || ["", ""], pan: [] });
+      thumb: giThumb(e.img.thumb), art: gaFull(e.img.art), line: ((g || {}).lines || {})[e.id] || ["", "", ""], pan: [] });
     // units without a picture left out
     const fit = (b) => ({ ...b, pick: b.pick.filter((i) => units.has(i)), groups: b.groups.map((gr) => ({ ...gr, ids: gr.ids.filter((i) => units.has(i)) })).filter((gr) => gr.ids.length) });
     const banners = ((g || {}).banners || []).map(fit).filter((b) => b.groups.length);
-    ga.data = { banners, archive: ((g || {}).archive || []).map(fit).filter((b) => b.groups.length), units, snd: (g || {}).snd || {} };
+    ga.data = { banners, archive: ((g || {}).archive || []).map(fit).filter((b) => b.groups.length), units, snd: (g || {}).sndUrl || {}, ui: (g || {}).ui || {} };
   }
   if (!location.hash.startsWith("#/gamegacha")) return;
   // an archived banner opened by link joins the tiles
@@ -118,8 +118,8 @@ function gaHome() {
   const up = b.groups.filter((x) => String(x.g).endsWith("_pickup")).flatMap((x) => x.ids).map(gaU);
   // TEMPORARY test button (+1300 lunacy)
   $("#gehome").innerHTML = `<div class="gewallet">${GM_LUNIMG}<b>${gmW.lunacy.toLocaleString("en")}</b>${typeof ADM_PAGES === "undefined" ? "" : `<button id="getest" title="For testing: lunacy for nothing (admin only)">+ 1300 · test</button>`}</div>
-    <div class="getiles">${ga.data.banners.map((x) => `<div class="getile"><img src="${gaFull(x.tile)}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">${ga.old.has(x.id) ? `<button data-drop="${x.id}" title="Remove this banner from the list">×</button>` : ""}</div>`).join("")}</div>
-    <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.illust ? gaFull(b.illust) : ""}')"></div>${b.typo ? `<img class="getypo" src="${gaFull(b.typo)}">` : ""}
+    <div class="getiles">${ga.data.banners.map((x) => `<div class="getile"><img src="${x.pics.tile || ""}" data-b="${x.id}" class="${x === b ? "on" : ""}" title="${x.pick.length ? x.pick.map((i) => esc(gaU(i).title + " — " + gaU(i).who)).join("\n") : "Standard Extraction"}">${ga.old.has(x.id) ? `<button data-drop="${x.id}" title="Remove this banner from the list">×</button>` : ""}</div>`).join("")}</div>
+    <div class="geshow"><div class="geart" style="background-image:url('${f ? f.art : b.pics.illust || ""}')"></div>${b.pics.typo ? `<img class="getypo" src="${b.pics.typo}">` : ""}
       <div class="geinfo">${b.end ? `<div class="geend">Until ${esc(b.end.slice(0, 10))}</div>` : ""}
         <div>000 <b>${rate("3")}</b> &nbsp; E.G.O <b>${rate("EGO")}</b> &nbsp; 00 <b>${rate("2")}</b></div><div>The tenth of a ten: 00 or better.</div>
         ${up.length ? `<div class="geup">${up.map((x) => `<img src="${x.thumb}" class="${x.ego ? "ego" : ""}" title="${esc(x.title + " — " + x.who)} · rate up">`).join("")}</div>` : ""}</div>
@@ -271,7 +271,7 @@ function gaReveal(id, alive) {
     q.style.color = sm.style.color = col;
     q.textContent = u.line[1];
     if (u.line[1]) { q.classList.add("on"); gaSnd("040", 0.5); }
-    if (u.line[0]) { ga.voice = new Audio("/api/quiz_audio?s=" + encodeURIComponent(u.line[0])); ga.voice.volume = typeof gmVol === "function" ? Math.min(1, gmVol() / 0.6) : 1; ga.voice.play().catch(() => {}); }
+    if (u.line[0]) { ga.voice = new Audio(u.line[2]); ga.voice.volume = typeof gmVol === "function" ? Math.min(1, gmVol() / 0.6) : 1; ga.voice.play().catch(() => {}); }
     await tap(u.line[1] ? Math.min(7000, 2000 + u.line[1].length * 30) : 500); if (!on()) return;
     q.classList.remove("on");
     await flash(u.ego ? "037" : "035", 700, u.ego ? "#777" : "#fff");

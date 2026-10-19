@@ -230,7 +230,7 @@ def api_plan(g):
         "/api/appnotes", "/api/appnotes?all=1", "/api/types", "/api/marks", "/api/myteam", "/api/mirror", "/api/history",
         "/api/gacha", "/api/game_pics", "/api/announcers", "/api/game_cards", "/api/music", "/api/sounds", "/api/sounds?q=yi%20sang",
         "/api/langs", "/api/ui_langs", "/api/ui_lang/status", "/api/ui_lang?lang=ru", "/api/site_status", "/api/sprites",
-        "/api/mods_owned", "/api/battle_maps", "/api/bgm_tracks", "/api/stage_pics", "/api/fighter_pics",
+        "/api/mods_owned", "/api/battle_maps", "/api/bgm_tracks", "/api/stage_pics", "/api/game_arenas", "/api/game_voices?n=8", "/api/abno_logs", "/api/fighter_pics",
         "/api/versus_list", "/api/versus_live", "/api/versus_team_rules", f"/api/versus_tags?ids={iid}",
         f"/api/versus_plan?left={iid}&right={iid2}&seed=1&rounds=3", "/api/mirror/catalog", "/api/community",
         "/api/community_rec", "/api/bilibili?period=week&sort=views", "/api/news", "/api/browse?q=bgmCover&limit=5",

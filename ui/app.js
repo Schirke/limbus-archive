@@ -3209,7 +3209,7 @@ function vsDrawRight() {
       else {
         if (typeof muAudio !== "undefined") muAudio.pause();
         vsAudio.dataset.n = b.dataset.play;
-        vsAudio.src = "/api/music_audio?n=" + b.dataset.play;
+        vsAudio.src = muUrl(b.dataset.play);
         vsAudio.play().catch(() => toast("This track could not be read from the game's files."));
       }
       drawTracks();

@@ -11,7 +11,7 @@ routes.banners = async () => {
   const name = (id) => { const u = unitById(id); return (u ? (u.title ? `${u.title} ${u.sinnerName}` : `${u.name} · ${u.sinnerName}`) : "").replace(/::\s*/g, ": "); };
   const pc = (b, ...gs) => { const all = b.groups.reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) || 1;
     return (100 * b.groups.filter((x) => gs.includes(x.g)).reduce((s, x) => s + (x.occ.DEFAULT || 0), 0) / all).toFixed(2).replace(/\.?0+$/, "") + "%"; };
-  const card = (b) => `<div class="card bncard ${b.open ? "open" : ""}">${b.tile ? `<img src="${imgFull(b.tile)}" loading="lazy" onerror="this.style.visibility='hidden'">` : "<i></i>"}
+  const card = (b) => `<div class="card bncard ${b.open ? "open" : ""}">${b.pics.tile ? `<img src="${b.pics.tile}" loading="lazy" onerror="this.style.visibility='hidden'">` : "<i></i>"}
     <div class="bd"><b>${b.pick.map(name).filter(Boolean).map(esc).join("<br>") || "Banner " + b.id}</b>
       <small>000 ${pc(b, "3", "3_pickup")}${b.groups.some((x) => x.g === "3_pickup") ? ` · featured ${pc(b, "3_pickup")}` : ""} · E.G.O ${pc(b, "EGO", "EGO_pickup")}</small>
       <div class="ft"><span class="${b.open ? "bnlive" : "bnended"}">${b.open ? "OPEN" : "ENDED"}</span><small>${b.end ? (b.open ? "until " : "ended ") + esc(b.end.slice(0, 10)) : ""}</small>

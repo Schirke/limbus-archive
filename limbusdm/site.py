@@ -112,16 +112,23 @@ SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
 #   always  made every time (from the internet, or one request); any other part is skipped while what it is made from
 #           (the app, the game version, the site settings, its "uses": INPUTS) is as when it was made last (Exporter.pages)
 PARTS = {
-    "quiz": {"cfg": "games", "taken": True},
-    "cards": {"cfg": "games", "taken": True},  # (random picks: kept until the game or the app changes)
+    "quiz": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (voice lines)", "start": ["/api/quiz"], "sort": True,
+             "packs": [(r"/api/quiz$", PACK), (r"/api/quiz_audio\?", VOICE_PACK), (r"/api/asset_thumb\?", PACK)]}},
+    # the Games page's card pictures: random picks, made again only when the game or the app changes; the index gives the list
+    "cards": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (cards)", "start": ["/api/game_cards?n=9"], "packs": [],
+              "prune": ["/api/game_cards?n=9"], "inline": {"cards": "/api/game_cards?n=9"}}},
     # Guess the Canto picks a background at random: all of them, a small one with its full-size picture
     "scenes": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (story backgrounds)", "start": ["/api/game_pics"],
                "packs": [(r"/api/game_pics$", PACK), (r"/api/asset_img\?", SCENE_PACK), (r"/api/asset_thumb\?", GAME_PACK)]}},
-    "gacha": {"cfg": "games", "taken": True},
-    "newgames": {"cfg": "games", "taken": True},
+    "gacha": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (Extraction)", "start": ["/api/gacha"],
+              "packs": [((r"/api/gacha$", r"/api/gacha_ui\?", r"/api/asset_img\?"), PACK), (r"/api/quiz_audio\?", VOICE_PACK)]}},
+    # Guess the arena (the stage pictures) and Guess the sound (a few lines of each announcer, all of the E.G.O's)
+    "newgames": {"cfg": "games", "taken": True, "uses": ["stage pictures"], "crawl": {"stage": "Games (arenas, voices)", "start": ["/api/game_arenas", "/api/stage_pics", "/api/game_voices"],
+                 "sources": "voices", "prune": ["/api/game_voices"],
+                 "packs": [((r"/api/game_arenas$", r"/api/stage_pics$"), PACK), (r"/api/stage_pic\?", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
     "units": {"taken": True},
     "langs": {"always": True},
-    "small": {"always": True},
+    "small": {"always": True, "crawl": {"stage": "News", "start": ["/api/news", "/api/growth"], "packs": []}},  # (one-list pages asked every time)
     # the planner's gifts then theme packs with its list, the history with the rest
     "tools": {"taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
               "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
@@ -130,12 +137,13 @@ PARTS = {
     "anim": {"cfg": "spine", "taken": True, "uses": ["fx"]},
     "enemies": {"cfg": "enemies", "taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
                 "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]}},
-    "music": {"cfg": "music", "taken": True},
+    "music": {"cfg": "music", "taken": True, "crawl": {"stage": "Music", "start": ["/api/music"], "sources": "music", "packs": []}},  # (Opus from the banks)
     "story": {"cfg": "story", "uses": ["story reader"]},
     "announcers": {"cfg": "story", "taken": True, "crawl": {"stage": "Announcers", "start": ["/api/announcers"],
                    "packs": [(r"/api/announcers$", PACK), ((r"/api/asset_thumb\?", r"/api/asset_img\?"), GAME_PACK),
                              (r"/api/bank\?", VOICE_PACK)]}},
-    "abnologs": {"cfg": "story", "taken": True, "uses": ["enemy pictures", "abno authors"]},
+    "abnologs": {"cfg": "story", "taken": True, "uses": ["enemy pictures", "abno authors"], "crawl": {"stage": "Abnormality logs", "start": ["/api/abno_logs"],
+                 "packs": [(r"/api/abno_logs$", PACK), ((r"/api/asset_thumb\?", r"/api/enemy_thumb\?"), GAME_PACK)]}},
     "biggames": {"taken": True, "uses": ["big games"]},
     "extra": {"taken": True, "by": "verify"},  # (requests the check found unanswered: Exporter.extra)
 }
@@ -502,6 +510,25 @@ def _grouped(got: dict, first: list[tuple[list, int]]) -> tuple[dict, list]:
     return urls, groups
 
 
+def _music_sources(svc, keys: list[str]) -> dict:
+    """A track as Opus straight from its bank."""
+    tracks, out = svc.music()["tracks"], {}
+    for k in keys:
+        m = re.fullmatch(r"/api/music_audio\?n=(\d+)", k)
+        if m and int(m.group(1)) < len(tracks):
+            t = tracks[int(m.group(1))]
+            out[k] = url_key("/api/bank", path=t["bank"], i=t["i"])
+    return out
+
+
+def _voices_sources(svc, keys: list[str]) -> dict:
+    """Guess the sound: a few lines of each announcer."""
+    return {"/api/game_voices": url_key("/api/game_voices", n=ANNOUNCER_LINES)} if "/api/game_voices" in keys else {}
+
+
+# PARTS "sources": a file made from another request than its own (key → request)
+SOURCES = {"music": _music_sources, "voices": _voices_sources}
+
 _APP: list[str] = []
 
 
@@ -557,6 +584,7 @@ INPUTS = {
     "story reader": lambda ex: _story_version(),
     "big games": lambda ex: _files_sig(os.path.join(resource_dir(), "ui", "big")),
     "enemy pictures": lambda ex: _files_sig(os.path.join(ex.svc.data_dir, "enemy_thumbs")),  # (drawn by the app's pages)
+    "stage pictures": lambda ex: _files_sig(os.path.join(ex.svc.data_dir, "stage_thumbs")),  # (made by the player on demand)
     "abno authors": lambda ex: _file_sig(os.path.join(resource_dir(), "ui", "abno_authors.json")),
 }
 MADE = "made.json"  # (d/, not uploaded) what each part was made from, what was sent last (Exporter.pages, _publish)
@@ -928,17 +956,46 @@ class Exporter:
         if old.get("app") != app:  # (another app may answer differently: its answers asked again, pictures kept)
             have = {k: f for k, f in have.items() if ".json" not in f}
         self.progress(stage, 0, 0)
-        got, todo = {}, list(sec["start"])
+        got, todo, srcs = {}, list(sec["start"]), {}
         seen = set(todo)
         while todo:
-            level = self.fetch_all(todo, have, stage)
+            level_have = have
+            if sec.get("sources"):  # a file made from another request: kept while that request is the same
+                src = SOURCES[sec["sources"]](self.svc, todo)
+                srcs.update(src)
+                level_have = {k: f for k, f in have.items() if k not in src}
+                level_have.update((k, old["urls"][k]) for k, s in src.items() if (old.get("src") or {}).get(k) == s and k in (old.get("urls") or {}) and k not in sec["start"])
+            level = self.fetch_all(todo, level_have, stage, srcs)
             got.update((k, level[k]) for k in todo if k in level)
             todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen]
             seen.update(todo)
-        urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in got if re.match(p, k)], size) for pat, size in sec["packs"]])
+        for key in sec.get("prune", ()):
+            if key in got:
+                got[key] = self._prune(key, got)
+        inline = {field: self._stored(got.pop(key)) for field, key in (sec.get("inline") or {}).items() if key in got}  # (the answer goes into the manifest: the index gives it)
+        order = sorted if sec.get("sort") else list  # (a pack holds its files in this order)
+        urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in order(k for k in got if re.match(p, k))], size) for pat, size in sec["packs"]])
         m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups}
+        if srcs:
+            m["src"] = {k: s for k, s in srcs.items() if k in urls}
+        m.update(inline)
         self.write_manifest(name, m)
         return m
+
+    def _prune(self, key: str, got: dict) -> str:
+        """An answer without the rows that link to a file this part has not got (the app had nothing there)."""
+        bad = lambda v: isinstance(v, str) and LINK.match(v) and links.key(v) not in got  # noqa: E731
+        drop = lambda v: bad(v) or (isinstance(v, list) and any(bad(x) for x in v)) or (isinstance(v, dict) and any(bad(x) for x in v.values()))  # noqa: E731
+
+        def walk(o):
+            if isinstance(o, dict):
+                return {k: walk(v) for k, v in o.items()}
+            return [walk(v) for v in o if not drop(v)] if isinstance(o, list) else o
+        was = self._stored(got[key])
+        now = walk(was)
+        if now == was:
+            return got[key]
+        return self._store(json.dumps(now, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), "application/json", gz=True)
 
     def _links(self, key: str, rel: str) -> list[str]:
         """What an answer links to: /api/… and /spine/… strings in a list's JSON, the pages an atlas names."""
@@ -963,19 +1020,6 @@ class Exporter:
         except (OSError, ValueError):
             pass
         return out
-
-    def music(self) -> dict:
-        """The soundtrack as Opus straight from the banks."""
-        old = self.read_manifest("music")
-        tracks = self.svc.music()["tracks"]
-        src = {url_key("/api/music_audio", n=n): url_key("/api/bank", path=t["bank"], i=t["i"]) for n, t in enumerate(tracks)}
-        # keep a file only while its track number means the same sound
-        have = {k: f for k, f in old.get("urls", {}).items() if old.get("src", {}).get(k) == src.get(k)}
-        urls = self.fetch_all(list(src), have, "site: Music", src)
-        urls["/api/music"] = self.fetch("/api/music") or ""
-        m = {"kind": "music", "id": self.svc.latest_snapshot_id(), "urls": {k: f for k, f in urls.items() if f}, "src": src}
-        self.write_manifest("music", m)
-        return m
 
     def anim(self) -> dict:
         """Animations: Spine skeletons with illustration layers, and battle clips (clips()). Effect renders need the
@@ -1082,82 +1126,6 @@ class Exporter:
                 json.dump(now, f)
         return lists + clips + sprites
 
-    def quiz(self) -> dict:
-        """Guess the Identity: the voice line list and every line's sound."""
-        old = self.read_manifest("quiz")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        q = self.svc.quiz()
-        samples = {e[0] for e in (q.get("ids") or []) + (q.get("bosses") or []) if e}  # an entry: [sample name, whose, …]
-        samples |= {ln[0] for c in q.get("chars") or [] for ln in c.get("lines") or []}  # Guess the character: [sample, text, where]
-        keys = ["/api/quiz"] + [url_key("/api/quiz_audio", s=s) for s in sorted(samples)]
-        # Guess the character: the speakers' pictures from the story's log
-        keys += [url_key("/api/asset_thumb", path=p) for p in sorted({c.get("pic") for c in q.get("chars") or []} - {None, ""})]
-        # (the list is the app's own making: a newer app has more in it for the same game version)
-        got = self.fetch_all(keys, {k: f for k, f in have.items() if k != "/api/quiz"}, "site: Games (voice lines)")
-        # lines in small packs
-        urls, groups = _grouped(got, [(keys[:1], PACK), ([k for k in keys if k.startswith("/api/quiz_audio")], VOICE_PACK)])
-        m = {"kind": "quiz", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("quiz", m)
-        return m
-
-    def newgames(self) -> dict:
-        """Guess the arena (the stage pictures) and Guess the sound (announcers' and E.G.O voice lines)."""
-        old = self.read_manifest("newgames")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        lists = ["/api/game_arenas", "/api/stage_pics"]
-        try:
-            arenas = json.loads(self._get("/api/game_arenas")[0])
-            pics = set(json.loads(self._get("/api/stage_pics")[0]).get("have") or [])
-            voices = json.loads(self._get("/api/game_voices")[0])
-        except Exception as e:
-            self.failed.append(("/api/game_arenas", str(e)))
-            arenas, pics, voices = [], set(), {}
-        stages = [url_key("/api/stage_pic", name=a["name"]) for a in arenas if a["name"] in pics]
-        # a few lines of each announcer (all of them: ~160 MB); the site's list names only those
-        ann = {name: sorted(ls, key=lambda ln: (ln[2] > 6000, ln[1]))[:ANNOUNCER_LINES] for name, ls in (voices.get("announcers") or {}).items()}
-        voices = {"announcers": ann, "egos": voices.get("egos") or {}}
-        lines = [(ln[0], ln[1]) for part in voices.values() for ls in part.values() for ln in ls]
-        clips = [url_key("/api/bank", path=b, i=i) for b, i in dict.fromkeys(lines)]
-        # (the lists are the app's own making: asked again every time)
-        got = self.fetch_all(lists + stages + clips, {k: f for k, f in have.items() if k not in lists}, "site: Games (arenas, voices)")
-        urls, groups = _grouped(got, [(lists, PACK), (stages, GAME_PACK), (clips, VOICE_PACK)])
-        voices = {part: {k: [ln for ln in ls if url_key("/api/bank", path=ln[0], i=ln[1]) in urls] for k, ls in v.items()} for part, v in voices.items()}
-        urls["/api/game_voices"] = self._store(json.dumps(voices, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
-        m = {"kind": "newgames", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("newgames", m)
-        return m
-
-    def abnologs(self) -> dict:
-        """Abnormality logs page: the list, the pictures and each one's Spine look."""
-        old = self.read_manifest("abnologs")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        lists = ["/api/abno_logs"]
-        try:
-            ab = json.loads(self._get("/api/abno_logs")[0]).get("list") or []
-        except Exception as e:
-            self.failed.append(("/api/abno_logs", str(e)))
-            ab = []
-        pics = [url_key("/api/asset_thumb", path=a["pic"]) for a in ab if a.get("pic")]
-        pics += [url_key("/api/enemy_thumb", app=a["app"]) for a in ab if a.get("app") and not a.get("pic")]
-        spine = []
-        for x in dict.fromkeys((a["spine"]["bundle"], a["spine"]["atlas"]) for a in ab if a.get("spine")):
-            base = f"/spine/{x[0]}/{x[1]}.2/"
-            spine += [base + "skeleton.atlas", base + "skeleton.json"]
-            try:  # the atlas names its pages: a line that is a file name
-                atlas = self._text(base + "skeleton.atlas", have)
-                spine += [base + ln.strip() for ln in atlas.splitlines() if ln.strip().lower().endswith(".png")]
-            except Exception:
-                pass
-        # (the list carries the writers' guesses: asked again every time)
-        got = self.fetch_all(lists + pics + spine, {k: f for k, f in have.items() if k not in lists}, "site: Abnormality logs")
-        urls, groups = _grouped(got, [(lists, PACK), (pics, GAME_PACK)])
-        m = {"kind": "abnologs", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("abnologs", m)
-        return m
-
     def biggames(self) -> dict:
         """The big games (ui/big): what each asks the app for, found by running them in a hidden window (bigNeeds)."""
         old = self.read_manifest("biggames")
@@ -1193,25 +1161,6 @@ class Exporter:
         urls, groups = _grouped(got, [(lists, PACK), ([k for k in keys if k not in lists and k not in sounds], GAME_PACK), (sounds, VOICE_PACK)])
         m = {"kind": "biggames", "id": sid, "made": made, "urls": urls, "groups": groups}
         self.write_manifest("biggames", m)
-        return m
-
-    def gacha(self) -> dict:
-        """Extraction: banners, their pictures, screen pictures and sounds, E.G.O lines."""
-        from . import gacha
-        old = self.read_manifest("gacha")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        g = gacha.build(self.svc)
-        keys = ["/api/gacha"] + [url_key("/api/gacha_ui", n=n) for n in gacha.UI_USED]
-        # archive banners too
-        keys += [url_key("/api/asset_img", path=b[k]) for b in g["banners"] + g.get("archive", []) for k in ("tile", "typo", "illust") if b.get(k)]
-        keys = list(dict.fromkeys(keys))
-        sounds = [url_key("/api/quiz_audio", s=s) for s in sorted(set(g["snd"].values()))]
-        voices = [url_key("/api/quiz_audio", s=v[0]) for v in g["lines"].values() if v[0]]
-        got = self.fetch_all(keys + sounds + voices, {k: f for k, f in have.items() if k != "/api/gacha"}, "site: Games (Extraction)")
-        urls, groups = _grouped(got, [(keys + sounds, PACK), (voices, VOICE_PACK)])
-        m = {"kind": "gacha", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("gacha", m)
         return m
 
     def story(self) -> dict:
@@ -1284,29 +1233,6 @@ class Exporter:
                                       (sounds + voices, VOICE_PACK), (music + videos, PACK)])
         m = {"kind": "story", "id": sid, "v": story.VERSION, "mv": getattr(story, "MODEL_VERSION", 1), "urls": urls, "groups": groups}
         self.write_manifest("story", m)
-        return m
-
-    CARDS = 9  # pictures kept for each card of the Games page (it draws three)
-
-    def cards(self) -> dict:
-        """Games page cards under "hub=1" requests, so they sit in a pack or two."""
-        from urllib.parse import parse_qsl, urlsplit
-        old = self.read_manifest("cards")
-        sid = self.svc.latest_snapshot_id()
-        try:
-            picked = json.loads(self._get(f"/api/game_cards?n={self.CARDS}")[0])
-        except Exception as e:
-            self.failed.append(("/api/game_cards", str(e)))
-            picked = {}
-        # the preset: same as last time unless changed
-        kept = bool(old.get("id")) and (old.get("cards") or {}) == picked
-        if kept:
-            picked = old["cards"]  # the same pictures as last time: nothing is uploaded again
-        key = lambda u: url_key(urlsplit(u).path, **dict(parse_qsl(urlsplit(u).query)))  # noqa: E731
-        keys = list(dict.fromkeys(key(u) for us in picked.values() for u in us))
-        urls = self.fetch_all(keys, self.kept(old) if kept else {}, "site: Games (cards)")
-        m = {"kind": "cards", "id": sid, "urls": urls, "cards": {g: [u for u in us if key(u) in urls] for g, us in picked.items()}}
-        self.write_manifest("cards", m)
         return m
 
     def extra(self, keys: list[str]) -> int:
@@ -1397,15 +1323,6 @@ class Exporter:
         files = self.fetch_all(keys + ["/api/langs"] + ui, have, "site: Languages")
         m = {"kind": "langs", "id": self.svc.latest_snapshot_id(), "urls": files, "src": src}
         self.write_manifest("langs", m)
-        return m
-
-    def small(self) -> dict:
-        """One-list pages asked every time: News, Upgrade calc."""
-        from .growth import icons
-        pics = [url_key("/api/object", bundle=v["b"], pid=v["p"]) for v in icons(self.svc).values()]
-        urls = self.fetch_all(["/api/news", "/api/growth"] + pics, {}, "site: News")
-        m = {"kind": "small", "id": self.svc.latest_snapshot_id(), "urls": urls}
-        self.write_manifest("small", m)
         return m
 
     def open_routes(self) -> list[str]:

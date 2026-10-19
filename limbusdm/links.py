@@ -19,9 +19,34 @@ def img(path: str) -> str:
     return f"/api/asset_img?path={_q(path)}" if path else ""
 
 
+def obj(bundle: str, pid) -> str:
+    """A picture of a bundle by its object id."""
+    return f"/api/object?bundle={_q(bundle)}&pid={pid}" if bundle else ""
+
+
 def bank(path: str, i) -> str:
     """One sound of a sound bank."""
     return f"/api/bank?path={_q(path)}&i={i}" if path else ""
+
+
+def quiz_audio(sample: str) -> str:
+    """One voice line or sound by its sample's name."""
+    return f"/api/quiz_audio?s={_q(sample)}" if sample else ""
+
+
+def gacha_ui(name: str) -> str:
+    """A picture of the Extraction screens."""
+    return f"/api/gacha_ui?n={_q(name)}" if name else ""
+
+
+def stage_pic(name: str) -> str:
+    """A battle stage's picture."""
+    return f"/api/stage_pic?name={_q(name)}" if name else ""
+
+
+def music_audio(n: int) -> str:
+    """A soundtrack's track by its number."""
+    return f"/api/music_audio?n={n}"
 
 
 def enemy_thumb(app: str) -> str:

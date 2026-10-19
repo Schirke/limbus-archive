@@ -12,7 +12,7 @@ const upgFmt = (n) => Math.round(n).toLocaleString("en-US");
 // the game's item pictures (growth.py ICONS); a missing one = its text
 function upgPic(k, alt = "", cls = "") {
   const v = upg.db.icons && upg.db.icons[k];
-  return v ? `<img class="upgi ${cls}" src="/api/object?bundle=${encodeURIComponent(v.b)}&pid=${v.p}" alt="${esc(alt)}" title="${esc(alt)}" onerror="icoFail(this)">`
+  return v ? `<img class="upgi ${cls}" src="${v.url}" alt="${esc(alt)}" title="${esc(alt)}" onerror="icoFail(this)">`
     : `<span class="upgi upgtk ${cls}">${esc(alt)}</span>`;
 }
 const upgShard = (sinner, cls = "") => upgPic(`shard_${sinner}`, `${UPG_SINNERS[sinner - 1] || ""} Egoshard`, cls);
