@@ -174,7 +174,7 @@ routes.gamehilo = async (args = []) => {
   kqLoading("Higher or lower");
   if (!kh.ids) {
     const u = await units().catch(() => null);
-    kh.ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb && x.speed && x.speed.length).map((x) => ({ key: "i" + x.id, x, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName, pic: giThumb(x.img.thumb) }));
+    kh.ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb && x.speed && x.speed.length).map((x) => ({ key: "i" + x.id, x, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName, pic: x.pics.thumb }));
     if (!u) setTimeout(() => { kh.ids = null; });
   }
   if (!location.hash.startsWith("#/gamehilo")) return;
@@ -263,7 +263,7 @@ routes.gamepassive = async (args = []) => {
   kqLoading("Whose passive");
   if (!kp.list) {
     const u = await units().catch(() => null), seen = new Map();
-    kp.ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName, sinner: x.sinner, kw: x.keywords || [], pic: giThumb(x.img.thumb) }));
+    kp.ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName, sinner: x.sinner, kw: x.keywords || [], pic: x.pics.thumb }));
     for (const x of (u || {}).ids || []) for (const p of x.passives || []) {
       const text = (p.desc || "").trim();
       if (text.length < 40 || !["battle", "support"].includes(p.kind)) continue;
@@ -344,7 +344,7 @@ routes.gameego = async (args = []) => {
     ke.list = ((u || {}).egos || []).filter((x) => x.img && x.img.thumb && (x.skills || []).length).map((x) => {
       const s = x.skills.find((k) => /AWAKEN/.test(k.type)) || x.skills[0], top = s.up[Math.max(...Object.keys(s.up).map(Number))];
       return { key: "e" + x.id, id: x.id, name: x.name + " " + x.sinnerName, title: x.name, sub: x.sinnerName, sinner: x.sinner, grade: x.grade, cost: x.cost || [],
-        top, passive: (x.passives || [])[0], pic: giThumb(x.img.thumb) };
+        top, passive: (x.passives || [])[0], pic: x.pics.thumb };
     });
     if (!u) setTimeout(() => { ke.list = null; });
   }
@@ -428,7 +428,7 @@ routes.gamesound = async (args = []) => {
     ks.ann = Object.entries((v || {}).announcers || {}).filter(([, lines]) => lines.length).map(([name, lines]) => ({ key: "a:" + name, name, title: name, sub: "Announcer", kind: "ann", lines }));
     const egos = new Map(((u || {}).egos || []).map((x) => [String(x.id), x]));
     ks.egos = Object.entries((v || {}).egos || {}).filter(([id, lines]) => egos.has(id) && lines.length).map(([id, lines]) => { const x = egos.get(id);
-      return { key: "e" + id, id: x.id, name: x.name + " " + x.sinnerName, title: x.name, sub: x.sinnerName, sinner: x.sinner, kind: "ego", lines, pic: giThumb(x.img.thumb) }; });
+      return { key: "e" + id, id: x.id, name: x.name + " " + x.sinnerName, title: x.name, sub: x.sinnerName, sinner: x.sinner, kind: "ego", lines, pic: x.pics.thumb }; });
     if (!v || !u) setTimeout(() => { ks.ann = null; });
   }
   if (!location.hash.startsWith("#/gamesound")) return;
@@ -517,7 +517,7 @@ routes.gamememory = async (args = []) => {
   kqLoading("Memory");
   if (!km.ids) {
     const u = await units().catch(() => null);
-    km.ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, title: x.title, sub: x.sinnerName, sinner: x.sinner, pic: giThumb(x.img.thumb) }));
+    km.ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, title: x.title, sub: x.sinnerName, sinner: x.sinner, pic: x.pics.thumb }));
     if (!u) setTimeout(() => { km.ids = null; });
   }
   if (!location.hash.startsWith("#/gamememory")) return;

@@ -36,7 +36,7 @@ async function sxData() {
   const count = (t) => { for (const m of String(t || "").matchAll(/<link="([^"]+)">|\[([A-Za-z0-9_]+)\]/g)) used.set(m[1] || m[2], (used.get(m[1] || m[2]) || 0) + 1); };
   const own = [];
   for (const x of [...UNITS.ids, ...UNITS.egos]) {
-    const ego = !x.title, who = `${ego ? x.name : x.title} · ${x.sinnerName}`, go = `#/db/${ego ? "ego" : "ids"}/${x.id}`, pic = imgThumb(x.img.thumb), names = new Set();
+    const ego = !x.title, who = `${ego ? x.name : x.title} · ${x.sinnerName}`, go = `#/db/${ego ? "ego" : "ids"}/${x.id}`, pic = x.pics.thumb, names = new Set();
     for (const sk of [...(x.skills || []), ...(x.defense || [])]) {
       for (const u of Object.values(sk.up)) { count(u.desc); (u.coindescs || []).flat().forEach(count); }
       const n = topUp(sk).name;
@@ -51,11 +51,11 @@ async function sxData() {
   for (const [k, n] of [...used].sort((a, b) => b[1] - a[1])) {
     const g = UNITS.glossary[k];
     if (!g?.name) continue;
-    if (!kws.has(g.name)) kws.set(g.name, { g: "Keywords", t: g.name, s: sxPlain(g.desc).replace(/\s+/g, " ").slice(0, 90), ...(g.icon ? { pic: imgThumb(g.icon) } : { html: statusIcon(k, "s28") }), go: "#/db/ids", kw: g.name, k: [g.name, k] });
+    if (!kws.has(g.name)) kws.set(g.name, { g: "Keywords", t: g.name, s: sxPlain(g.desc).replace(/\s+/g, " ").slice(0, 90), ...(g.iconUrl ? { pic: g.iconUrl } : { html: statusIcon(k, "s28") }), go: "#/db/ids", kw: g.name, k: [g.name, k] });
   }
   rows.push(...kws.values());
-  for (const x of UNITS.ids) rows.push({ g: "Identities", t: x.title, s: x.sinnerName + season(x), pic: imgThumb(x.img.thumb), go: `#/db/ids/${x.id}`, k: [x.title, x.sinnerName, x.id] });
-  for (const x of UNITS.egos) rows.push({ g: "E.G.O", t: x.name, s: `${x.sinnerName} · ${x.grade}`, pic: imgThumb(x.img.thumb), go: `#/db/ego/${x.id}`, k: [x.name, x.sinnerName, x.grade, x.id] });
+  for (const x of UNITS.ids) rows.push({ g: "Identities", t: x.title, s: x.sinnerName + season(x), pic: x.pics.thumb, go: `#/db/ids/${x.id}`, k: [x.title, x.sinnerName, x.id] });
+  for (const x of UNITS.egos) rows.push({ g: "E.G.O", t: x.name, s: `${x.sinnerName} · ${x.grade}`, pic: x.pics.thumb, go: `#/db/ego/${x.id}`, k: [x.name, x.sinnerName, x.grade, x.id] });
   rows.push(...own);
   const seen = new Set();
   for (const e of en?.list || []) {

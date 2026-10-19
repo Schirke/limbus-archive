@@ -118,12 +118,12 @@ async function pfUnits() {
   if (pf.units) return pf.units;
   const u = await api("/api/units").catch(() => null), all = new Map(), sinners = [];
   for (const x of (u || {}).ids || []) if (x.img && x.img.thumb) {
-    all.set(x.id, { id: x.id, title: x.title, who: x.sinnerName, sinner: x.sinner, kind: "r" + x.rank, thumb: giThumb(x.img.thumb), art: gaFull(x.img.art2 || x.img.art),
-      art1: gaFull(x.img.art), ...(x.img.art2 && x.img.art2 !== x.img.art ? { art3: gaFull(x.img.art2), thumb3: giThumb(x.img.art2) } : {}) });
+    all.set(x.id, { id: x.id, title: x.title, who: x.sinnerName, sinner: x.sinner, kind: "r" + x.rank, thumb: x.pics.thumb, art: x.pics.art2 || x.pics.art,
+      art1: x.pics.art, ...(x.img.art2 && x.img.art2 !== x.img.art ? { art3: x.pics.art2, thumb3: x.pics.thumb2 } : {}) });
     sinners[x.sinner - 1] = x.sinnerName;
   }
   for (const e of (u || {}).egos || []) if (e.img && e.img.thumb)
-    all.set(e.id, { id: e.id, title: e.name, who: e.sinnerName, sinner: e.sinner, kind: "ego", grade: e.grade, thumb: giThumb(e.img.thumb), art: gaFull(e.img.art) });
+    all.set(e.id, { id: e.id, title: e.name, who: e.sinnerName, sinner: e.sinner, kind: "ego", grade: e.grade, thumb: e.pics.thumb, art: e.pics.art });
   return (pf.units = { all, sinners });
 }
 // the card's art: before Uptie III or after it (the choice kept; an Identity without a second art has one)

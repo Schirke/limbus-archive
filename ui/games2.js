@@ -34,10 +34,10 @@ async function giOpen(page, daily) {  // daily: start at once
   if (!gi.data) {
     const [q, units, en] = await Promise.all([api("/api/quiz"), api("/api/units"), api("/api/enemies")].map((p) => p.catch(() => null)));
     const ids = new Map(((units || {}).ids || []).map((x) => [x.id, { key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName,
-      sinner: x.sinner, season: giSeason(units, x.season), pic: giThumb(x.img.thumb), lines: [],
+      sinner: x.sinner, season: giSeason(units, x.season), pic: x.pics.thumb, lines: [],
       // skills by picture; free hints: sin, damage type, slot
       skills: (x.skills || []).concat(x.defense || []).map((s) => { const u = s.up[Math.max(...Object.keys(s.up).map(Number))] || {};
-        return { s: String(s.id), pic: giThumb(`Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`), text: u.name || "",
+        return { s: String(s.id), pic: s.iconUrl, text: u.name || "",
           when: [u.sin, u.atk, s.type === "SKILL" ? "Skill " + s.tier : u.def || "Defense"].filter(Boolean).join(" · ") }; }).filter((s) => s.text) }]));
     const thumbs = new Set((en || {}).thumbs || []);
     const bosses = new Map(((en || {}).list || []).map((e) => [e.id, { key: "b" + e.id, id: e.id, name: e.name, title: e.name, sub: e.group, boss: true,

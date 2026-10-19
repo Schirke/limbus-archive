@@ -126,7 +126,8 @@ PARTS = {
     "newgames": {"cfg": "games", "taken": True, "uses": ["stage pictures"], "crawl": {"stage": "Games (arenas, voices)", "start": ["/api/game_arenas", "/api/stage_pics", "/api/game_voices"],
                  "sources": "voices", "prune": ["/api/game_voices"],
                  "packs": [((r"/api/game_arenas$", r"/api/stage_pics$"), PACK), (r"/api/stage_pic\?", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
-    "units": {"taken": True},
+    # the database (Identities & E.G.O; other pages show its pictures too), the interface's icons and fonts
+    "units": {"taken": True, "crawl": {"stage": "Identities & E.G.O", "start": ["/api/units", "/api/ui_icons"], "packs": "units"}},
     "langs": {"always": True, "crawl": {"stage": "Languages", "start": ["/api/langs", "/api/ui_langs"], "sources": "langs",
               "fresh": [r"/api/ui_lang\?"], "packs": [((r"/api/lang\?", r"/api/langfont\?", r"/api/langs$", r"/api/ui_langs$", r"/api/ui_lang\?"), PACK)],
               "hold": "langs"}},  # (hold: a computer with no translations of its own leaves the site's as they are)
@@ -336,40 +337,6 @@ def public(rep: dict) -> dict:
     return rep
 
 
-# ------------------------------------------------------------------ what a page asks for
-def unit_urls(units: dict) -> list[str]:
-    """Requests of the Identities & E.G.O page (ui/db.js)."""
-    from .uiicons import FONTS, ICONS
-    urls = [url_key("/api/units")]
-    urls += [url_key("/api/ui_icon", k=k) for k in ICONS] + [url_key("/api/ui_icon", k=f"sinner_{n}") for n in range(1, 13)]
-    urls += [url_key("/api/font", name=n) for n in FONTS]
-    thumbs, full = set(), set()
-
-    def walk(o, key=""):
-        if isinstance(o, dict):
-            for k, v in o.items():
-                walk(v, k)
-        elif isinstance(o, list):
-            for v in o:
-                walk(v, key)
-        elif isinstance(o, str) and o.startswith("Assets/"):
-            (full if key in ("art", "art2") else thumbs).add(o)
-            if key == "art2":  # (Profile: the Uptie III face)
-                thumbs.add(o)
-    walk(units)
-    for u in units.get("ids", []):
-        # skill pictures by `icon`, defense skills too (E.G.O skills have none: the page draws the E.G.O's picture)
-        for s in (u.get("skills") or []) + (u.get("defense") or []):
-            icon = f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png"
-            thumbs.add(icon)
-            full.add(icon)  # drawn into its sin frame
-    # E.G.O skills use the E.G.O's picture
-    full.update(u["img"]["thumb"] for u in units.get("egos", []) if (u.get("img") or {}).get("thumb"))
-    urls += [url_key("/api/asset_thumb", path=p) for p in sorted(thumbs)]
-    urls += [url_key("/api/asset_img", path=p) for p in sorted(full)]
-    return urls
-
-
 # ------------------------------------------------------------------ files
 def _ffmpeg() -> str:
     import imageio_ffmpeg
@@ -565,7 +532,33 @@ def _story_packs(ex, got: dict) -> list:
     return [(k(lists + models), PACK), (k(thumbs + sprites), GAME_PACK), (k(pics), SCENE_PACK), (k(sounds + voices), VOICE_PACK), (k(music + videos), PACK)]
 
 
-PACKERS = {"story": _story_packs}
+def _units_packs(ex, got: dict) -> list:
+    """The database's packs: the newest faces (the front page, the list's first screen), skill pictures small (the games pick
+    at random), keyword pictures by name, a card's art and skill pictures in a pack of its own (the second art in the next),
+    then the rest in the order of old (lists, icons, fonts, small pictures, big ones); an E.G.O's own skill pictures after."""
+    if "/api/units" not in got:
+        return []
+    K, u = links.key, ex._stored(got["/api/units"])
+    kit = ex._stored(got["/api/ui_icons"]) if "/api/ui_icons" in got else {}
+    ids, egos = u.get("ids") or [], u.get("egos") or []
+    fresh = sorted(ids, key=lambda x: (x.get("date") or "", x["id"]), reverse=True)
+    faces = [x["pics"]["thumb"] for x in fresh for k in ("thumb", "art") if (x.get("img") or {}).get(k)]  # (two per Identity: its art's small one is the same)
+    icons = [s["iconUrl"] for x in ids for s in (x.get("skills") or []) + (x.get("defense") or [])]
+    words = sorted(k for k in got if k.startswith("/api/asset_thumb?") and "/Buf/" in k)
+    cards = []
+    for x in ids + egos:
+        p = x["pics"]
+        cards.append(([p["art"]] + ([s["artUrl"] for s in (x.get("skills") or []) + (x.get("defense") or [])] if x.get("title") else [p["full"]]), CARD_PACK))
+        if p["art2"]:
+            cards.append(([p["art2"]], CARD_PACK))
+    rest = ["/api/units"] + (kit.get("icons") or []) + (kit.get("fonts") or [])
+    later = {K(s[f]) for x in egos for s in x.get("skills") or [] for f in ("iconUrl", "artUrl") if s.get(f)}
+    rest += sorted(k for k in got if k.startswith("/api/asset_thumb?") and k not in later) + sorted(k for k in got if k.startswith("/api/asset_img?") and k not in later)
+    k = lambda xs: [K(x) for x in xs if x]  # noqa: E731
+    return [(k(faces[:FRESH_FACES]), PACK), (k(faces[FRESH_FACES:]), PACK), (k(icons), GAME_PACK), (words, WORD_PACK)] + [(k(c), n) for c, n in cards] + [(k(rest), PACK)]
+
+
+PACKERS = {"story": _story_packs, "units": _units_packs}
 
 
 def _report_order(ex, r: dict, got: dict) -> list[str]:
@@ -987,39 +980,6 @@ class Exporter:
         os.makedirs(os.path.join(self.out, "d", "tr"), exist_ok=True)
         with gzip.open(os.path.join(self.out, "d", "tr", name + ".json.gz"), "wt", encoding="utf-8") as f:
             json.dump(found, f, ensure_ascii=False)
-
-    def units(self) -> dict:
-        old = self.read_manifest("units")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)  # (another game version: only what it left alone is kept)
-        units = self.svc.unit_db()
-        # the app's own lists: asked again every time
-        got = self.fetch_all(unit_urls(units), {k: f for k, f in have.items() if k != "/api/units"}, "site: Identities & E.G.O")
-        # faces in their own packs, skill pictures in small packs (the games pick at random)
-        thumb = lambda p: url_key("/api/asset_thumb", path=p)  # noqa: E731
-        ids = units.get("ids", [])
-        # (newest first: the front page and the list's first screen come from one small pack)
-        fresh = sorted(ids, key=lambda x: (x.get("date") or "", x["id"]), reverse=True)
-        faces = [thumb(x["img"][k]) for x in fresh for k in ("thumb", "art") if (x.get("img") or {}).get(k)]
-        icons = [thumb(f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png") for x in ids for s in x.get("skills", []) + x.get("defense", [])]
-        # a card's art and skill pictures in a pack of their own, the second art in the next
-        img = lambda p: url_key("/api/asset_img", path=p)  # noqa: E731
-        cards = []
-        for x in ids + units.get("egos", []):
-            im = x.get("img") or {}
-            own = ([img(im["art"])] if im.get("art") else []) + [img(f"Assets/Resources_moved/Sprite/SkillIcon/{s.get('icon') or s['id']}.png")
-                                                                  for s in (x.get("skills") or []) + (x.get("defense") or []) if x.get("title")]
-            if not x.get("title") and im.get("thumb"):
-                own.append(img(im["thumb"]))
-            cards.append((own, CARD_PACK))
-            if im.get("art2"):
-                cards.append(([img(im["art2"])], CARD_PACK))
-        # keyword icons in small packs, by name
-        words = sorted(k for k in got if k.startswith("/api/asset_thumb?") and "/Buf/" in k)
-        urls, groups = _grouped(got, [(faces[:FRESH_FACES], PACK), (faces[FRESH_FACES:], PACK), (icons, GAME_PACK), (words, WORD_PACK)] + cards)
-        m = {"kind": "units", "id": sid, "urls": urls, "groups": groups}
-        self.write_manifest("units", m)
-        return m
 
     def crawl(self, name: str, sec: dict | None = None) -> dict:
         """A part made by following links (PARTS "crawl"): its lists, then every file their answers link to (links.py), level
@@ -1583,7 +1543,6 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
                                          to=json.dumps("/#/" + route), title=e(title), desc=e(desc), body=body, route=e(route)))
             out.append(path)
 
-        art = lambda p: p and url_key("/api/asset_img", path=p)  # noqa: E731
         thumb = lambda p: p and url_key("/api/asset_thumb", path=p)  # noqa: E731
         seasons = units.get("seasons") or {}
         season = lambda x: (seasons.get(str(x.get("season"))) or {}).get("name") or ""  # noqa: E731
@@ -1594,7 +1553,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
                 f"Keywords: {', '.join(word(k) for k in x.get('statuses') or [])}." if x.get("statuses") else "",
                 f"Skills: {' · '.join(dict.fromkeys(names))}." if names else ""]))
             card(f"db/id/{x['id']}", f"db/id/{x['id']}", f"{x.get('title')} {x.get('sinnerName')}", short(desc),
-                 skills_html(x.get("skills") or [], x.get("passives") or []), art((x.get("img") or {}).get("art")))
+                 skills_html(x.get("skills") or [], x.get("passives") or []), links.key((x.get("pics") or {}).get("art") or ""))
         for x in units.get("egos") or []:
             cost = ", ".join(f"{c['sin']} ×{c['n']}" for c in x.get("cost") or [])
             names = [n for n, _ in (skill(s) for s in x.get("skills") or []) if n]
@@ -1602,7 +1561,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
                 f"{x.get('grade')} E.G.O of {x.get('sinnerName')}" + (f" · {season(x)}." if season(x) else "."),
                 f"Cost: {cost}." if cost else "", f"Skills: {' · '.join(dict.fromkeys(names))}." if names else ""]))
             card(f"db/ego/{x['id']}", f"db/ego/{x['id']}", f"{x.get('name')} · {x.get('sinnerName')} E.G.O", short(desc),
-                 skills_html(x.get("skills") or [], x.get("passives") or []), art((x.get("img") or {}).get("art")))
+                 skills_html(x.get("skills") or [], x.get("passives") or []), links.key((x.get("pics") or {}).get("art") or ""))
         if "enemies" in open_:
             for x in (load("/api/enemies") or {}).get("list") or []:
                 texts = load(links.key(x.get("info") or "")) or {}

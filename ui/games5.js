@@ -14,7 +14,6 @@ const ga = { st: null, data: null, banner: null, run: 0, skip: null, voice: null
 const gaNew = () => ({ pulls: 0, n: { r3: 0, r2: 0, r1: 0, ego: 0 }, since: 0, got: {}, pity: {}, banner: 0, all: true });
 const gaKeep = () => { try { localStorage.setItem(GA_KEEP, JSON.stringify(ga.st)); } catch {} };
 const gaUi = (n) => (ga.data && ga.data.ui[n]) || "/api/gacha_ui?n=" + n;
-const gaFull = (p) => `/api/asset_img?path=${encodeURIComponent(p)}`;
 const gaU = (id) => ga.data.units.get(id);
 const gaKind = (id) => gaU(id).ego ? "ego" : "r" + gaU(id).rank;
 const gaWait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -56,10 +55,10 @@ routes.gamegacha = async (args = []) => {
     const units = new Map();
     for (const x of (u || {}).ids || []) if (x.img && x.img.thumb) units.set(x.id, { id: x.id, title: x.title, who: x.sinnerName, sinner: x.sinner, rank: x.rank, season: giSeason(u, x.season),
       tint: ((u.seasons || {})[x.season == null ? "8000" : x.season > 9100 && x.season < 9200 ? "9100" : String(x.season)] || {}).color || "",
-      thumb: giThumb(x.img.thumb), art: gaFull(x.img.art2 || x.img.art), line: said.get(x.id) || ["", "", ""], pan: ((g || {}).pan || {})[x.id] || [] });
+      thumb: x.pics.thumb, art: x.pics.art2 || x.pics.art, line: said.get(x.id) || ["", "", ""], pan: ((g || {}).pan || {})[x.id] || [] });
     for (const e of (u || {}).egos || []) if (e.img && e.img.thumb) units.set(e.id, { id: e.id, title: e.name, who: e.sinnerName, sinner: e.sinner, ego: e.grade, season: giSeason(u, e.season),
       tint: ((u.seasons || {})[e.season == null ? "8000" : e.season > 9100 && e.season < 9200 ? "9100" : String(e.season)] || {}).color || "",
-      thumb: giThumb(e.img.thumb), art: gaFull(e.img.art), line: ((g || {}).lines || {})[e.id] || ["", "", ""], pan: [] });
+      thumb: e.pics.thumb, art: e.pics.art, line: ((g || {}).lines || {})[e.id] || ["", "", ""], pan: [] });
     // units without a picture left out
     const fit = (b) => ({ ...b, pick: b.pick.filter((i) => units.has(i)), groups: b.groups.map((gr) => ({ ...gr, ids: gr.ids.filter((i) => units.has(i)) })).filter((gr) => gr.ids.length) });
     const banners = ((g || {}).banners || []).map(fit).filter((b) => b.groups.length);
@@ -352,8 +351,8 @@ routes.gamedare = async () => {
   $("#main").innerHTML = `<h1>Challenge roulette</h1><div class="sub">Reading the game's files…</div>`;
   if (!gd.data) {
     const u = await api("/api/units").catch(() => null), kw = (u || {}).keywords || {};
-    const ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ id: x.id, title: x.title, sinner: x.sinner, rank: x.rank, kw: (x.keywords || []).map((k) => kw[k] || k), pic: giThumb(x.img.thumb) }));
-    const egos = ((u || {}).egos || []).filter((e) => e.img && e.img.thumb).map((e) => ({ id: e.id, title: e.name, sinner: e.sinner, grade: e.grade, pic: giThumb(e.img.thumb) }));
+    const ids = ((u || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ id: x.id, title: x.title, sinner: x.sinner, rank: x.rank, kw: (x.keywords || []).map((k) => kw[k] || k), pic: x.pics.thumb }));
+    const egos = ((u || {}).egos || []).filter((e) => e.img && e.img.thumb).map((e) => ({ id: e.id, title: e.name, sinner: e.sinner, grade: e.grade, pic: e.pics.thumb }));
     gd.data = { ids, egos, sinners: (u || {}).sinners || [], sins: (u || {}).sins || [], kws: [...new Set(ids.flatMap((x) => x.kw))] };
   }
   if (!location.hash.startsWith("#/gamedare")) return;

@@ -504,7 +504,7 @@ routes.gamejig = async (args = []) => {
   if (!gj.arts) {
     const u = await api("/api/units").catch(() => null);
     gj.arts = ((u || {}).ids || []).filter((x) => x.img && x.img.art && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title,
-      sub: x.sinnerName, thumb: giThumb(x.img.thumb), pic: `/api/asset_img?path=${encodeURIComponent(x.img.art)}` }));
+      sub: x.sinnerName, thumb: x.pics.thumb, pic: x.pics.art }));
     if (!u) setTimeout(() => { gj.arts = null; });
   }
   if (!location.hash.startsWith("#/gamejig")) return;

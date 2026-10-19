@@ -80,7 +80,7 @@
       let at = -1, top = 0;
       const show = (i) => {
         // phone: the art after uptie 3 (when there is one) fits the tall banner better
-        const x = slides[i], url = imgFull(matchMedia("(max-width: 900px)").matches && x.img.art2 || x.img.art), im = new Image();
+        const x = slides[i], url = matchMedia("(max-width: 900px)").matches && x.pics.art2 || x.pics.art, im = new Image();
         im.onload = () => {
           if (!who.isConnected) return;
           top ^= 1; at = i;

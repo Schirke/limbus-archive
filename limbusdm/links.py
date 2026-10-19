@@ -50,6 +50,16 @@ def music_audio(n: int) -> str:
     return f"/api/music_audio?n={n}"
 
 
+def ui_icon(k: str) -> str:
+    """One of the game's interface icons."""
+    return f"/api/ui_icon?k={_q(k)}"
+
+
+def font(name: str) -> str:
+    """One of the game's interface fonts."""
+    return f"/api/font?name={_q(name)}"
+
+
 def enemy_thumb(app: str) -> str:
     """The page's picture of an enemy's idle pose."""
     return f"/api/enemy_thumb?app={_q(app)}" if app else ""

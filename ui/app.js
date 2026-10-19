@@ -1055,7 +1055,7 @@ function recentAdd(sel, title, sub) {
 }
 const animThumb = (id) => {
   const u = typeof unitById === "function" && unitById(id);
-  return u && u.img && u.img.thumb ? `<img loading="lazy" src="${imgThumb(u.img.thumb)}" onerror="this.style.visibility='hidden'">` : `<span class="an-ph"></span>`;
+  return u && u.img && u.img.thumb ? `<img loading="lazy" src="${u.pics.thumb}" onerror="this.style.visibility='hidden'">` : `<span class="an-ph"></span>`;
 };
 // enemy picture from the handbook, else grey
 const animEnemyThumb = (app) => `<img loading="lazy" src="/api/enemy_thumb?app=${encodeURIComponent(app)}" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'an-ph' }))">`;
@@ -2541,7 +2541,7 @@ const vsIcon = (id) => `/api/char_icon?id=${encodeURIComponent(id)}`;
 // fallback picture from the database
 function vsImgErr(img) {
   const id = img.dataset.id || "", u = typeof UNITS !== "undefined" && UNITS && /^\d+$/.test(id) && unitById(+id);
-  const alt = u && u.img && u.img.thumb ? imgThumb(u.img.thumb) : "";
+  const alt = u && u.img && u.img.thumb ? u.pics.thumb : "";
   const tried = (img.dataset.tried || "").split("|");
   for (const src of [vsIcon(id), alt]) if (src && !tried.includes(src) && !img.src.endsWith(src)) {
     img.dataset.tried = tried.concat(src).join("|");

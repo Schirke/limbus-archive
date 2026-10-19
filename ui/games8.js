@@ -18,7 +18,7 @@ routes.gamewhen = async (args = []) => {
   if (!gt.data) {
     const u = await api("/api/units").catch(() => null);
     const of = (list, ego) => (list || []).filter((x) => x.date && x.img && x.img.thumb).map((x) => ({ key: (ego ? "g" : "i") + x.id, id: x.id, ego, title: ego ? x.name : x.title, sub: x.sinnerName,
-      name: (ego ? x.name : x.title) + " " + x.sinnerName, day: gtDay(x.date), season: giSeason(u, x.season) || "", pic: giThumb(x.img.thumb) }));
+      name: (ego ? x.name : x.title) + " " + x.sinnerName, day: gtDay(x.date), season: giSeason(u, x.season) || "", pic: x.pics.thumb }));
     const all = [...of((u || {}).ids, false), ...of((u || {}).egos, true)];
     // (what the game came out with would all be one answer: not asked)
     const from = Math.min(...all.map((x) => x.day));

@@ -237,7 +237,7 @@ def api_plan(g):
         "/api/tree?prefix=Assets/Resources_moved/Sprite/", "/api/buffs?status=1", "/api/stages", "/api/story", "/api/story_lines",
         "/api/quiz", f"/api/skill_slots?id={iid}", f"/api/fx?id={iid}", f"/api/fx_buffs?id={iid}",
         f"/api/mods?id={iid}&light=1", f"/api/skills?id={iid}", f"/api/owner_videos?id={iid}",
-        f"/api/char_icon?id={iid}", f"/api/char_icon?id={eid}", "/api/ui_icon?k=sinner_1", "/api/gacha_ui?n=icon_lunacy",
+        f"/api/char_icon?id={iid}", f"/api/char_icon?id={eid}", "/api/ui_icon?k=sinner_1", "/api/ui_icons", "/api/gacha_ui?n=icon_lunacy",
         "/api/patchnotes?new=1", f"/api/frames?id={iid}",
     ]
     if rep_id:

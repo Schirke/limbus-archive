@@ -131,7 +131,7 @@ function dcDraw() {
   $("#main").innerHTML = `<div class="dcpage"><h1>Damage calculator</h1>
     <p class="muted small dccredit">Formula and presets: <a href="https://github.com/BaTyANl/ElderCalc" target="_blank" rel="noopener">BaTyANl calc ↗</a></p>
     <div class="cqpicks">
-      <div class="cqpick" data-side="a"><img src="${imgThumb(x.img.thumb)}" alt="" onerror="this.style.visibility='hidden'">
+      <div class="cqpick" data-side="a"><img src="${x.pics.thumb}" alt="" onerror="this.style.visibility='hidden'">
         <div class="grow"><div class="cqname">${esc(x.title || x.name)}</div><div class="muted small">${esc(x.sinnerName)}</div></div>
         <input class="cqin" placeholder="Change…" autocomplete="off"><div class="cqlist"></div></div>
       <div class="cqvs">VS</div>
@@ -241,7 +241,7 @@ function dcBind(pres, u) {
         list.querySelectorAll("[data-en]").forEach((d) => d.onmousedown = () => { dc.en = +d.dataset.en; dc.ev = 0; dcDraw(); });
       } else {
         const found = w.length ? dcList().filter((x) => hit(`${x.title || x.name} ${x.sinnerName} ${sxEn(x.title || x.name)} ${sxEn(x.sinnerName)}`)).slice(0, 8) : [];
-        list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${imgThumb(x.img.thumb)}" alt=""><span>${esc(x.title || x.name)} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
+        list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${x.pics.thumb}" alt=""><span>${esc(x.title || x.name)} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
         list.querySelectorAll("[data-id]").forEach((d) => d.onmousedown = () => { dc.id = +d.dataset.id; dc.slot = 0; redraw(); });
       }
     };

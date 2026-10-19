@@ -650,7 +650,11 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/marks":
                 return self._json(svc.marks)
             if p == "/api/units":
-                return self._json(svc.unit_db())
+                return self._json(_unit_links(svc))
+            if p == "/api/ui_icons":  # the interface's icons and fonts (the site keeps them with the Identities)
+                from .uiicons import FONTS, ICONS
+                return self._json({"icons": [links.ui_icon(k) for k in [*ICONS, *(f"sinner_{n}" for n in range(1, 13))]],
+                                   "fonts": [links.font(n) for n in FONTS]})
             if p == "/api/community":  # live streams of the game, a list made on GitHub
                 from . import community
                 return self._json(community.streams())
@@ -1278,6 +1282,37 @@ def _enemy_entry(e: dict, spine: bool, drawn: bool) -> dict:
     tile = links.enemy_thumb(e["app"]) if drawn and (spine or not pic) else links.thumb(pic)
     big = "" if spine else links.img(pic) or (links.enemy_thumb(e["app"]) if drawn else "")
     return {**e, "spine": spine, "info": f"/api/enemy?id={e['id']}", "tile": tile, "big": big, "face": links.thumb(pic)}
+
+
+def _unit_links(svc) -> dict:
+    """The Identities & E.G.O with their pictures' links: `pics` {thumb, art, art2, thumb2 (the second art small), full (an
+    E.G.O's picture big: what its skills show)}; skills `iconUrl` / `artUrl` (an E.G.O's only when the game has its own);
+    keywords `iconUrl`."""
+    db = svc.unit_db()
+    was = getattr(svc, "_units_linked", None)
+    if was and was[0] is db:
+        return was[1]
+
+    def pics(x):
+        im = x.get("img") or {}
+        out = {"thumb": links.thumb(im.get("thumb")), "art": links.img(im.get("art")), "art2": links.img(im.get("art2")),
+               "thumb2": links.thumb(im.get("art2"))}
+        return out if x.get("title") else {**out, "full": links.img(im.get("thumb"))}
+
+    def skills(x, key):
+        for s in x[key] or []:
+            path = links.SKILL_ICON.format(s.get("icon") or s["id"])
+            if x.get("title") or svc.lookup_container(path) or extra_file(path):  # (an E.G.O's own: rare)
+                s = {**s, "iconUrl": links.thumb(path), "artUrl": links.img(path)}
+            yield s
+
+    def unit(x):
+        return {**x, "pics": pics(x), **{k: list(skills(x, k)) for k in ("skills", "defense") if k in x}}
+    out = {**db, **{k: [unit(x) for x in db[k]] for k in ("ids", "egos") if k in db}}
+    if "glossary" in db:
+        out["glossary"] = {k: {**g, "iconUrl": links.thumb(g["icon"])} if g.get("icon") else g for k, g in db["glossary"].items()}
+    svc._units_linked = (db, out)
+    return out
 
 
 def _skill_links(svc, s: dict | None, sid, pic: str):

@@ -18,7 +18,7 @@ routes.gamediff = async (args = []) => {
   if (!gf.arts) {
     const u = await api("/api/units").catch(() => null);
     gf.arts = ((u || {}).ids || []).filter((x) => x.img && x.img.art && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title,
-      sub: x.sinnerName, thumb: giThumb(x.img.thumb), pic: `/api/asset_img?path=${encodeURIComponent(x.img.art)}` }));
+      sub: x.sinnerName, thumb: x.pics.thumb, pic: x.pics.art }));
     if (!u) setTimeout(() => { gf.arts = null; });
   }
   if (!location.hash.startsWith("#/gamediff")) return;

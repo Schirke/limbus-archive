@@ -36,7 +36,7 @@ const gxIds = () => gxIdsP || (gxIdsP = api("/api/units").then((u) => ((u || {})
   return { key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title, sub: x.sinnerName, sinner: x.sinner, season: giSeason(u, x.season) || "—",
     date: x.date || "", rank: x.rank, kw: (x.keywords || []).map((k) => u.keywords[k] || k), assoc: x.assoc || [],
     atk: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).atk).filter(Boolean))],
-    sins: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).sin).filter(Boolean))], resist: x.resist || {}, pic: giThumb(x.img.thumb) }; })).catch(() => []));
+    sins: [...new Set((x.skills || []).filter((s) => s.type === "SKILL").map((s) => top(s).sin).filter(Boolean))], resist: x.resist || {}, pic: x.pics.thumb }; })).catch(() => []));
 // what the games' page shows as a game's best (games.js gmBest)
 function gxBest(game) {
   if (game === "enemy") return Math.max(0, ...Object.entries(gp.best).filter(([k]) => /^(enemy|id)/.test(k)).map(([, v]) => v));
@@ -100,11 +100,10 @@ async function gpOpen(page, daily) {
       && !seen.has(e.name) && !seen.has(e.app) && seen.add(e.name).add(e.app))
       .map((e) => ({ key: "e" + e.id, id: e.id, name: e.name, title: e.name, sub: e.group, pic: `/api/enemy_thumb?app=${encodeURIComponent(e.app)}` }));
     const ids = ((units || {}).ids || []).filter((x) => x.img && x.img.thumb).map((x) => ({ key: "i" + x.id, id: x.id, name: x.title + " " + x.sinnerName, title: x.title,
-      sub: x.sinnerName, sinner: x.sinner, season: giSeason(units, x.season), pic: giThumb(x.img.thumb), art: x.img.art }));
-    const full = (p) => `/api/asset_img?path=${encodeURIComponent(p)}`;
-    const arts = ids.filter((x) => x.art).map((x) => ({ ...x, thumb: x.pic, pic: full(x.art) }));
+      sub: x.sinnerName, sinner: x.sinner, season: giSeason(units, x.season), pic: x.pics.thumb, art: x.pics.art }));
+    const arts = ids.filter((x) => x.art).map((x) => ({ ...x, thumb: x.pic, pic: x.art }));
     const egos = ((units || {}).egos || []).filter((e) => e.img && e.img.art).map((e) => ({ key: "g" + e.id, id: e.id, name: e.name + " " + e.sinnerName, title: e.name,
-      sub: e.sinnerName, sinner: e.sinner, season: giSeason(units, e.season), thumb: e.img.thumb ? giThumb(e.img.thumb) : "", pic: full(e.img.art) }));
+      sub: e.sinnerName, sinner: e.sinner, season: giSeason(units, e.season), thumb: e.pics.thumb, pic: e.pics.art }));
     const scenes = ((pics || {}).scenes || []).map((s) => ({ key: s.key, canto: s.canto, name: "Canto " + s.canto, title: "Canto " + s.canto, sub: "", pic: s.img, thumb: s.thumb }));
     gp.data = { enemies, ids, arts, egos, scenes, atlas: [], cantos: [...new Set(scenes.map((s) => s.canto))].sort((a, b) => a - b) };
   }

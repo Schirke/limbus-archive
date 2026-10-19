@@ -190,7 +190,7 @@ function fmtDesc(text, plain = false) {
   const kwSpan = (k, label) => {
     const g = gl[k];
     if (!g) return mark(`<span class="kw neu">${esc(label || k)}</span>`);
-    return mark(`<span class="kw ${g.type}" data-kw="${esc(k)}">${g.icon ? `<img class="kwico" src="${imgThumb(g.icon)}" onerror="this.remove()">` : ""}${esc(label || g.name)}</span>`);
+    return mark(`<span class="kw ${g.type}" data-kw="${esc(k)}">${g.iconUrl ? `<img class="kwico" src="${g.iconUrl}" onerror="this.remove()">` : ""}${esc(label || g.name)}</span>`);
   };
   // [TabExplain] is a wrap mark, not a keyword
   let s = String(text).replace(/\[TabExplain\]/g, "").replace(/<sprite[^>]*>/g, "")
@@ -222,7 +222,7 @@ document.addEventListener("click", (e) => {
   const g = UNITS && UNITS.glossary[kw.dataset.kw];
   if (!g) return;
   let t = tip || Object.assign(document.createElement("div"), { id: "kwtip" });
-  t.innerHTML = `<div class="kwhead">${g.icon ? `<img src="${imgThumb(g.icon)}">` : ""}<b class="${g.type}">${esc(g.name)}</b></div>
+  t.innerHTML = `<div class="kwhead">${g.iconUrl ? `<img src="${g.iconUrl}">` : ""}<b class="${g.type}">${esc(g.name)}</b></div>
     <div class="kwdesc">${fmtDesc(g.desc)}</div>${g.flavor ? `<div class="kwflavor">${esc(g.flavor)}</div>` : ""}`;
   document.body.appendChild(t);
   const r = kw.getBoundingClientRect(), w = Math.min(380, window.innerWidth - 20);
@@ -234,7 +234,7 @@ document.addEventListener("click", (e) => {
 
 function unitCard(x, extra = "") {
   const isId = !!x.title;
-  return `<div class="ucard" data-u="${x.id}">${extra}<div class="uimg"><img loading="lazy" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'"></div>
+  return `<div class="ucard" data-u="${x.id}">${extra}<div class="uimg"><img loading="lazy" src="${x.pics.thumb}" onerror="this.style.visibility='hidden'"></div>
     <div class="ucap"><div class="urank">${isId ? rankIcons(x.rank) : ico(`grade_${x.grade}`, "s18", x.grade, x.grade)}</div>
       <div class="utitle">${esc(isId ? x.title : x.name)}</div><div class="muted small">${esc(x.sinnerName)}</div>
       ${isId && x.statuses.length ? `<div class="usins">${x.statuses.map((k) => statusIcon(k, "s20")).join("")}</div>` : ""}</div></div>`;
@@ -246,7 +246,7 @@ function dbCard(x, newest) {
     : (x.cost || []).map((c) => `<span class="arch">${sinIcon(c.sin, "s18")}${c.n}</span>`).join("");
   // tile: art, emblem, rank, season; who, title, archetype
   const sid = Math.floor(x.id / 100) % 100;
-  return `<div class="ucard dcard d2" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">
+  return `<div class="ucard dcard d2" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${x.pics.thumb}" onerror="this.style.visibility='hidden'">
       <span class="uem">${ico(`sinner_${sid}`, "s36", x.sinnerName, "")}</span>
       <span class="urank">${isId ? rankIcons(x.rank) : ico(`grade_${x.grade}`, "s22", x.grade, x.grade)}</span>${seasonTag(x.season)}</div>
     ${x.date && x.date === newest ? `<span class="unew">NEW</span>` : ""}
@@ -277,16 +277,16 @@ function skillView(s, up, level, label, fallbackImg, plain = false) {
   const pl = ks.filter((k) => k < up), prev = !s.up[up] || !pl.length ? null : s.up[Math.max(...pl)];
   const chg = (f) => prev && f(prev) !== f(u) ? " hl" : "";
   const color = SIN_COLORS[u.sin] || "#777";
-  // (enemies: the server's links; fallbackImg {thumb, img} too)
-  const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = s.iconUrl || imgThumb(iconPath);
+  // (the server's links; fallbackImg {thumb, img}: an E.G.O skill's picture without one of its own)
   const fb = typeof fallbackImg === "string" ? { thumb: imgThumb(fallbackImg), img: imgFull(fallbackImg) } : fallbackImg || {};
+  const iconPath = s.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${s.icon || s.id}.png`, icon = s.iconUrl || fb.thumb || imgThumb(iconPath);
   const key = frameKey(u.sin, s.tier, label === "Defense");
   const coinOf = (v) => v.coin == null ? "" : `${v.op === "SUB" ? "−" : "+"}${v.coin}`, coin = coinOf(u);
   const off = level + (u.level || 0);
   return `<div class="skv" style="--sin:${color}">
     <div class="skvtop">
       ${u.base != null ? `<div class="skvbase${chg((v) => v.base)}">${u.base}</div>` : ""}
-      <div class="skvicon${key ? " framed" : ""}"><img ${key ? `data-src="${icon}" style="visibility:hidden"` : `src="${icon}"`} ${key ? `data-frame="${key}" data-art="${s.artUrl || imgFull(iconPath)}" ${fb.img ? `data-art2="${fb.img}"` : ""} data-name="${esc(`${s.id} ${u.name}`)}" title="Click to save the icon in its frame" onclick="saveIcon(this)"` : ""} onerror="${fb.thumb ? `this.onerror=null;this.src='${fb.thumb}'` : "this.remove()"}">${coin ? `<span class="skvcoin${chg(coinOf)}">${esc(coin)}</span>` : ""}</div>
+      <div class="skvicon${key ? " framed" : ""}"><img ${key ? `data-src="${icon}" style="visibility:hidden"` : `src="${icon}"`} ${key ? `data-frame="${key}" data-art="${s.artUrl || fb.img || imgFull(iconPath)}" ${fb.img ? `data-art2="${fb.img}"` : ""} data-name="${esc(`${s.id} ${u.name}`)}" title="Click to save the icon in its frame" onclick="saveIcon(this)"` : ""} onerror="${fb.thumb ? `this.onerror=null;this.src='${fb.thumb}'` : "this.remove()"}">${coin ? `<span class="skvcoin${chg(coinOf)}">${esc(coin)}</span>` : ""}</div>
       <div class="skvmain">
         <div class="skvcoins">${Array.from({ length: u.coins }, (_, i) => coinIcon((u.coinkinds || [])[i] || "")).join("")}${s.copies ? `<span class="copies">×${s.copies}</span>` : ""}</div>
         <div class="skvbanner">${sinIcon(u.sin, "s20")}<span>${esc(u.name)}</span></div>
@@ -322,10 +322,10 @@ function openUnit(id) {
        ...((x.defense || []).length ? [["Defense", x.defense, "Defense"]] : [])]
     : x.skills.map((s) => [s.label || "Skill", [s], s.label || ""]);
   const panel = () => { const [, list, label] = tabs[tab] || [null, []];
-    return list.map((s, i) => skillView(s, up, level, label || (i ? "Extra" : ""), isId ? null : (s.label === "Corrosion" && x.img.art2) || x.img.thumb, true)
+    return list.map((s, i) => skillView(s, up, level, label || (i ? "Extra" : ""), isId ? null : s.label === "Corrosion" && x.pics.art2 ? { thumb: x.pics.thumb2, img: x.pics.art2 } : { thumb: x.pics.thumb, img: x.pics.full }, true)
       + (typeof dcSkillLine === "function" ? dcSkillLine(x, s, up, level) : "")).join(`<div class="sksep"></div>`); };
   const left = () => {
-    let h = `<div class="udart"><img src="${imgFull(art2 && x.img.art2 ? x.img.art2 : x.img.art)}" onerror="this.src='${imgThumb(x.img.thumb)}'">
+    let h = `<div class="udart"><img src="${art2 && x.pics.art2 ? x.pics.art2 : x.pics.art}" onerror="this.src='${x.pics.thumb}'">
         ${x.img.art2 ? `<button class="artbtn ${art2 ? "on" : ""}" id="art2" title="${isId ? "Art after uptie 3" : "Corrosion art"}">⟳</button>` : ""}</div>`;
     if (isId) {
       const sp = x.speed[Math.min(up, x.speed.length) - 1] || [];
@@ -488,10 +488,10 @@ function tbCard(sid, i, S, here) {
   const x = unitById(MY.slots[sid]), name = UNITS.sinners[sid - 1];
   const egos = here || x ? (MY.egos[sid] || []).map(unitById).filter(Boolean) : [];
   const egoImg = (e) => { const pr = here ? tbPrice(e.cost, "", S) : null;
-    return `<img class="${pr ? "tb" + pr.v : ""}" src="${imgThumb(e.img.thumb)}" title="${esc(e.grade)} · ${esc(e.name)}${pr ? ": " + esc(pr.text) : ""}" onerror="this.style.visibility='hidden'">`; };
+    return `<img class="${pr ? "tb" + pr.v : ""}" src="${e.pics.thumb}" title="${esc(e.grade)} · ${esc(e.name)}${pr ? ": " + esc(pr.text) : ""}" onerror="this.style.visibility='hidden'">`; };
   return `<div class="tbc ${x ? "" : "empty"} ${x && !here ? "bk" : ""} ${tbSel === sid ? "sel" : ""}" data-slot="${sid}" ${x ? `draggable="true" title="${esc(x.title)}"` : ""}>
     ${x ? `<button class="tbn ${i < 0 ? "off" : ""}" data-tbo="${sid}" title="${i < 0 ? "Not in the order: click to add" : "Click two numbers to swap them (again on the same one: take it out), or drag the card"}">${i < 0 ? "+" : i + 1}</button>${tbPasMark(x, here ? "battle" : "support", S)}` : ""}
-    <div class="tbimg">${x ? `<img class="u" src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'">` : ico(`sinner_${sid}`, "s36", name, "")}</div>
+    <div class="tbimg">${x ? `<img class="u" src="${x.pics.thumb}" onerror="this.style.visibility='hidden'">` : ico(`sinner_${sid}`, "s36", name, "")}</div>
     <div class="tbegos">${egos.map(egoImg).join("")}</div>
     <div class="tbname">${esc(x ? x.title : "Pick")}</div><div class="tbsin">${esc(name)}</div></div>`;
 }
@@ -525,7 +525,7 @@ function tbPasList(sides, S) {
   return { all, bad: all.filter((r) => r.pr.v !== "ok") };
 }
 function tbPas({ all, bad }, S) {
-  const shown = (tbAll ? all : bad).map(({ x, p, pr }) => tbRow(x.img.thumb, p.name, `${p.kind === "battle" ? "Passive" : "Support"} · ${x.title}`, tbCosts(p.cost, p.mode, S), pr, tbPlain(p.desc))).join("");
+  const shown = (tbAll ? all : bad).map(({ x, p, pr }) => tbRow(x.pics.thumb, p.name, `${p.kind === "battle" ? "Passive" : "Support"} · ${x.title}`, tbCosts(p.cost, p.mode, S), pr, tbPlain(p.desc))).join("");
   return `<div class="tbhead"><span class="muted small">${all.length - bad.length} of ${all.length} switch on easily</span><span class="grow"></span><button id="tbfind">Find support passives</button></div>
     ${shown || `<div class="muted small">${all.length ? "Every passive with a sin condition works with this team." : "No passive here asks for sins."}</div>`}
     ${all.length && bad.length < all.length ? `<button class="tblink" data-tball>${tbAll ? "Only the problems" : `Show all ${all.length}`}</button>` : ""}`;
@@ -620,7 +620,7 @@ function tbPrice(cost, mode, S) {
 }
 const tbCosts = (cost, mode, S) => (cost || []).map(({ sin, n }) => `<span class="tbcost ${(mode === "res" ? (S.can[sin] || []).length >= n : S.rate[sin]) ? "" : "no"}" title="${mode === "res" ? "Resonance" : "Owned"} ${n} ${sin}">${sinIcon(sin, "s16")}${n}</span>`).join("");
 const tbPlain = (t) => String(t || "").replace(/<[^>]+>/g, "").replace(/\[(\w+)\]/g, (_, k) => statusName(k));
-const tbRow = (img, name, sub, costs, pr, tip = "") => `<div class="tbrow ${pr ? pr.v : ""}" title="${esc(tip)}"><img src="${imgThumb(img)}" onerror="this.style.visibility='hidden'">
+const tbRow = (img, name, sub, costs, pr, tip = "") => `<div class="tbrow ${pr ? pr.v : ""}" title="${esc(tip)}"><img src="${img}" onerror="this.style.visibility='hidden'">
   <div class="tbtx"><b>${esc(name)}</b><small>${esc(sub)}</small>${pr ? `<small class="tbv">${esc(pr.text)}</small>` : ""}</div><span class="tbcosts">${costs}</span></div>`;
 
 // the worst sin check of an Identity's passives of this kind, as a corner mark on its slot
@@ -755,7 +755,7 @@ function tbFind() {
         .flatMap((x) => x.passives.filter((p) => p.kind === "support").map((p) => ({ x, p, pr: tbPrice(p.cost, p.mode, S) })))
         .filter(({ p, pr }) => (!st || p.desc.includes(`[${st}]`)) && (!works || !pr || pr.v !== "no"));
       return rows.length ? `<div class="tbsub">${esc(UNITS.sinners[sid - 1])}</div>` + rows.map(({ x, p, pr }) => `<div class="tbrow tbpick ${pr ? pr.v : ""} ${MY.slots[sid] === x.id ? "on" : ""}" data-tbpick="${sid}:${x.id}">
-        <img src="${imgThumb(x.img.thumb)}" onerror="this.style.visibility='hidden'"><div class="tbtx"><b>${esc(p.name)}</b><small>${esc(x.title)}${MY.slots[sid] === x.id ? " · in the team" : ""}</small>
+        <img src="${x.pics.thumb}" onerror="this.style.visibility='hidden'"><div class="tbtx"><b>${esc(p.name)}</b><small>${esc(x.title)}${MY.slots[sid] === x.id ? " · in the team" : ""}</small>
         ${pr ? `<small class="tbv">${esc(pr.text)}</small>` : ""}<div class="tbdesc">${fmtDesc(p.desc)}</div></div><span class="tbcosts">${tbCosts(p.cost, p.mode, S)}</span></div>`).join("") : "";
     }).join("");
     modal(`<h2 style="margin-top:0">Support passives for the backup</h2>

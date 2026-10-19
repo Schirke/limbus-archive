@@ -37,7 +37,7 @@ function cqSlots(x) {
 }
 function cqPicker(side) {
   const x = unitById(cq[cqKey(side)]);
-  return `<div class="cqpick" data-side="${side}"><img src="${imgThumb(x.img.thumb)}" alt="" onerror="this.style.visibility='hidden'">
+  return `<div class="cqpick" data-side="${side}"><img src="${x.pics.thumb}" alt="" onerror="this.style.visibility='hidden'">
     <div class="grow"><div class="cqname">${esc(cqName(x))}</div><div class="muted small">${esc(x.sinnerName)}${x.grade ? ` · ${esc(x.grade)}` : ""}${x.season && x.season < 100 ? ` · Season ${x.season}` : ""}</div></div>
     <input class="cqin" placeholder="Change…" autocomplete="off"><div class="cqlist"></div></div>`;
 }
@@ -64,7 +64,7 @@ function cqDraw() {
   const kws = (x) => x.statuses.map((k) => `<span class="kw ${(UNITS.glossary[k] || {}).type || "neu"}">${statusIcon(k, "s20")}${esc(statusName(k))}</span>`).join(" ") || "—";
   const slots = (x) => ego ? x.skills.map((s) => [s.label || "Skill", s]) : cqSlots(x);
   const pa = new Map(slots(A)), pb = new Map(slots(B));
-  const art = (x) => ego ? x.img.thumb : null;
+  const art = (x) => ego ? { thumb: x.pics.thumb, img: x.pics.full } : null;
   const labels = [...new Set([...pa.keys(), ...pb.keys()])];
   if (!ego) labels.sort((x, y) => x.localeCompare(y, "en", { numeric: true }));
   const sec = (t) => `<tr class="cqsec"><td></td><th>${t}</th><td></td></tr>`;
@@ -109,7 +109,7 @@ function cqDraw() {
     inp.oninput = () => {
       const w = sxWords(inp.value);
       const found = w.length ? cqList().filter((x) => { const t = sxNorm(`${cqName(x)} ${x.sinnerName} ${sxEn(cqName(x))} ${sxEn(x.sinnerName)}`); return w.every((q) => t.includes(q)); }).slice(0, 8) : [];
-      list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${imgThumb(x.img.thumb)}" alt=""><span>${esc(cqName(x))} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
+      list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${x.pics.thumb}" alt=""><span>${esc(cqName(x))} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
       list.querySelectorAll("[data-id]").forEach((d) => d.onmousedown = () => { cq[cqKey(p.dataset.side)] = +d.dataset.id; cqDraw(); });
     };
     inp.onfocus = () => sxBack().then(() => { if (inp.value) inp.oninput(); });
