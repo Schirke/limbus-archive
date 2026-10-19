@@ -210,7 +210,7 @@ def look_frames(svc, cid, look: str) -> dict:
     """The frames of another appearance of an Identity (e.g. "CastOff"): groups S1… and "Poses", like character_frames."""
     groups, poses = {}, []
     for c in svc.owner_clips(cid):
-        if look.lower() not in c["animator"].lower() or c["kind"] not in ("skill", "pose"):
+        if look.lower() not in c["animator"].lower() or c["kind"] not in ("skill", "pose") or str(c["clip"]).startswith("tl:"):
             continue
         path = svc.object_file(c["bundle"])
         if not path:
