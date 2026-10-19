@@ -412,6 +412,12 @@ def check_pages(rep, base, only=None, shots=False):
         shutil.rmtree(prof, ignore_errors=True)
 
 
+# pictures a page drew with no address (a link missing from an answer) or that didn't load
+BAD_IMGS = r"""[...document.images].filter((i) => { const s = i.getAttribute("src");
+  return s !== null && (!s.trim() || /(^|\/)(undefined|null)$/.test(s)) || (i.complete && i.currentSrc && !i.naturalWidth && i.style.visibility !== "hidden"); })
+  .slice(0, 5).map((i) => i.getAttribute("src") || "(empty)")"""
+
+
 def visit(tab, base, route, n, settle=1.5, longest=15):
     tab.take()
     tab.call("Page.navigate", url=f"{base}/?check={n}#/{route}")
@@ -432,7 +438,7 @@ def visit(tab, base, route, n, settle=1.5, longest=15):
                 if url.startswith(base) and meth == "GET":
                     if code >= 500:
                         out.append(("FAIL", f"{code} {url[len(base):]}"))
-                    elif code == 404 and "/api/" in url:
+                    elif code == 404 and ("/api/" in url or p.get("type") == "Image"):
                         out.append(("warn", f"404 {url[len(base):]}"))
             elif m == "Network.loadingFailed":
                 meth, url = reqs.get(p["requestId"], ("GET", "?"))
@@ -450,6 +456,8 @@ def visit(tab, base, route, n, settle=1.5, longest=15):
                     out.append(("warn", "console: " + msg[:300]))
         if time.time() - start > 2 and time.time() - last > settle:
             break
+    for src in tab.js(BAD_IMGS) or []:
+        out.append(("warn", f"picture without a file: {src[:200]}"))
     seen, uniq = set(), []
     for x in out:
         if x not in seen:
