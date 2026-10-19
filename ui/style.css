@@ -19,6 +19,8 @@ button:disabled { opacity: .45; cursor: default; }
 input[type=checkbox] { width: auto; }
 code, pre, .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 12.5px; }
 pre { white-space: pre-wrap; word-break: break-word; margin: 0; }
+/* text that can be selected and copied (the app window blocks it elsewhere) */
+.copyable { user-select: text; -webkit-user-select: text; cursor: text; }
 
 /* shell: top menu, the pages of a section under it, status and reset timers on the right */
 #top { flex: none; height: 56px; display: flex; align-items: center; gap: 6px; padding: 0 28px; background-color: #161315; border-bottom: 1px solid var(--line); }

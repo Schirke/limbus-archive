@@ -355,12 +355,12 @@ function openUnit(id) {
         ${isId ? `<span class="lvlabel lv">Lv. <b id="lvn">${level}</b></span><input type="range" id="lvr" min="1" max="${MAX_LEVEL}" value="${level}">` : ""}
         <button class="hltog ${hl ? "on" : ""}" id="hltog" title="Highlight what changed from the previous ${isId ? "Uptie" : "Threadspin"}">Changes</button></div>
       <div class="sktabs">${tabs.map(([n], i) => `<button class="${i === tab ? "on" : ""}" data-tab="${i}">${esc(n)}</button>`).join("")}</div>
-      <div class="skpanel">${(tabs[tab] || [0, []])[1].length ? panel() : `<div class="muted">No skills.</div>`}</div>
-      ${x.passives.length ? `<h3 class="group">Passives</h3>${x.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}` : ""}`;
+      <div class="skpanel copyable">${(tabs[tab] || [0, []])[1].length ? panel() : `<div class="muted">No skills.</div>`}</div>
+      ${x.passives.length ? `<h3 class="group">Passives</h3><div class="copyable">${x.passives.map((p) => passiveHtml(pasAt(p, up), true)).join("")}</div>` : ""}`;
   };
   const draw = () => {
     modal(`<div class="ud${hl ? "" : " nohl"}"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
-        <div class="grow"><div class="udtitle">${esc(isId ? x.title : x.name)}</div>
+        <div class="grow copyable"><div class="udtitle">${esc(isId ? x.title : x.name)}</div>
         <div class="muted small">${esc(x.sinnerName)} · id ${x.id}${x.date ? ` · updated ${esc(x.date)}` : ""}</div></div>
         ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}<button id="tocmp">⇄ Compare</button>${isId ? `<button id="toanim">Battle animations →</button>` : ""}</div>
       <div class="udcols"><div class="udleft" id="udleft">${left()}</div><div class="udright" id="udright">${right()}</div></div></div>`);

@@ -212,7 +212,16 @@ function closeModal() {
   if (then) then();
 }
 $("#modal-close").onclick = closeModal;
-$("#modal").onclick = (e) => { if (e.target.id === "modal") closeModal(); };
+// (a text selection dragged out: no close)
+$("#modal").onmousedown = (e) => { closeModal.down = e.target.id === "modal"; };
+$("#modal").onclick = (e) => { if (e.target.id === "modal" && closeModal.down) closeModal(); };
+// .copyable: right-click copies the selection (the app window has no menu)
+document.addEventListener("contextmenu", (e) => {
+  const t = String(getSelection()).trim();
+  if (!window.pywebview || !t || !e.target.closest || !e.target.closest(".copyable")) return;
+  e.preventDefault();
+  navigator.clipboard.writeText(t).then(() => toast("Copied.", 1500), () => {});
+});
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
 
 const fmtSize = (n) => n == null ? "" : n > 1e9 ? (n / 1e9).toFixed(2) + " GB" : n > 1e6 ? (n / 1e6).toFixed(1) + " MB" : n > 1e3 ? (n / 1e3).toFixed(0) + " KB" : n + " B";
