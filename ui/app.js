@@ -959,6 +959,13 @@ async function openPath(path) {
 }
 async function openTreeFile(f, target) {
   const pv = target || $("#pv");
+  if (f.pid) {  // an object of a player file (resources.assets…)
+    const head = `<div class="mono small" style="margin-bottom:8px">${esc(f.name || f.pid)} · ${esc(f.type)} · ${esc(f.bundle)}${f.w ? ` · ${f.w}×${f.hgt}` : ""}</div>`;
+    pv.innerHTML = head + `<div class="muted">Loading…</div>`;
+    pv.innerHTML = head + await previewHtml(f) + `<div class="row" style="margin-top:10px"><button onclick='exportObj(${JSON.stringify({ bundle: f.bundle, pid: f.pid })})'>Export</button>
+      <button onclick='exportObj(${JSON.stringify({ bundle: f.bundle, pid: f.pid, fmt: "props" })})'>Export properties</button></div>`;
+    return;
+  }
   if (f.types[0] === "file" && f.path.endsWith(".bank")) {
     pv.innerHTML = `<div class="mono small" style="margin-bottom:8px">${esc(f.path)}</div><div class="muted">Reading sound list…</div>`;
     const sounds = await api(`/api/bank_list?path=${encodeURIComponent(f.path)}`).catch((e) => ({ error: e.message }));

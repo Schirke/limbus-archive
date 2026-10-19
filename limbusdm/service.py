@@ -1416,10 +1416,16 @@ class Service:
             return {"dirs": [], "files": []}
         prefix = prefix.strip("/")
         plen = len(prefix) + 1 if prefix else 0
+        # player files (resources.assets…) open like folders: types, then their objects
+        player = {b["file"]: lg for lg, b in snap["bundles"].items() if b.get("file") and b.get("index")}
+        top, _, kind = prefix.rpartition("/")
+        if prefix in player or top in player:
+            return self._player_tree(sid, prefix, player[prefix] if prefix in player else player[top],
+                                     None if prefix in player else kind)
         entries = [(p, {"types": a["types"], "bundle": a["bundle"]}) for p, a in snap["assets"].items()]
         entries += [(rel, {"types": ["file"], "size": f["size"], "blob": f.get("blob"), "h": f["h"]})
                     for rel, f in snap["files"].items()]
-        dirs, files = {}, []
+        dirs, files, counts = {}, [], None
         for p, info in entries:
             if prefix and not p.startswith(prefix + "/"):
                 continue
@@ -1427,10 +1433,35 @@ class Service:
             if "/" in rest:
                 d = rest.split("/", 1)[0]
                 dirs[d] = dirs.get(d, 0) + 1
+            elif p in player:
+                if counts is None:
+                    counts = dict(self._browse_rows(sid, "select bundle, count(*) from o where bundle like 'install:%' group by bundle"))
+                dirs[rest] = counts.get(player[p], 0)
             else:
                 files.append({"path": p, **info})
         return {"dirs": sorted(dirs.items()), "files": sorted(files, key=lambda x: x["path"])[:3000],
                 "total_files": len(files)}
+
+    def _browse_rows(self, sid: str, sql: str, args=()) -> list:
+        path = self.ensure_browse(sid)
+        if not path:
+            return []
+        db = sqlite3.connect(path)
+        try:
+            return db.execute(sql, args).fetchall()
+        finally:
+            db.close()
+
+    def _player_tree(self, sid: str, prefix: str, logical: str, kind: str | None) -> dict:
+        """A player file in Browse files: its object types, or the objects of one type."""
+        if kind is None:
+            rows = self._browse_rows(sid, "select type, count(*) from o where bundle = ? group by type", (logical,))
+            return {"dirs": sorted(rows), "files": [], "total_files": 0}
+        rows = self._browse_rows(sid, "select pid, name, h, w, hgt from o where bundle = ? and type = ? "
+                                      "order by name is null, name, pid", (logical, kind))
+        files = [{"path": f"{prefix}/{name or pid}", "types": [kind], "type": kind, "bundle": logical, "pid": str(pid),
+                  "name": name, "h": h, "w": w, "hgt": hgt} for pid, name, h, w, hgt in rows[:5000]]
+        return {"dirs": [], "files": files, "total_files": len(rows)}
 
     def lookup_container(self, path: str):
         db_path = self.ensure_browse()
