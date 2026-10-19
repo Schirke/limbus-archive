@@ -786,15 +786,29 @@ function drawImages(el, all) {
   bindStars(el);
   bindMore();
 }
+let IMG_MODE = "slide";  // a changed image: one picture with a before / now slider, or the two side by side
 function openImage(it) {
   const { oldSrc } = imgPair(it);
-  const n = it.new;
-  let h = `<h2 style="margin-top:0">${esc(it.name || "")}</h2><div class="small muted mono" style="margin-bottom:10px">${esc(it.path || "")} · ${esc(it.bundle)} · ${esc(it.type)}</div><div class="compare">`;
+  const n = it.new, both = !!(it.old && n);
+  let h = `<h2 style="margin-top:0">${esc(it.name || "")}</h2><div class="small muted mono" style="margin-bottom:10px">${esc(it.path || "")} · ${esc(it.bundle)} · ${esc(it.type)}</div>`;
+  if (both) h += `<div class="seg imgmode">${[["slide", "Slider"], ["side", "Side by side"]].map(([k, l]) => `<button class="toggle ${IMG_MODE === k ? "on" : ""}" data-im="${k}">${l}</button>`).join("")}</div>
+    <div class="imgslide ${IMG_MODE === "slide" ? "" : "hidden"}" style="--x:50%"><img src="${live(it)}"><img class="was" src="${oldSrc}"><i></i>
+      <input type="range" min="0" max="100" step="0.1" value="50" aria-label="Before / now"><span class="l">before</span><span class="r">now</span></div>`;
+  h += `<div class="compare ${both && IMG_MODE === "slide" ? "hidden" : ""}">`;
   if (it.old) h += `<figure><img src="${oldSrc}"><figcaption>before (stored preview)</figcaption></figure>`;
   if (n) h += `<figure><img src="${live(it)}"><figcaption>now (full size from the game cache)</figcaption></figure>`;
   h += `</div>`;
   if (n) h += `<div class="row" style="margin-top:12px"><button onclick='exportObj(${JSON.stringify({ bundle: it.bundle, pid: it.pid })})'>Export PNG</button></div>`;
   modal(h);
+  if (!both) return;
+  const box = $("#modal-body"), sl = box.querySelector(".imgslide");
+  sl.querySelector("input").oninput = (e) => sl.style.setProperty("--x", e.target.value + "%");
+  box.querySelectorAll("[data-im]").forEach((b) => b.onclick = () => {
+    IMG_MODE = b.dataset.im;
+    box.querySelectorAll("[data-im]").forEach((x) => x.classList.toggle("on", x === b));
+    sl.classList.toggle("hidden", IMG_MODE !== "slide");
+    box.querySelector(".compare").classList.toggle("hidden", IMG_MODE === "slide");
+  });
 }
 
 // ---------- leaks
