@@ -166,8 +166,10 @@ def drop(svc, base_url: str, cid, v: str = "") -> int:
     return len(names)
 
 
-def _ids(svc) -> list[int]:
-    return [c["id"] for s in svc.characters().get("sinners", []) for c in s["ids"] + s["egos"]]
+def _ids(svc) -> list[int | str]:
+    """Identities (each followed by its second forms' prefabs) and E.G.O."""
+    return [x for s in svc.characters().get("sinners", []) for c in s["ids"] + s["egos"]
+            for x in [c["id"]] + [f["id"] for f in c.get("forms") or []]]
 
 
 def _apps(svc) -> list[str]:
@@ -181,7 +183,7 @@ def counts(svc) -> dict:
     ex = Exporter(svc, "")
     try:
         m = _read(ex)
-        units = sum(1 for c in m["have"] if c.isdigit())
+        units = sum(1 for c in m["have"] if c.isdigit() or svc.form_owner(c))
         out = {"have": units, "total": len(_ids(svc)), "videos": len(m["src"]), "old": len(m["old"]), "running": False,
                "enemies": {"have": len(m["have"]) - units, "total": len(_apps(svc))}}
     except Exception:

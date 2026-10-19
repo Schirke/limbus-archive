@@ -621,6 +621,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/char_icon":  # a Versus pick: an Identity's / E.G.O's profile picture, an enemy's portrait
                 import re as _re
                 cid = q.get("id", "")
+                cid = str(svc.form_owner(cid) or cid)  # (a second form: its Identity's)
                 base = "Assets/Resources_moved/Sprite/Unit/"
                 if _re.fullmatch(r"1\d{4}", cid):
                     path = f"{base}Profile/Normal/{cid}_normal_profile.png"

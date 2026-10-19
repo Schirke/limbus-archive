@@ -162,6 +162,7 @@ ON_OTHER = re.compile(r"(?i)target|enemy")
 
 def unit_buffs(svc, uid, limit: int = 3) -> list[dict]:
     """Buff effects of one unit that have a video: its own buffs (who 0) and the debuffs it inflicts (who 1)."""
+    uid = svc.form_owner(uid) or uid  # (a second form: its Identity's)
     bf = svc.buff_fx
     db = bf.db()
     made = set(bf.status()["have"])
@@ -191,12 +192,17 @@ AT_END = re.compile(r"(?i)end(attack|skill)|succeed|OSA|kill")
 def skill_plan(svc, cid, groups: list[dict], own: list[dict]) -> list[dict]:
     """When each buff effect comes on in each skill video ("buffs" render): own buffs from the start, debuffs at the hit
     that inflicts them."""
-    skills = units._records(svc.static_tables(["skill"]), "skill") if isinstance(cid, int) and 10000 <= cid < 20000 else {}
+    form = svc.form_skills(cid)
+    owner = svc.form_owner(cid) or cid
+    skills = units._records(svc.static_tables(["skill"]), "skill") if isinstance(owner, int) and 10000 <= owner < 20000 else {}
+    # (with a second form: its own skill playing that animation)
+    by_motion = {n: i for i, n in reversed(form["motion"].items()) if i in form["skills"] + form["defense"]} if form else {}
     ids = {x["id"] for x in own}
     gives: dict[str, dict] = {}  # group → {buff id: hit}
     for g in groups:
         m = re.search(r"(?:^|_)S(\d+)", g["name"])
-        row = skills.get(cid * 100 + int(m.group(1))) if m and skills else None
+        sid = (by_motion.get(int(m.group(1))) if form else owner * 100 + int(m.group(1))) if m and skills else None
+        row = skills.get(sid) if sid else None
         if not row or not row.get("skillData"):
             continue
         hits = sum(len((p.get("events") or {}).get("hits") or []) for p in g["parts"])

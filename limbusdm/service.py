@@ -546,7 +546,10 @@ class Service:
             bs = owner_bundles(bundles, cid)
             if not bs and cid < 20000:  # early Identities share a Sinner bundle (sd_p1_assets_all…)
                 bs = self.appearance_bundles(cid)
-            return {"id": cid, "title": title, "bundles": bs, "spine": spine_by_owner.get(cid, [])}
+            e = {"id": cid, "title": title, "bundles": bs, "spine": spine_by_owner.get(cid, [])}
+            if forms.get(cid):
+                e["forms"] = forms[cid]
+            return e
 
         # every playable Identity / E.G.O is listed, files found or not
         try:
@@ -554,6 +557,10 @@ class Service:
             playable = {x["id"] for x in db["ids"] + db["egos"]}
         except Exception:
             playable = set()
+        try:
+            forms = self.forms()
+        except Exception:
+            forms = {}
 
         sinners = {}
         for cid in sorted(set(nm.personalities) | {c for c in spine_by_owner if str(c).startswith("1")}):
@@ -849,11 +856,91 @@ class Service:
             out.setdefault(name, {"bundle": bundle, "app": name})
         return list(out.values())
 
+    # ------------------------------------------------------------ second forms (Ring Faust's CastOff…)
+    def forms(self) -> dict[int, list[dict]]:
+        """Identities' second forms: the other battle prefabs in the Identity's own bundle (the game switches to them
+        in battle). {id: [{"id": its prefab, "name": "CastOff"}]}"""
+        import re
+        from . import units
+        sid = self.latest_snapshot_id()
+        cached = getattr(self, "_forms", None)
+        if cached and cached[0] == sid:
+            return cached[1]
+        out: dict[int, list[dict]] = {}
+        browse = self.ensure_browse()
+        if browse:
+            apps = {k: r.get("appearance") for k, r in units._records(self.static_tables(["personality"]), "personality").items()
+                    if isinstance(r, dict)}
+            db = sqlite3.connect(browse)
+            try:
+                rows = db.execute("""select bundle, name from o where type = 'GameObject' and name like '1%Appearance'
+                                     and c like '%/' || name || '.prefab'""").fetchall()
+            finally:
+                db.close()
+            by: dict[str, set] = {}
+            for b, n in rows:
+                if re.match(r"1\d{4}_", n) and "produce" not in b.lower():
+                    by.setdefault(n, set()).add(b)
+            for n, bs in sorted(by.items()):
+                cid = int(n[:5])
+                base = apps.get(cid)
+                if not base or n == base or not bs & by.get(base, set()):
+                    continue  # (story copies sit in other bundles)
+                stem = base[:-len("Appearance")] + "_"
+                label = n[len(stem):-len("Appearance")] if n.startswith(stem) else re.sub(r"^\d+_|Appearance$", "", n)
+                out.setdefault(cid, []).append({"id": n, "name": label.replace("_", " ")})
+        self._forms = (sid, out)
+        return out
+
+    def form_owner(self, cid) -> int | None:
+        """The Identity whose second form `cid` (its prefab name) is, else None."""
+        if not isinstance(cid, str) or not cid[:5].isdigit():
+            return None
+        owner = int(cid[:5])
+        return owner if any(f["id"] == cid for f in self.forms().get(owner, [])) else None
+
+    def form_skills(self, cid) -> dict | None:
+        """The own skills of an Identity with a second form, or of the form: {"skills": [ids], "defense": [ids],
+        "motion": {id: n of the "S<n>" animation it plays}}; None for other characters. The game lists the forms' skills
+        one set after another, each set starting again from S1; a form without a set of its own shares the first."""
+        import re
+        from . import units
+        owner = self.form_owner(cid) or cid
+        forms = self.forms().get(owner) if isinstance(owner, int) else None
+        u = forms and next((x for x in self.unit_db().get("ids", []) if x.get("id") == owner), None)
+        if not u:
+            return None
+        sid = self.latest_snapshot_id()
+        cached = getattr(self, "_skill_rows", None)
+        if not cached or cached[0] != sid:
+            cached = self._skill_rows = (sid, units._records(self.static_tables(["skill"]), "skill"))
+        motion = {}
+        for s in (u.get("skills") or []) + (u.get("defense") or []):
+            data = (cached[1].get(s["id"]) or {}).get("skillData") or [{}]
+            m = re.fullmatch(r"S(\d+)", data[0].get("skillMotion") or "")
+            if m:
+                motion[s["id"]] = int(m.group(1))
+        sets: list[list[int]] = []
+        for s in u.get("skills") or []:
+            if not sets or motion.get(s["id"]) == 1 and any(motion.get(x) == 1 for x in sets[-1]):
+                sets.append([])
+            sets[-1].append(s["id"])
+        if not sets:
+            return None
+        defs: list[list[int]] = [[] for _ in sets]
+        for s in u.get("defense") or []:
+            defs[max((i for i, x in enumerate(sets) if x[0] < s["id"]), default=0)].append(s["id"])
+        k = 0 if cid == owner else 1 + [f["id"] for f in forms].index(cid)
+        k = k if k < len(sets) else 0
+        return {"skills": sets[k], "defense": defs[k], "motion": motion}
+
     def skill_slots(self, cid) -> dict[int, dict]:
         """An Identity's skill videos as the game names them: {n: {slot, name}} (n is not the tier)."""
-        if not isinstance(cid, int) or not str(cid).startswith("1"):
+        own = self.form_skills(cid)
+        owner = self.form_owner(cid) or cid
+        if not isinstance(owner, int) or not str(owner).startswith("1"):
             return {}
-        u = next((x for x in self.unit_db().get("ids", []) if x.get("id") == cid), None)
+        u = next((x for x in self.unit_db().get("ids", []) if x.get("id") == owner), None)
         if not u:
             return {}
 
@@ -861,15 +948,32 @@ class Service:
             ups = s.get("up") or {}
             return (ups[max(ups, key=int)] if ups else {}).get("name", "")
 
+        skills, ds = u.get("skills") or [], u.get("defense") or []
+        ds = ds if isinstance(ds, list) else [ds]
+        if own:  # (with a second form: its own skills, by the animation each plays)
+            skills = [s for s in skills if s["id"] in own["skills"]]
+            ds = [s for s in ds if s["id"] in own["defense"]]
+
+        def put(s, slot):
+            n = own["motion"].get(s["id"]) if own else s["id"] - owner * 100
+            if n is None or n in out and slot.startswith("Defense"):
+                return
+            if n in out:  # (two skills, one animation)
+                if name(s) not in out[n]["name"].split(" / "):
+                    out[n]["name"] = f"{out[n]['name']} / {name(s)}"
+            else:
+                out[n] = {"slot": slot, "name": name(s)}
+
         out, tiers = {}, {}
-        for s in sorted(u.get("skills") or [], key=lambda s: s["id"]):
+        for s in sorted(skills, key=lambda s: s["id"]):
             tiers.setdefault(s.get("tier"), []).append(s)
         for tier, ss in tiers.items():
             for i, s in enumerate(ss, 1):
-                out[s["id"] - cid * 100] = {"slot": f"Skill {tier}" + (f".{i}" if len(ss) > 1 else ""), "name": name(s)}
-        ds = u.get("defense") or []
-        for i, s in enumerate(ds if isinstance(ds, list) else [ds], 1):
-            out[s["id"] - cid * 100] = {"slot": "Defense" + (f" {i}" if len(ds) > 1 else ""), "name": name(s)}
+                put(s, f"Skill {tier}" + (f".{i}" if len(ss) > 1 else ""))
+        for i, s in enumerate(ds, 1):
+            put(s, "Defense" + (f" {i}" if len(ds) > 1 else ""))
+        if owner != cid:
+            return out
         # joint skills with another Identity (videos "…_S<n>_<its id>"): "with" = {its id: its name}
         import re
         browse = self.ensure_browse()

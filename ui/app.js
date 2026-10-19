@@ -1207,7 +1207,7 @@ async function openAnimEntry(sel) {
   if (!await animHead(v, sel, { title: c.title, sub: `${c.sinner} · ${c.isEgo ? "E.G.O" : "Identity"} ${c.id}`, pic: animThumb(c.id), tabs, cid: c.id })) return;
   const body = $("#abody");
   if (anim.tab.startsWith("spine")) return openSpine(c.spine[+anim.tab.slice(5)], body);
-  if (anim.tab === "fx" || anim.tab === "effects") return openFx(c, body);
+  if (anim.tab === "fx" || anim.tab === "effects") return openFx(fxForm(c), body);
   if (anim.tab === "mod") return openMod(c, body, () => { anim.tab = "fx"; openAnimEntry(sel); });
   if (anim.tab === "videos") {
     body.innerHTML = sel.videos.map((v) => `<div class="card"><div class="row" style="margin-bottom:6px"><b class="grow">${esc(v.label)}</b>
@@ -1276,6 +1276,11 @@ const fxOwn = (id) => anim.fxBuffs?.[id]?.own || [];
 const fxOptFor = (c) => FX_OPTS.filter((o) => !o[3] || (o[3] === "own" ? fxOwn(c.id).length : /^2\d{4}$/.test(String(c.id))));
 // Effects tab: each effect alone, transparent
 const fxEffects = () => anim.tab === "effects";
+// a second form (Ring Faust's CastOff…), picked under Render options: rendered as a character of its own
+const fxForm = (c) => {
+  const f = (c.forms || []).find((x) => x.id === anim.fxForm);
+  return f ? { ...c, id: f.id, title: `${c.title} · ${f.name}`, owner: c.id } : c;
+};
 const FX_KINDS = [["skill", "Skill effects"], ["aura", "Auras"], ["battle", "Battle VFX"]];
 const FX_NOT_EFFECTS = ["alpha", "static", "novoice", "nobg", "subs", "buffs"];
 const fxOpts = () => FX_OPTS.filter(([k, , , only]) => !(fxEffects() && FX_NOT_EFFECTS.includes(k)) && !(only === "own" && !fxOwn(anim.sel?.cid).length));
@@ -1305,9 +1310,16 @@ async function openFx(c, body) {
   const tab = anim.tab, effects = fxEffects();
   const solo = !effects && !!anim.fxSolo, v = fxVariant(), q = `id=${encodeURIComponent(c.id)}${v ? `&v=${v}` : ""}`;
   const label = (n) => effects ? n.replace(/_/g, " ") : fxLabel(n);
+  // still the open one (and the same form)
+  const mine = () => anim.sel?.cid === (c.owner || c.id) && fxForm({ ...c, id: c.owner || c.id }).id === c.id;
+  if (c.owner) {  // (a form's skills have names of their own)
+    anim.formSlots = anim.formSlots || {};
+    if (!anim.formSlots[c.id]) anim.formSlots[c.id] = await api(`/api/skill_slots?id=${encodeURIComponent(c.id)}`).catch(() => ({}));
+    anim.slots = anim.formSlots[c.id];
+  } else if (anim.sel?.slots) anim.slots = anim.sel.slots;
   let st;
   try { st = await api(`/api/fx?${q}`); } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
-  if (!$("#abody") || anim.sel?.cid !== c.id || anim.tab !== tab || fxVariant() !== v) return;
+  if (!$("#abody") || !mine() || anim.tab !== tab || fxVariant() !== v) return;
   if (!st.available) {
     body.innerHTML = `<div class="empty">The effects renderer (LimbusViewer) isn't part of this build.</div>`;
     return;
@@ -1322,7 +1334,7 @@ async function openFx(c, body) {
   if (!buffs) {
     api(`/api/fx_buffs?id=${encodeURIComponent(c.id)}`).catch(() => ({ levels: [], notes: {} })).then((b) => {
       anim.fxBuffs[c.id] = b;
-      if ($("#abody") && anim.sel?.cid === c.id && anim.tab === tab) openFx(c, body);
+      if ($("#abody") && mine() && anim.tab === tab) openFx(c, body);
     });
   }
   const levels = buffs?.levels || [];
@@ -1340,8 +1352,9 @@ async function openFx(c, body) {
       anim.fxOpt?.buffs && fxOwn(c.id).length ? `Buffs: ${fxOwn(c.id).map((x) => `${esc(x.buff)} (on ${x.on === "self" ? "itself" : "the target"})`).join(", ")}.` : ""].filter(Boolean).join(" ");
   const tags = [solo && "no target", ...fxOpts().map(([k, , t]) => anim.fxOpt?.[k] && t), effects && "effects", anim.fxLevel > 0 && `buff level ${anim.fxLevel}`,
     anim.fxMod && `mod ${anim.fxMod}`].filter(Boolean).join(", ");
-  const fileName = (n) => `${c.id} ${c.title} - ${label(n)}${tags ? ` (${tags})` : ""}`;
-  const save = (items) => exportObj({ fxvideo: { id: c.id, v, items, folder: `${c.id} ${c.title}${tags ? ` (${tags})` : ""}` } });
+  const fileName = (n) => `${c.owner || c.id} ${c.title} - ${label(n)}${tags ? ` (${tags})` : ""}`;
+  const save = (items) => exportObj({ fxvideo: { id: c.id, v, items, folder: `${c.owner || c.id} ${c.title}${tags ? ` (${tags})` : ""}` } });
+  const forms = c.forms || [];
   // Built once per character / options / mods; then videos update card by card.
   const base = `${c.id}:${v}:${modList.join(",")}:${levels.length}`;
   const src = (n, stamp) => `${st.urls?.[n] || `/api/fx_video?${q}&name=${encodeURIComponent(n)}`}&t=${stamp}`;
@@ -1354,7 +1367,10 @@ async function openFx(c, body) {
       <details class="an-opts"><summary>Render options <small class="muted">${esc(tags || "none set")}</small></summary><div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
         ${effects ? "" : `<span class="seg"><button class="toggle ${solo ? "" : "on"}" data-solo="0">With target</button><button class="toggle ${solo ? "on" : ""}" data-solo="1">Without target</button></span>`}
         ${fxOptFor(c).filter(([k]) => !(effects && FX_NOT_EFFECTS.includes(k))).map(([k, label]) => `<button class="toggle ${anim.fxOpt?.[k] ? "on" : ""}" data-opt="${k}">${label}</button>`).join("")}
-      </div></details><div id="fxnote" class="muted small" style="margin-bottom:8px"></div>
+      </div></details>
+      ${forms.length ? `<div class="row" style="margin:0 0 8px;gap:8px;flex-wrap:wrap"><span class="small">Form</span><span class="seg"><button class="toggle ${c.owner ? "" : "on"}" data-form="">Base</button>${forms.map((f) =>
+        `<button class="toggle ${f.id === c.id ? "on" : ""}" data-form="${esc(f.id)}">${esc(f.name)}</button>`).join("")}</span></div>` : ""}
+      <div id="fxnote" class="muted small" style="margin-bottom:8px"></div>
       ${levels.length > 1 ? `<div class="row" style="margin:0 0 8px;gap:8px;flex-wrap:wrap"><span class="small">Buffs</span><span class="seg">${levels.map((l, i) =>
         `<button class="toggle ${(anim.fxLevel || 0) === i ? "on" : ""}" data-lv="${i}" title="${esc(l.join("\n"))}">${i ? `Level ${i}` : "Base"}</button>`).join("")}</span>
         <span class="muted small grow">${esc((levels[anim.fxLevel || 0] || []).join(" · "))}</span></div>` : ""}
@@ -1366,6 +1382,7 @@ async function openFx(c, body) {
       openFx(c, body);
     };
     body.querySelectorAll("[data-lv]").forEach((b) => b.onclick = () => { anim.fxLevel = +b.dataset.lv; openFx(c, body); });
+    body.querySelectorAll("[data-form]").forEach((b) => b.onclick = () => { anim.fxForm = b.dataset.form; openAnimEntry(anim.sel); });
     body.querySelectorAll("[data-solo]").forEach((b) => b.onclick = () => { anim.fxSolo = b.dataset.solo === "1"; openFx(c, body); });
     body.querySelectorAll("[data-opt]").forEach((b) => b.onclick = () => {
       anim.fxOpt = { ...anim.fxOpt, [b.dataset.opt]: !anim.fxOpt?.[b.dataset.opt] };
@@ -2534,7 +2551,12 @@ function vsChars() {
   const out = [];
   const season = (id) => { const u = U && unitById(id); return u ? seasonKey(u.season) : ""; };
   for (const s of anim.data.sinners) {
-    for (const x of s.ids) out.push({ id: String(x.id), label: `${s.name} · ${x.title}`, group: "Identities", pg: s.name, short: x.title, type: "ids", sinner: s.sid, season: season(x.id) });
+    for (const x of s.ids) {
+      out.push({ id: String(x.id), label: `${s.name} · ${x.title}`, group: "Identities", pg: s.name, short: x.title, type: "ids", sinner: s.sid, season: season(x.id) });
+      // its second forms: fighters of their own (own skills)
+      for (const f of x.forms || []) out.push({ id: f.id, label: `${s.name} · ${x.title} · ${f.name}`, group: "Identities", pg: s.name, short: `${x.title} · ${f.name}`,
+        type: "ids", sinner: s.sid, season: season(x.id), owner: String(x.id) });
+    }
     for (const x of s.egos) out.push({ id: String(x.id), label: `${s.name} · ${x.title} (E.G.O)`, group: "E.G.O", pg: s.name, short: `${x.title} (E.G.O)`, type: "egos", sinner: s.sid, season: season(x.id) });
   }
   for (const g of anim.data.groups) for (const [kind, arr] of Object.entries(g.kinds)) for (const x of arr)
@@ -2549,7 +2571,8 @@ const vsChar = (id) => vsChars().find((c) => c.id === String(id));
 const vsIcon = (id) => `/api/char_icon?id=${encodeURIComponent(id)}`;
 // fallback picture from the database
 function vsImgErr(img) {
-  const id = img.dataset.id || "", u = typeof UNITS !== "undefined" && UNITS && /^\d+$/.test(id) && unitById(+id);
+  const id = img.dataset.id || "", own = (anim.data && vsChar(id) || {}).owner || id;  // (a second form: its Identity's)
+  const u = typeof UNITS !== "undefined" && UNITS && /^\d+$/.test(own) && unitById(+own);
   const alt = u && u.img && u.img.thumb ? u.pics.thumb : "";
   const tried = (img.dataset.tried || "").split("|");
   for (const src of [vsIcon(id), alt]) if (src && !tried.includes(src) && !img.src.endsWith(src)) {
