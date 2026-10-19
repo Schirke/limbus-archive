@@ -1438,6 +1438,15 @@ class Exporter:
             ok = all("404" in e for _, e in self.failed[failed:])
             parts[name] = {"in": sig if ok else None, "m": self.manifest_hash(name)}
             self.made_save(made)
+        self.extra_lists()
+
+    def extra_lists(self):
+        """The app's lists the check took into "extra" (Story map, planner catalog…), asked again every send."""
+        old = self.read_manifest("extra")
+        keys = [k for k, f in (old.get("urls") or {}).items() if k.startswith("/api/") and ".json" in f and not NO_HEAL.search(k)]
+        if keys:
+            got = self.fetch_all(keys, {}, "site: what the pages asked for")
+            self.write_manifest("extra", {**old, "urls": {**old["urls"], **got}})
 
     def fx(self) -> dict:
         """The Animations page's "With effects" tab: limbusdm/sitefx.py."""
