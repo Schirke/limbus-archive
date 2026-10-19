@@ -35,6 +35,12 @@
 .upgadd .cqin { flex: 1; width: auto; }
 .upgplus { font: 24px/1 "LC Bebas", Impact, sans-serif; color: var(--gold); width: 52px; text-align: center; }
 
+/* the Collection */
+.upgcol { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.upgcol span { margin-right: auto; }
+.upgmine { color: #8fc46a; font-weight: 400; font-size: 12px; font-family: inherit; }
+.upgcost .upgmine { white-space: nowrap; }
+
 /* what you have */
 .upghave { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px; background: rgba(0, 0, 0, .3); border: 1px solid #3a2a1e; }
 .upghave .lvlabel { margin: 10px 0 0; min-width: 72px; }

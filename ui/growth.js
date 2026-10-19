@@ -18,7 +18,34 @@ function upgPic(k, alt = "", cls = "") {
 const upgShard = (sinner, cls = "") => upgPic(`shard_${sinner}`, `${UPG_SINNERS[sinner - 1] || ""} Egoshard`, cls);
 // an E.G.O's own last Threadspin (level V only where the game has it)
 const upgTop = (x) => x.title ? 4 : Math.min(x.maxUp || 4, (upg.db.upEgo[x.grade] || []).length + 1);
-const upgRow = (x) => ({ id: x.id, lv0: 1, lv1: upg.db.maxLv, up0: 1, up1: upgTop(x) });
+// the player's Collection (its page keeps it in this browser: {ids: {id: {u, l}}, egos: {id: {u}}})
+function upgMine() {
+  try { const c = typeof collectionMine === "function" ? collectionMine() : JSON.parse(localStorage.getItem("collection") || "null"); if (c && c.ids && c.egos) return c; } catch (e) {}
+  return { ids: {}, egos: {} };
+}
+const upgOwn = (x, c = upgMine()) => (x.title ? c.ids : c.egos)[x.id];
+// a row starts where the Collection has it; a level it doesn't know = not counted
+function upgFromMine(r, own) {
+  const x = unitById(r.id), d = upg.db;
+  if (!own) return r;
+  r.up0 = Math.min(Math.max(own.u || 1, 1), upgTop(x)); r.up1 = Math.max(r.up1, r.up0);
+  if (x.title) { r.lv0 = Math.min(own.l || d.maxLv, d.maxLv); r.lv1 = Math.max(r.lv1, r.lv0); }
+  return r;
+}
+const upgRow = (x) => upgFromMine({ id: x.id, lv0: 1, lv1: upg.db.maxLv, up0: 1, up1: upgTop(x) }, upgOwn(x));
+const upgMaxed = (x, own) => (own.u || 1) >= upgTop(x) && (!x.title || !own.l || own.l >= upg.db.maxLv);
+function upgColBar(craft) {
+  const c = upgMine(), ni = Object.keys(c.ids).length, ne = Object.keys(c.egos).length;
+  if (!ni && !ne) return "";
+  const units = [...UNITS.ids, ...UNITS.egos];
+  if (craft) {
+    const miss = units.filter((x) => upg.db.craft[x.id] && !upgOwn(x, c) && !upg.clist.includes(x.id)).length;
+    return `<div class="upgcol"><span>Collection: ${ni} Identities, ${ne} E.G.O</span>${miss ? `<button data-col="missing">Add all ${miss} I don't have</button>` : ""}</div>`;
+  }
+  const open = units.filter((x) => { const o = upgOwn(x, c); return o && !upgMaxed(x, o) && !upg.list.some((r) => r.id === x.id); }).length;
+  return `<div class="upgcol"><span>Collection: ${ni} Identities, ${ne} E.G.O</span><button data-col="take">Take Uptie and levels from it</button>
+    ${open ? `<button data-col="open">Add all ${open} not at max</button>` : ""}</div>`;
+}
 
 function upgLoad() {
   try {
@@ -162,7 +189,7 @@ function upgUpRow(r, i) {
 function upgCraftRow(id, i) {
   const x = unitById(id), cr = upg.db.craft[id];
   return `<div class="upgunit">${upgHead(x)}
-    <div class="upgcost">${cr ? `<span>${upgShard(x.sinner, "s")}${cr.p}</span>` : `<span class="muted">Not in the Dispenser</span>`}</div>
+    <div class="upgcost">${upgOwn(x) ? `<span class="upgmine">✓ in your Collection</span>` : ""}${cr ? `<span>${upgShard(x.sinner, "s")}${cr.p}</span>` : `<span class="muted">Not in the Dispenser</span>`}</div>
     <button class="upgdel" data-del="${i}" title="Remove">✕</button></div>`;
 }
 const upgAddBox = (ph) => `<div class="cqpick upgadd"><span class="upgplus">+</span><input class="cqin" placeholder="${ph}" autocomplete="off"><div class="cqlist"></div></div>`;
@@ -176,6 +203,7 @@ function upgUp() {
   const shTotal = sins.reduce((a, s) => a + n.sh[s], 0);
   return `<div class="upglist">${upg.list.map(upgUpRow).join("") || `<p class="muted">Add what you want to level up.</p>`}</div>
     ${upgAddBox("Add an Identity or E.G.O…")}
+    ${upgColBar(false)}
     ${upgHave(`${anyId ? d.ticket.map((_, i) => upgIn(upgPic(`t${i + 1}`, `Ticket ${ROMAN[i]}`, "wide"), `data-tix="${i}"`, upg.have.t[i])).join("") : ""}
       ${upgIn(upgPic("thread", "Threads"), `data-have="th"`, upg.have.th)}
       ${sins.map((s) => upgIn(upgShard(s), `data-sh="${s}"`, upg.have.sh[s] || 0)).join("")}
@@ -198,6 +226,7 @@ function upgCraft() {
   const left = sins.reduce((a, s) => a + Math.max(0, need[s] - (upg.csh[s] || 0)), 0), r = upgSim({ exp: 0, th: 0, sh: left });
   return `<div class="upglist">${upg.clist.map(upgCraftRow).join("") || `<p class="muted">Add what you want to extract.</p>`}</div>
     ${upgAddBox("Add from the Dispenser…")}
+    ${upgColBar(true)}
     ${sins.length ? upgHave(sins.map((s) => upgIn(upgShard(s), `data-csh="${s}"`, upg.csh[s] || 0)).join("")) : ""}
     ${total ? `<div class="upgbar"><i style="width:${(total - left) / total * 100}%"></i><span>${upgFmt(total - left)} / ${upgFmt(total)} Egoshards</span></div>` : ""}
     ${!total ? "" : !left ? `<p class="muted">You have every Egoshard already.</p>` : `<h3>From the pass and Mirror Dungeon</h3>${upgFarmTiles(r, { exp: 0, th: 0, sh: left }, "until the Extraction")}`}`;
@@ -238,6 +267,13 @@ function upgBind() {
   const m = $("#main"), d = upg.db, craft = upg.tab === "craft";
   m.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { upg.tab = b.dataset.tab; upgDraw(); });
   m.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => { (craft ? upg.clist : upg.list).splice(+b.dataset.del, 1); upgDraw(); });
+  m.querySelectorAll("[data-col]").forEach((b) => b.onclick = () => {
+    const c = upgMine(), units = [...UNITS.ids, ...UNITS.egos], k = b.dataset.col;
+    if (k === "take") upg.list.forEach((r) => upgFromMine(r, upgOwn(unitById(r.id), c)));
+    if (k === "open") units.forEach((x) => { const o = upgOwn(x, c); if (o && !upgMaxed(x, o)) upgAdd(x); });
+    if (k === "missing") units.forEach((x) => { if (d.craft[x.id] && !upgOwn(x, c)) upgAdd(x); });
+    upgDraw();
+  });
   // numbers: redraw when the field is left (typing isn't cut off by a redraw)
   const num = (i, set) => { i.onchange = () => { set(i.value); upgDraw(); }; i.onkeydown = (e) => { if (e.key === "Enter") i.blur(); }; };
   m.querySelectorAll("[data-r]").forEach((i) => {
@@ -262,7 +298,8 @@ function upgBind() {
     const taken = new Set(craft ? upg.clist : upg.list.map((r) => r.id));
     const pool = [...UNITS.ids, ...UNITS.egos].filter((x) => !taken.has(x.id) && (!craft || d.craft[x.id]));
     const found = w.length ? pool.filter((x) => hit(`${x.title || x.name} ${x.sinnerName} ${sxEn(x.title || x.name)} ${sxEn(x.sinnerName)}`)).slice(0, 10) : [];
-    list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${imgThumb(x.img.thumb)}" alt=""><span>${esc(x.title || x.name)} <i>${esc(x.sinnerName)} · ${esc(upgRank(x))}</i></span></div>`).join("");
+    const mine = upgMine(), tag = (x) => { const o = upgOwn(x, mine); return o ? ` <b class="upgmine">✓${o.u ? ` ${ROMAN[o.u - 1]}` : ""}${o.l ? ` · Lv ${o.l}` : ""}</b>` : ""; };
+    list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${imgThumb(x.img.thumb)}" alt=""><span>${esc(x.title || x.name)} <i>${esc(x.sinnerName)} · ${esc(upgRank(x))}</i>${tag(x)}</span></div>`).join("");
     list.querySelectorAll("[data-id]").forEach((el) => el.onmousedown = (e) => { e.preventDefault(); upgAdd(unitById(+el.dataset.id)); upgDraw(); const n = $(".upgadd input"); if (n) n.focus(); });
   };
   inp.onfocus = () => sxBack().then(() => inp.oninput());
