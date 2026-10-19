@@ -413,6 +413,14 @@ class Service:
         b = snap["bundles"].get(logical) if snap else None
         if not b:
             return None
+        if "file" in b:  # a player file ("install:resources.assets"): only while it is the one the snapshot read
+            from .snapshot import install_path
+            path, rec = install_path(self.game, b["file"]), snap["files"].get(b["file"]) or {}
+            try:
+                st = os.stat(path)
+            except OSError:
+                return None
+            return path if (st.st_size, int(st.st_mtime)) == (rec.get("size"), rec.get("mtime")) else None
         return self.game.bundle_file(b["name"], b["hash"], b["url"])
 
     def _name_index(self, db_path: str):

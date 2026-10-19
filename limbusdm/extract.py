@@ -11,7 +11,7 @@ from collections import OrderedDict
 
 import UnityPy
 
-from . import bundles as _bundles  # noqa: F401  (sets the Unity fallback version)
+from . import bundles as _bundles  # (also sets the Unity fallback version)
 
 _lock = threading.RLock()  # re-entrant: clip rendering opens dependency bundles while holding it
 # open bundles, newest last; a bundle takes ~6x its size in memory, so few are kept
@@ -38,6 +38,7 @@ def _env(path: str):
             return _envs[path]
         with open(path, "rb") as f:
             env = UnityPy.load(f.read())
+        _bundles.add_resources(env, path)
         _envs[path] = env
         _sizes[path] = os.path.getsize(path)
         while len(_envs) > 1 and (len(_envs) > MAX_ENVS or sum(_sizes[p] for p in _envs) > MAX_BYTES):

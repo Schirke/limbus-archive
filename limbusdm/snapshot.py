@@ -23,12 +23,35 @@ TEXT_MAX = 32 * 1024 * 1024
 # files that change on every launch and only add noise
 DEFAULT_IGNORE = ["*.log", "*/Unity/*Analytics*", "*/Unity/ShaderVariantAnalytics/*", "*/Settings/*", "*/Temp/*"]
 BUNDLE_HASH_RE = re.compile(r"_[0-9a-f]{32}\.bundle$")
+# the Unity player's own files (main UI atlases, fonts, scenes): indexed like bundles as "install:<file>"
+INSTALL_RE = re.compile(r"^install/LimbusCompany_Data/(resources\.assets|sharedassets\d+\.assets|level\d+"
+                        r"|globalgamemanagers(?:\.assets)?)$")
 
 
 def bundle_logical_name(url: str) -> str:
     """Stable bundle name: CDN file name without the content hash."""
     base = re.split(r"[\\/]", url)[-1]
     return BUNDLE_HASH_RE.sub("", base)
+
+
+def install_bundles(files: dict) -> dict:
+    """{"install:<file>": entry} for the player files in a snapshot's file list; hash = with their .resS / .resource."""
+    out = {}
+    for rel, rec in files.items():
+        m = INSTALL_RE.match(rel)
+        if not m:
+            continue
+        recs = [rec] + [files[r] for r in dict.fromkeys((rel + ".resS", os.path.splitext(rel)[0] + ".resource"))
+                        if r in files]
+        if any(r.get("h") in (None, "unreadable") for r in recs):
+            continue
+        h = hashlib.sha1("|".join(r["h"] for r in recs).encode()).hexdigest()
+        out["install:" + m.group(1)] = {"name": m.group(1), "hash": h, "size": sum(r["size"] for r in recs), "file": rel}
+    return out
+
+
+def install_path(game: GamePaths, rel: str) -> str:
+    return os.path.join(game.game, *rel.split("/")[1:])
 
 
 def _sha1_file(path: str) -> str:
@@ -106,6 +129,11 @@ def job_memory(path: str) -> int:
     """Memory a bundle takes to index (decompressed size + decoded textures)."""
     from .cabs import unpacked_size
     return int(unpacked_size(path) * 1.6) + (300 << 20)
+
+
+def install_job(path: str, size: int) -> tuple[int, float]:
+    """(memory, time shares) of a player file: read in place, its .resS texture by texture; `size` = with them."""
+    return os.path.getsize(path) * 2 + (300 << 20), job_time(int(size * 1.6) + (300 << 20))
 
 
 def job_time(mem: int) -> float:
@@ -246,6 +274,11 @@ class Snapshotter:
             if loc.bundles and not entry["bundle"]:
                 entry["bundle"] = bundle_logical_name(cat.bundles[loc.bundles[0]].url)
 
+        # ---------- files ----------
+        prev_files = (prev_snapshot or {}).get("files", {})
+        roots = {"install": g.game, "locallow": g.locallow}
+        files = self._scan_files(roots, prev_files)
+
         # ---------- bundles ----------
         jobs, missing = [], []
         for logical, b in bundles.items():
@@ -258,13 +291,24 @@ class Snapshotter:
                 missing.append(logical)
                 b["missing"] = True
                 continue
-            jobs.append((logical, path, rel, os.path.getsize(path), job_memory(path)))
+            mem = job_memory(path)
+            jobs.append((logical, path, rel, os.path.getsize(path), mem, job_time(mem)))
+        for logical, b in install_bundles(files).items():
+            rel = b["index"] = f"bundle_index/install_{b['name']}_{b['hash']}.json.gz"
+            bundles[logical] = b
+            path = install_path(g, b["file"])
+            if self.store.exists(rel):
+                continue
+            if os.path.isfile(path):
+                jobs.append((logical, path, rel, b["size"], *install_job(path, b["size"])))
+            else:
+                b.pop("index")
         jobs.sort(key=lambda j: -j[4])  # biggest first for better load balancing
         total_bytes = sum(j[3] for j in jobs) or 1
-        total_time = sum(job_time(j[4]) for j in jobs) or 1
+        total_time = sum(j[5] for j in jobs) or 1
         done_bytes = done_time = 0
         errors, failed, retried, stalled, stopped = {}, [], set(), set(), set()
-        sizes_of = {j[0]: j[4] for j in jobs}
+        shares_of = {j[0]: j[5] for j in jobs}
         started = last_done = time.time()
         read_secs = read_shares = 0.0
         self.progress("bundles", 0, len(jobs), f"{len(jobs)} bundles to index")
@@ -301,7 +345,7 @@ class Snapshotter:
                                       f"{int(now - t0) // 60} min", eta=-1)
                         per_share = read_secs / read_shares if read_shares else 1.0
                         for job, kind, pool, t0 in list(running.values()):
-                            if now - t0 > max(STALL_MIN, STALL_X * per_share * job_time(job[4])):
+                            if now - t0 > max(STALL_MIN, STALL_X * per_share * job[5]):
                                 stalled.add(job[0])
                                 stopped.add(pool)
                                 _kill(pool)
@@ -310,7 +354,7 @@ class Snapshotter:
                                                                       initializer=_worker_start)
                     for fut in done:
                         job, kind, pool, t0 = running.pop(fut)
-                        logical, path, rel, size, mem = job
+                        logical, path, rel, size, mem, shares = job
                         used -= mem
                         last_done = now
                         try:
@@ -327,7 +371,7 @@ class Snapshotter:
                                 continue
                             if logical not in retried and logical not in stalled:
                                 retried.add(logical)
-                                pending.insert(0, (logical, path, rel, size, budget + 1))
+                                pending.insert(0, (logical, path, rel, size, budget + 1, shares))
                                 continue
                             errors[logical] = ["not read: it took too long, tried again next snapshot"
                                                if logical in stalled else
@@ -339,9 +383,9 @@ class Snapshotter:
                                 errors[logical] = res["errors"][:20]
                             self.store.write_json(rel, res)
                             read_secs += res.get("secs") or 0
-                            read_shares += job_time(mem)
+                            read_shares += shares
                         done_bytes += size
-                        done_time += job_time(sizes_of[logical])
+                        done_time += shares_of[logical]
                         i += 1
                         part = done_time / total_time  # time left, from the share done so far
                         spent = time.time() - started
@@ -356,11 +400,6 @@ class Snapshotter:
                         p.shutdown(wait=True, cancel_futures=True)
         for logical in missing + failed:
             bundles[logical].pop("index", None)
-
-        # ---------- files ----------
-        prev_files = (prev_snapshot or {}).get("files", {})
-        roots = {"install": g.game, "locallow": g.locallow}
-        files = self._scan_files(roots, prev_files)
 
         now = datetime.now()
         snap = {

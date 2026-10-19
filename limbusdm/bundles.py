@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 import hashlib
+import io
+import os
 import warnings
+from contextlib import ExitStack
 
 import UnityPy
 from UnityPy.export.Texture2DConverter import parse_image_data
+from UnityPy.files.SerializedFile import SerializedFile
+from UnityPy.streams import EndianBinaryReader
 
 from .store import Store
 
@@ -79,9 +84,53 @@ def _h(data) -> str:
 
 
 def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
-    """Return {"objects": [...], "errors": [...]} for the bundle at `path`. Read-only on `path`."""
-    with open(path, "rb") as f:  # read from the file as needed: the compressed bundle isn't kept in memory too
-        env = UnityPy.load(f)
+    """Return {"objects": [...], "errors": [...]} for the bundle at `path` (or a player file like resources.assets).
+    Read-only on `path`."""
+    with ExitStack() as opened:
+        # read from the file as needed: the compressed bundle isn't kept in memory too
+        env = UnityPy.load(opened.enter_context(open(path, "rb")))
+        add_resources(env, path)
+        return _index_env(env, path, store, thumbs)
+
+
+class ReadOnDemand(io.RawIOBase):
+    """A file opened for each read and closed at once (never held open: the game can replace it)."""
+
+    def __init__(self, path: str):
+        super().__init__()
+        self.path, self.pos = path, 0
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    def tell(self):
+        return self.pos
+
+    def seek(self, pos, whence=0):
+        self.pos = pos if whence == 0 else self.pos + pos if whence == 1 else os.path.getsize(self.path) + pos
+        return self.pos
+
+    def read(self, n=-1):
+        with open(self.path, "rb") as f:
+            f.seek(self.pos)
+            data = f.read(n)
+        self.pos += len(data)
+        return data
+
+
+def add_resources(env, path: str) -> None:
+    """A player file (resources.assets, sharedassets*, level*): its .resS / .resource data files next to it."""
+    if not any(isinstance(f, SerializedFile) for f in env.files.values()):
+        return
+    for side in dict.fromkeys((path + ".resS", os.path.splitext(path)[0] + ".resource")):
+        if os.path.isfile(side):
+            env.register_cab(os.path.basename(side), EndianBinaryReader(ReadOnDemand(side)))
+
+
+def _index_env(env, path: str, store: Store, thumbs: bool) -> dict:
     containers: dict[int, str] = {}
     # path → object from m_Container only (env.container walks the whole cache: very slow)
     for obj in env.objects:
@@ -94,7 +143,10 @@ def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
 
     objects, errors = [], []
     textures: dict[int, str] = {}
-    sprites = []
+    sprites, geo = [], {}
+    # a player file numbers its objects 1, 2, 3…: a sprite's raw data names its texture by that number, which a
+    # rebuild shifts; such sprites are hashed by their picture instead
+    player = any(isinstance(f, SerializedFile) for f in env.files.values())
     for obj in env.objects:
         t = obj.type.name
         rec = {"pid": obj.path_id, "type": t}
@@ -139,8 +191,11 @@ def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
                 rec["h"] = _h(obj.get_raw_data())
                 r = sp.m_Rect
                 rec["rect"] = [round(r.x), round(r.y), round(r.width), round(r.height)]
+                tr = sp.m_RD.textureRect
+                geo[obj.path_id] = f"{rec['rect']}|{tr.x},{tr.y},{tr.width},{tr.height}|{sp.m_Pivot.x},{sp.m_Pivot.y}"
                 try:
-                    rec["tex_pid"] = sp.m_RD.texture.path_id
+                    if sp.m_RD.texture.file_id == 0:  # in player files path ids are small: one from another file clashes
+                        rec["tex_pid"] = sp.m_RD.texture.path_id
                 except Exception:
                     pass
                 sprites.append(rec)
@@ -160,6 +215,8 @@ def index_bundle(path: str, store: Store, thumbs: bool = True) -> dict:
         th = textures.get(rec.get("tex_pid"))
         if th:
             rec["tex"] = th
+            if player and rec["pid"] in geo:
+                rec["h"] = _h(f"{th}|{geo[rec['pid']]}".encode())
     try:  # CAB names let other bundles' references be resolved to this one
         from .cabs import cab_names
         cabs = cab_names(path)

@@ -514,13 +514,13 @@ async function renderReport(id, keepTab) {
   const r = REPORT, s = r.summary;
   const counts = {
     // images with a game path only
-    leaks: s.leaks + s.foreign_only, texts: s.texts, data: s.data, images: (r.sections.images || []).filter((it) => it.path).length || s.images, audio: s.audio,
+    leaks: s.leaks + s.foreign_only, texts: s.texts, data: s.data, images: (r.sections.images || []).filter((it) => it.path || PLAYER_FILE.test(it.bundle)).length || s.images, audio: s.audio,
     video: s.video, code: s.code, catalog: s.catalog_added + s.catalog_removed, other: s.other,
   };
   // open on the first non-empty tab
   if (!keepTab && !counts[view.tab]) view.tab = SECTIONS.find(([k]) => counts[k])?.[0] || "leaks";
   main.innerHTML = `<div class="row"><div class="grow"><h1>Patch · ${esc(fmtVer(r.new.version))}</h1>
-    <div class="sub">${esc(fmtSnap(r.new.id))} compared with ${esc(fmtSnap(r.old.id))} · ${s.bundles_changed} bundles changed</div></div>
+    <div class="sub">${esc(fmtSnap(r.new.id))} compared with ${esc(fmtSnap(r.old.id))} · ${s.bundles_changed} bundles changed${(r.baseline || []).length ? ` · ${r.baseline.length} main game files read for the first time: their changes show from the next patch` : ""}</div></div>
     <div class="row" style="gap:10px">${STATE && STATE.site_publish ? `<button id="rsite" title="put this report and the Identities & E.G.O database on the web copy">Send to site</button>` : ""}<button id="rnotes" title="a short text of what's new, to paste into Discord or Telegram">What's new</button><a href="#/patches">← all patches</a></div></div>
     <div class="tabs">${SECTIONS.map(([k, label]) => `<button data-tab="${k}" class="${k === view.tab ? "active" : ""} ${k === "leaks" && counts.leaks ? "has-leak" : ""}">${label}<span class="n">${counts[k]}</span></button>`).join("")}</div>
     <div class="filters">
@@ -750,7 +750,10 @@ const IMG_CATS = [
   ["RPG", /^(RPGSystem|V2_Texture\/RPG|Sprite\/RPGUI)\//], ["Notices", /^Notice\//], ["Skin previews", /^SkinPreview/],
   ["UI", /^(Sprite\/UI|UI|V2_Texture|DUI|UIConfigs|Sprite\/PanicType)\//],
 ];
+// the game's own files (resources.assets…): no paths, sorted by name
+const PLAYER_FILE = /^install:/, PLAYER_UI = /mainui|^ui|_ui|icon|button|frame|sdf|font/i;
 function imgCat(it) {
+  if (!it.path && PLAYER_FILE.test(it.bundle)) return PLAYER_UI.test(it.name || "") ? "UI" : "Other images";
   if (!it.path) return NOPATH_CAT;
   const p = it.path.replace(/^Assets\/Resources_moved\//, "");
   for (const [label, re] of IMG_CATS) if (re.test(p)) return label;

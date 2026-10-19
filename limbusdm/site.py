@@ -334,8 +334,9 @@ def report_urls(rep: dict, cfg: dict) -> list[str]:
             h = side and (side.get("h") if side.get("type") == "Texture2D" else side.get("tex"))
             if h:
                 urls.append(url_key("/api/thumb", h=h))
-        # full pictures of every image with a game path
-        if n and it.get("path") and cfg["full_images"]:
+        # full pictures of every image with a game path; a player file's sprites always (no preview of their own)
+        if n and (it.get("path") and cfg["full_images"]
+                  or n.get("type") == "Sprite" and str(it.get("bundle")).startswith("install:")):
             urls.append(obj(it))
     for sec in ("texts", "data", "video", "code"):
         for it in S.get(sec, []):

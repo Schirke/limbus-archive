@@ -22,6 +22,8 @@ STRUCTURAL_TYPES = {"GameObject", "Transform", "RectTransform", "MonoBehaviour",
 AUDIO_EXT = {".bank", ".wav", ".ogg", ".mp3", ".fsb"}
 VIDEO_EXT = {".mp4", ".usm", ".webm"}
 CODE_FILES = re.compile(r"(GameAssembly\.dll|global-metadata\.dat|\.dll)$", re.I)
+# player files ("install:resources.assets"…): these listed one by one, prefab parts and nameless objects as counts
+INSTALL_LISTED = IMAGE_TYPES | {"TextAsset", "AudioClip", "VideoClip", "Font"}
 
 
 # ---------------------------------------------------------------- json records
@@ -92,6 +94,8 @@ def text_lines_diff(a: bytes | None, b: bytes | None, limit=300) -> list[str]:
 def _object_maps(store: Store, snap: dict, logicals: set[str]) -> dict[str, dict]:
     out = {}
     for logical in logicals:
+        if logical.startswith("install:"):
+            continue
         b = snap["bundles"].get(logical)
         if not b or not b.get("index"):
             continue
@@ -109,6 +113,38 @@ def _object_maps(store: Store, snap: dict, logicals: set[str]) -> dict[str, dict
             o.pop("tex_pid", None)
             out[key] = o
     return out
+
+
+def _install_pairs(store: Store, old: dict, new: dict, logical: str) -> list[tuple]:
+    """(old, new) objects of a player file that differ. Matched by type + name, equal hashes first: a rebuild of
+    the file numbers its path ids anew."""
+    def groups(snap):
+        b = snap["bundles"].get(logical) or {}
+        out = defaultdict(list)
+        for o in ((store.read_json(b["index"]) if b.get("index") else None) or {}).get("objects", []):
+            o = dict(o, bundle=logical, pid=str(o["pid"]))
+            o.pop("tex_pid", None)
+            out[(o["type"], o.get("name", ""))].append(o)
+        return out
+
+    def unmatched(objs, same):
+        left = Counter(same)
+        out = []
+        for o in objs:
+            if left[o.get("h")] > 0:
+                left[o.get("h")] -= 1
+            else:
+                out.append(o)
+        return out
+
+    og, ng = groups(old), groups(new)
+    pairs = []
+    for key in sorted(set(og) | set(ng)):
+        os_, ns = og.get(key, []), ng.get(key, [])
+        same = Counter(o.get("h") for o in os_) & Counter(n.get("h") for n in ns)
+        os_, ns = unmatched(os_, same), unmatched(ns, same)
+        pairs += [(os_[i] if i < len(os_) else None, ns[i] if i < len(ns) else None) for i in range(max(len(os_), len(ns)))]
+    return pairs
 
 
 def _flags(*texts: str | None) -> list[str]:
@@ -222,8 +258,23 @@ def diff_snapshots(store: Store, old_id: str, new_id: str) -> dict:
     affected = {k for k in set(ob) | set(nb) if ob.get(k, {}).get("hash") != nb.get(k, {}).get("hash")}
     om, nm = _object_maps(store, old, affected), _object_maps(store, new, affected)
     # objects with a path first, nameless parts after
-    for key in sorted(set(om) | set(nm), key=lambda k: (not k.startswith("c:"), k)):
-        o, n = om.get(key), nm.get(key)
+    pairs = [(om.get(key), nm.get(key)) for key in sorted(set(om) | set(nm), key=lambda k: (not k.startswith("c:"), k))]
+    # a player file read for the first time (the old snapshot had it only as a file) is a baseline, not news
+    baseline, folded = [], Counter()
+    for logical in sorted(k for k in affected if k.startswith("install:")):
+        x, y = ob.get(logical) or {}, nb.get(logical) or {}
+        if y and not y.get("index"):
+            continue  # not read this time
+        if y and not x.get("index") and (x or y["file"] in old["files"]):
+            baseline.append(logical)
+            continue
+        for o, n in _install_pairs(store, old, new, logical):
+            cur = n or o
+            if cur["type"] not in INSTALL_LISTED and (cur["type"] in STRUCTURAL_TYPES or not cur.get("name")):
+                folded[("added" if not o else "removed" if not n else "changed", cur["type"], logical)] += 1
+            else:
+                pairs.append((o, n))
+    for o, n in pairs:
         if o and n and o.get("h") == n.get("h"):
             continue
         kind = "added" if not o else "removed" if not n else "changed"
@@ -245,6 +296,10 @@ def diff_snapshots(store: Store, old_id: str, new_id: str) -> dict:
                 item["lines"] = text_lines_diff(ob_, nb_)
         sections[sec].append(item)
 
+    for (kind, t, logical), count in sorted(folded.items()):
+        sections["other"].append({"kind": kind, "type": t, "name": f"{count} object{'s' if count > 1 else ''}", "bundle": logical, "pid": "",
+                                  "count": count, "old": None, "new": None, "flags": []})
+
     # an image with a path comes as a Texture2D plus a Sprite cut from it: show it once
     tex_paths = {(it["kind"], it["path"]) for it in sections["images"] if it["type"] == "Texture2D" and it["path"]}
     sections["images"] = [it for it in sections["images"]
@@ -253,7 +308,7 @@ def diff_snapshots(store: Store, old_id: str, new_id: str) -> dict:
     # ---- bundles themselves (for the "other" overview)
     bundle_changes = []
     for k in sorted(affected):
-        kind = "added" if k not in ob else "removed" if k not in nb else "changed"
+        kind = "baseline" if k in baseline else "added" if k not in ob else "removed" if k not in nb else "changed"
         bundle_changes.append({"kind": kind, "bundle": k, "size": (nb.get(k) or ob.get(k)).get("size")})
 
     # ---- files
@@ -332,7 +387,9 @@ def diff_snapshots(store: Store, old_id: str, new_id: str) -> dict:
     summary["catalog_added"] = len(catalog["added"])
     summary["catalog_removed"] = len(catalog["removed"])
     summary["bundles_changed"] = len(bundle_changes)
-    other_by_type = Counter(f"{it['kind']} {it['type']}" for it in sections["other"])
+    other_by_type = Counter()
+    for it in sections["other"]:
+        other_by_type[f"{it['kind']} {it['type']}"] += it.get("count", 1)
 
     report = {
         "id": f"{old_id}__{new_id}",
@@ -343,6 +400,7 @@ def diff_snapshots(store: Store, old_id: str, new_id: str) -> dict:
         "foreign_only": foreign,
         "catalog": catalog,
         "bundles": bundle_changes,
+        "baseline": baseline,
         "other_by_type": other_by_type.most_common(),
     }
     store.write_json(f"reports/{report['id']}.json.gz", report)
