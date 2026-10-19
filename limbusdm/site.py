@@ -68,6 +68,8 @@ PAGES = {
                "their bosses.", "open": True, "part": "tools"},
     "calc": {"title": "Damage calculator", "seo": "Limbus Company damage calculator: any Identity or E.G.O skill against any enemy, coin "
              "by coin, with the max damage of every skill.", "open": True, "part": "enemies"},
+    "growth": {"title": "Upgrade calculator", "seo": "Limbus Company upgrade calculator: EXP, Threads and Egoshards for any level or "
+               "Uptie, and how many Luxcavation and Mirror Dungeon runs and days that takes.", "open": True, "part": "small"},
     "banners": {"title": "Banner archive", "seo": "Every Limbus Company Extraction banner: when it ran and who was on it.", "open": True,
                 "part": "gacha"},
     "gamegacha": {"title": "Extraction", "seo": "A Limbus Company Extraction simulator, paid with the lunacy the site's games give.",
@@ -1395,8 +1397,8 @@ class Exporter:
         return m
 
     def small(self) -> dict:
-        """One-list pages asked every time: News."""
-        urls = self.fetch_all(["/api/news"], {}, "site: News")
+        """One-list pages asked every time: News, Upgrade calc."""
+        urls = self.fetch_all(["/api/news", "/api/growth"], {}, "site: News")
         m = {"kind": "small", "id": self.svc.latest_snapshot_id(), "urls": urls}
         self.write_manifest("small", m)
         return m

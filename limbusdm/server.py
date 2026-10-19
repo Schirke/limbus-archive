@@ -23,7 +23,7 @@ TOKEN_HEADER = "X-Limbus-Datamine"
 KEEP = "max-age=3600"
 # lists only a new snapshot changes: kept in memory after the first time
 PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror",
-                "/api/game_arenas", "/api/game_voices", "/api/announcers"}
+                "/api/game_arenas", "/api/game_voices", "/api/announcers", "/api/growth"}
 
 
 def _etag(svc) -> str:
@@ -506,6 +506,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/announcers":  # Announcers page (limbusdm/announcers.py)
                 from . import announcers
                 return self._json(_announcer_links(announcers.get(svc)))
+            if p == "/api/growth":  # Upgrade calc page (limbusdm/growth.py)
+                from . import growth
+                return self._json(growth.get(svc))
             if p == "/api/abno_logs":  # Abnormality logs page (limbusdm/abnologs.py)
                 from . import abnologs
                 return self._json(abnologs.get(svc))
