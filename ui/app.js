@@ -260,6 +260,7 @@ async function refresh() {
     STATE = await api("/api/state");
   } catch (e) { return; }
   renderStatus();
+  snapGate();
   if (typeof bigSync === "function") bigSync();  // (admins see the hidden pages)
   const had = new Set(Object.keys(routes));
   if (!window.bigLoaded) {  // the big games (ui/big, built: biggames.js); true once all are in
@@ -431,6 +432,7 @@ function route() {
   document.querySelectorAll("#subnav a").forEach((a) => a.classList.toggle("active", a === sub || a.dataset.route === name || (game && a.parentElement.classList.contains("gmrow") && a.dataset.route === "games")));
   refresh.hook = null;
   stopAnim();
+  if (snapGate()) { $("#main").innerHTML = ""; return; }  // pages wait
   (routes[name] || routes.patches)(rest.map(decodeURIComponent));
 }
 window.addEventListener("hashchange", route);
@@ -475,6 +477,51 @@ async function checkVersion() {
 async function takeSnapshot() {
   try { await api("/api/snapshot", { report: true }); toast("Snapshot started"); refresh(); }
   catch (e) { toast(esc(e.message)); }
+}
+
+// No snapshot yet: one screen over the whole app (its button, Light mode, tips); the pages open once it is taken.
+// True while it is up.
+function snapGate() {
+  const s = STATE, on = typeof SITE === "undefined" && s && !s.snapshots.length;
+  let g = $("#snapgate");
+  if (!on) {
+    if (g) { g.remove(); route(); }  // snapshot done
+    return false;
+  }
+  if (!g) {
+    g = document.createElement("div");
+    g.id = "snapgate";
+    g.innerHTML = `<div class="sgbox"><img class="sglogo" src="/ui/icon.png" alt=""><h1>First: a snapshot of the game</h1>
+      <p>Limbus Archive reads the game's files once and keeps what it found — a <b>snapshot</b>. Every page (Database, Story, Games, Versus, Patches…) is built from it, so the app stays locked until it is done.</p>
+      <div id="sggame" class="sggame" hidden><b class="bad">The game wasn't found.</b> Install Limbus Company from Steam, or paste its folder here:
+        <div class="row" style="gap:8px;margin-top:6px"><input type="text" id="sgdir" placeholder="C:\\Program Files (x86)\\Steam\\steamapps\\common\\Limbus Company" style="flex:1"><button id="sgdirsave">Save</button></div></div>
+      <button class="primary sggo" id="sggo">Take snapshot</button>
+      <label class="sglight"><input type="checkbox" id="sglight"> <b>Light mode</b> <span class="muted">— slower, but uses much less memory</span></label>
+      <div class="hint">Turn it on before you start if the PC has <b>8 GB of memory or less</b> or an old processor, or if the last try froze the PC or closed the app. It reads 2 files at a time instead of all at once. Can be changed later in Settings.</div>
+      <div id="sgjob"></div>
+      <ul class="sgtips">
+        <li>The first time it takes <b>5–20 minutes</b>, it depends on the PC. Later game patches only read what changed.</li>
+        <li>Open the game once before and let it download everything: the app reads only what the game itself downloaded.</li>
+        <li><b>Stuck?</b> If the numbers haven't moved for 10 minutes, close the app, open it again and press Take snapshot — what is already read is kept, it goes on from there.</li>
+        <li><b>The app closed or the PC froze?</b> Turn on Light mode and press Take snapshot again.</li>
+        <li>You can cancel at any time and take it later; it goes on from where it stopped.</li>
+      </ul></div>`;
+    document.body.appendChild(g);
+    $("#sggo").onclick = takeSnapshot;
+    $("#sglight").checked = !!s.settings.light;
+    $("#sglight").onchange = (e) => api("/api/settings", { light: e.target.checked }).then(() => toast(e.target.checked ? "Light mode on" : "Light mode off", 1500), (x) => toast(esc(x.message)));
+    $("#sgdirsave").onclick = async () => { await api("/api/settings", { game_dir: $("#sgdir").value.trim() }).catch((x) => toast(esc(x.message))); refresh(); };
+  }
+  const j = s.job, busy = j && j.running, snap = busy && j.kind === "snapshot";
+  $("#sggame").hidden = s.game.ok;
+  $("#sggo").disabled = busy || !s.game.ok;
+  $("#sggo").textContent = snap ? "Taking the snapshot…" : j && j.kind === "snapshot" && j.error ? "Take snapshot again" : "Take snapshot";
+  $("#sglight").disabled = busy;  // (read at the start)
+  $("#sgjob").innerHTML = snap ? jobBlock()
+    : busy ? `<div class="card small muted">Busy: ${esc(j.kind)} — ${esc(j.stage)}. The button unlocks when it ends.</div>`
+    : j && j.kind === "snapshot" && j.error ? `<div class="card"><span class="badge removed">stopped</span> ${j.error === "cancelled" ? "Cancelled." : esc(j.error)}
+        <div class="small muted">Press Take snapshot again: it goes on from where it stopped.${j.error === "cancelled" ? "" : " If it stops again, turn on Light mode first."}</div></div>` : "";
+  return true;
 }
 
 // ------------------------------------------------------------------ Patches

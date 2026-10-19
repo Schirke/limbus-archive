@@ -1853,3 +1853,14 @@ button.sndnav:hover { color: var(--gold); }
   .ud .sktabs { flex-wrap: wrap; gap: 6px 16px; }
   .ud .skvmeta { flex-wrap: wrap; row-gap: 4px; } .ud .panels .panel h4 { padding-right: 14px; max-width: 100%; }
 }
+
+/* no snapshot yet: the one screen over the app */
+#snapgate { position: fixed; inset: 0; z-index: 48; background: var(--bg); overflow-y: auto; display: flex; justify-content: center; align-items: flex-start; padding: 6vh 16px 24px; }
+#snapgate .sgbox { width: min(640px, 100%); background: var(--panel); border: 1px solid var(--line); border-top: 2px solid var(--gold); border-radius: var(--radius); padding: 26px 30px; }
+#snapgate .sglogo { height: 44px; display: block; margin: 0 auto 6px; }
+#snapgate h1 { text-align: center; margin: 0 0 12px; }
+#snapgate .sggo { display: block; width: 100%; font-size: 18px; padding: 14px; margin: 18px 0 14px; }
+#snapgate .sglight { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; cursor: pointer; }
+#snapgate .hint { color: var(--muted); font-size: 12.5px; margin: 4px 0 14px 26px; }
+#snapgate .sggame { border: 1px solid var(--red); border-radius: 6px; padding: 10px 12px; margin-top: 12px; }
+#snapgate .sgtips { color: var(--muted); font-size: 13px; padding-left: 20px; margin: 14px 0 0; } #snapgate .sgtips li { margin: 5px 0; }

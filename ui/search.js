@@ -96,7 +96,7 @@ function sxFindAll(q) {
   return SX_ORDER.filter((g) => by[g]).map((g) => [g, by[g]]);
 }
 function sxOpen() {
-  if ($("#sxbox")) return;
+  if ($("#sxbox") || $("#snapgate")) return;  // (no snapshot yet)
   const el = document.createElement("div");
   el.id = "sxbox";
   el.innerHTML = `<div class="sxpanel"><div class="sxin"><span class="sxglass">⌕</span><input id="sxq" placeholder="Search Identities, E.G.O, skills, passives, keywords, enemies, story, music…" autocomplete="off"><kbd>Esc</kbd></div>
