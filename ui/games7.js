@@ -178,7 +178,7 @@ function gnResult() {
 // ------------------------------------------------------------------ Guess the buff
 // A buff's or a debuff's own effect plays (the videos Database → Buff effects has made): name the buff.
 const GB_ROUNDS = 10, GB_WORTH = 1000, GB_HINT = 250, GB_TYPE = { pos: "Buff", neg: "Debuff", neu: "Neutral" };
-const gb = { game: null, pool: null };
+const gb = { game: null, pool: null, vid: {} };
 window.addEventListener("hashchange", () => { if (!location.hash.startsWith("#/gamebuff")) gb.game = null; });
 
 routes.gamebuff = async (args = []) => {
@@ -216,6 +216,7 @@ routes.gamebuff = async (args = []) => {
       if (!x.fx.length && by.get(x.name) === x) by.delete(x.name);
     }
     gb.pool = [...by.values()];
+    gb.vid = (r || {}).videos || {};
     if (!r) setTimeout(() => { gb.pool = null; });  // (not read: asked again the next time)
   }
   if (!location.hash.startsWith("#/gamebuff")) return;
@@ -264,7 +265,7 @@ function gbDraw() {
   const cls = (key) => d ? (key === a.key ? "ok" : key === d.pick ? "bad" : "dim") : "";
   $("#main").innerHTML = `<h1>Guess the buff</h1>${gzTop(g)}
     <div class="gmstage gistage gpstage wide"><div>
-      <div class="gbvid"><video src="/api/buff_video?name=${encodeURIComponent(g.fx)}" autoplay loop muted playsinline></video></div>
+      <div class="gbvid"><video src="${esc(gb.vid[g.fx])}" autoplay loop muted playsinline></video></div>
       <div class="gihints">${hints.map(hint).join("")}</div></div>
     <div><div class="gmkick">${d ? (d.ok ? `+${d.points}${used ? ` · ${used} HINT${used > 1 ? "S" : ""} USED` : ""}` : "MISSED") : `WORTH ${gbWorth(g)} NOW`}</div>
       <div class="gmq">${d ? esc(a.name) : "Which buff is this?"}</div>

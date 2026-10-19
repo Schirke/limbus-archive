@@ -54,6 +54,11 @@ def enemy_thumb(app: str) -> str:
     return f"/api/enemy_thumb?app={_q(app)}" if app else ""
 
 
+def buff_video(name: str) -> str:
+    """The video of a buff's effect."""
+    return f"/api/buff_video?name={_q(name)}"
+
+
 def spine(bundle: str, atlas) -> dict:
     """A Spine skeleton's two files; the atlas names its pages."""
     base = f"/spine/{_q(bundle)}/{atlas}.2/skeleton"  # .2: pages at the atlas size

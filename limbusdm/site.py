@@ -132,7 +132,7 @@ PARTS = {
     # the planner's gifts then theme packs with its list, the history with the rest
     "tools": {"taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
               "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
-    "buffs": {"uses": ["buff videos"]},
+    "buffs": {"uses": ["buff videos"], "crawl": {"stage": "Buff effects", "start": ["/api/buffs"], "packs": [], "final": "buffs"}},
     "fx": {"cfg": "spine", "uses": ["skill videos"]},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
     "anim": {"cfg": "spine", "taken": True, "uses": ["fx"]},
     "enemies": {"cfg": "enemies", "taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
@@ -528,6 +528,30 @@ def _voices_sources(svc, keys: list[str]) -> dict:
 
 # PARTS "sources": a file made from another request than its own (key → request)
 SOURCES = {"music": _music_sources, "voices": _voices_sources}
+
+
+def _buffs_final(ex, got: dict, old: dict):
+    """The videos made on the site's computer only: an older patch's stay until made again, the list says which are here."""
+    from .viewer import _safe_name
+    st = ex._stored(got["/api/buffs"])
+    have = old.get("urls") or {}
+    for b in st["list"]:
+        for n in b.get("fx") or []:
+            k = links.key(links.buff_video(n))
+            if k not in got and have.get(k) and os.path.exists(os.path.join(ex.out, "d", have[k])):
+                got[k] = have[k]
+    names = list(dict.fromkeys(n for b in st["list"] for n in b.get("fx") or []))
+    on = [n for n in names if links.key(links.buff_video(n)) in got]
+    st.update(have=sorted({_safe_name(n) for n in on}), failed=[n for n in names if n not in on], queue=0, current=[], busy=False,
+              error="", available=False, videos={n: links.buff_video(n) for n in on})
+    got["/api/buffs"] = ex._store(json.dumps(st, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
+    extra = ex.read_manifest("extra")  # (the old auto-fetched copy)
+    if any(k.startswith("/api/buff") for k in extra.get("urls", {})):
+        extra["urls"] = {k: f for k, f in extra["urls"].items() if not k.startswith("/api/buff")}
+        ex.write_manifest("extra", extra)
+
+
+FINALS = {"buffs": _buffs_final}
 
 _APP: list[str] = []
 
@@ -973,6 +997,8 @@ class Exporter:
             if key in got:
                 got[key] = self._prune(key, got)
         inline = {field: self._stored(got.pop(key)) for field, key in (sec.get("inline") or {}).items() if key in got}  # (the answer goes into the manifest: the index gives it)
+        if sec.get("final"):  # the part's own last touch
+            FINALS[sec["final"]](self, got, old)
         order = sorted if sec.get("sort") else list  # (a pack holds its files in this order)
         urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in order(k for k in got if re.match(p, k))], size) for pat, size in sec["packs"]])
         m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups}
@@ -1264,37 +1290,6 @@ class Exporter:
         urls.update(got)
         self.write_manifest("extra", {"kind": "extra", "id": sid, "urls": urls})
         return len(got)
-
-    def buffs(self) -> dict:
-        """Buff effects: the list and the videos made so far (none can be made on the site)."""
-        from .viewer import _safe_name
-        old = self.read_manifest("buffs")
-        fx = self.svc.buff_fx
-        made = os.path.basename(fx.folder())  # (named by the game version and what draws the videos)
-        same = _game(old.get("id")) == _game(made)
-        have = old.get("urls", {}) if same else {}
-        st = {"list": fx.db()["list"], **fx.status()}
-        names = list(dict.fromkeys(n for b in st["list"] for n in b.get("fx") or []))
-        # another patch or renderer: the old videos stay until made again (as the skills' do: sitefx._read)
-        cur = {url_key("/api/buff_video", name=n) for n in names}
-        prev = {} if same else {k: f for k, f in old.get("urls", {}).items() if k in cur}
-        ready = set(st["have"])
-        # and those the site has already
-        keys = [url_key("/api/buff_video", name=n) for n in names if _safe_name(n) in ready or url_key("/api/buff_video", name=n) in have]
-        urls = self.fetch_all(keys, have, "site: Buff effects")
-        urls.update({k: f for k, f in prev.items() if k not in urls})
-        on_site ={n for n in names if url_key("/api/buff_video", name=n) in urls}
-        st.update(have=sorted({_safe_name(n) for n in on_site}), failed=[n for n in names if n not in on_site],
-                  queue=0, current=[], busy=False, error="", available=False)
-        urls["/api/buffs"] = self._store(json.dumps(st, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
-        m = {"kind": "buffs", "id": made, "urls": urls}
-        self.write_manifest("buffs", m)
-        # drop the old auto-fetched copy
-        extra = self.read_manifest("extra")
-        if any(k.startswith("/api/buff") for k in extra.get("urls", {})):
-            extra["urls"] = {k: f for k, f in extra["urls"].items() if not k.startswith("/api/buff")}
-            self.write_manifest("extra", extra)
-        return m
 
     def langs(self) -> dict:
         """Language tables and their list; a table is kept while its source is the same."""

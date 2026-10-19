@@ -86,7 +86,7 @@ function bfProgress() {
 const bfFile = (b, n) => `${bfName(b)} - ${n}`;
 function bfFig(b, n) {
   const btns = bfHas(n) ? `<span class="grow"></span><button data-bsave="${esc(n)}">Save</button><button data-bgif="${esc(n)}" title="a looping GIF under 10 MB, to post in Discord">GIF</button><button data-bpng="${esc(n)}" title="every frame as a PNG in a folder, for video editors">PNG</button>` : "";
-  const dl = bfHas(n) && typeof siteDl === "function" ? siteDl(`/api/buff_video?name=${encodeURIComponent(n)}`, bfFile(b, n), true) : "";
+  const dl = bfHas(n) && typeof siteDl === "function" ? siteDl(BUFFS.videos[n], bfFile(b, n), true) : "";
   return `${bfVideo(n)}<figcaption class="row bfcap"><span class="mono">${esc(n)}</span>${btns}</figcaption>${dl}`;
 }
 function bfSaveBtn(b) {
@@ -95,7 +95,7 @@ function bfSaveBtn(b) {
 }
 
 function bfVideo(n) {
-  if (bfHas(n)) return `<video src="/api/buff_video?name=${encodeURIComponent(n)}" autoplay loop muted playsinline></video>`;
+  if (bfHas(n)) return `<video src="${esc(BUFFS.videos[n])}" autoplay loop muted playsinline></video>`;
   if (bfFailed(n)) return `<div class="bfnone">This effect could not be drawn outside the game.</div>`;
   if (!BUFFS.available) return `<div class="bfnone">The Unity player is missing — no videos.</div>`;
   return `<div class="bfnone">${BUFFS.current.includes(n) ? "Drawing…" : "In line…"}<div class="progress"><div style="width:${BUFFS.current.includes(n) ? 60 : 10}%"></div></div></div>`;

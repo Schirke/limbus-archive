@@ -8,7 +8,7 @@ import shutil
 import sqlite3
 import threading
 
-from . import units
+from . import links, units
 
 
 class _Viewer:
@@ -340,10 +340,12 @@ class BuffFx:
     def status(self) -> dict:
         d = self.folder()
         have = sorted(f[:-5] for f in os.listdir(d) if f.endswith(".webm")) if os.path.isdir(d) else []
+        names = {viewer._safe_name(n): n for n in self.db()["fx"]}
         with self.lock:
             return {"have": have, "failed": self._failed(), "queue": len(self.queue) + len(self.current),
                     "current": list(self.current), "busy": self.busy, "error": self.error,
-                    "available": bool(viewer.viewer_exe())}
+                    "available": bool(viewer.viewer_exe()),
+                    "videos": {names[f]: links.buff_video(names[f]) for f in have if f in names}}  # (made ones)
 
     def start(self, names: list[str] | None = None, first: bool = False):
         """Queue these effects (None: every one not made yet); `first`: ahead of the ones waiting."""
