@@ -148,7 +148,10 @@ def start_server(rep):
             self.close_connection = True
             self._json({"error": "check: read only"}, 403)
 
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    class Server(ThreadingHTTPServer):
+        request_queue_size = 128  # a page opens its connections in one burst; 5 refuses some of them on Windows
+
+    httpd = Server(("127.0.0.1", 0), H)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd, f"http://127.0.0.1:{httpd.server_address[1]}"
 
