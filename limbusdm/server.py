@@ -688,15 +688,15 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/story":  # Database → Story (story.py, private repo): chapters, episodes, Sinners' Identity stories
                 from . import story
                 lang = q.get("lang", "en")
-                return self._json(story.index(svc, lang if lang in story.LANGS else "en"))
+                return self._json(_story_index_links(story.index(svc, lang if lang in story.LANGS else "en")))
             if p == "/api/story_ep":  # one story file as scenes
                 from . import story
                 lang = q.get("lang", "en")
                 ep = story.episode_of(svc, q.get("id", ""), lang if lang in story.LANGS else "en")
-                return self._json(ep) if ep else self._json({"error": "no such story"}, 404)
+                return self._json(_story_ep_links(ep)) if ep else self._json({"error": "no such story"}, 404)
             if p == "/api/story_kit":  # Story workshop's catalog: people, backgrounds, pictures, music of the stories
                 from . import story
-                return self._json(story.kit(svc))
+                return self._json(_story_kit_links(story.kit(svc)))
             if p == "/api/collection_refs":  # Collection: what screenshots of the game's lists are compared with
                 from . import collection
                 return self._json(collection.refs(svc))
@@ -705,7 +705,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/story_model":  # a layered standing picture: where its body and faces sit
                 from . import story
                 lay = story.model_layout(svc, q.get("path", "")) if q.get("path", "").startswith("Assets/Resources_moved/Story/StandingModel/") else None
-                return self._json(lay) if lay else self._json({"error": "no such model"}, 404)
+                if not lay:
+                    return self._json({"error": "no such model"}, 404)
+                return self._json({**lay, "layers": [dict(x, url=links.story_sprite(lay["bundle"], x["s"])) if x["n"] != "pivot" else x for x in lay["layers"]]})
             if p == "/api/story_sprite":  # one sprite of such a model
                 from . import story
                 png = story.sprite_png(svc, q.get("b", ""), int(q.get("p", "0")))
@@ -797,7 +799,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     tracks = svc.music().get("events") or {}
                 except Exception:
                     tracks = {}  # (no sound banks read: the themes are listed by their event names)
-                return self._json({"chapters": db["chapters"], "tile": db.get("tile") or 2048, "units": entry, "tracks": tracks,
+                from . import stages
+                pics = stages.node_pic_ids(svc)
+                return self._json({"chapters": [_stage_links(c, pics) for c in db["chapters"]], "tile": db.get("tile") or 2048, "units": entry, "tracks": tracks,
                                    "maps": [m["name"] for m in battle_maps(svc)], "assist": db.get("assist") or {},
                                    "announcers": db.get("announcers") or {}, "sinners": db.get("sinners") or []})
             if p == "/api/enemies":  # the handbook's list; an entry's skill and passive texts come with /api/enemy
@@ -1290,6 +1294,62 @@ def _mirror_links(db: dict) -> dict:
     """The planner's gifts and theme packs with their picture's link."""
     return {**db, "gifts": {k: {**g, "tile": links.thumb(g.get("pic"))} for k, g in (db.get("gifts") or {}).items()},
             "packs": [{**p, "tile": links.thumb(p.get("pic"))} for p in db.get("packs") or []]}
+
+
+STORY_OFF = re.compile(r"(?i)off|none|stop")  # (a line's bgm that stops the music)
+
+
+def _story_index_links(idx: dict) -> dict:
+    """The Story list with its files as links: a chapter's `tile` / `big` picture; an episode part [file, detail, banner,
+    banner link, the file's link, banner's small link]; an Identity story's `info`."""
+    part = lambda p: [*p, links.story_pic(p[2], 1280), links.story_ep(p[0]), links.thumb(p[2])]  # noqa: E731
+    ch = lambda c: {**c, "tile": links.thumb(c.get("pic")), "big": links.story_pic(c.get("pic"), 1280),  # noqa: E731
+                    "eps": [{**e, "parts": [part(p) for p in e["parts"]]} for e in c["eps"]]}
+    return {**idx, "main": [ch(c) for c in idx["main"]], "other": [ch(c) for c in idx["other"]],
+            "ident": [{**s, "items": [{**it, "info": links.story_ep(it.get("story"))} for it in s["items"]]} for s in idx["ident"]]}
+
+
+def _story_ep_links(ep: dict) -> dict:
+    """A story file with `links` {"<px>|<path>": picture, "m|<psb>": model layout, "a|<sample>": sound, "v|<name>": video}:
+    the reader (ui/story.js stLink) takes every file from there."""
+    L = {}
+    for v in ep["pics"].values():
+        L["1920|" + v] = links.story_pic(v, 1920)
+    for m in ep["models"].values():
+        if m.get("img"):
+            L["2048|" + m["img"]] = links.story_pic(m["img"], 2048)
+        if m.get("psb"):
+            L["m|" + m["psb"]] = links.story_model(m["psb"])
+    for ln in ep["lines"]:
+        for x in [ln.get("v")] + (ln.get("sfx") or []) + [ln.get("bgm") if ln.get("bgm") and not STORY_OFF.fullmatch(ln["bgm"]) else ""]:
+            if x:
+                L["a|" + x] = links.story_audio(x)
+        if ln.get("vid"):
+            L["v|" + ln["vid"]] = links.story_video(ln["vid"])
+    return {**ep, "links": L}
+
+
+def _story_kit_links(kit: dict) -> dict:
+    """Story workshop's catalog with `links` as a story file has them (its scenes play in the reader), a person's `tile`."""
+    L = {}
+    for k in ("bg", "cg"):
+        for it in kit.get(k) or []:
+            L["1920|" + it["p"]] = links.story_pic(it["p"], 1920)
+    for c in kit.get("chars") or []:
+        if c.get("img"):
+            L["2048|" + c["img"]] = links.story_pic(c["img"], 2048)
+        if c.get("psb"):
+            L["m|" + c["psb"]] = links.story_model(c["psb"])
+    for k in ("bgm", "sfx"):
+        for it in kit.get(k) or []:
+            L["a|" + it["k"]] = links.story_audio(it["k"])
+    return {**kit, "chars": [{**c, "tile": links.thumb(c.get("face") or c.get("img"))} for c in kit.get("chars") or []], "links": L}
+
+
+def _stage_links(c: dict, pics: set) -> dict:
+    """A Story map chapter with its tiles' pictures [small, big] and the nodes' card pictures (those that have one)."""
+    return {**c, "tileUrls": {rc: [links.thumb(p), links.story_pic(p, 1024)] for rc, p in (c.get("tiles") or {}).items()},
+            "nodes": [{**n, "picUrl": links.stage_node_pic(n["id"])} if n["id"] in pics else n for n in c.get("nodes") or []]}
 
 
 def _report_links(rep: dict, site: dict | None = None) -> dict:

@@ -9,8 +9,8 @@ const stSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const stGet = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const ST_TABS = [["main", "Main Story"], ["ident", "Identity Archive"]];
 const ST_PART = { Before: "Pre-battle", Inter: "Interlude", After: "Post-battle" };
-const stImg = (p) => `/api/asset_thumb?path=${encodeURIComponent(p)}`;
-const stFull = (p, m = 1920) => `/api/story_pic?path=${encodeURIComponent(p)}&m=${m}`;
+// a file of a story's answer by what it is: "<px>|<picture path>", "m|<model>", "a|<sound>", "v|<video>" (server _story_ep_links)
+const stLink = (L, k) => (L && L[k]) || "";
 
 routes.story = async (args) => {
   let [a, b, c] = args;
@@ -52,7 +52,7 @@ function storyDraw() {
     }
     const tag = c.kind === "mini" ? "Mini" : c.label;
     const name = c.kind === "mini" ? (c.title || c.label) : (c.title || c.label);
-    const card = `<button class="stcanto${c.kind === "restored" || c.kind === "fools" ? " restored" : ""}" data-id="${c.id}" aria-expanded="${on}"><span class="art"${c.pic ? ` style="background-image:url('${stImg(c.pic)}')"` : ""}></span>
+    const card = `<button class="stcanto${c.kind === "restored" || c.kind === "fools" ? " restored" : ""}" data-id="${c.id}" aria-expanded="${on}"><span class="art"${c.tile ? ` style="background-image:url('${c.tile}')"` : ""}></span>
       <span class="tag">${esc(tag)}</span>${c.time ? `<span class="code">${esc(c.time)}</span>` : ""}<span class="name">${esc(name)}</span><span class="count">${c.eps.reduce((n, e) => n + e.parts.length, 0)} episodes</span></button>`;
     const grp = st.tab === "main" && c.kind !== "main" ? ({ intervallo: "Intervallo", restored: "Restored", fools: "Restored", extra: "Other" })[c.kind] || "Mini stories" : st.tab === "main" && last === "Restored" ? "Main story" : "";
     if (grp && grp !== last) { cards += `<div class="stgroup">${grp}</div>`; last = grp; }
@@ -68,13 +68,13 @@ function storyDraw() {
   // every story file is one episode, as in the game's Story Theater: a picture, a strip of Ep. 1…N, a panel with Enter
   const eps = !cur ? [] : st.tab === "ident"
     ? cur.items.map((it) => ({ id: it.story, n: "", title: it.name, detail: "", pic: "", icon: `/api/char_icon?id=${it.id}` }))
-    : cur.eps.flatMap((e) => e.parts.map((p) => ({ id: p[0], n: e.n, title: e.title, desc: e.desc, detail: p[1], pic: p[2] || cur.pic })));
+    : cur.eps.flatMap((e) => e.parts.map((p) => ({ id: p[0], n: e.n, title: e.title, desc: e.desc, detail: p[1], pic: p[3] || cur.big })));
   const key = st.tab + ":" + (cur ? cur.id : "");
   let at = st.pick[key];
   if (at == null || !eps[at]) at = Math.max(0, eps.findIndex((e) => e.id === st.last));
   st.pick[key] = at;
   const ep = eps[at];
-  const pic = ep && (ep.pic ? `background-image:url('${stFull(ep.pic, 1280)}')` : ep.icon ? `background-image:url('${ep.icon}')` : "");
+  const pic = ep && (ep.pic ? `background-image:url('${ep.pic}')` : ep.icon ? `background-image:url('${ep.icon}')` : "");
   const view = !ep ? "" : `<div class="stview">
       <div class="stbanner${ep.icon ? " icon" : ""}" style="${pic}"><span class="stbtag">EP.${at + 1}</span></div>
       <div class="stinfo"><div class="stepl">${st.tab === "ident" ? "Identity story" : "Episode"}</div><div class="stepn">${esc(ep.n || String(at + 1))}</div>
@@ -277,7 +277,7 @@ async function rLoad(file, at) {
   $("#rtxt").textContent = "";
   $("#rwho").textContent = ""; $("#rrole").textContent = "";
   let ep;
-  try { ep = await api(`/api/story_ep?id=${encodeURIComponent(file)}`); }
+  try { ep = await api(stEpLink(file)); }
   catch (e) { $("#rtxt").textContent = "Could not read this story: " + e.message; return; }
   R.ep = ep;
   R.states = rFold(ep.lines);
@@ -288,6 +288,11 @@ async function rLoad(file, at) {
   await rPreload(ep, file);
   if (R.file !== file) return;
   rShow(Math.min(at, Math.max(0, ep.lines.length - 1)));
+}
+// a story file's address, from the list
+function stEpLink(file) {
+  for (const c of [...st.idx.main, ...st.idx.other]) for (const e of c.eps) for (const p of e.parts) if (p[0] === file) return p[4];
+  return st.idx.ident.flatMap((s) => s.items).find((it) => it.story === file)?.info || "";
 }
 // a scene made in Story workshop, played as a story file is
 async function stPlayEp(ep, title, at = 0) {
@@ -319,8 +324,8 @@ function rFold(lines) {
 // a story's files are fetched in reading order: it starts once its first lines' are here, the rest come in the
 // background; kept as blob URLs while it is read
 const R_FIRST = 10;  // lines whose files are waited for
-const rAudioUrl = (s) => "/api/story_audio?s=" + encodeURIComponent(s);
-const rSpriteUrl = (lay, x) => `/api/story_sprite?b=${encodeURIComponent(lay.bundle)}&p=${x.s}`;
+const rAudioUrl = (s) => stLink(R.ep?.links, "a|" + s);
+const rSpriteUrl = (lay, x) => x.url;
 const rSrc = (u) => R.blobs.get(u) || u;
 async function rPreload(ep, file) {
   // (the story before keeps its blobs: its pictures may still be on screen; the one before that is let go, all but
@@ -333,10 +338,10 @@ async function rPreload(ep, file) {
   let need = 0;
   ep.lines.forEach((l, i) => {
     const st = R.states[i];
-    for (const k of ["bg:" + st.bg, "cg:" + st.cg]) if (ep.pics[k]) urls.add(stFull(ep.pics[k]));
+    for (const k of ["bg:" + st.bg, "cg:" + st.cg]) if (ep.pics[k]) urls.add(stLink(ep.links, "1920|" + ep.pics[k]));
     for (const [m] of st.chars) {
       const info = ep.models[m] || {}, lay = lays[info.psb];
-      if (info.img) urls.add(stFull(info.img, 2048));
+      if (info.img) urls.add(stLink(ep.links, "2048|" + info.img));
       if (lay) lay.layers.forEach((x) => { if (x.n !== "pivot") urls.add(rSpriteUrl(lay, x)); });
     }
     if (l.v) urls.add(rAudioUrl(l.v));
@@ -344,7 +349,8 @@ async function rPreload(ep, file) {
     if (l.bgm && !/^(off|none|stop)$/i.test(l.bgm)) urls.add(rAudioUrl(l.bgm));
     if (i === R_FIRST - 1) need = urls.size;
   });
-  Object.values(ep.pics).forEach((p) => urls.add(stFull(p)));  // (pictures no line names in order)
+  Object.values(ep.pics).forEach((p) => urls.add(stLink(ep.links, "1920|" + p)));  // (pictures no line names in order)
+  urls.delete("");
   if (!need) need = urls.size;
   for (const u of urls) if (R.blobsOld.has(u)) R.blobs.set(u, R.blobsOld.get(u));
   const live = new Set([...R.blobsOld.values(), ...R.blobs.values()]);
@@ -369,8 +375,8 @@ async function rPreload(ep, file) {
   clearTimeout(shown);
   box.classList.remove("on");
 }
-function rLayout(path) {
-  if (!R.layouts.has(path)) R.layouts.set(path, api("/api/story_model?path=" + encodeURIComponent(path)).catch(() => null));
+function rLayout(path, L = R.ep?.links) {
+  if (!R.layouts.has(path)) R.layouts.set(path, api(stLink(L, "m|" + path)).catch(() => null));
   return R.layouts.get(path);
 }
 
@@ -403,10 +409,10 @@ function rShow(i) {
   $("#rend").classList.remove("on");
   // picture
   const bgp = ep.pics["bg:" + s.bg], cgp = ep.pics["cg:" + s.cg];
-  $("#rbg").style.backgroundImage = bgp ? `url('${rSrc(stFull(bgp))}')` : "none";
+  $("#rbg").style.backgroundImage = bgp ? `url('${rSrc(stLink(ep.links, "1920|" + bgp))}')` : "none";
   const cg = $("#rcg");
   cg.style.display = cgp ? "block" : "none";
-  cg.style.backgroundImage = cgp ? `url('${rSrc(stFull(cgp))}')` : "none";
+  cg.style.backgroundImage = cgp ? `url('${rSrc(stLink(ep.links, "1920|" + cgp))}')` : "none";
   $("#rchars").style.display = cgp ? "none" : "";
   R.el.classList.toggle("mono", !l.m && !l.who && !s.chars.length && !cgp && (!bgp || /black/i.test(s.bg)));
   rChars(s, l.m);
@@ -482,7 +488,7 @@ function rBgm(name) {
 function rVideo(name) {
   const box = $("#rvid");
   const v = document.createElement("video");
-  v.src = "/api/story_video?name=" + encodeURIComponent(name);
+  v.src = stLink(R.ep.links, "v|" + name);
   v.autoplay = true; v.playsInline = true;
   v.style.cursor = "pointer";
   const at = R.i;
@@ -534,7 +540,7 @@ function rStand(m, info, slot) {
       Object.assign(im.style, { position: "absolute", width: w + "px", height: h + "px", left: -w / 2 + "px", bottom: "0" });
       inner.append(im);
     };
-    im.src = rSrc(stFull(info.img, 2048));
+    im.src = rSrc(stLink(R.ep.links, "2048|" + info.img));
     return node;
   }
   rLayout(info.psb).then((lay) => {  // a layered model: body + one face, in its own pixels around its origin

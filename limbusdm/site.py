@@ -51,7 +51,7 @@ PAGES = {
            "and full art.", "open": True, "cards": True, "part": "units"},
     "enemies": {"title": "Enemies", "seo": "Limbus Company enemies and Abnormalities: their skills, passives and battle look, Canto by "
                 "Canto.", "open": True, "cards": True, "part": "enemies"},
-    "stages": {"title": "Story map", "seo": "Every Canto's stages in Limbus Company: who stands there and what waits."},
+    "stages": {"title": "Story map", "seo": "Every Canto's stages in Limbus Company: who stands there and what waits.", "part": "story"},
     "announcers": {"title": "Announcers", "seo": "Every battle announcer of Limbus Company with all of its lines by situation: read them "
                    "and hear them.", "open": True, "part": "announcers"},
     "abnologs": {"title": "Abnormality logs", "seo": "Every Limbus Company Abnormality observation log, Canto by Canto: which Sinner "
@@ -140,7 +140,10 @@ PARTS = {
     "enemies": {"cfg": "enemies", "taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
                 "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]}},
     "music": {"cfg": "music", "taken": True, "crawl": {"stage": "Music", "start": ["/api/music"], "sources": "music", "packs": []}},  # (Opus from the banks)
-    "story": {"cfg": "story", "uses": ["story reader"]},
+    # the Story list, every story file, its pictures, standing models, sounds and voices; Story workshop's catalog; the Story map
+    "story": {"cfg": "story", "uses": ["story reader"], "crawl": {"stage": "Story", "hold": "story", "packs": "story",
+              "start": ["/api/story", "/api/story_lines", "/api/story_kit", "/api/ui_sprite?n=SettingIcon", "/api/stages"],
+              "fresh": [r"/api/story_ep\?"], "versions": "story", "renew": {"mv": r"/api/story_model\?"}}},
     "announcers": {"cfg": "story", "taken": True, "crawl": {"stage": "Announcers", "start": ["/api/announcers"],
                    "packs": [(r"/api/announcers$", PACK), ((r"/api/asset_thumb\?", r"/api/asset_img\?"), GAME_PACK),
                              (r"/api/bank\?", VOICE_PACK)]}},
@@ -505,12 +508,64 @@ def _lang_sources(svc, keys: list[str]) -> dict:
 SOURCES = {"music": _music_sources, "voices": _voices_sources, "langs": _lang_sources}
 
 
-def _langs_hold(ex) -> bool:
+def _langs_hold(ex, old: dict) -> bool:
     from . import langs
-    return not langs.own(ex.svc)
+    return bool(old) and not langs.own(ex.svc)
 
 
-HOLDS = {"langs": _langs_hold}
+def _story_hold(ex, old: dict) -> bool:
+    import importlib.util
+    return importlib.util.find_spec("limbusdm.story") is None  # (a copy without the private reader)
+
+
+HOLDS = {"langs": _langs_hold, "story": _story_hold}
+
+
+def _story_versions(ex) -> dict:
+    from . import story
+    return {"mv": getattr(story, "MODEL_VERSION", 1)}  # (standing models placed anew: asked again)
+
+
+VERSIONS = {"story": _story_versions}
+
+
+def _story_packs(ex, got: dict) -> list:
+    """Story's packs: lists and models, small pictures and model sprites, scene pictures (chapter banners, each story
+    file's in reading order, the map), effects and voices, music and videos."""
+    K, read = links.key, lambda k: ex._stored(got[k]) if k in got else {}  # noqa: E731
+    idx, kit, sdb = read("/api/story"), read("/api/story_kit"), read("/api/stages")
+    chapters = (idx.get("main") or []) + (idx.get("other") or [])
+    files = [K(f) for f in dict.fromkeys([p[4] for c in chapters for e in c["eps"] for p in e["parts"]]
+                                         + [it["info"] for s in idx.get("ident") or [] for it in s["items"]]) if f]
+    lists = ["/api/story", "/api/story_lines", "/api/story_kit", "/api/ui_sprite?n=SettingIcon"] + files
+    thumbs = [c["tile"] for c in chapters if c.get("tile")] + [c["tile"] for c in kit.get("chars") or [] if c.get("tile")]
+    thumbs += [n["picUrl"] for c in sdb.get("chapters") or [] for n in c["nodes"] if n.get("picUrl")]
+    banners = {p[2]: p[3] for c in chapters for e in c["eps"] for p in e["parts"] if p[2]} | {c["pic"]: c["big"] for c in chapters if c.get("pic")}
+    pics = [banners[b] for b in sorted(banners)]
+    models, sprites, sounds, voices, music, videos = [], [], [], [], [], []
+    for f in files:
+        ep = read(f)
+        if not ep:
+            continue
+        L = ep.get("links") or {}
+        pics += [L.get("1920|" + v) for v in ep["pics"].values()]
+        for m in ep["models"].values():
+            if m.get("img"):
+                pics.append(L.get("2048|" + m["img"]))
+            if m.get("psb"):
+                models.append(L.get("m|" + m["psb"]))
+                sprites += [x["url"] for x in read(K(L.get("m|" + m["psb"]) or "")).get("layers") or [] if x.get("url")]
+        for ln in ep["lines"]:
+            voices.append(L.get("a|" + ln["v"]) if ln.get("v") else "")
+            sounds += [L.get("a|" + x) for x in ln.get("sfx") or []]
+            music.append(L.get("a|" + ln["bgm"]) if ln.get("bgm") else "")
+            videos.append(L.get("v|" + ln["vid"]) if ln.get("vid") else "")
+    pics += [u[1] for c in sdb.get("chapters") or [] for u in (c.get("tileUrls") or {}).values()]  # (the map close up)
+    k = lambda xs: [K(x) for x in xs if x]  # noqa: E731
+    return [(k(lists + models), PACK), (k(thumbs + sprites), GAME_PACK), (k(pics), SCENE_PACK), (k(sounds + voices), VOICE_PACK), (k(music + videos), PACK)]
+
+
+PACKERS = {"story": _story_packs}
 
 
 def _report_order(ex, r: dict, got: dict) -> list[str]:
@@ -972,13 +1027,15 @@ class Exporter:
         sec = sec or PARTS[name]["crawl"]
         stage = "site: " + sec["stage"]
         old, app = self.read_manifest(name), __import__("limbusdm").__version__
-        if old and sec.get("hold") and HOLDS[sec["hold"]](self):
+        if sec.get("hold") and HOLDS[sec["hold"]](self, old):
             return old
+        ver = VERSIONS[sec["versions"]](self) if sec.get("versions") else {}
         have = {k: f for k, f in (old.get("urls") or {}).items() if k not in sec["start"]} if sec.get("keep_all") else self.kept(old, sec["start"])  # (the lists: asked every time)
         if old.get("app") != app and not sec.get("keep_all"):  # (another app may answer differently: its answers asked again, pictures kept)
             have = {k: f for k, f in have.items() if ".json" not in f}
-        if sec.get("fresh"):  # …and these
-            have = {k: f for k, f in have.items() if not any(re.match(p, k) for p in sec["fresh"])}
+        fresh = list(sec.get("fresh") or []) + [p for v, p in (sec.get("renew") or {}).items() if old.get(v) != ver.get(v)]
+        if fresh:  # …and these
+            have = {k: f for k, f in have.items() if not any(re.match(p, k) for p in fresh)}
         self.progress(stage, 0, 0)
         got, todo, srcs = {}, list(sec["start"]), {}
         seen = set(todo)
@@ -1000,8 +1057,12 @@ class Exporter:
         if sec.get("final"):  # the part's own last touch
             (FINALS[sec["final"]] if isinstance(sec["final"], str) else sec["final"])(self, got, old)
         order = sorted if sec.get("sort") else list  # (a pack holds its files in this order)
-        urls, groups = _grouped(got, [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in order(k for k in got if re.match(p, k))], size) for pat, size in sec["packs"]])
-        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups, **(sec.get("manifest") or {})}
+        if isinstance(sec["packs"], str):  # (a part's own order: site.PACKERS)
+            first = PACKERS[sec["packs"]](self, got)
+        else:
+            first = [([k for p in ((pat,) if isinstance(pat, str) else pat) for k in order(k for k in got if re.match(p, k))], size) for pat, size in sec["packs"]]
+        urls, groups = _grouped(got, first)
+        m = {"kind": name, "id": self.svc.latest_snapshot_id(), "app": app, "urls": urls, "groups": groups, **ver, **(sec.get("manifest") or {})}
         if srcs:
             m["src"] = {k: s for k, s in srcs.items() if k in urls}
         m.update(inline)
@@ -1187,78 +1248,6 @@ class Exporter:
         urls, groups = _grouped(got, [(lists, PACK), ([k for k in keys if k not in lists and k not in sounds], GAME_PACK), (sounds, VOICE_PACK)])
         m = {"kind": "biggames", "id": sid, "made": made, "urls": urls, "groups": groups}
         self.write_manifest("biggames", m)
-        return m
-
-    def story(self) -> dict:
-        """Story: the list, every story file, its pictures, standing models, sounds and voices."""
-        old = self.read_manifest("story")
-        try:
-            from . import story
-        except ImportError:  # (a copy without the private code: no reader)
-            return old
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        if old.get("v") != story.VERSION:  # (the reader's output changed: ask every story file again)
-            have = {k: f for k, f in have.items() if not k.startswith("/api/story_ep")}
-        if old.get("mv") != getattr(story, "MODEL_VERSION", 1):  # (standing models placed anew)
-            have = {k: f for k, f in have.items() if not k.startswith("/api/story_model")}
-        try:
-            idx = json.loads(self._get("/api/story")[0])
-        except Exception as e:
-            self.failed.append(("/api/story", str(e)))
-            return old
-        chapters = idx["main"] + idx["other"]
-        files = list(dict.fromkeys([p[0] for c in chapters for e in c["eps"] for p in e["parts"]]
-                                   + [it["story"] for s in idx["ident"] for it in s["items"]]))
-        files = [f for f in files if f]
-        lists = ["/api/story", "/api/story_lines", "/api/story_kit", url_key("/api/ui_sprite", n="SettingIcon")] + [url_key("/api/story_ep", id=f) for f in files]
-        thumbs = [url_key("/api/asset_thumb", path=c["pic"]) for c in chapters if c.get("pic")]
-        try:  # Story workshop's people: their story portraits
-            kit = json.loads(self._get("/api/story_kit")[0])
-            thumbs += [url_key("/api/asset_thumb", path=c.get("face") or c["img"]) for c in kit["chars"] if c.get("face") or c.get("img")]
-        except Exception as e:
-            self.failed.append(("/api/story_kit", str(e)))
-        banners = {p[2] for c in chapters for e in c["eps"] for p in e["parts"] if p[2]} | {c["pic"] for c in chapters if c.get("pic")}
-        pics = [url_key("/api/story_pic", path=b, m=1280) for b in sorted(banners)]
-        models, sprites, sounds, voices, music, videos = [], [], [], [], [], []
-        self.progress("site: Story (reading the scenes)", 0, len(files))
-        for i, f in enumerate(files):
-            ep = story.episode_of(self.svc, f)
-            self.progress("site: Story (reading the scenes)", i + 1, len(files))
-            if not ep:
-                continue
-            pics += [url_key("/api/story_pic", path=v, m=1920) for v in ep["pics"].values()]
-            for m in ep["models"].values():
-                if m.get("img"):
-                    pics.append(url_key("/api/story_pic", path=m["img"], m=2048))
-                if m.get("psb"):
-                    models.append(url_key("/api/story_model", path=m["psb"]))
-                    lay = story.model_layout(self.svc, m["psb"]) or {}
-                    sprites += [url_key("/api/story_sprite", b=lay["bundle"], p=x["s"]) for x in lay.get("layers") or [] if x["n"] != "pivot"]
-            for ln in ep["lines"]:
-                if ln.get("v"):
-                    voices.append(url_key("/api/story_audio", s=ln["v"]))
-                sounds += [url_key("/api/story_audio", s=x) for x in ln.get("sfx") or []]
-                if ln.get("bgm") and not re.fullmatch(r"(?i)off|none|stop", ln["bgm"]):
-                    music.append(url_key("/api/story_audio", s=ln["bgm"]))
-                if ln.get("vid"):
-                    videos.append(url_key("/api/story_video", name=ln["vid"]))
-        # the Story map's node cards
-        try:
-            from . import stages
-            have_pic = stages.node_pic_ids(self.svc)
-            sdb = json.loads(self._get("/api/stages")[0])
-            thumbs += [url_key("/api/stage_node_pic", id=n["id"]) for c in sdb["chapters"] for n in c["nodes"] if n["id"] in have_pic]
-            pics += [url_key("/api/story_pic", path=p, m=1024) for c in sdb["chapters"] for p in (c.get("tiles") or {}).values()]  # (the map close up)
-        except Exception as e:
-            self.failed.append(("/api/stages", str(e)))
-        # (voices in reading order: a pack holds the next lines)
-        keys = list(dict.fromkeys(lists + thumbs + pics + models + sprites + sounds + voices + music + videos))
-        got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in ("/api/story", "/api/story_lines", "/api/story_kit")}, "site: Story")
-        urls, groups = _grouped(got, [(lists + models, PACK), (thumbs + sprites, GAME_PACK), (pics, SCENE_PACK),
-                                      (sounds + voices, VOICE_PACK), (music + videos, PACK)])
-        m = {"kind": "story", "id": sid, "v": story.VERSION, "mv": getattr(story, "MODEL_VERSION", 1), "urls": urls, "groups": groups}
-        self.write_manifest("story", m)
         return m
 
     def extra(self, keys: list[str]) -> int:

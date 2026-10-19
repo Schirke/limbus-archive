@@ -100,6 +100,41 @@ def patchnotes(rid: str) -> str:
     return f"/api/patchnotes?id={_q(rid)}"
 
 
+def story_pic(path: str, m: int = 1920) -> str:
+    """A story picture as a smaller WebP at most m px."""
+    return f"/api/story_pic?path={_q(path)}&m={m}" if path else ""
+
+
+def story_ep(file: str) -> str:
+    """One story file as scenes."""
+    return f"/api/story_ep?id={_q(file)}" if file else ""
+
+
+def story_audio(sample: str) -> str:
+    """A story's voice, effect or music."""
+    return f"/api/story_audio?s={_q(sample)}" if sample else ""
+
+
+def story_video(name: str) -> str:
+    """A story's video."""
+    return f"/api/story_video?name={_q(name)}" if name else ""
+
+
+def story_model(psb: str) -> str:
+    """A layered standing picture's layout."""
+    return f"/api/story_model?path={_q(psb)}" if psb else ""
+
+
+def story_sprite(bundle: str, pid) -> str:
+    """One sprite of a layered standing picture."""
+    return f"/api/story_sprite?b={_q(bundle)}&p={pid}"
+
+
+def stage_node_pic(nid) -> str:
+    """A Story map node's card picture."""
+    return f"/api/stage_node_pic?id={nid}"
+
+
 def spine(bundle: str, atlas) -> dict:
     """A Spine skeleton's two files; the atlas names its pages."""
     base = f"/spine/{_q(bundle)}/{atlas}.2/skeleton"  # .2: pages at the atlas size

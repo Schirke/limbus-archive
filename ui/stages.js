@@ -68,14 +68,14 @@ function stMap() {
   const xs = c.nodes.map((n) => n.x * k).sort((a, b) => a - b), gap = Math.min(...xs.slice(1).map((v, i) => v - xs[i]).filter((v) => v > 8), 9999);
   const cw = Math.round(Math.max(96, Math.min(t * .2, 260, gap * 1.6)));
   box.innerHTML = `<div class="stcanvas" style="width:${w}px;height:${h}px">
-      ${Object.entries(c.tiles).map(([rc, path]) => { const [r, col] = rc.split("_");
-        return `<img loading="lazy" draggable="false" src="${t > 384 ? stFull(path, 1024) : imgThumb(path)}" style="left:${col * t}px;top:${(c.rows - 1 - r) * t}px;width:${t}px;height:${t}px" onerror="this.remove()">`; }).join("")}
+      ${Object.entries(c.tileUrls).map(([rc, u]) => { const [r, col] = rc.split("_");
+        return `<img loading="lazy" draggable="false" src="${u[t > 384 ? 1 : 0]}" style="left:${col * t}px;top:${(c.rows - 1 - r) * t}px;width:${t}px;height:${t}px" onerror="this.remove()">`; }).join("")}
       <svg width="${w}" height="${h}"><polyline points="${c.nodes.map((n) => at(n).join(",")).join(" ")}"/></svg>
       ${c.nodes.map((n, i) => { const [x, y] = at(n);
         return `<a class="stnode ${n.kind}" href="#/stages/${c.id}/${n.id}" data-n="${n.id}" style="left:${x}px;top:${y}px" title="${esc(`${n.n} · ${n.title || ST_KIND[n.kind][1]}`)}">${n.kind === "story" ? "" : esc(n.n.split("-").pop())}</a>`; }).join("")}
       ${c.nodes.map((n) => { const [x, y] = at(n);  // the game's cards over (or under) the nodes
         return `<a class="stcard ${n.up === false ? "down" : "up"} ${n.kind}" href="#/stages/${c.id}/${n.id}" data-n="${n.id}" style="left:${x}px;top:${y}px;width:${cw}px">
-          <span class="pic"><img loading="lazy" draggable="false" src="/api/stage_node_pic?id=${n.id}" alt="" onerror="this.remove()"></span>
+          <span class="pic">${n.picUrl ? `<img loading="lazy" draggable="false" src="${n.picUrl}" alt="" onerror="this.remove()">` : ""}</span>
           <span class="band"><i>${ST_KIND[n.kind][0]}</i><em>${esc(n.n)}</em><b>${esc(n.title || ST_KIND[n.kind][1])}</b></span></a>`; }).join("")}
     </div>`;
   // a card with a story opens it (a choice when it has a part before and after the fight); others pick the node

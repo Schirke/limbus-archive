@@ -141,7 +141,7 @@ function wkEp(sc) {
     lines.push(out);
     prev = s;
   });
-  return { id: "workshop", lines, models, pics };
+  return { id: "workshop", lines, models, pics, links: wk.kit.links };
 }
 function wkPlay(sc, at = 0) {
   wkHear(null);
@@ -238,14 +238,14 @@ function wkSide() {
   if (c) wkFaces(c, l);
 }
 function wkFace(c) {
-  const src = c.face ? stImg(c.face) : c.img ? stImg(c.img) : "";
+  const src = c.tile;
   return src ? `<img class="wkpor" loading="lazy" src="${src}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'wkpor',textContent:this.dataset.n}))" data-n="${esc(c.name.slice(0, 1))}">` : `<i class="wkpor">${esc(c.name.slice(0, 1))}</i>`;
 }
 // a layered model's faces: its face_<name> sprites (the _L / _R takes are one face)
 async function wkFaces(c, l) {
   const box = $("#wkfaces");
   if (!c.psb) { box.innerHTML = `<span class="muted">One picture: no other faces</span>`; return; }
-  const lay = await rLayout(c.psb);
+  const lay = await rLayout(c.psb, wk.kit.links);
   if ($("#wkfaces") !== box || wk.sc.l[wk.sel] !== l) return;
   if (!lay) { box.innerHTML = `<span class="muted">Could not read the faces</span>`; return; }
   const faces = new Map();
@@ -262,8 +262,8 @@ function wkStage(box = $("#wkstage"), sc = wk.sc, i = wk.sel) {
   const s = wkFold(sc)[i], l = sc.l[i] || {}, bg = wkFind("bg", s.bg), cg = wkFind("cg", s.cg), c = wkChar(l.m);
   box.style.setProperty("--k", ((box.clientWidth || 640) / ST_W).toFixed(5));
   const who = l.n || c?.name || "";
-  box.innerHTML = `<div class="wkbg"${bg ? ` style="background-image:url('${stFull(bg.p)}')"` : ""}></div><div class="wkchars"></div>
-    ${cg ? `<div class="wkcg" style="background-image:url('${stFull(cg.p)}')"></div>` : ""}
+  box.innerHTML = `<div class="wkbg"${bg ? ` style="background-image:url('${stLink(wk.kit.links, "1920|" + bg.p)}')"` : ""}></div><div class="wkchars"></div>
+    ${cg ? `<div class="wkcg" style="background-image:url('${stLink(wk.kit.links, "1920|" + cg.p)}')"></div>` : ""}
     ${(l.fx || []).length ? `<div class="wkfxtag">${(l.fx || []).map((x) => `<span>${esc(WK_FX.find(([k]) => k === x)[1])}</span>`).join("")}</div>` : ""}
     <div class="wkbox">${who ? `<b style="--c:${wkColor(c)}">${esc(who)}</b>` : ""}<p class="${who ? "" : "narr"}"></p></div>`;
   box.querySelector(".wkbox p").textContent = wkPlain(l.x);
@@ -287,10 +287,10 @@ function wkStand(c, slot, feel, dim, front) {
     const im = new Image();
     im.alt = "";
     im.onload = () => { const w = im.naturalWidth, h = im.naturalHeight; Object.assign(im.style, { position: "absolute", width: w + "px", height: h + "px", left: -w / 2 + "px", bottom: "0" }); inner.append(im); };
-    im.src = stFull(c.img, 2048);
+    im.src = stLink(wk.kit.links, "2048|" + c.img);
     return el;
   }
-  rLayout(c.psb).then((lay) => {
+  rLayout(c.psb, wk.kit.links).then((lay) => {
     if (!lay) return;
     const f = feel || "idle", look = (slot > 5) !== flip ? "L" : slot === 5 && !flip ? "L" : "R";
     const names = new Set(lay.layers.map((x) => x.n));
@@ -452,7 +452,7 @@ function wkPickList() {
   const shown = items.slice(0, p.n);
   let h;
   if (kind === "m") h = `<div class="wkpgrid people">${shown.map((c) => `<button data-a="use" data-k="${esc(c.m)}">${wkFace(c)}<b>${esc(c.name)}</b><span>${esc(c.nick || c.ch || "")}</span></button>`).join("")}</div>`;
-  else if (kind === "bg" || kind === "cg") h = `<div class="wkpgrid pics">${shown.map((x) => `<button data-a="use" data-k="${esc(x.k)}"><img loading="lazy" src="${stFull(x.p)}" alt=""><b>${esc(wkNice(x.k))}</b><span>${esc(x.ch || "")}</span></button>`).join("")}</div>`;
+  else if (kind === "bg" || kind === "cg") h = `<div class="wkpgrid pics">${shown.map((x) => `<button data-a="use" data-k="${esc(x.k)}"><img loading="lazy" src="${stLink(wk.kit.links, "1920|" + x.p)}" alt=""><b>${esc(wkNice(x.k))}</b><span>${esc(x.ch || "")}</span></button>`).join("")}</div>`;
   else h = `<div class="wkplist">${shown.map((x) => `<div class="wkprow"><button class="sndplay" data-a="hear" data-k="${esc(x.k)}" aria-label="Listen to ${esc(wkNice(x.k))}">▶</button><b>${esc(wkNice(x.k))}</b><span class="muted">${esc(x.ch || "")}</span><button data-a="use" data-k="${esc(x.k)}">Use</button></div>`).join("")}</div>`;
   if (!items.length) h = `<div class="empty">Nothing found.</div>`;
   if (items.length > shown.length) h += `<div class="wkpmore"><button data-a="more">Show more (${items.length - shown.length} left)</button></div>`;
@@ -469,7 +469,7 @@ function wkHear(key, btn) {
   document.querySelectorAll("#wkpick .sndplay.on").forEach((x) => { x.classList.remove("on"); x.textContent = "▶"; });
   if (a) { a.pause(); wk.audio = null; if (a.dataset.k === key) return; }
   if (!key) return;
-  const n = new Audio(rAudioUrl(key));
+  const n = new Audio(stLink(wk.kit.links, "a|" + key));
   n.dataset.k = key; n.volume = mediaVol();
   n.play().catch(() => {});
   n.onended = () => { if (wk.audio === n) wkHear(null); };

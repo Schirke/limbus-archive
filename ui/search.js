@@ -67,9 +67,9 @@ async function sxData() {
   for (const b of bf?.list || []) rows.push({ g: "Buff effects", t: b.name, s: sxPlain(b.desc).split("\n")[0].slice(0, 70), pic: b.icon ? imgThumb(b.icon) : "", go: `#/buffs/${b.id}`, k: [b.name, b.id] });
   (Array.isArray(mus) ? mus : []).forEach((m, n) => rows.push({ g: "Music", t: m.name, s: [m.by, m.where].filter(Boolean).join(" · "), icon: "♪", play: n, k: [m.name, m.by, m.where] }));
   for (const c of [...(sto?.main || []), ...(sto?.other || [])]) {
-    rows.push({ g: "Story", t: `${c.label} · ${c.title}`, s: [c.company, c.area].filter(Boolean).join(" · "), pic: c.pic ? stImg(c.pic) : "", go: `#/story/main/${c.id}`, k: [c.label, c.title, c.company, c.area] });
+    rows.push({ g: "Story", t: `${c.label} · ${c.title}`, s: [c.company, c.area].filter(Boolean).join(" · "), pic: c.tile || "", go: `#/story/main/${c.id}`, k: [c.label, c.title, c.company, c.area] });
     for (const e of c.eps || []) if (e.parts?.[0]) rows.push({ g: "Story", t: e.title || `Episode ${e.n}`, s: `${c.label} · episode ${e.n}`, minor: 1,
-      pic: e.parts[0][2] ? stImg(e.parts[0][2]) : "", go: `#/story/read/${encodeURIComponent(e.parts[0][0])}`, k: [e.title, c.label] });
+      pic: e.parts[0][5] || "", go: `#/story/read/${encodeURIComponent(e.parts[0][0])}`, k: [e.title, c.label] });
   }
   for (const a of sx.ann || []) rows.push({ g: "Announcers", t: a.name, s: `Announcer · ${a.lines.length} lines`, pic: a.tile, go: `#/announcers/${a.id}`, k: [a.name, "announcer"] });
   for (const g of GM_GAMES) rows.push({ g: "Games", t: g[2], s: g[3], icon: "🎲", go: g[1], k: [g[2], g[3], "game"] });
