@@ -241,17 +241,18 @@ function dcBind(pres, u) {
     inp.oninput = () => {
       const w = sxWords(inp.value), hit = (s) => { const t = sxNorm(s); return w.every((q) => t.includes(q)); };
       if (foe) {
-        const found = w.length ? ENEMIES.list.filter((e) => e.variants && e.variants.length && hit(`${e.name} ${sxEn(e.name)}`)).slice(0, 8) : [];
+        const found = w.length ? ENEMIES.list.filter((e) => e.variants && e.variants.length && hit(`${e.name} ${sxEn(e.name)}`)) : [];
         list.innerHTML = `<div data-en="0"><span class="dcdummy">🎯</span><span>Training dummy</span></div>` + found.map((e) => `<div data-en="${e.id}">${enTileImg(e)}<span>${esc(e.name)} <i>${esc(e.label || "")}</i></span></div>`).join("");
         list.querySelectorAll("[data-en]").forEach((d) => d.onmousedown = () => { dc.en = +d.dataset.en; dc.ev = 0; dcDraw(); });
       } else {
-        const found = w.length ? dcList().filter((x) => hit(`${x.title || x.name} ${x.sinnerName} ${sxEn(x.title || x.name)} ${sxEn(x.sinnerName)}`)).slice(0, 8) : [];
-        list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img src="${x.pics.thumb}" alt=""><span>${esc(x.title || x.name)} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
+        const found = w.length ? dcList().filter((x) => hit(`${x.title || x.name} ${x.sinnerName} ${sxEn(x.title || x.name)} ${sxEn(x.sinnerName)}`)) : [];
+        list.innerHTML = found.map((x) => `<div data-id="${x.id}"><img loading="lazy" src="${x.pics.thumb}" alt=""><span>${esc(x.title || x.name)} <i>${esc(x.sinnerName)}</i></span></div>`).join("");
         list.querySelectorAll("[data-id]").forEach((d) => d.onmousedown = () => { dc.id = +d.dataset.id; dc.slot = 0; redraw(); });
       }
     };
     inp.onfocus = () => sxBack().then(() => inp.oninput());
     inp.onblur = () => setTimeout(() => { list.innerHTML = ""; }, 150);
+    list.onmousedown = (e) => e.preventDefault();  // scrollbar keeps focus
   });
 }
 function dcBindTable() {

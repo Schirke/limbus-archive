@@ -4,6 +4,7 @@
 .dcpage .cqpick select { max-width: 100%; margin-top: 3px; }
 .dcpage .cqpick > img.sp, .dcnopic { width: 64px; height: 64px; object-fit: contain; }
 .dcdummy { display: inline-grid; place-items: center; width: 64px; height: 64px; font-size: 34px; background: rgba(255, 255, 255, .04); }
+.dcpage .cqlist { max-height: 420px; overflow-y: auto; }  /* all hits, scroll */
 .cqlist .dcdummy { width: 32px; height: 32px; font-size: 18px; }
 .dcnum { width: 70px; }
 .dcresrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -6px 0 14px; }
