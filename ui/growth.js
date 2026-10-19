@@ -16,7 +16,8 @@ function upgPic(k, alt = "", cls = "") {
     : `<span class="upgi upgtk ${cls}">${esc(alt)}</span>`;
 }
 const upgShard = (sinner, cls = "") => upgPic(`shard_${sinner}`, `${UPG_SINNERS[sinner - 1] || ""} Egoshard`, cls);
-const upgTop = (x) => x.title ? 4 : (upg.db.upEgo[x.grade] || []).length + 1;
+// an E.G.O's own last Threadspin (level V only where the game has it)
+const upgTop = (x) => x.title ? 4 : Math.min(x.maxUp || 4, (upg.db.upEgo[x.grade] || []).length + 1);
 const upgRow = (x) => ({ id: x.id, lv0: 1, lv1: upg.db.maxLv, up0: 1, up1: upgTop(x) });
 
 function upgLoad() {
@@ -29,7 +30,7 @@ function upgLoad() {
   } catch (e) {}
 }
 function upgSave() {
-  const { db, ...keep } = upg;
+  const { db, shLeft, ...keep } = upg;
   try { localStorage.setItem(UPG_KEY, JSON.stringify(keep)); } catch (e) {}
 }
 
@@ -83,43 +84,51 @@ function upgDay() {
 }
 const upgExpRun = (s) => s.t.reduce((a, n, i) => a + n * (upg.db.ticket[i] || 0), 0);
 
-// day by day: Enkephalin comes in, modules go to the bonus Thread runs, then EXP runs, then plain Thread runs
-function upgFarm(n) {
-  const d = upg.db, day = upgDay(), es = d.exp[upg.cfg.exp], ts = d.thread[upg.cfg.thr], per = upgExpRun(es);
-  let enk = 0, exp = n.expLeft, th = n.thLeft, days = 0, er = 0, tr = 0, tb = 0, mods = 0;
-  const run = (cost) => { if (enk < cost * d.stamina.module) return false; enk -= cost * d.stamina.module; mods += cost; return true; };
-  while ((exp > 0 || th > 0) && days < UPG_DAYS) {
-    days++; enk += day.enk;
-    for (let b = UPG_THREAD_BONUS; th > 0 && b > 0 && run(ts.cost); b--) { th -= ts.bonus; tr++; tb++; }
-    while (exp > 0 && run(es.cost)) { exp -= per; er++; }
-    while (th > 0 && run(ts.cost)) { th -= ts.n; tr++; }
-  }
-  return { days, er, tr, tb, mods, enk: mods * d.stamina.module, lun: day.lun * days, never: days >= UPG_DAYS };
-}
-
 // shards per level past the pass's last one (its own levels are taken as done): crates of choice go to whoever is short
 function upgShardsAt() {
   const p = upg.db.pass, r = (t) => t.o * UPG_CRATE + t.r * UPG_CRATE / 12;
-  return r(p.ex.f) + (upg.cfg.paid ? r(p.ex.p) : 0);
+  return p.ex ? r(p.ex.f) + (upg.cfg.paid ? r(p.ex.p) : 0) : 0;
 }
-// day by day: pass missions and Mirror Dungeon give pass points, every level past the last its crates, until `need` shards are there
-function upgPass(need) {
+// day by day until the EXP, Threads and Egoshards are there. Enkephalin goes, in this order, to the pass missions (one EXP and
+// one Thread run: their loot counts), the weekly bonus run, the Mirror Dungeon runs (pass points → crates), then Luxcavation
+function upgSim(need) {
   const d = upg.db, c = upg.cfg, day = upgDay(), mod = d.stamina.module, p = d.pass, md = d.md;
+  const es = d.exp[c.exp], ts = d.thread[c.thr], per = upgExpRun(es), crate = upgShardsAt();
   const nb = md.normal.bonus[0] || { bp: 0, lun: 0, mod: 0 }, hb = md.hard ? md.hard.bonus[0] : nb;
   const b = c.bonus === "hard" ? hb : c.bonus === "normal" ? nb : null;
-  const mis = d.exp[c.exp].cost + d.thread[c.thr].cost;  // the daily missions: one EXP and one Thread run
-  const keep = b ? 3 * b.mod * mod : 0;
-  let enk = 0, sh = 0, lv = 0, pts = 0, all = 0, days = 0, runs = 0, weeks = 0, mods = 0, lun = 0, waiting = false;
-  const per = upgShardsAt(), gain = (n) => { pts += n; all += n; while (pts >= p.need) { pts -= p.need; lv++; sh += per; } };
-  while (sh < need && per > 0 && days < UPG_DAYS) {
-    if (days % 7 === 0) { waiting = !!b; if (c.missions) gain(p.weekly); }
-    days++; enk += day.enk;
-    if (c.missions && enk >= mis * mod) { enk -= mis * mod; mods += mis; gain(p.daily); }
-    if (waiting && enk >= 3 * b.mod * mod) { enk -= 3 * b.mod * mod; mods += 3 * b.mod; gain(3 * b.bp); lun += 3 * b.lun; weeks++; waiting = false; }
+  let enk = 0, exp = need.exp, th = need.th, sh = crate > 0 ? need.sh : 0, days = 0, er = 0, tr = 0, tb = 0, runs = 0, weeks = 0, mods = 0, lun = 0;
+  let lv = 0, pts = 0, all = 0, waiting = false, bonus = 0;
+  const spend = (n) => { if (enk < n * mod) return false; enk -= n * mod; mods += n; return true; };
+  const gain = (n) => { pts += n; all += n; while (pts >= p.need) { pts -= p.need; lv++; sh -= crate; } };
+  const thRun = () => { th -= bonus > 0 ? ts.bonus : ts.n; if (bonus-- > 0) tb++; tr++; };
+  while ((exp > 0 || th > 0 || sh > 0) && days < UPG_DAYS) {
+    if (days % 7 === 0) { waiting = !!b && sh > 0; if (c.missions && sh > 0) gain(p.weekly); }
+    days++; enk += day.enk; bonus = UPG_THREAD_BONUS;
+    if (c.missions && sh > 0 && enk >= (es.cost + ts.cost) * mod) { spend(es.cost); spend(ts.cost); exp -= per; er++; thRun(); gain(p.daily); }
+    if (waiting && sh > 0 && spend(3 * b.mod)) { gain(3 * b.bp); lun += 3 * b.lun; weeks++; waiting = false; }
     // (modules for the next weekly bonus run are kept back: it gives the most points per module)
-    for (let i = 0; i < c.md && !waiting && enk - keep >= md.normal.plain.mod * mod; i++) { enk -= md.normal.plain.mod * mod; mods += md.normal.plain.mod; gain(md.normal.plain.bp); runs++; }
+    const keep = sh > 0 && b ? 3 * b.mod * mod : 0;
+    for (let i = 0; i < c.md && sh > 0 && !waiting && enk - keep >= md.normal.plain.mod * mod; i++) { spend(md.normal.plain.mod); gain(md.normal.plain.bp); runs++; }
+    while (th > 0 && bonus > 0 && spend(ts.cost)) thRun();
+    while (exp > 0 && spend(es.cost)) { exp -= per; er++; }
+    while (th > 0 && spend(ts.cost)) thRun();
   }
-  return { days, runs, weeks, mods, lun, lv, all, sh, never: sh < need, refill: day.lun * days };
+  return { days, er, tr, tb, runs, weeks, mods, lun, lv, all, refill: day.lun * days, never: days >= UPG_DAYS, noPass: need.sh > 0 && !crate };
+}
+// the farming tiles of a result
+function upgFarmTiles(r, need, label) {
+  const d = upg.db, es = d.exp[upg.cfg.exp], ts = d.thread[upg.cfg.thr];
+  return `<div class="upgtiles">
+    ${upgTile(upgDays(r.days, r.never), r.never ? "Never" : `${upgFmt(r.days)} day${r.days === 1 ? "" : "s"}`, label,
+      r.never ? "" : r.days >= 14 ? `≈ ${upgFmt(r.days / 7 * 10) / 10} weeks` : "")}
+    ${need.exp ? upgTile(upgPic("t4", "Ticket IV", "wide"), upgFmt(r.er), "EXP Luxcavation runs", `Lv ${es.lv}: ${upgFmt(upgExpRun(es))} EXP for ${es.cost} modules`) : ""}
+    ${need.th ? upgTile(upgPic("thread", "Threads"), upgFmt(r.tr), "Thread Luxcavation runs", `${r.tb} with the daily bonus · Lv ${ts.lv}: ${ts.n} / ${ts.bonus} for ${ts.cost} modules`) : ""}
+    ${need.sh && !r.noPass ? upgTile(`<span class="upgi upgtk">MD</span>`, upgFmt(r.weeks + r.runs), "Mirror Dungeon runs", `${r.weeks} with the weekly bonus, ${r.runs} without`) : ""}
+    ${need.sh && !r.noPass ? upgTile(`<span class="upgi upgtk">LV</span>`, `+${upgFmt(r.lv)}`, `pass levels past ${d.pass.max}`, `${upgFmt(r.all)} points · ${upgFmt(r.lv * upgShardsAt())} Egoshards`) : ""}
+    ${upgTile(upgPic("module", "Modules"), upgFmt(r.mods), "Enkephalin Modules", `${upgFmt(r.mods * d.stamina.module)} Enkephalin`)}
+    ${r.lun || r.refill ? upgTile(upgPic("lunacy", "Lunacy"), upgFmt(r.lun - r.refill), "Lunacy on the way", [r.lun && `${upgFmt(r.lun)} from the weekly bonus`, r.refill && `${upgFmt(r.refill)} on refills`].filter(Boolean).join(", ")) : ""}
+  </div>
+  ${r.noPass ? `<p class="empty">No pass in this snapshot: Egoshards not counted.</p>` : need.sh ? `<p class="muted small">Egoshards come from the pass past level ${d.pass.max} (the levels before it taken as done): every ${d.pass.need} points ${upgFmt(upgShardsAt() / UPG_CRATE)} crate(s) of choice with the ${upg.cfg.paid ? "Limbus Pass" : "free pass"}, 1–3 Egoshards each, counted as 2. The weekly bonus is used on all 3 at once.</p>` : ""}`;
 }
 
 // ---------------------------------------------------------------- page
@@ -155,7 +164,8 @@ const upgHave = (inner) => `<div class="upghave"><span class="lvlabel">You have<
 const upgIn = (icon, attr, v) => `<label class="upgtix">${icon}<input type="number" min="0" ${attr} value="${v}"></label>`;
 
 function upgUp() {
-  const d = upg.db, n = upgNeed(), f = upgFarm(n), es = d.exp[upg.cfg.exp], ts = d.thread[upg.cfg.thr];
+  const d = upg.db, n = upgNeed(), f = upgSim({ exp: n.expLeft, th: n.thLeft, sh: n.shLeft });
+  upg.shLeft = n.shLeft;
   const sins = Object.keys(n.sh).map(Number).sort((a, b) => a - b), anyId = upg.list.some((r) => unitById(r.id).title);
   const shTotal = sins.reduce((a, s) => a + n.sh[s], 0);
   return `<div class="upglist">${upg.list.map(upgUpRow).join("") || `<p class="muted">Add what you want to level up.</p>`}</div>
@@ -172,33 +182,19 @@ function upgUp() {
         sins.length ? sins.map((s) => `${UPG_SINNERS[s - 1]} ${n.sh[s]}`).join(" · ") + " · universal ones work too" : "")}
     </div>
     <h3>Farming what is left</h3>
-    ${f.days === 0 ? `<p class="muted">Nothing left to farm.</p>` : `<div class="upgtiles">
-      ${n.expLeft ? upgTile(upgPic("t4", "Ticket IV", "wide"), upgFmt(f.er), "EXP Luxcavation runs", `Lv ${es.lv}: ${upgFmt(upgExpRun(es))} EXP for ${es.cost} modules`) : ""}
-      ${n.thLeft ? upgTile(upgPic("thread", "Threads"), upgFmt(f.tr), "Thread Luxcavation runs", `${f.tb} with the daily bonus · Lv ${ts.lv}: ${ts.n} / ${ts.bonus} for ${ts.cost} modules`) : ""}
-      ${upgTile(upgPic("module", "Modules"), upgFmt(f.mods), "Enkephalin Modules", `${upgFmt(f.enk)} Enkephalin`)}
-      ${upgTile(upgDays(f.days, f.never), f.never ? "Never" : `${upgFmt(f.days)} day${f.days === 1 ? "" : "s"}`, "of Enkephalin", f.lun ? `refills: ${upgFmt(f.lun)} Lunacy` : "no Lunacy refills")}
-    </div>`}
-    ${n.shLeft ? `<p class="muted small">Egoshards still short: ${upgFmt(n.shLeft)}. They come from the pass: see Extract.</p>` : ""}`;
+    ${f.days === 0 ? `<p class="muted">Nothing left to farm.</p>` : upgFarmTiles(f, { exp: n.expLeft, th: n.thLeft, sh: n.shLeft }, n.shLeft ? "until it is all there" : "of Enkephalin")}`;
 }
 
 function upgCraft() {
-  const d = upg.db, p = d.pass, need = {};
+  const d = upg.db, need = {};
   for (const id of upg.clist) { const x = unitById(id), cr = d.craft[id]; if (cr) need[x.sinner] = (need[x.sinner] || 0) + cr.p; }
   const sins = Object.keys(need).map(Number).sort((a, b) => a - b), total = sins.reduce((a, s) => a + need[s], 0);
-  const left = sins.reduce((a, s) => a + Math.max(0, need[s] - (upg.csh[s] || 0)), 0), r = upgPass(left);
+  const left = sins.reduce((a, s) => a + Math.max(0, need[s] - (upg.csh[s] || 0)), 0), r = upgSim({ exp: 0, th: 0, sh: left });
   return `<div class="upglist">${upg.clist.map(upgCraftRow).join("") || `<p class="muted">Add what you want to extract.</p>`}</div>
     ${upgAddBox("Add from the Dispenser…")}
     ${sins.length ? upgHave(sins.map((s) => upgIn(upgShard(s), `data-csh="${s}"`, upg.csh[s] || 0)).join("")) : ""}
     ${total ? `<div class="upgbar"><i style="width:${(total - left) / total * 100}%"></i><span>${upgFmt(total - left)} / ${upgFmt(total)} Egoshards</span></div>` : ""}
-    ${!total ? "" : !p.ex ? `<p class="empty">No pass in this snapshot.</p>` : !left ? `<p class="muted">You have every Egoshard already.</p>` : `<h3>From the pass and Mirror Dungeon</h3>
-    <div class="upgtiles">
-      ${upgTile(upgDays(r.days, r.never), r.never ? "Never" : `${upgFmt(r.days)} day${r.days === 1 ? "" : "s"}`, "until the Extraction", r.never ? "" : `≈ ${upgFmt(r.days / 7 * 10) / 10} weeks`)}
-      ${upgTile(`<span class="upgi upgtk">MD</span>`, upgFmt(r.weeks + r.runs), "Mirror Dungeon runs", `${r.weeks} with the weekly bonus, ${r.runs} without`)}
-      ${upgTile(`<span class="upgi upgtk">LV</span>`, `+${upgFmt(r.lv)}`, `pass levels past ${p.max}`, `${upgFmt(r.all)} points`)}
-      ${upgTile(upgPic("module", "Modules"), upgFmt(r.mods), "Enkephalin Modules", `${upgFmt(r.mods * d.stamina.module)} Enkephalin`)}
-      ${upgTile(upgPic("lunacy", "Lunacy"), upgFmt(r.lun - r.refill), "Lunacy on the way", `${upgFmt(r.lun)} from the weekly bonus${r.refill ? `, ${upgFmt(r.refill)} on refills` : ""}`)}
-    </div>
-    <p class="muted small">Counted past pass level ${p.max} (the levels before it taken as done): every ${p.need} points ${upgFmt(upgShardsAt() / UPG_CRATE)} crate(s) of choice with the ${upg.cfg.paid ? "Limbus Pass" : "free pass"}. Crates give 1–3 Egoshards: counted as 2. The weekly bonus is used on all 3 at once.</p>`}`;
+    ${!total ? "" : !left ? `<p class="muted">You have every Egoshard already.</p>` : `<h3>From the pass and Mirror Dungeon</h3>${upgFarmTiles(r, { exp: 0, th: 0, sh: left }, "until the Extraction")}`}`;
 }
 
 function upgSide() {
@@ -214,7 +210,7 @@ function upgSide() {
     ${row(upgPic("t4", "Ticket IV", "wide"), "EXP Luxcavation", `<select data-c="exp">${d.exp.map((s, i) => `<option value="${i}" ${c.exp === i ? "selected" : ""}>Lv ${s.lv} · ${upgFmt(upgExpRun(s))}</option>`).join("")}</select>`)}
     ${row(upgPic("thread", "Threads"), "Thread Luxcavation", `<select data-c="thr">${d.thread.map((s, i) => `<option value="${i}" ${c.thr === i ? "selected" : ""}>Lv ${s.lv} · ${s.n} / ${s.bonus}</option>`).join("")}</select>`,
       `the first ${UPG_THREAD_BONUS} a day give ${d.thread[c.thr].bonus}; a day starts at ${reset} your time`)}
-    ${craft && d.pass.ex ? `<h3>Pass and Mirror Dungeon</h3>
+    ${(craft || upg.shLeft) && d.pass.ex ? `<h3>Pass and Mirror Dungeon</h3>
     <span class="cqkind upgpass"><button class="${c.paid ? "" : "on"}" data-paid="0">Free pass</button><button class="${c.paid ? "on" : ""}" data-paid="1">Limbus Pass</button></span>
     ${row(`<span class="upgi upgtk">MD</span>`, "Weekly bonus", `<select data-c="bonus">${[["hard", `Hard ×3 · ${3 * hb.bp}`], ["normal", `Normal ×3 · ${3 * nb.bp}`], ["none", "Not used"]].map(([k, t]) => `<option value="${k}" ${c.bonus === k ? "selected" : ""}>${t}</option>`).join("")}</select>`)}
     ${row(`<span class="upgi upgtk">MD</span>`, "Runs a day", `<input type="number" class="dcnum" min="0" max="5" data-c="md" value="${c.md}">`, `${d.md.normal.plain.bp} points for ${d.md.normal.plain.mod} modules without the bonus`)}
