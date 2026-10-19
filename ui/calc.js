@@ -606,7 +606,8 @@ function dcbRefresh() {
 
   // the dummy: statuses before the skill and after it, and what changed them
   const tg = m.target(s, o), sg = (v) => v > 0 ? `+${v}` : `−${-v}`;
-  const img = (k) => { const g = UNITS.glossary[k]; return g && g.icon ? `<img src="${imgThumb(g.icon)}" alt="" onerror="this.remove()">` : esc(statusName(k)); };
+  // (the server's link once units go by links)
+  const img = (k) => { const g = UNITS.glossary[k], src = g && (g.iconUrl || (g.icon && imgThumb(g.icon))); return src ? `<img src="${src}" alt="" onerror="this.remove()">` : esc(statusName(k)); };
   const nm = (k) => esc((UNITS.glossary[k] || {}).name || statusName(k));
   $("#dcbbadges").innerHTML = tg.st.map(([k, b0, a]) => {
     if (typeof b0 === "number") return `<span class="dcbbadge" title="${nm(k)}">${img(k)}<b class="c">${a}</b>${a - b0 ? `<i class="dc">${sg(a - b0)}</i>` : ""}</span>`;
