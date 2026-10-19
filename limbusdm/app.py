@@ -201,6 +201,12 @@ def main():
     win.events.closing += save
     profile = "webview" if PORT == 47821 else f"webview_{PORT}"  # a running copy locks its WebView2 profile
     webview.start(private_mode=False, storage_path=os.path.join(data_dir(), profile))
+    try:  # snapshot workers: not left running
+        import multiprocessing
+        for p in multiprocessing.active_children():
+            p.terminate()
+    except Exception:
+        pass
     os._exit(0)
 
 

@@ -106,8 +106,8 @@ def _index_job(args):
     return res
 
 
-def free_memory() -> int:
-    """Available physical memory in bytes (Windows; a safe guess elsewhere)."""
+def free_memory(total: bool = False) -> int:
+    """Available physical memory in bytes (or all of it: total; Windows; a safe guess elsewhere)."""
     try:
         import ctypes
 
@@ -120,9 +120,9 @@ def free_memory() -> int:
         st = MEMORYSTATUSEX()
         st.dwLength = ctypes.sizeof(st)
         ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st))
-        return int(st.ullAvailPhys)
+        return int(st.ullTotalPhys if total else st.ullAvailPhys)
     except Exception:
-        return 4 << 30
+        return (8 if total else 4) << 30
 
 
 def job_memory(path: str) -> int:
@@ -151,7 +151,7 @@ def _kill(pool) -> None:
     pool.shutdown(wait=False, cancel_futures=True)
 
 
-STALL_MIN, STALL_X = 20 * 60, 25  # a bundle is given up after max(20 min, 25x its expected time)
+STALL_MIN, STALL_X = 8 * 60, 25  # a bundle is given up after max(8 min, 25x its expected time)
 
 
 class Snapshotter:
@@ -160,11 +160,18 @@ class Snapshotter:
         self.store = store
         self.game = game
         self.ignore = ignore if ignore is not None else DEFAULT_IGNORE
-        # light mode: 2 bundles at a time
-        self.workers = workers or (2 if light else max(1, min(12, (os.cpu_count() or 4) - 1)))
+        # light mode: 2 bundles at a time; else 1 per 3 GB of memory (8 GB PCs swapped to a halt)
+        self.workers = workers or (2 if light else max(2, min(12, (os.cpu_count() or 4) - 1, free_memory(total=True) // (3 << 30))))
         self.thumbs = thumbs
         self.progress = progress or (lambda stage, done, total, msg="", **_: None)
         self.cancelled = False
+        self._pools = {}
+
+    def stop(self):
+        """Cancel now: the bundles being read are stopped too, not waited for."""
+        self.cancelled = True
+        for p in list(self._pools.values()):
+            _kill(p)
 
     # ---------- files ----------
     def _ignored(self, rel: str) -> bool:
@@ -281,7 +288,11 @@ class Snapshotter:
 
         # ---------- bundles ----------
         jobs, missing = [], []
-        for logical, b in bundles.items():
+        for n, (logical, b) in enumerate(bundles.items()):
+            if self.cancelled:
+                raise InterruptedError
+            if n % 100 == 0:
+                self.progress("checking bundles", n, len(bundles), logical)
             rel = f"bundle_index/{logical}_{b['hash']}.json.gz"
             b["index"] = rel
             if self.store.exists(rel):
@@ -319,7 +330,8 @@ class Snapshotter:
             heavy_at, reserve = 600 << 20, 1536 << 20
             pending, running, used, i = list(jobs), {}, 0, 0
             sizes = {"heavy": max(1, min(4, self.workers // 2)), "light": self.workers}
-            pools = {k: ProcessPoolExecutor(n, max_tasks_per_child=8, initializer=_worker_start) for k, n in sizes.items()}
+            pools = self._pools  # (stop() kills them)
+            pools.update({k: ProcessPoolExecutor(n, max_tasks_per_child=8, initializer=_worker_start) for k, n in sizes.items()})
             try:
                 while pending or running:
                     while pending and len(running) < self.workers:

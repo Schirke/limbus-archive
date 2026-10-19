@@ -203,6 +203,9 @@ class Service:
                         "started": time.time(), "error": None, "result": None}
 
         def progress(stage, done, total, msg="", eta=None):
+            # Cancel pressed: a snapshot stops at its next step (its report, once begun, is finished: no other run makes it)
+            if self.job.get("cancel") and kind == "snapshot" and stage != "report":
+                raise InterruptedError
             self.job.update(stage=stage, done=done, total=total, msg=msg, eta=eta)
 
         def runner():
@@ -211,7 +214,8 @@ class Service:
             except InterruptedError:
                 self.job["error"] = "cancelled"
             except Exception as e:
-                self.job["error"] = f"{type(e).__name__}: {e}"
+                # (stopped workers make the snapshot fail its own way)
+                self.job["error"] = "cancelled" if self.job.get("cancel") else f"{type(e).__name__}: {e}"
                 traceback.print_exc()
             finally:
                 self.job["running"] = False
@@ -286,8 +290,10 @@ class Service:
         self._run_job("update", fn)
 
     def cancel(self):
+        if self.job and self.job.get("running"):
+            self.job["cancel"] = True  # (before the snapshot has begun too)
         if self._snapshotter:
-            self._snapshotter.cancelled = True
+            self._snapshotter.stop()
 
     def scan(self, sid: str):
         rel = f"reports/scan2_{sid}.json.gz"  # scan2: rules changed in 0.4.6 (no "sample")

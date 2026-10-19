@@ -444,10 +444,20 @@ function jobBlock() {
   if (j.running) {
     const snap = j.kind === "snapshot";
     const left = j.eta == null ? (snap && j.stage === "bundles" ? " · working out the time left…" : "") : j.eta < 0 ? "" : j.eta < 60 ? " · less than a minute left" : ` · about ${Math.round(j.eta / 60)} min left`;
-    return `<div class="card"><b>${esc(j.kind)}</b> — ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}${left}<div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div><div class="small muted mono">${esc(j.msg || "")}</div>${snap ? `<div class="small muted">You can cancel and take the snapshot later: what is already read is kept, it goes on from there.</div>` : ""}<button class="danger" onclick="api('/api/cancel',{})">Cancel</button></div>`;
+    return `<div class="card"><b>${esc(j.kind)}</b> — ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}${left}<div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div><div class="small muted mono">${esc(j.msg || "")}</div>${snap ? `<div class="small muted">You can cancel and take the snapshot later: what is already read is kept, it goes on from there.</div>` : ""}${j.cancel
+      ? `<button class="danger" disabled>Stopping…</button>${jobCancel.at && Date.now() - jobCancel.at > 20000 ? `<div class="small bad" style="margin-top:6px">It doesn't stop? Close the app and open it again${snap ? " — what is already read is kept" : ""}.</div>` : ""}`
+      : `<button class="danger" onclick="jobCancel()">Cancel</button>`}</div>`;
   }
   if (j.error) return `<div class="card"><span class="badge removed">failed</span> ${esc(j.kind)}: ${esc(j.error)}</div>`;
   return "";
+}
+// Cancel: the button says so at once (a busy PC answers late)
+function jobCancel() {
+  jobCancel.at = Date.now();
+  if (STATE && STATE.job) STATE.job.cancel = true;
+  if (refresh.hook) refresh.hook();
+  if ($("#snapgate")) snapGate();
+  api("/api/cancel", {}).catch((e) => toast(esc(e.message)));
 }
 async function installUpdate() {
   if (!confirm("Download the update, close the app and start the new version? Your data stays.")) return;
