@@ -84,7 +84,8 @@ PAGES = {
     "home": {"title": "Limbus Archive", "seo": "Limbus Company fan archive: patch highlights, Identity and E.G.O database, enemies, "
              "animations, music and mini-games.", "open": True, "part": "units"},
     "profile": {"open": True, "part": "units"},
-    "compare": {"open": True, "part": "units"},
+    "compare": {"title": "Compare", "seo": "Compare two Limbus Company Identities or E.G.O side by side: stats, resistances, skills "
+                "and passives.", "open": True, "part": "units"},
     "gameid": {"open": True, "part": "quiz"}, "gamechar": {"open": True, "part": "quiz"}, "gamecanto": {"open": True, "part": "scenes"},
     "gamearena": {"open": True, "part": "newgames"}, "gamesound": {"open": True, "part": "newgames"},
     **{r: {"open": True} for r in ("gameskill", "gameenemy", "gamewordle", "gameconn", "gamegrid", "gamesplash", "gameatlas",
