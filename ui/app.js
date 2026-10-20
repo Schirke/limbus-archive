@@ -1098,7 +1098,7 @@ routes.anim = async () => {
   const main = $("#main");
   anim.filter = anim.filter || "all";
   main.innerHTML = `<div class="an-app">
-    <aside class="an-rail"><div class="an-rhead"><input type="search" id="aq" placeholder="Search: Yi Sang, Sunshower, Canto 9, pirate…" value="${esc(anim.q)}">
+    <aside class="an-rail"><div class="an-rhead"><div class="an-sbar"><input type="search" id="aq" placeholder="Search: Yi Sang, Sunshower, Canto 9, pirate…" value="${esc(anim.q)}"><button id="arail" class="an-collapse" title="Collapse the list: more room for the player" aria-label="Collapse the list">‹</button></div>
       <div class="an-chips" id="afilters"></div></div><div id="alist" class="an-list"></div></aside>
     <div class="an-main" id="aview"><div class="an-empty">Pick a Sinner's Identity or E.G.O, or an enemy on the left.<br>
       <span class="muted small">Skills with the game's own effects and sounds, battle clips, single effects, and your mods — all for the one you pick.</span></div></div></div>`;
@@ -1108,6 +1108,10 @@ routes.anim = async () => {
   await units().catch(() => null);
   anim.owned = new Set(await api("/api/mods_owned").catch(() => []));
   $("#aq").oninput = (e) => { anim.q = e.target.value; drawAnimTree(); };
+  // (the list folds to its pictures: the player gets the room)
+  const fold = (on) => { $(".an-app").classList.toggle("rail", on); $("#arail").textContent = on ? "›" : "‹"; try { localStorage.setItem("anim.rail", on ? "1" : ""); } catch (e) { /* private mode */ } };
+  fold((() => { try { return !!localStorage.getItem("anim.rail"); } catch (e) { return false; } })());
+  $("#arail").onclick = () => fold(!$(".an-app").classList.contains("rail"));
   drawAnimTree();
   if (anim.sel) openAnimEntry(anim.sel);
   if (anim.data.pending) waitAnimGroups();
@@ -1225,8 +1229,8 @@ async function animHead(v, sel, o) {
   v.innerHTML = `<div class="an-hdr"><div class="an-pic">${o.pic || ""}</div><div class="an-ht"><h2>${esc(o.title)}</h2><small>${esc(o.sub)}</small></div><span class="grow"></span>
       ${o.cid != null ? `<label class="an-mod ${anim.fxMod ? "active" : ""}" title="Applies to every tab: Skills and Effects are shown and rendered with this mod; Edit mod changes it">
         <span class="muted small">Mod</span><select id="amod"><option value="">Original — no mod</option>${mods.map((m) => `<option ${m.name === anim.fxMod ? "selected" : ""}>${esc(m.name)}</option>`).join("")}<option value="+">+ New mod…</option></select></label>` : ""}</div>
-    <div class="an-tabs">${o.tabs.map(([k, l]) => `<button data-t="${k}" class="${k === anim.tab ? "on" : ""}">${esc(l)}</button>`).join("")}</div><div id="abody" class="an-body"></div>`;
-  v.querySelectorAll("[data-t]").forEach((b) => b.onclick = () => { anim.tab = b.dataset.t; openAnimEntry(sel); });
+    <div class="an-tabs">${o.tabs.map(([k, l]) => `<button data-t="${k}" class="${k === anim.tab || k === "fx" && PLAY_MODES.includes(anim.tab) ? "on" : ""}">${esc(l)}</button>`).join("")}</div><div id="abody" class="an-body"></div>`;
+  v.querySelectorAll("[data-t]").forEach((b) => b.onclick = () => { anim.tab = b.dataset.t === "fx" ? plMode() : b.dataset.t; openAnimEntry(sel); });
   if ($("#amod")) $("#amod").onchange = async (e) => {
     if (e.target.value === "+") {
       const name = (prompt("Name of the new mod (letters, digits, dashes):") || "").trim();
@@ -1244,6 +1248,7 @@ async function animHead(v, sel, o) {
 }
 async function openAnimEntry(sel) {
   stopAnim();
+  if (typeof plStop === "function") plStop(false);
   anim.sel = sel;
   const v = $("#aview");
   if (sel.spine) {
@@ -1254,7 +1259,7 @@ async function openAnimEntry(sel) {
     // an enemy / abnormality: its battle prefab's skills played with the game's effects
     const x = sel.enemy, c = { id: x.app, title: x.name || x.app.replace(/^\d+_|Appearance$/g, "") };
     anim.slots = {};
-    const tabs = [["fx", "Skills"], ["mod", "Edit mod"]];
+    const tabs = [["fx", "Play"], ["mod", "Edit mod"]];
     if (!tabs.some(([k]) => k === anim.tab)) anim.tab = "fx";
     recentAdd(sel, c.title, `${x.kind} · ${x.app}`);
     if (!await animHead(v, sel, { title: c.title, sub: `${x.kind} · ${x.app}`, pic: animEnemyThumb(x.app), tabs, cid: x.app })) return;
@@ -1266,14 +1271,22 @@ async function openAnimEntry(sel) {
   if (!sel.videos) sel.videos = await api(`/api/owner_videos?id=${c.id}`).catch(() => []);
   if (!sel.slots) sel.slots = await api(`/api/skill_slots?id=${c.id}`).catch(() => ({}));
   anim.slots = sel.slots;
-  const tabs = [["fx", "Skills"], ["battle", "Battle clips"], ["effects", "Effects"], ["mod", "Edit mod"], ...(sel.videos.length ? [["videos", `Videos (${sel.videos.length})`]] : []),
+  // (Play = Skills, Effects and Battle clips, a switch inside)
+  const tabs = [["fx", "Play"], ["mod", "Edit mod"], ...(sel.videos.length ? [["videos", `Videos (${sel.videos.length})`]] : []),
     ...c.spine.map((x, i) => [`spine${i}`, `Spine · ${x.base}`])];
-  if (!anim.tab || !tabs.some(([k]) => k === anim.tab)) anim.tab = "fx";
+  if (!anim.tab || !PLAY_MODES.includes(anim.tab) && !tabs.some(([k]) => k === anim.tab)) anim.tab = "fx";
   recentAdd(sel, c.title, `${c.sinner} · ${c.isEgo ? "E.G.O" : "Identity"} ${c.id}`);
   if (!await animHead(v, sel, { title: c.title, sub: `${c.sinner} · ${c.isEgo ? "E.G.O" : "Identity"} ${c.id}`, pic: animThumb(c.id), tabs, cid: c.id })) return;
-  const body = $("#abody");
+  let body = $("#abody");
   if (anim.tab.startsWith("spine")) return openSpine(c.spine[+anim.tab.slice(5)], body);
-  if (anim.tab === "fx" || anim.tab === "effects") return openFx(fxForm(c), body);
+  if (anim.tab === "fx" && plEligible(fxForm(c))) return openPlay(fxForm(c), body);
+  if (anim.tab === "fx" || anim.tab === "effects" || anim.tab === "battle") {
+    // the old pages under the Play switch
+    body.innerHTML = `<div class="pl-top">${plModeBar()}</div><div class="pl-sub"></div>`;
+    plModeClicks(body);
+    body = body.querySelector(".pl-sub");
+    if (anim.tab !== "battle") return openFx(fxForm(c), body);
+  }
   if (anim.tab === "mod") return openMod(c, body, () => { anim.tab = "fx"; openAnimEntry(sel); });
   if (anim.tab === "videos") {
     body.innerHTML = sel.videos.map((v) => `<div class="card"><div class="row" style="margin-bottom:6px"><b class="grow">${esc(v.label)}</b>
@@ -1295,15 +1308,18 @@ async function openAnimEntry(sel) {
     <div class="row" style="margin:8px 0">
       <button id="aplay" class="toggle">${anim.playing ? "⏸ pause" : "▶ play"}</button><button id="aprev" class="toggle">◀</button><button id="anext" class="toggle">▶</button>
       <span id="acount" class="muted small"></span>
-      <label class="small">speed <select id="aspeed">${[0.25, 0.5, 1, 1.5, 2].map((s) => `<option ${s === anim.speed ? "selected" : ""}>${s}</option>`).join("")}</select></label>
-      <label class="small" title="Layers a skill script switches on (afterimages, clones)"><input type="checkbox" id="aall" ${anim.all ? "checked" : ""}> all animated layers</label>
+      <span class="seg" id="aspeed">${[0.25, 0.5, 1, 1.5, 2].map((s) => `<button class="toggle ${s === anim.speed ? "on" : ""}" data-sp="${s}">×${s}</button>`).join("")}</span>
+      <label class="pl-sw" title="Layers a skill script switches on (afterimages, clones)"><input type="checkbox" id="aall" ${anim.all ? "checked" : ""}><i></i><span>All animated layers</span></label>
       <span class="grow"></span><button id="agif">Export GIF</button></div>
     <div class="animstage"><canvas id="acanvas"></canvas></div>`;
   body.querySelectorAll("[data-clip]").forEach((b) => b.onclick = () => { anim.clip = anim.clips.find((x) => same(x, { clip: b.dataset.clip, bundle: b.dataset.bundle })); openAnimEntry(sel); });
   $("#aplay").onclick = () => { anim.playing = !anim.playing; $("#aplay").textContent = anim.playing ? "⏸ pause" : "▶ play"; anim.playing ? startAnim() : stopAnim(); };
   $("#aprev").onclick = () => stepClip(-1);
   $("#anext").onclick = () => stepClip(1);
-  $("#aspeed").onchange = (e) => { anim.speed = +e.target.value; };
+  $("#aspeed").querySelectorAll("[data-sp]").forEach((b) => b.onclick = () => {
+    anim.speed = +b.dataset.sp;
+    $("#aspeed").querySelectorAll("[data-sp]").forEach((x) => x.classList.toggle("on", x === b));
+  });
   $("#aall").onchange = (e) => { anim.all = e.target.checked; openAnimEntry(sel); };
   $("#agif").onclick = () => exportObj({ clipgif: { bundle: anim.clip.bundle, clip: anim.clip.clip, go: anim.clip.animator_go, all: anim.all, name: `${c.id}_${anim.clip.label.replace(/[^\w ]+/g, "").trim()}` } });
   await loadClip(anim.clip);
@@ -3709,7 +3725,7 @@ async function drawSiteBox() {
       <span class="muted small">writes the pages and data out again, packs them and uploads what changed; the progress is in the status at the top</span></div>
     ${siteLog(s.log, when)}
     ${s.fx ? `<div class="row" style="gap:8px;margin-top:10px"><button id="sitefx" ${busy && !fxJob ? "disabled" : ""}>${fxJob ? "Stop rendering" : "Render videos for the site"}</button>
-      <span class="muted small">Animations → With effects on the site: <b>${s.fx.have}</b> of ${s.fx.total} Identities and E.G.O have their videos there (${s.fx.videos} videos; with the target, and with buffs where they have any)${s.fx.old ? `; ${s.fx.old} of them are from before the last patch and will be rendered again` : ""}.${s.fx.enemies ? ` Enemies: <b>${s.fx.enemies.have}</b> of ${s.fx.enemies.total} (rendered after the Identities).` : ""}
+      <span class="muted small">Animations → Play on the site: <b>${s.fx.have}</b> of ${s.fx.total} Identities and E.G.O have their videos there (${s.fx.videos} videos; with the target, and with buffs where they have any)${s.fx.old ? `; ${s.fx.old} of them are from before the last patch and will be rendered again` : ""}.${s.fx.enemies ? ` Enemies: <b>${s.fx.enemies.have}</b> of ${s.fx.enemies.total} (rendered after the Identities).` : ""}
         ${s.fx.buffs ? `Buff effects: <b>${s.fx.buffs.have}</b> of ${s.fx.buffs.total} made${s.fx.buffs.failed ? ` (${s.fx.buffs.failed} draw nothing)` : ""}.` : ""}
         Renders the buff effects first, then the skills one by one — hours the first time; it can be stopped and goes on from there. Then Send to site.</span></div>` : ""}
     ${s.command ? `<div class="hint" style="margin-top:10px">The upload alone, by hand (sends what was prepared last):</div>

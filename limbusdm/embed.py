@@ -1,0 +1,41 @@
+"""The skill player's window inside the app's window (Windows): a child window laid over the page's stage box."""
+import ctypes
+import sys
+from ctypes import wintypes
+
+_u = ctypes.windll.user32 if sys.platform == "win32" else None
+SW_HIDE, SW_SHOWNA = 0, 8
+HWND_TOP, SWP_NOACTIVATE, SWP_SHOWWINDOW = 0, 0x10, 0x40
+
+
+def child_of(parent: int, pid: int) -> int:
+    """The window of process `pid` under `parent` (0 until it exists)."""
+    if not _u or not parent:
+        return 0
+    found = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def each(hwnd, _):
+        p = wintypes.DWORD()
+        _u.GetWindowThreadProcessId(hwnd, ctypes.byref(p))
+        if p.value == pid:
+            found.append(hwnd)
+        return True
+    _u.EnumChildWindows(parent, each, 0)
+    return found[0] if found else 0
+
+
+def place(hwnd: int, x: int, y: int, w: int, h: int, clip=None):
+    """Over the box (pixels from the app window's client corner), above the page. clip (left, top, right, bottom in the
+    window's own pixels): only that part shows, where the page is scrolled and the box is cut off."""
+    if _u and hwnd:
+        _u.SetWindowPos(hwnd, HWND_TOP, int(x), int(y), max(1, int(w)), max(1, int(h)), SWP_NOACTIVATE | SWP_SHOWWINDOW)
+        _g = ctypes.windll.gdi32
+        rgn = _g.CreateRectRgn(*[int(v) for v in clip]) if clip else 0
+        _u.SetWindowRgn(hwnd, rgn, True)  # (the window owns the region now)
+        _u.EnableWindow(hwnd, False)  # (clicks on the picture don't take the keys from the page)
+
+
+def hide(hwnd: int):
+    if _u and hwnd:
+        _u.ShowWindow(hwnd, SW_HIDE)

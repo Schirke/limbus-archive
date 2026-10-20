@@ -185,6 +185,7 @@ def main():
     state["window"] = win = webview.create_window(APP_TITLE, f"http://127.0.0.1:{PORT}/{link}", min_size=(900, 600),
                                                   background_color="#121012", maximized=big, **_window_place())
     look["maximized"] = big
+    svc.app_handle = lambda: int(win.native.Handle.ToInt64()) if getattr(win, "native", None) else 0  # (the skill player's parent window)
 
     def remember(v: bool):
         look["maximized"] = v
@@ -201,6 +202,10 @@ def main():
     win.events.closing += save
     profile = "webview" if PORT == 47821 else f"webview_{PORT}"  # a running copy locks its WebView2 profile
     webview.start(private_mode=False, storage_path=os.path.join(data_dir(), profile))
+    try:  # the skill player's window
+        svc.fx.preview_stop()
+    except Exception:
+        pass
     try:  # snapshot workers: not left running
         import multiprocessing
         for p in multiprocessing.active_children():

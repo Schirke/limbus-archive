@@ -73,7 +73,7 @@ async function spDraw() {
         <label class="small" title="whose frames these are: an Identity / E.G.O id, or an enemy's …Appearance name">of <input id="spid" value="${esc(sp.id ?? sh.id)}" placeholder="10315" style="width:150px"></label>
         <label class="small">named <input id="spmod" value="${esc(sp.mod)}" style="width:120px"></label>
         <button id="spload">Load the changed frames</button>
-        <span class="small muted">then pick the mod in Animations → With effects. Drop PNGs anywhere here to replace frames by file name, or on a tile to replace that one.</span></div>` : ""}
+        <span class="small muted">then pick the mod in Animations → Play. Drop PNGs anywhere here to replace frames by file name, or on a tile to replace that one.</span></div>` : ""}
     </div>
     <div id="spview"></div><div id="spgrid"></div>`;
 
@@ -109,7 +109,7 @@ async function spDraw() {
     try {
       const r = await api("/api/sprites/load", { zip: sp.zip, id, mod: sp.mod });
       animMods.kept = {};
-      toast(`${r.count} frame${r.count === 1 ? "" : "s"} loaded into mod “${esc(sp.mod)}” of ${esc(id)} — pick it in Animations → With effects`, 7000);
+      toast(`${r.count} frame${r.count === 1 ? "" : "s"} loaded into mod “${esc(sp.mod)}” of ${esc(id)} — pick it in Animations → Play`, 7000);
     } catch (e) { toast(esc(e.message)); }
   };
   spGrid();

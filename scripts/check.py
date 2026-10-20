@@ -19,9 +19,9 @@ OUT = os.path.join(ROOT, "build", "check")
 sys.path.insert(0, ROOT)
 
 VOLATILE = {"/api/state", "/api/appnotes", "/api/community", "/api/community_rec", "/api/bilibili", "/api/news",
-            "/api/versus_live", "/api/versus_list", "/api/stage_pics", "/api/fighter_pics", "/api/buffs", "/api/fx",
+            "/api/versus_live", "/api/versus_list", "/api/stage_pics", "/api/fighter_pics", "/api/buffs", "/api/fx", "/api/preview",
             "/api/site_status", "/api/ui_lang/status", "/api/enemies", "/api/sprites", "/api/mods_owned", "/api/game_cards"}
-QUIET = {"/api/state", "/api/community", "/api/versus_live", "/api/fx", "/api/buffs", "/api/stage_pics", "/api/fighter_pics"}
+QUIET = {"/api/state", "/api/community", "/api/versus_live", "/api/fx", "/api/preview", "/api/buffs", "/api/stage_pics", "/api/fighter_pics"}
 
 
 def py_files():
@@ -235,7 +235,7 @@ def api_plan(g):
         f"/api/versus_plan?left={iid}&right={iid2}&seed=1&rounds=3", "/api/mirror/catalog", "/api/community",
         "/api/community_rec", "/api/bilibili?period=week&sort=views", "/api/news", "/api/browse?q=bgmCover&limit=5",
         "/api/tree?prefix=Assets/Resources_moved/Sprite/", "/api/buffs?status=1", "/api/stages", "/api/story", "/api/story_lines",
-        "/api/quiz", f"/api/skill_slots?id={iid}", f"/api/fx?id={iid}", f"/api/fx_buffs?id={iid}",
+        "/api/quiz", f"/api/skill_slots?id={iid}", f"/api/fx?id={iid}", f"/api/fx_buffs?id={iid}", f"/api/preview?id={iid}",
         f"/api/mods?id={iid}&light=1", f"/api/skills?id={iid}", f"/api/owner_videos?id={iid}",
         f"/api/char_icon?id={iid}", f"/api/char_icon?id={eid}", "/api/ui_icon?k=sinner_1", "/api/ui_icons", "/api/gacha_ui?n=icon_lunacy",
         "/api/patchnotes?new=1", f"/api/frames?id={iid}",

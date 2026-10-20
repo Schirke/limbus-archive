@@ -282,7 +282,7 @@
   const animPage = routes.anim;
   routes.anim = (args) => {
     const r = animPage(args), sub = document.querySelector("#main .sub");
-    if (sub) sub.textContent = "Battle animations of Identities and E.G.O replayed from the game's own clips, and Spine skeletons: the animated art of Identities and E.G.O, enemies, abnormalities and the RPG's people. Skills with the game's own effects: the With effects tab where the videos were sent here, and the desktop app for the rest.";
+    if (sub) sub.textContent = "Battle animations of Identities and E.G.O replayed from the game's own clips, and Spine skeletons: the animated art of Identities and E.G.O, enemies, abnormalities and the RPG's people. Skills with the game's own effects: the Play tab plays the videos sent here; the desktop app plays any skill at once and renders the rest.";
     return r;
   };
   document.querySelectorAll("a[data-route], #top a[data-group]").forEach((a) => {

@@ -44,6 +44,26 @@ class _NoPlayer:
         raise ImportError("the player comes with the release build only")
 
 class Service:
+    app_handle = staticmethod(lambda: 0)  # (the app window's handle: set by app.py; 0 without a window)
+
+    def preview_place(self, b: dict):
+        """The skill player's window over the page's stage box (a child of the app's window)."""
+        from . import embed
+        pv = getattr(self.fx, "pv", None) or {}
+        parent = self.app_handle()
+        if not pv.get("pid") or not parent:
+            return
+        hwnd = pv.get("hwnd") or embed.child_of(parent, pv["pid"])
+        if not hwnd:
+            return
+        pv["hwnd"] = hwnd
+        if b.get("show", True) and b.get("w", 0) > 4 and b.get("h", 0) > 4:
+            d = float(b.get("dpr") or 1)
+            c = b.get("clip")  # (the seen part: left, top, right, bottom in the box's CSS pixels)
+            embed.place(hwnd, b["x"] * d, b["y"] * d, b["w"] * d, b["h"] * d, [v * d for v in c] if c else None)
+        else:
+            embed.hide(hwnd)
+
     def __init__(self, data_dir: str):
         self.data_dir = data_dir
         self.store = Store(data_dir)

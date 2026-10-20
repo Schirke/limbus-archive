@@ -402,6 +402,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 cid, v = _fx_id(q["id"]), _fx_variant(q)
                 st = svc.fx.status(cid, v)
                 return self._json({**st, "urls": {n: links.fx_video(cid, st.get("v") or "", n) for n in st["videos"]}})
+            if p == "/api/preview":  # the interactive skill player: its state; with ?id= the skills it plays
+                return self._json({**svc.fx.preview_status(), **({"groups": svc.fx.preview_groups(_fx_id(q["id"]))} if q.get("id") else {})})
             if p == "/api/fx_buffs":  # the buff levels its renders can show, and which buff switches each effect on
                 from .viewer import buff_levels
                 from .buffs import unit_buffs
@@ -1043,6 +1045,17 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     over.pop(cid, None)
                 T.save_tag_overrides(svc, over)
                 return self._json({"over": over})
+            if p == "/api/preview":  # {id, v} starts the player (set up once; the same one again is left as it is), {stop: 1} closes it
+                if b.get("stop"):
+                    svc.fx.preview_stop()
+                    return self._json(svc.fx.preview_status())
+                return self._json(svc.fx.preview_start(_fx_id(b["id"]), _fx_variant(b), svc.app_handle()))
+            if p == "/api/preview_cmd":  # one command for the player (viewer.Renderer.preview_cmd)
+                svc.fx.preview_cmd(b)
+                return self._json(svc.fx.preview_status())
+            if p == "/api/preview_rect":  # the stage box in the app window's pixels: the player's window is laid over it ({show: false}: hidden)
+                svc.preview_place(b)
+                return self._json({"ok": True})
             if p == "/api/versus_live_stop":
                 svc.fx.stop_live()
                 return self._json(svc.fx.live_status())
