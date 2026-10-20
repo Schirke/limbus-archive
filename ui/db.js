@@ -174,7 +174,8 @@ function kwPlainOf() {
     if (!o || (uses[k] || 0) > (uses[o] || 0) || ((uses[k] || 0) === (uses[o] || 0) && k.length < o.length)) key[n] = k;
   }
   const names = Object.keys(key).sort((a, b) => b.length - a.length).map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  kwPlain = { key, rx: names.length ? new RegExp(`(?<![\\w\\[])(${names.join("|")})(?![\\w\\]])`, "g") : null };
+  // the game skips a name followed by a letter or one of []()【】-_<'":+
+  kwPlain = { key, rx: names.length ? new RegExp(`(?<![\\w\\[])(${names.join("|")})(?![\\p{L}\\d_\\[\\]()【】\\-<'":+])`, "gu") : null };
   return kwPlain;
 }
 // [Tag] colours the game draws (not in its texts); the rest lime
