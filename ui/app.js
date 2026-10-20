@@ -1205,7 +1205,7 @@ async function openAnimEntry(sel) {
     return;
   }
   body.innerHTML = `<div class="muted">Reading the clips…</div>`;
-  try { anim.clips = await api(`/api/owner_clips?id=${c.id}`); } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try { anim.clips = c.clips ? await api(c.clips) : []; } catch (e) { body.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (!anim.clips.length) { body.innerHTML = `<div class="empty">No battle clips for this one${c.spine.length ? " — see its Spine tab" : ""}.</div>`; return; }
   // same clip = same object in the same bundle
   const same = (x, y) => x.clip === y.clip && x.bundle === y.bundle;
@@ -1929,16 +1929,16 @@ async function pickFrame(target, host, done) {
 async function loadClip(cl) {
   $("#acount").textContent = "loading…";
   let r;
-  try { r = await api(`/api/clip?bundle=${encodeURIComponent(cl.bundle)}&clip=${cl.clip}&go=${cl.animator_go}&all=${anim.all ? 1 : 0}`); }
+  try { r = await api(anim.all ? cl.allUrl : cl.url); }
   catch (e) { $("#acount").textContent = e.message; return; }
   const ids = Object.keys(r.sprites);
   const imgs = {};
-  // sprites can come from other bundles: each one carries its own bundle + pid
+  // sprites can come from other bundles: each one carries its own link
   await Promise.all(ids.map((key) => new Promise((res) => {
     const im = new Image(), s = r.sprites[key];
     im.onload = () => { imgs[key] = im; res(); };
     im.onerror = () => res();
-    im.src = `/api/object?bundle=${encodeURIComponent(s.bundle)}&pid=${s.pid}`;
+    im.src = s.url;
   })));
   // bounds over the whole clip, sprite pivot at (x, y), flips mirror around the pivot
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -2047,9 +2047,8 @@ async function openSpine(x, host) {
   host.querySelector(".spgif").onclick = (e) => spineGif(x.base, e.target);
   host.querySelector(".spvid").onclick = (e) => spineVideo(x.base, e.target);
   // load script, layers and atlas at once
-  spineAtlas(x.bundle, x.atlas);
-  const [sp, scene] = await Promise.all([loadSpinePlayer().catch((e) => e),
-    api(`/api/spine_scene?bundle=${encodeURIComponent(x.bundle)}&atlas=${x.atlas}`).catch(() => ({}))]);
+  spineAtlas(x.bundle, x.atlas, x.files);
+  const [sp, scene] = await Promise.all([loadSpinePlayer().catch((e) => e), api(x.scene).catch(() => ({}))]);
   if (sp instanceof Error) { host.querySelector(".spbox").innerHTML = `<div class="empty">${esc(sp.message)}</div>`; return; }
   if (!host.isConnected) return;
   const hasScene = !!(scene.layers && scene.layers.some((l) => l.kind === "image"));
@@ -2062,12 +2061,12 @@ async function openSpine(x, host) {
   }
   const sel = host.querySelector(".spanim");
   if (!full) {
-    spn.player = await addSpinePlayer(sp, host.querySelector(".spbox"), x.bundle, x.atlas, null, { controls: true });
+    spn.player = await addSpinePlayer(sp, host.querySelector(".spbox"), x.bundle, x.atlas, null, { controls: true, files: x.files });
     spn.players = [spn.player]; spn.stack = [{ player: spn.player }];
     return;
   }
   // illustration stack: images share a WebGL canvas, each skeleton its own player
-  scene.layers.forEach((l) => l.kind === "spine" && spineAtlas(x.bundle, l.atlas));
+  scene.layers.forEach((l) => l.kind === "spine" && spineAtlas(x.bundle, l.atlas, l.files));
   const parts = [];
   for (const l of scene.layers) {
     if (l.kind === "image") {
@@ -2079,10 +2078,10 @@ async function openSpine(x, host) {
     ${parts.map((p, i) => p.kind === "fx" ? `<canvas class="fxl" data-i="${i}"></canvas>` : `<div class="spbox" data-i="${i}"></div>`).join("")}</div>`;
   host.querySelector(".sphint").textContent = "Background and effect layers come from the illustration's prefab; the effects (scrolling noise, dissolve) are replayed from their materials, so they are close to the game but not exact.";
   const stage = host.querySelector(".spscene");
-  spn.fx = sceneFx(stage, scene, parts.filter((p) => p.kind === "fx").map((p) => ({ canvas: stage.querySelector(`[data-i="${parts.indexOf(p)}"]`), layers: p.layers })), x.bundle);
+  spn.fx = sceneFx(stage, scene, parts.filter((p) => p.kind === "fx").map((p) => ({ canvas: stage.querySelector(`[data-i="${parts.indexOf(p)}"]`), layers: p.layers })));
   const players = await Promise.all(parts.map((p, i) => p.kind !== "spine" ? null : addSpinePlayer(sp, stage.querySelector(`[data-i="${i}"]`), x.bundle, p.l.atlas, {
     x: -p.l.ox / (p.l.scale || 1), y: -(scene.h - p.l.oy) / (p.l.scale || 1), width: scene.w / (p.l.scale || 1), height: scene.h / (p.l.scale || 1),
-    padLeft: "0%", padRight: "0%", padTop: "0%", padBottom: "0%", transitionTime: 0 }, { skin: p.l.skin, anim: p.l.anim })));
+    padLeft: "0%", padRight: "0%", padTop: "0%", padBottom: "0%", transitionTime: 0 }, { skin: p.l.skin, anim: p.l.anim, files: p.l.files })));
   if (!stage.isConnected) { players.forEach((p) => p && p.dispose()); return; }
   spn.stack = parts.map((p, i) => p.kind === "fx" ? { canvas: stage.querySelector(`[data-i="${i}"]`) } : { player: players[i] });
   spn.players = players.filter(Boolean);
@@ -2176,7 +2175,7 @@ void main() {
   c.a *= tint.a;
   gl_FragColor = vec4(c.rgb * c.a, c.a);
 }`;
-function sceneFx(stage, scene, runs, bundle) {
+function sceneFx(stage, scene, runs) {
   const img = (src) => new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
   const pot = (im) => {  // WebGL 1 repeats only power-of-two textures
     const c = document.createElement("canvas");
@@ -2212,9 +2211,7 @@ function sceneFx(stage, scene, runs, bundle) {
     const items = [];
     const ready = Promise.all(layers.map(async (l) => {
       const fx = (l.material && l.material.fx) || null;
-      const [im, nim, dim] = await Promise.all([img(`/api/scene_sprite?bundle=${encodeURIComponent(bundle)}&pid=${l.sprite}`),
-        fx && fx.noise ? img(`/api/object?bundle=${encodeURIComponent(bundle)}&pid=${fx.noise}`) : null,
-        fx && fx.dissolve ? img(`/api/object?bundle=${encodeURIComponent(bundle)}&pid=${fx.dissolve}`) : null]);
+      const [im, nim, dim] = await Promise.all([img(l.url), l.noiseUrl ? img(l.noiseUrl) : null, l.dissolveUrl ? img(l.dissolveUrl) : null]);
       return im && { l, fx, tex: texture(im), ntex: nim && texture(nim, true), dtex: dim && texture(dim, true) };
     })).then((r) => { items.push(...r.filter(Boolean)); });  // Promise.all keeps the layer order
     const draw = (time) => {

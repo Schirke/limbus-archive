@@ -137,7 +137,9 @@ PARTS = {
               "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
     "buffs": {"uses": ["buff videos"], "crawl": {"stage": "Buff effects", "start": ["/api/buffs"], "packs": [], "final": "buffs"}},
     "fx": {"cfg": "spine", "uses": ["skill videos"]},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
-    "anim": {"cfg": "spine", "taken": True, "uses": ["fx"]},
+    # the Animations list, its Spine skeletons with their illustrations' layers, battle clips with their sprites
+    "anim": {"cfg": "spine", "taken": True, "uses": ["fx"], "crawl": {"stage": "Animations", "start": ["/api/characters"], "shape": "anim",
+             "versions": "anim", "renew": {"av": r"/api/(spine_scene|owner_clips|clip)\?"}, "packs": "anim"}},  # (av: answers with links)
     "enemies": {"cfg": "enemies", "taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
                 "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]}},
     "music": {"cfg": "music", "taken": True, "crawl": {"stage": "Music", "start": ["/api/music"], "sources": "music", "packs": []}},  # (Opus from the banks)
@@ -493,7 +495,36 @@ def _story_versions(ex) -> dict:
     return {"mv": getattr(story, "MODEL_VERSION", 1)}  # (standing models placed anew: asked again)
 
 
-VERSIONS = {"story": _story_versions}
+VERSIONS = {"story": _story_versions, "anim": lambda ex: {"av": 1}}  # (anim 1: its answers carry links)
+
+
+def _anim_shape(ex, got: dict):
+    """The Animations list as the site shows it: enemies sorted by chapter, Spine only when the site has no battle clips, an
+    enemy drawn by its battle prefab only with its videos here."""
+    if "/api/characters" not in got:
+        return
+    chars = ex._stored(got["/api/characters"])
+    for _ in range(100):  # the enemies' chapters are sorted in the background on the first run
+        if not chars.get("pending"):
+            break
+        time.sleep(4)
+        chars = json.loads(ex._get("/api/characters")[0])
+    if not ex.cfg["clips"]:
+        for s in chars["sinners"]:
+            s["ids"] = [x for x in s["ids"] if x.get("spine")]
+            s["egos"] = [x for x in s["egos"] if x.get("spine")]
+            for x in s["ids"] + s["egos"]:
+                x.pop("clips", None)
+    sent = set(ex.read_manifest("fx").get("have") or {})
+    for g in chars["groups"]:
+        g["kinds"] = {k: arr for k, arr in ((k, [x for x in arr if not x.get("app") or x["app"] in sent]) for k, arr in g["kinds"].items()) if arr}
+    chars["groups"] = [g for g in chars["groups"] if g["kinds"]]
+    chars["pending"] = False
+    got["/api/characters"] = ex._store(json.dumps(chars, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
+
+
+# PARTS "shape": a part's lists as the site keeps them, before their links are followed (ex, {list: file})
+SHAPES = {"anim": _anim_shape}
 
 
 def _story_packs(ex, got: dict) -> list:
@@ -558,7 +589,38 @@ def _units_packs(ex, got: dict) -> list:
     return [(k(faces[:FRESH_FACES]), PACK), (k(faces[FRESH_FACES:]), PACK), (k(icons), GAME_PACK), (words, WORD_PACK)] + [(k(c), n) for c, n in cards] + [(k(rest), PACK)]
 
 
-PACKERS = {"story": _story_packs, "units": _units_packs}
+def _anim_packs(ex, got: dict) -> list:
+    """Animations' packs in the order of old: each skeleton's files and its illustration (its layers' skeletons, pictures,
+    effect textures), then the clip lists, the clips, their sprites; the list last."""
+    if "/api/characters" not in got:
+        return []
+    K = links.key
+    read = lambda k, empty: ex._stored(got[k]) if k in got else empty  # noqa: E731
+    ch = read("/api/characters", {})
+    units = [c for s in ch.get("sinners") or [] for c in s["ids"] + s["egos"]]
+    todo = [x for c in units for x in c["spine"]] + [x for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("files")]
+    keys, seen = [], set()
+
+    def skeleton(files):
+        a = K(files["atlas"])
+        if a not in seen:
+            seen.add(a)
+            keys.extend([a, K(files["json"])] + (ex._links(a, got[a]) if a in got else []))  # (the atlas names its pages)
+    for x in todo:
+        skeleton(x["files"])
+        keys.append(K(x["scene"]))
+        for l in read(K(x["scene"]), {}).get("layers") or []:
+            if l.get("files"):
+                skeleton(l["files"])
+            else:
+                keys.extend(K(l[f]) for f in ("url", "noiseUrl", "dissolveUrl") if l.get(f))
+    lists = [K(c["clips"]) for c in units if c.get("clips")]
+    clips = list(dict.fromkeys(K(cl[f]) for k in lists for cl in read(k, []) for f in ("url", "allUrl") if cl.get(f)))
+    sprites = [K(s["url"]) for k in clips for s in (read(k, {}).get("sprites") or {}).values() if s.get("url")]
+    return [(keys + lists + clips + sprites + ["/api/characters"], PACK)]
+
+
+PACKERS = {"story": _story_packs, "units": _units_packs, "anim": _anim_packs}
 
 
 def _report_order(ex, r: dict, got: dict) -> list[str]:
@@ -835,17 +897,6 @@ class Exporter:
                 self._same[g] = None
         return self._same[g]
 
-    def _text(self, key: str, have: dict) -> str:
-        """An answer naming what to fetch next, read back from the site's own file when it has one."""
-        rel = have.get(key) or self.journal.get(key)
-        if rel:
-            try:
-                with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8", errors="replace") as f:
-                    return f.read()
-            except OSError:
-                pass
-        return self._get(key)[0].decode("utf-8", "replace")
-
     # -- manifests
     def _manifest_path(self, name: str) -> str:
         return os.path.join(self.out, "d", "m", name + ".json.gz")
@@ -1007,6 +1058,8 @@ class Exporter:
                 level_have = {k: f for k, f in have.items() if k not in src}
                 level_have.update((k, old["urls"][k]) for k, s in src.items() if (old.get("src") or {}).get(k) == s and k in (old.get("urls") or {}) and k not in sec["start"])
             level = self.fetch_all(todo, level_have, stage, srcs)
+            if sec.get("shape") and not got:  # (the lists as the site shows them)
+                SHAPES[sec["shape"]](self, level)
             got.update((k, level[k]) for k in todo if k in level)
             todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen]
             seen.update(todo)
@@ -1068,110 +1121,10 @@ class Exporter:
             pass
         return out
 
-    def anim(self) -> dict:
-        """Animations: Spine skeletons with illustration layers, and battle clips (clips()). Effect renders need the
-        app."""
-        old = self.read_manifest("anim")
-        sid = self.svc.latest_snapshot_id()
-        have = self.kept(old)
-        self.progress("site: Animations", 0, 0)
-        for _ in range(100):  # the enemies' chapters are sorted in the background on the first run
-            chars = json.loads(self._get("/api/characters")[0])
-            if not chars.get("pending"):
-                break
-            time.sleep(4)
-        if not self.cfg["clips"]:
-            for s in chars["sinners"]:
-                s["ids"] = [x for x in s["ids"] if x.get("spine")]
-                s["egos"] = [x for x in s["egos"] if x.get("spine")]
-        sent = set(self.read_manifest("fx").get("have") or {})  # (an enemy drawn by its battle prefab: only with videos here)
-        for g in chars["groups"]:
-            g["kinds"] = {k: arr for k, arr in ((k, [x for x in arr if not x.get("app") or x["app"] in sent]) for k, arr in g["kinds"].items()) if arr}
-        chars["groups"] = [g for g in chars["groups"] if g["kinds"]]
-        chars["pending"] = False
-        todo = [x for s in chars["sinners"] for c in s["ids"] + s["egos"] for x in c["spine"]]
-        todo += [x for g in chars["groups"] for arr in g["kinds"].values() for x in arr if x.get("atlas")]  # (prefab-drawn: videos only)
-        keys, seen = [], set()
-
-        def skeleton(bundle, atlas):
-            if (bundle, str(atlas)) in seen:
-                return
-            seen.add((bundle, str(atlas)))
-            base = f"/spine/{bundle}/{atlas}.2/"
-            keys.extend([base + "skeleton.atlas", base + "skeleton.json"])
-            try:  # the atlas names its pages: a line that is a file name
-                text = self._text(base + "skeleton.atlas", have)
-                keys.extend(base + ln.strip() for ln in text.splitlines() if ln.strip().lower().endswith(".png"))
-            except Exception:
-                pass
-        for i, x in enumerate(todo):
-            if i % 25 == 0:
-                self.progress("site: Animations (list)", i, len(todo))
-            skeleton(x["bundle"], x["atlas"])
-            k = url_key("/api/spine_scene", bundle=x["bundle"], atlas=x["atlas"])
-            keys.append(k)
-            try:
-                scene = json.loads(self._text(k, have))
-            except Exception:
-                continue
-            for l in scene.get("layers") or []:
-                if l.get("kind") == "spine":
-                    skeleton(x["bundle"], l["atlas"])
-                elif l.get("sprite"):
-                    keys.append(url_key("/api/scene_sprite", bundle=x["bundle"], pid=l["sprite"]))
-                    fx = (l.get("material") or {}).get("fx") or {}
-                    keys.extend(url_key("/api/object", bundle=x["bundle"], pid=fx[n]) for n in ("noise", "dissolve") if fx.get(n))
-        if self.cfg["clips"]:
-            keys += self.clips([c["id"] for s in chars["sinners"] for c in s["ids"] + s["egos"]], have)
-        urls = self.fetch_all(list(dict.fromkeys(keys)), have, "site: Animations")
-        urls["/api/characters"] = self._store(json.dumps(chars, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
-        m = {"kind": "anim", "id": sid, "urls": urls}
-        self.write_manifest("anim", m)
-        return m
-
     def _stored(self, rel: str):
         """A JSON answer back from the file it was stored in."""
         with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8") as f:
             return json.load(f)
-
-    def clips(self, ids: list, have: dict) -> list[str]:
-        """Battle clips of Identities / E.G.O: lists and clips fetched here, sprites by the caller."""
-        lists = [url_key("/api/owner_clips", id=i) for i in ids]
-        got = self.fetch_all(lists, have, "site: Animations (clip lists)")
-        # what lists and clips named last time is kept (d/clips.json) while their files are the same
-        sig = lambda keys, files: hashlib.sha1("\n".join(files.get(k) or "" for k in keys).encode()).hexdigest()  # noqa: E731
-        kept_path = os.path.join(self.out, "d", "clips.json")
-        kept = _read_json(kept_path)
-        if kept.get("lists") == sig(lists, got):
-            clips = kept["clips"]
-        else:
-            clips = []
-            for k in lists:
-                try:
-                    clips += [url_key("/api/clip", bundle=c["bundle"], clip=c["clip"], go=js_string(c["animator_go"]), all=a)
-                              for c in self._stored(got[k]) for a in (0, 1)]
-                except (KeyError, OSError, ValueError, TypeError):
-                    pass
-            clips = list(dict.fromkeys(clips))
-            kept = {}
-        now = {"lists": sig(lists, got), "clips": clips}
-        have.update(got)
-        got = self.fetch_all(clips, have, "site: Animations (clips)")
-        have.update(got)
-        now["files"] = sig(clips, got)
-        if kept.get("files") == now["files"]:
-            sprites = kept["sprites"]
-        else:
-            sprites = []
-            for k in clips:
-                try:
-                    sprites += [url_key("/api/object", bundle=sp["bundle"], pid=sp["pid"]) for sp in self._stored(got[k])["sprites"].values()]
-                except (KeyError, OSError, ValueError, TypeError, AttributeError):
-                    pass
-            now["sprites"] = sprites
-            with open(kept_path, "w", encoding="utf-8") as f:
-                json.dump(now, f)
-        return lists + clips + sprites
 
     def biggames(self) -> dict:
         """The big games (ui/big): what each asks the app for, found by running them in a hidden window (bigNeeds)."""

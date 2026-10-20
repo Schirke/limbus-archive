@@ -151,6 +151,26 @@ def spine(bundle: str, atlas) -> dict:
     return {"atlas": base + ".atlas", "json": base + ".json"}
 
 
+def spine_scene(bundle: str, atlas) -> str:
+    """The illustration a skeleton is part of: its layers."""
+    return f"/api/spine_scene?bundle={_q(bundle)}&atlas={atlas}"
+
+
+def scene_sprite(bundle: str, pid) -> str:
+    """An illustration layer's picture."""
+    return f"/api/scene_sprite?bundle={_q(bundle)}&pid={pid}"
+
+
+def owner_clips(cid) -> str:
+    """The battle clips of an Identity / E.G.O."""
+    return f"/api/owner_clips?id={cid}"
+
+
+def clip(bundle: str, clip_id, go, all_layers: int = 0) -> str:
+    """One battle clip as frames (all_layers: with the layers a skill switches on)."""
+    return f"/api/clip?bundle={_q(bundle)}&clip={_q(clip_id)}&go={_q(go)}&all={all_layers}"
+
+
 def key(url: str) -> str:
     """An address as the site's service worker names it (sw.js keyOf): path decoded, params sorted."""
     path, _, qs = url.partition("?")

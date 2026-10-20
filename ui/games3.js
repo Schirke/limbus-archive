@@ -110,7 +110,7 @@ async function gpOpen(page, daily) {
   if (page === "atlas" && !gp.data.atlas.length) {  // the Identities whose art moves: the first skeleton of each is the art itself
     const chars = await api("/api/characters").catch(() => null), sk = new Map();
     for (const s of (chars || {}).sinners || []) for (const x of s.ids) if (x.spine && x.spine[0]) sk.set(x.id, x.spine[0]);
-    gp.data.atlas = gp.data.ids.filter((x) => sk.has(x.id)).map((x) => ({ ...x, thumb: x.pic, pic: "", base: `/spine/${encodeURIComponent(sk.get(x.id).bundle)}/${sk.get(x.id).atlas}.2/` }));
+    gp.data.atlas = gp.data.ids.filter((x) => sk.has(x.id)).map((x) => ({ ...x, thumb: x.pic, pic: "", base: sk.get(x.id).files.atlas.slice(0, -"skeleton.atlas".length) }));
   }
   if (gp.page !== page) return;
   gpDrawStart();

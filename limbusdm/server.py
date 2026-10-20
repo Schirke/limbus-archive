@@ -346,15 +346,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 wav, fn = export_wav(path, int(q["i"]))
                 extra = {"Content-Disposition": f'attachment; filename="{fn}"'} if q.get("download") else {}
                 return self._send(200, wav, "audio/wav", extra)
-            if p == "/api/characters":  # (+ "of": the enemy a Spine skeleton is drawn for — its picture in the list)
-                ch = svc.characters()
-                of = {(x["bundle"], str(x["atlas"])): app for app, xs in svc.enemy_spines().items() for x in xs}
-                if of:
-                    ch = {**ch, "groups": [{**g, "kinds": {k: [{**x, "of": of[(x["bundle"], str(x.get("atlas")))]}
-                                                               if not x.get("app") and (x["bundle"], str(x.get("atlas"))) in of else x
-                                                               for x in arr] for k, arr in g["kinds"].items()}}
-                                           for g in ch.get("groups", [])]}
-                return self._json(ch)
+            if p == "/api/characters":
+                return self._json(_char_links(svc))
             m = re.match(r"^/api/ext/(\w+)$", p)
             if m:  # the extension's own data (ext.py next to ext.js; any other: its own .py)
                 f = os.path.join(svc.data_dir, "ext", "ext.py" if m.group(1) == "games" else m.group(1) + ".py")
@@ -402,8 +395,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 full = os.path.join(svc.videos_dir(), name)
                 ctype = "image/gif" if name.lower().endswith(".gif") else "video/webm" if name.lower().endswith(".webm") else "video/mp4"
                 return self._file(full, ctype)
-            if p == "/api/owner_clips":
-                return self._json(svc.owner_clips(int(q["id"])))
+            if p == "/api/owner_clips":  # (+ a clip's links: as it is, with every layer)
+                return self._json([{**c, "url": links.clip(c["bundle"], c["clip"], c["animator_go"]),
+                                    "allUrl": links.clip(c["bundle"], c["clip"], c["animator_go"], 1)} for c in svc.owner_clips(int(q["id"]))])
             if p == "/api/fx":
                 return self._json(svc.fx.status(_fx_id(q["id"]), _fx_variant(q)))
             if p == "/api/fx_buffs":  # the buff levels its renders can show, and which buff switches each effect on
@@ -592,6 +586,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if p == "/api/clip":
                     r = render_any(path, q["clip"], int(q["go"]), all_layers, q["bundle"], svc.resolver())
                     r.pop("_objs", None)
+                    r["sprites"] = {k: {**s, "url": links.obj(s["bundle"], s["pid"])} for k, s in (r.get("sprites") or {}).items()}
                     return self._json(r)
                 gif = clip_gif(path, q["clip"], int(q["go"]), all_layers, 1.0, q["bundle"], svc.resolver())
                 return self._send(200, gif, "image/gif")
@@ -615,7 +610,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                         found = next((sc for a, sc in scenes.items() if base and cuts.get(str(a), "").startswith(base)), None)
                     return json.dumps(found or {}, ensure_ascii=False).encode("utf-8")
                 from .spine import cached
-                return self._send(200, cached(svc.data_dir, path, f"scene/{int(q['atlas'])}", scene, self._keep()), "application/json; charset=utf-8")
+                data = _scene_links(cached(svc.data_dir, path, f"scene/{int(q['atlas'])}", scene, self._keep()), q["bundle"])
+                return self._send(200, data, "application/json; charset=utf-8")
             if p.startswith("/spine/"):
                 return self._spine_file(p)
             if p == "/api/asset_thumb":
@@ -1273,6 +1269,49 @@ def game_cards(svc: Service, n: int = 12) -> dict:
         traceback.print_exc()
     out.update(fixed)
     return out
+
+
+def _spine_links(x: dict) -> dict:
+    """A Spine skeleton with its files and its illustration's layers."""
+    return {**x, "files": links.spine(x["bundle"], x["atlas"]), "scene": links.spine_scene(x["bundle"], x["atlas"])}
+
+
+def _char_links(svc) -> dict:
+    """The Animations list with links: a skeleton's `files` / `scene`, an Identity's / E.G.O's `clips`; a skeleton drawn for
+    an enemy names it (`of`: its picture in the list)."""
+    ch, spines = svc.characters(), svc.enemy_spines()
+    was = getattr(svc, "_chars_linked", None)
+    if was and was[0] is ch and was[1] is spines:
+        return was[2]
+    of = {(x["bundle"], str(x["atlas"])): app for app, xs in spines.items() for x in xs}
+
+    def item(x):
+        if not x.get("app") and (x["bundle"], str(x.get("atlas"))) in of:
+            x = {**x, "of": of[(x["bundle"], str(x.get("atlas")))]}
+        return _spine_links(x) if x.get("atlas") else x
+
+    def unit(c):
+        return {**c, "spine": [_spine_links(x) for x in c["spine"]], "clips": links.owner_clips(c["id"])}
+    out = {**ch, "sinners": [{**s, "ids": [unit(c) for c in s["ids"]], "egos": [unit(c) for c in s["egos"]]} for s in ch.get("sinners", [])],
+           "groups": [{**g, "kinds": {k: [item(x) for x in arr] for k, arr in g["kinds"].items()}} for g in ch.get("groups", [])]}
+    svc._chars_linked = (ch, spines, out)
+    return out
+
+
+def _scene_links(data: bytes, bundle: str) -> bytes:
+    """An illustration's layers with links: a skeleton's `files`, a picture's `url`, its effect textures' `noiseUrl` /
+    `dissolveUrl`."""
+    sc = json.loads(data)
+    if not sc.get("layers"):
+        return data
+    for l in sc["layers"]:
+        if l.get("kind") == "spine":
+            l["files"] = links.spine(bundle, l["atlas"])
+        elif l.get("sprite"):
+            l["url"] = links.scene_sprite(bundle, l["sprite"])
+            fx = (l.get("material") or {}).get("fx") or {}
+            l.update((n + "Url", links.obj(bundle, fx[n])) for n in ("noise", "dissolve") if fx.get(n))
+    return json.dumps(sc, ensure_ascii=False).encode("utf-8")
 
 
 def _enemy_entry(e: dict, spine: bool, drawn: bool) -> dict:
