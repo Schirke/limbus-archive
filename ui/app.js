@@ -1336,10 +1336,11 @@ function fxLabel(name, slots = anim.slots) {
 // render options (limbusdm/viewer.py FLAGS); each set is rendered and kept separately
 const FX_OPTS = [["alpha", "Transparent", "transparent"], ["static", "Static camera", "static camera"], ["16bit", "16-bit", "16-bit"], ["tails", "Tails", "tails"],
   ["novoice", "No voice", "no voice"], ["nobg", "No background", "no background", "ego"], ["subs", "Subtitles", "subtitles", "ego"],
-  ["nobloom", "No Bloom", "no bloom"], ["buffs", "Buffs", "with buffs", "own"], ["targets", "Targets", "with targets", "ego"]];
+  ["nobloom", "No Bloom", "no bloom"], ["buffs", "Buffs", "with buffs", "own"], ["targets", "Targets", "with targets", "ego"],
+  ["skillbg", "Skill background", "with skill background", "alpha"]];
 // options only E.G.O cut-ins use
 const fxOwn = (id) => anim.fxBuffs?.[id]?.own || [];
-const fxOptFor = (c) => FX_OPTS.filter((o) => !o[3] || (o[3] === "own" ? fxOwn(c.id).length : /^2\d{4}$/.test(String(c.id))));
+const fxOptFor = (c) => FX_OPTS.filter((o) => !o[3] || (o[3] === "alpha" ? anim.fxOpt?.alpha : o[3] === "own" ? fxOwn(c.id).length : /^2\d{4}$/.test(String(c.id))));
 // Effects tab: each effect alone, transparent
 const fxEffects = () => anim.tab === "effects";
 // a second form (Ring Faust's CastOff…), picked under Render options: rendered as a character of its own
@@ -1348,8 +1349,9 @@ const fxForm = (c) => {
   return f ? { ...c, id: f.id, title: `${c.title} · ${f.name}`, owner: c.id } : c;
 };
 const FX_KINDS = [["skill", "Skill effects"], ["aura", "Auras"], ["battle", "Battle VFX"]];
-const FX_NOT_EFFECTS = ["alpha", "static", "novoice", "nobg", "subs", "buffs"];
-const fxOpts = () => FX_OPTS.filter(([k, , , only]) => !(fxEffects() && FX_NOT_EFFECTS.includes(k)) && !(only === "own" && !fxOwn(anim.sel?.cid).length));
+const FX_NOT_EFFECTS = ["alpha", "static", "novoice", "nobg", "subs", "buffs", "skillbg"];
+const fxOpts = () => FX_OPTS.filter(([k, , , only]) => !(fxEffects() && FX_NOT_EFFECTS.includes(k)) && !(only === "own" && !fxOwn(anim.sel?.cid).length)
+  && !(only === "alpha" && !anim.fxOpt?.alpha));
 function fxVariant() {
   return [!fxEffects() && anim.fxSolo && "solo", ...fxOpts().map(([k]) => anim.fxOpt?.[k] && k), fxEffects() && "alpha", fxEffects() && "effects",
     anim.fxLevel > 0 && `lv${anim.fxLevel}`, anim.fxMod && `m-${anim.fxMod}`].filter(Boolean).join("_");
@@ -1414,7 +1416,8 @@ async function openFx(c, body) {
     : effects ? "Each effect of the character on its own, without the characters, on a transparent background (WebM with alpha), the picture fitted to what it draws (a looping one: 4 s)."
     : [solo ? "Without the target: same moves and framing, for putting into your own videos."
       : "The game's skill timelines played in Unity with its own effects, shaders and sounds. The target is a stand-in; Spine parts aren't drawn. An E.G.O's own animation (its cut-in) is the first video.",
-      anim.fxOpt?.alpha ? "Transparent: Save gives a WebM (VP9 with alpha) to lay over your own footage." : "",
+      anim.fxOpt?.alpha ? `Transparent: Save gives a WebM (VP9 with alpha) to lay over your own footage. ${anim.fxOpt?.skillbg
+        ? "With the skill background: the red / dark tints and flashes some skills fill the screen with." : "The skill background (tints and flashes over the whole screen) is left out: “Skill background” brings it back."}` : "",
       anim.fxOpt?.buffs && fxOwn(c.id).length ? `Buffs: ${fxOwn(c.id).map((x) => `${esc(x.buff)} (on ${x.on === "self" ? "itself" : "the target"})`).join(", ")}.` : ""].filter(Boolean).join(" ");
   const tags = [solo && "no target", ...fxOpts().map(([k, , t]) => anim.fxOpt?.[k] && t), effects && "effects", anim.fxLevel > 0 && `buff level ${anim.fxLevel}`,
     anim.fxMod && `mod ${anim.fxMod}`].filter(Boolean).join(", ");
