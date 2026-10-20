@@ -13,7 +13,7 @@ const WK_SHOW = 240;  // cards drawn at once in the picker
 
 routes.workshop = async (args = []) => {
   const main = $("#main");
-  if (typeof bigSeen === "function" && !bigSeen("workshop")) { main.innerHTML = `<h1>Story workshop</h1><div class="empty">Not open yet.</div>`; return; }
+  if (typeof bigOpen === "function" && !bigOpen("workshop")) { main.innerHTML = `<h1>Story workshop</h1><div class="empty">Not open yet.</div>`; return; }
   if (!wk.kit) {
     main.innerHTML = `<h1>Story workshop</h1><div class="sub">Reading the stories' people, places and music…</div>`;
     try { wkSetKit(await api("/api/story_kit")); }
