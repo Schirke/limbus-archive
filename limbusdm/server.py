@@ -932,23 +932,13 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 if not os.path.exists(os.path.join(svc.data_dir, "site_config.json")):
                     return self._json({"error": "not here"}, 403)
                 lang = str(b.get("lang") or "")
-                if p == "/api/ui_lang/seen":
-                    return self._json({"new": uilang.add_seen(svc, b.get("strings") or [], b.get("page") or "")})
-                if p == "/api/ui_lang/translate":
-                    return self._json({"started": uilang.start(svc, "translate", lang=lang)})
-                if p == "/api/ui_lang/crawl":
-                    routes = [str(r) for r in b.get("routes") or [] if re.match(r"^[\w/-]+$", str(r))] or None
-                    return self._json({"started": uilang.start(svc, "crawl", port=self.server.server_address[1], routes=routes)})
                 if p == "/api/ui_lang/export":
-                    path = uilang.export_csv(svc, lang)
+                    try:
+                        path = uilang.export_csv(svc, lang)
+                    except ValueError as e:
+                        return self._json({"error": str(e)}, 400)
                     subprocess.Popen(["explorer", "/select,", path])
                     return self._json({"path": path})
-                if p == "/api/ui_lang/offer" and lang in uilang.local_langs(svc):
-                    uilang.set_offer(svc, lang, bool(b.get("on")))
-                    return self._json({"ok": True})
-                if p == "/api/ui_lang/delete" and lang in uilang.local_langs(svc):
-                    uilang.delete(svc, lang)
-                    return self._json({"ok": True})
                 if p == "/api/ui_lang/import":
                     try:
                         return self._json(uilang.import_csv(svc, lang, str(b.get("text") or "")))

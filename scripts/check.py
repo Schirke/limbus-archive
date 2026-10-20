@@ -91,6 +91,13 @@ def check_code(rep):
                     rep.warn("code", "global scope", "function declared twice, the later wins: " + where)
             else:
                 seen[name] = (f, kind)
+    try:  # interface text without a translation: shown in English, listed by scripts/ui_langcheck.py
+        import ui_langcheck
+        for lang, rows in ui_langcheck.missing().items():
+            if rows:
+                rep.warn("code", f"ui/lang/{lang}.json", f"{len(rows)} interface strings not translated (scripts/ui_langcheck.py lists them)")
+    except Exception as e:
+        rep.warn("code", "ui/lang", f"not checked: {type(e).__name__}: {e}")
 
 
 class Report:
