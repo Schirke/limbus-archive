@@ -505,7 +505,7 @@ function dcbFor(x, sk) {
 
 // ---- Automatic rows: skill, coin, passive and status texts read by a small grammar (condition, effect, "for every N", max); coin scripts give what lands on the target
 const DCA_G = { neg: ["Negative effect types on target", 0, 10], spd: ["Speed over the target", 0, 10], speed: ["Speed", 1, 20], res: ["Highest Resonance", 0, 10], sp: ["SP", -45, 45],
-  mhp: ["Missing HP %", 0, 99], mhpT: ["Missing HP % of the target", 0, 99], crack: ["Cracked Coins", 0, 5], crit: ["Critical Hits (0 none, 1 every coin)", 0, 1], clash: ["Clash count (Clash won)", 0, 10], aw: ["Atk Weight over one target", 0, 6] };
+  mhp: ["Missing HP %", 0, 99], mhpT: ["Missing HP % of the target", 0, 99], crack: ["Cracked Coins", 0, 5], crit: ["Critical Hits (0 none, 1 every coin)", 0, 1], clash: ["Clash count (Clash won)", 0, 10], aw: ["Atk Weight over one target", 0, 6], ally: ["Allies that count", 0, 6] };
 // plain status names in texts
 const DCA_NAMES = { Burn: "Combustion", Bleed: "Laceration", Tremor: "Vibration", Rupture: "Burst", Sinking: "Sinking", Poise: "Breath", Charge: "Charge" };
 const DCA_TYPES = /\b(Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)\s+(?:damage|Skills?)\b/i;
@@ -534,12 +534,14 @@ function dcaTerm(t, side, ctx = {}) {
   if (/^Cracked Coins?$/i.test(t)) return { g: "crack" };
   if (/^(?:point of )?Speed difference$/i.test(t)) return { g: "spd" };
   if (/^Clash count$/i.test(t)) return { g: "clash" };
+  if (/^(?:other |allied )?(?:ally|allies|Identity|Identities)\b/i.test(t)) return { g: "ally" };  // "for every ally that …"
   if (/^excess Atk Weight beyond/i.test(t)) return { g: "aw" };
   if ((m = /^\[(\w+)\] and \[(\w+)\] (?:this unit )?(?:consumed|spent)(?: in this Encounter)?$/i.exec(t)) && dcaG(m[1]).st && dcaG(m[2]).st)
     return { sum: [{ kw: m[1], side: "self", part: "s" }, { kw: m[2], side: "self", part: "s" }] };
   if (/^highest Reson/i.test(t)) return { g: "res" };
   if ((m = /^(-?)SP$/.exec(t))) return { g: "sp", neg: !!m[1] };
   if (/^(Stack|Stacks|effect's Stack|the effect's Stack)$/i.test(t) && ctx.own) return { kw: ctx.own, side: ctx.ownSide || "self", part: "s" };
+  if (/^(?:combined )?Stacks?$/i.test(t) && ctx.headTerm) return ctx.headTerm;  // "based on (…)": its count
   if ((m = /^(?:\[(\w+)\] )?(Count |Stack |Stacks )?(?:about to be )?(?:consumed|spent)( by this Skill)?$/i.exec(t)) && (m[1] || ctx.use)) {
     const kw = m[1] || ctx.use.kw, cap = ctx.use && ctx.use.kw === kw && !m[3] ? ctx.use.cap : (ctx.spent || {})[kw] ?? null;
     if (!dcaG(kw).st) return null;
@@ -590,6 +592,7 @@ function dcaCond(c, ctx) {
   const t = c.trim();
   if (/(?:2|two) or more targets|multiple targets|several targets/i.test(t)) return { never: t, why: "only when hitting several targets" };
   if (/\b(?:is|was|gets) defeated\b/i.test(t)) return { never: t, why: "only after a defeat" };
+  if ((m = /^(\d+)\+ (?:combined )?Stacks?$/i.exec(t)) && ctx.headTerm) return { q: ctx.headTerm, n: +m[1] };  // "- 3+ Stack: …" under "based on (…)"
   if ((m = /^(?:if (?:the )?(?:main )?target has|if this unit has|at) less than (\d+) (.+)$/i.exec(t)) && !/%/.test(m[2])) {
     const q = dcaTerm(/target has/i.test(t) && !/ on /.test(m[2]) ? m[2] + " on target" : m[2], /target has/i.test(t) ? "target" : "self", ctx);
     if (q) return { q, n: +m[1], lt: true };
@@ -617,20 +620,33 @@ function dcaLine(raw, ctx) {
   if (!t || /^(\[\w+\]\s*)+$/.test(t)) return null;
   const pre = /^(Combat Start|Turn Start|Turn End|On Use|Before Attack|On Hit(?: with [^:,]*)?)\s*[:,]\s*/i.exec(t);
   if (pre) { tags.push(pre[1].replace(/\s.*$/, "") === "Turn" && /End/.test(pre[1]) ? "OnEndTurn" : pre[1]); t = t.slice(pre[0].length); }
-  if (!bullet) ctx.head = null;
+  // a line at the header's own level (or no bullet) ends the header
+  const mark = bullet ? dcaPlain(raw)[0] : "";
+  if (!bullet || mark === ctx.headMark) { ctx.head = null; ctx.headPer = null; ctx.headSkill = null; ctx.headMark = null; ctx.headTerm = null; }
+  // "Apply the following effects to "Blazing Strike"": its bullets only for that Skill
+  if (ctx.headSkill && ctx.name && ctx.headSkill.toLowerCase() !== ctx.name.toLowerCase()) return { none: t, why: "another Skill", quiet: 1 };
   // "Skill 1 and Skill 2 …", "Skill 3: …": only for that Skill
   const only = /^Skill (\d)(?:,? (?:and|or) Skill (\d))?(?:\s*:\s*|\s+(?=gains?\b|deals?\b))/i.exec(t);
   if (only) { if (![only[1], only[2]].includes(String(ctx.tier))) return { none: t, why: "another Skill", quiet: 1 }; t = t.slice(only[0].length); }
+  // 'Skill "Eject" deals …', 'Skills "A" and "B" deal …': only for those names
+  const named = /^(?:Skills?|Base Skills?)\s+((?:["“'][^"”']+["”'](?:,?\s*(?:and|or)?\s*)?)+)/i.exec(t);
+  if (named && ctx.name) {
+    const names = [...named[1].matchAll(/["“']([^"”']+)["”']/g)].map((q) => q[1].trim().toLowerCase());
+    if (!names.includes(ctx.name.toLowerCase())) return { none: t, why: "another Skill", quiet: 1 };
+  }
   // condition before the first top-level comma or colon
   // a sentence over several lines ("At 7~14 Charge Count" / "Consume all …," / "And …") keeps its condition
   const chain = (ctx.comma || /^(and|or|then)\b/i.test(t)) && ctx.last;
   let conds = chain ? [...ctx.last] : bullet && ctx.head ? [...ctx.head] : [], rest = t;
   ctx.comma = /,$/.test(t);
-  if (/^(If|At|When|While|Against)\b/i.test(t)) {
+  if (/^(If|At|When|While|Against)\b/i.test(t) || /^\d+\+ [^:,]+:/i.test(t)) {
     const cut = dcaCut(t, /[,:]/);
     if (cut > 0) { conds.push(dcaCond(t.slice(0, cut), ctx)); rest = t.slice(cut + 1).trim(); }
     else if (!/Power|damage|Offense|Reuse/i.test(t)) { ctx.last = [...conds, dcaCond(t, ctx)]; ctx.comma = true; return null; }
   }
+  // "On Clash Lose, …": a lost Clash, not this attack
+  const lose = /^(?:On )?(?:Clash Lose|losing a Clash)\s*,\s*/i.exec(rest);
+  if (lose) { conds.push({ never: lose[0], why: "only after a lost Clash" }); rest = rest.slice(lose[0].length); }
   const only2 = /^Skill (\d)(?:,? (?:and|or) Skill (\d))?(?:\s*:\s*|\s+(?=gains?\b|deals?\b))/i.exec(rest);
   if (only2) { if (![only2[1], only2[2]].includes(String(ctx.tier))) return { none: t, why: "another Skill", quiet: 1 }; rest = rest.slice(only2[0].length); }
   const use = /consumes? (?:up to (\d+) |all )?\[(\w+)\]( Count)?/i.exec(rest);
@@ -658,13 +674,25 @@ function dcaLine(raw, ctx) {
   }
   if (!fx.length && crit) return { none: t, why: "crit only" };
   if (!fx.length) {
-    if (rest.endsWith(":") || use) { ctx.head = conds; return use ? null : { none: t }; }
+    const toSkill = /following effects? (?:to|for) ["“]([^"”]+)["”]/i.exec(rest), basedOn = /following effects? based on (.+?):?$/i.exec(rest);
+    if (rest.endsWith(":") || use || toSkill || basedOn) {
+      ctx.head = conds; ctx.headMark = mark; ctx.headSkill = toSkill ? toSkill[1].trim() : null;
+      ctx.headTerm = basedOn ? dcaTerm(basedOn[1].replace(/ Stacks?$/i, ""), null, ctx) : null;  // "based on (A + B)": what "N+ Stack" counts
+      // "For every 10 [X], gain the following effects:" — the bullets count per 10
+      const ev = rest.endsWith(":") && dcaEvery(rest), mm = ev && /^(\d+)\s+(.+)$/.exec(ev[1].trim()), q = mm && dcaTerm(mm[2], null, ctx);
+      ctx.headPer = q ? { q, every: +mm[1] } : null;
+      return use ? null : { none: t };
+    }
     const gain = /\b(gain|gains|inflict|inflicts|apply)\b/i.test(rest);
     if (/damage|\bPower\b|Offense Level|Reuse/i.test(rest) && !/Clash Power|heal|SP damage|Stagger|Shield|less damage|damage taken|Defense Level|\btakes? -|\btakes? damage|cannot|can't|nullify|Unopposed Attack against|Atk Weight|defeated|collectively received|can be used up to/i.test(rest) && !gain) return { unk: t };
     return gain ? { gain: t } : { none: t };
   }
   if (conds.some((c) => c.q === undefined && !c.unk && !c.never)) return { unk: t };
   const scope = /final Coin/i.test(rest) && !fx.every((f) => f.k === "reuse" && f.last && ctx.coin == null) ? "last" : ctx.coin ?? "all";
+  if (bullet && ctx.headPer) {
+    const times = /\((\d+) times per Skill\)/i.exec(rest);
+    fx.forEach((f) => { if (f.per) return; f.per = ctx.headPer.q; f.every = ctx.headPer.every; if (f.k === "reuse") { f.v = 1; if (times) f.cap = +times[1]; } });
+  }
   const keep = /\binstead\b/i.test(rest) ? fx.filter((f, i) => !fx.slice(i + 1).some((g) => g.k === f.k)) : fx;
   return { fx: keep.map((f) => ({ ...f, scope, crit })), conds, late, t, inst: /\binstead\b/i.test(rest) };
 }
@@ -679,6 +707,14 @@ function dcaClause(rest, ctx) {
   const fx = [];
   const both = /deal and take \+(\d+(?:\.\d+)?)% (?:more )?damage/i.exec(rest);
   if (both) return [{ k: "dyn", v: +both[1] }];
+  const dmgUp = /^Damage \+(\d+(?:\.\d+)?)%$/i.exec(rest.trim());  // "[WinDuel] Damage +40%"
+  if (dmgUp) return [{ k: "dyn", v: +dmgUp[1] }];
+  // "gains Offense Level equal to (highest Reson.) (max 6)", "gains (highest Reson. / 2) Offense Level (max 3)"
+  const KIND = { "coin power": "cp", "final power": "fp", "base power": "bp", "offense level": "ol" };
+  const eqTo = /(Offense Level|Coin Power|Final Power|Base Power) equal to \(?([^()]+?)\)?\s*\(max (\d+)/i.exec(rest);
+  const divBy = /\(([^()]+?)\s*\/\s*(\d+)\)\s*(Offense Level|Coin Power|Final Power|Base Power)(?:[^(]*\(max (\d+))?/i.exec(rest);
+  if (eqTo) { const q = dcaTerm(eqTo[2], null, ctx); return q ? [{ k: KIND[eqTo[1].toLowerCase()], v: 1, per: q, every: 1, cap: +eqTo[3] }] : "unk"; }
+  if (divBy) { const q = dcaTerm(divBy[1], null, ctx); return q ? [{ k: KIND[divBy[3].toLowerCase()], v: 1, per: q, every: +divBy[2], cap: divBy[4] ? +divBy[4] : undefined }] : "unk"; }
   const bonus = /\((\d+(?:\.\d+)?)% of this Coin's final damage\) bonus/i.exec(rest);
   if (bonus) return [{ k: "dyn", v: +bonus[1] }];
   const eq = /deal (\w+) damage equal to (?!.*% of this Coin's final damage).*\(max (\d+)\)/i.exec(rest);
@@ -694,12 +730,17 @@ function dcaClause(rest, ctx) {
   // "Reuse Coin ([X] - 1) times (4 times max)"
   const rx = /Reuse (?:this )?Coin \((.+?) - (\d+)\) times/i.exec(rest);
   if (rx) { const q = dcaTerm(rx[1], null, ctx), mx = /(\d+) times max|max (\d+) times/i.exec(rest); return q ? [{ k: "reuse", v: 1, per: q, every: 1, off: -rx[2], cap: mx ? +(mx[1] || mx[2]) : undefined }] : "unk"; }
-  const EFF = /(Coin Power|Final Power|Base Power|Offense Level|Clash Power)\s*([+-])\s*(\d+)|deals?\s+(?:an additional\s+)?\+\(([^%]*?)\)%\s+(?:more\s+)?(?:\w+\s+)?damage|takes?\s+\+(\d+(?:\.\d+)?)%\s+(?:more\s+)?damage|(?:deals?\s+(?:an additional\s+)?)?\+(\d+(?:\.\d+)?)%\s+(?:more\s+)?(?:\w+\s+)?damage|Reuse (?:this |the final )?Coin|\+(\d+) (Final Power|Coin Power|Offense Level|Base Power)|deals?\s+\w+\s+damage equal to (?:(\d+(?:\.\d+)?)|\(([^%]*?)\))% of this Coin's final damage/gi;
+  const EFF = /(Coin Power|Final Power|Base Power|Offense Level|Clash Power|Skill Power)\s*([+-])\s*(\d+)|deals?\s+(?:an additional\s+)?\+\(([^%]*?)\)%\s+(?:more\s+)?(?:\w+\s+)?damage|takes?\s+\+(\d+(?:\.\d+)?)%\s+(?:more\s+)?damage|(?:deals?\s+(?:an additional\s+)?)?\+(\d+(?:\.\d+)?)%\s+(?:more\s+)?(?:\w+\s+)?damage|Reuse (?:this |the final )?Coin|\+(\d+) (Final Power|Coin Power|Offense Level|Base Power)|deals?\s+\w+\s+damage equal to (?:(\d+(?:\.\d+)?)|\(([^%]*?)\))% of this Coin's final damage/gi;
   for (let m; (m = EFF.exec(rest));) {
-    if (m[1]) { if (/clash/i.test(m[1])) continue; fx.push({ k: { "coin power": "cp", "final power": "fp", "base power": "bp", "offense level": "ol" }[m[1].toLowerCase()], v: (m[2] === "-" ? -1 : 1) * +m[3] }); }
+    if (m[1]) { if (/clash/i.test(m[1])) continue; fx.push({ k: { "coin power": "cp", "final power": "fp", "skill power": "fp", "base power": "bp", "offense level": "ol" }[m[1].toLowerCase()], v: (m[2] === "-" ? -1 : 1) * +m[3] }); }  // "Skill Power" = older word for Final Power
     else if (m[4] != null) {
-      const e = m[4].replace(/\s+/g, " ").trim(), mm = /^(.+?)(\s+x\s+|\s*[×/]\s*)(.+)$/.exec(e);
+      let e = m[4].replace(/\s+/g, " ").trim(), off = 0;
+      // "+(50 + [Poise] on self + [Rupture] on target)%": a number plus counts
+      const lead = /^(\d+(?:\.\d+)?) \+ (.+)$/.exec(e), tail = /^(.+) \+ (\d+(?:\.\d+)?)$/.exec(e);
+      if (lead) { off = +lead[1]; e = lead[2]; } else if (tail && !/[x×/]/.test(e)) { off = +tail[2]; e = tail[1]; }
+      const mm = /^(.+?)(\s+x\s+|\s*[×/]\s*)(.+)$/.exec(e);
       let q = null, mul = 1;
+      if (off && !mm) { q = dcaTerm(e, null, ctx); if (!q) return "unk"; fx.push({ k: "dyn", v: 1, per: q, every: 0, off }); continue; }
       if (mm) {
         const a = dcaTerm(mm[1], null, ctx), b = dcaTerm(mm[3], null, ctx), na = parseFloat(mm[1]), nb = parseFloat(mm[3]);
         if (mm[2].trim() === "/" && a && Number.isFinite(nb)) { q = a; mul = 1 / nb; }
@@ -805,25 +846,45 @@ function dcaEnU(sk, u) {
 function dcaModel(x, sk, up) {
   const key = `${x.id}.${sk.id}.${up}`;
   if (DCA.has(key)) return DCA.get(key);
-  const u0 = cqAt(sk, up);
+  let u0 = cqAt(sk, up);
   if (!u0 || !u0.atk) return null;
-  const u = dcaEnU(sk, u0);
+  let u = dcaEnU(sk, u0);
   const slots = dcSlots(x), label = (slots.find(([, q]) => q === sk) || ["Skill"])[0], short = label.replace(/^Skill /, "S").replace(/^Counter$/, "C");
+  // "At 6+ …, use 'Write 'em all down' as Counter": the Counter is counted as that Skill (the last one named)
+  const turns = [...String(u.desc).matchAll(/^.*Reson.*use ['‘"“](.+?)['’"”] as (?:a )?Counter.*$/gim)].map((q) => q[1].toLowerCase());
+  const into = turns.length && x.skills.find((q) => { const v = cqAt(q, up); return v && v.atk && dcaPlain(dcaEnU(q, v).name).toLowerCase() === turns[turns.length - 1]; });
+  if (into) { u0 = cqAt(into, up); u = { ...dcaEnU(into, u0), into: dcaPlain(u0.name), from: u.desc }; }
   const rows = [], nodmg = [], needs = {}, gains = new Map(), seen = new Set();
   const note = (pn, h, unk) => nodmg.push(`${pn ? `<span class="dcbpn">${esc(pn)}</span> ` : ""}${dcbText(h)}${unk ? ` <span class="dcbunk">not read yet</span>` : ""}`);
   const gainsOf = (t0, from) => {
     const t = dcaNames(t0);
-    for (const m of t.matchAll(/\b(gain|gains|inflict|inflicts|apply)\s+(\+?)(\d+)\s+\[(\w+)\](\s+Count)?/gi)) {
-      const g = dcaG(m[4]);
-      if (!g.st) continue;
-      const side = /^(gain|apply)/i.test(m[1]) ? (/^apply/i.test(m[1]) && !/on self/i.test(t) ? "" : "self") : "target";
-      if (!side) continue;
-      const k = `${side[0]}_${m[4]}`, e = gains.get(k) || { side, kw: m[4], p: 0, c: 0, from: [] };
-      const upTo = /for every|every time/i.test(t) && /\(max (\d+)\)/i.exec(t), n = upTo ? Math.max(+m[3], +upTo[1]) : +m[3];
-      if (m[2] || m[5]) e.c = Math.max(e.c, n); else e.p = Math.max(e.p, n);
+    const put = (side, kw, n, count) => {
+      if (!dcaG(kw).st || !side) return;
+      const k = `${side[0]}_${kw}`, e = gains.get(k) || { side, kw, p: 0, c: 0, from: [] };
+      if (count) e.c = Math.max(e.c, n); else e.p = Math.max(e.p, n);
       if (!e.from.includes(from)) e.from.push(from);
       gains.set(k, e);
+    };
+    // "gain 1 [A] and 2 [B] next turn", "gain [A] and [B] equal to … (max 3)": every status of the clause
+    for (const m of t.matchAll(/\b(gain|gains|inflict|inflicts|apply|applies)\b((?:(?!\b(?:gain|gains|inflict|inflicts|apply|applies)\b)(?:[^.;]|\.\d))*)/gi)) {
+      // "… Fixer Sinclair gains": another Sinner's Identity, not this one
+      const before = t.slice(0, m.index).split(/[.;:\n]/).pop().trim();
+      if (/^(gains|applies|inflicts)$/i.test(m[1]) && (UNITS.sinners || []).some((n) => n !== x.sinnerName && before.endsWith(n))) continue;
+      const side = /^(gain|apply)/i.test(m[1]) ? (/^appl/i.test(m[1]) && !/on self|to self/i.test(m[2]) && !/\b(?:on|to) self\b/i.test(t) ? "" : "self") : "target";
+      const cl = m[2], upTo = /for every|every time|equal to/i.test(cl) && (/\(max (\d+)\)/i.exec(cl) || /\(max (\d+)\)/i.exec(t));
+      // "When hit, gain 1 [X] next turn (3 per turn)": up to 3 times
+      const times = /\((?:up to )?(\d+)(?: times)? per turn\)/i.exec(t.slice(m.index)), k = times && /^(when|on|after|every time)\b/i.test(before || t) ? +times[1] : 1;
+      let any = false;
+      for (const q of cl.matchAll(/(\+?)(\d+)\s+\[(\w+)\](\s+Count)?/g)) { any = true; put(side, q[3], upTo ? Math.max(+q[2], +upTo[1]) : +q[2] * k, q[1] || q[4]); }
+      if (!any && upTo) for (const q of cl.matchAll(/\[(\w+)\]/g)) put(side, q[1], +upTo[1], false);
+      // "gain [A]" without a number = 1; "[A] / [B] / [C]" = a choice: the last one
+      else if (!any) {
+        const lead = /^\s*((?:\[\w+\]\s*(?:\/|,|and|or)?\s*)+)/.exec(cl);
+        if (lead) { const ks = [...lead[1].matchAll(/\[(\w+)\]/g)].map((q) => q[1]); (/\//.test(lead[1]) ? ks.slice(-1) : ks).forEach((kw) => put(side, kw, 1, false)); }
+      }
     }
+    // "Max Blunt DMG Up gained by this effect: 5"
+    for (const q of t.matchAll(/Max \[(\w+)\] gained by this effect: (\d+)/gi)) put("self", q[1], +q[2], false);
   };
   // texts of this skill (rows), and the rest of the kit (statuses it gives)
   const read = (txt, ctx, mk) => String(txt || "").split("\n").forEach((l) => { const r = dcaLine(l, ctx); if (r) mk(r, l); });
@@ -837,8 +898,8 @@ function dcaModel(x, sk, up) {
   };
   // what the coins spend ("Spend 2 [Bullet]"), for "… about to be spent by this Skill"
   const spent = {};
-  for (const m of (u.coindescs || []).flat().join("\n").matchAll(/Spend (?:up to )?(\d+) \[(\w+)\]/gi)) spent[m[2]] = (spent[m[2]] || 0) + +m[1];
-  const kind = { atk: u.atk, sin: u.sin, op: u.op, tier: (/^Skill (\d)/.exec(label) || [])[1], spent }, sctx = { ...kind };
+  for (const m of (u.coindescs || []).flat().join("\n").matchAll(/Spend (?:up to )?(\d+|all of) \[(\w+)\]/gi)) spent[m[2]] = (spent[m[2]] || 0) + (/all/i.test(m[1]) ? Infinity : +m[1]);
+  const kind ={ atk: u.atk, sin: u.sin, op: u.op, tier: (/^Skill (\d)/.exec(label) || [])[1], spent, name: dcaPlain(u.name) }, sctx = { ...kind };
   let n = 0;
   read(u.desc, sctx, (r, l) => { gainsOf(dcaPlain(l), short); if (!r.gain) skillRow(r, l, `s${n++}`, short); });
   (u.coindescs || []).forEach((cd, i) => {
@@ -880,9 +941,9 @@ function dcaModel(x, sk, up) {
     seen.add(id);
     const g = dcaG(kw), fit = (f) => !f[2] || f[2] === u.atk || f[2] === u.sin;
     const q = { kw, side, part: "s" }, parts = [];
-    const own = (g.fx || []).filter(fit).filter((f) => side === "self" ? /^(dmg|ol|fp|cp)/.test(f[0]) : /^(take|def)/.test(f[0]));
+    const own = (g.fx || []).filter(fit).filter((f) => side === "self" ? /^(dmg|ol|fp|cp|bp)/.test(f[0]) : /^(take|def)/.test(f[0]));
     if (own.length) for (const [k, v] of own) {
-      const one = /1$/.test(k), kk = k.replace(/1$/, ""), map = { dmg: "dyn", take: "dyn", ol: "ol", def: "ol", fp: "fp", cp: "cp" }[kk];
+      const one = /1$/.test(k), kk = k.replace(/1$/, ""), map = { dmg: "dyn", take: "dyn", ol: "ol", def: "ol", fp: "fp", cp: "cp", bp: "bp" }[kk];
       const val2 = kk === "dmg" || kk === "take" ? v * 100 : kk === "def" ? -v : v;
       parts.push({ f: one ? { k: map, v: val2, scope: "all" } : { k: map, v: val2, per: q, every: 1, scope: "all", cap: g.max && (kk === "dmg" || kk === "take") ? +(val2 * g.max).toFixed(2) : undefined }, conds: one ? [{ q, n: 1 }] : [] });
     }
@@ -915,8 +976,9 @@ function dcaModel(x, sk, up) {
     if (unk.length) r.note = `counted as met: ${esc(unk.join("; "))}`; });
 
   if ("g_aw" in needs) needs.g_aw = Math.max(0, (u.targets || 1) - 1);
-  // Critical Hits: Poise kits and "on Critical Hit" rows
-  if (gains.has("s_Breath") || rows.some((r) => r.parts.some(({ f }) => f.crit)) || Object.keys(needs).some((k) => k.startsWith("s_Breath"))) needs.g_crit = 1;
+  // Critical Hits: a Poise Identity (the game's own tag) or this skill's text talks of Poise / crits
+  if ((x.statuses || []).includes("Breath") || /Critical|\[Breath\]|\bPoise\b/i.test([u.desc, ...(u.coindescs || []).flat()].join("\n"))
+    || rows.some((r) => r.parts.some(({ f }) => f.crit))) needs.g_crit = 1;
 
   // the target: statuses with Potency and Count, from the sliders and the coin scripts
   const inf = (u.inf || []).filter(([, kw]) => dcaG(kw).st === 2);
@@ -940,8 +1002,9 @@ function dcaModel(x, sk, up) {
   for (const [p, c] of pairs) if (!start[p] !== !start[c]) { start[p] ||= 1; start[c] ||= 1; }
 
   const order = { cp: "cp", fp: "fp", bp: "base", ol: "diff", dyn: "dyn" };
+  if (u.into) nodmg.unshift(`<b>Counted as “${esc(u.into)}”</b>: this Counter turns into it (${dcbText(u.from.split("\n").find((l) => /as (?:a )?Counter/i.test(l)) || "")})`);
   const m = {
-    auto: true, rows, stn: stk === "Sinking" ? "Gloom" : stk ? "Rupture" : "", stk,
+    auto: true, rows, stn: stk === "Sinking" ? "Gloom" : stk ? "Rupture" : "", stk, u: u.into ? u : undefined,
     bat: { auto: true },
     mods: (s, o) => {
       const out = { base: 0, cp: 0, fp: 0, last: 0, dyn: 0, diff: 0, lastDyn: 0, coinDyn: [], coinCp: [], coinFp: [], reuseAt: [], coinFlat: [], flatAll: [] };
@@ -953,7 +1016,7 @@ function dcaModel(x, sk, up) {
           if (!v) return;
           if (f.k === "take") return;  // this unit takes more
           if (f.k === "flat") { if (typeof f.scope === "number") (out.coinFlat[f.scope] ||= []).push([v, f.sin]); else out.flatAll.push([v, f.sin]); return; }
-          if (f.k === "reuse") { const at = f.at ?? f.scope; if (typeof at === "number") for (let j = 0; j < v; j++) out.reuseAt.push(at); else out.reuse = true; return; }
+          if (f.k === "reuse") { const at = f.at ?? f.scope, c = typeof at === "number" ? at : u.coins - 1; for (let j = 0; j < v; j++) out.reuseAt.push(c); return; }
           if (typeof f.scope === "number") { const arr = { dyn: out.coinDyn, cp: out.coinCp, fp: out.coinFp }[f.k]; if (arr) arr[f.scope] = (arr[f.scope] || 0) + v; else out[order[f.k]] += v; }
           else if (f.scope === "last" && (f.k === "dyn" || f.k === "fp")) out[f.k === "dyn" ? "lastDyn" : "last"] += v;
           else out[order[f.k]] += v;
@@ -980,6 +1043,7 @@ const dcbOn = (bm) => Object.fromEntries(bm.m.rows.map((r) => { const v = bm.b.o
 
 // the formula of dcCalc on the model's numbers. face: "best" (heads on Plus Coins, tails on Minus Coins), "heads" or "tails"
 function dcbCalc(m, u, s, o, env, face = "best") {
+  u = m.u || u;  // a Counter that turns into another Skill
   const x = { base: 0, cp: 0, fp: 0, last: 0, dyn: 0, diff: 0, flatLast: 0, lastDyn: 0, reuse: false, targets: 1, subDyn: 0, coinDyn: [], coinCp: [], coinFp: [], reuseAt: [], coinFlat: [], flatAll: [], ...m.mods(s, o) };
   const res = (k) => env.R[k] ?? 1, sd = s.stdmg && m.stn ? m.target(s, o, face).dmg : [];
   const add = u.op !== "SUB", heads = face === "best" ? add : face === "heads";

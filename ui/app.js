@@ -113,7 +113,7 @@ async function langApply(path, data) {
 function unitsEn(d) {
   const sk = {}, ps = {}, gl = {};
   for (const x of [...d.ids, ...d.egos]) {
-    for (const s of [...x.skills, ...(x.defense || [])]) sk[s.id] = Object.fromEntries(Object.entries(s.up).map(([k, u]) => [k, { desc: u.desc, coindescs: (u.coindescs || []).map((c) => [...c]) }]));
+    for (const s of [...x.skills, ...(x.defense || [])]) sk[s.id] = Object.fromEntries(Object.entries(s.up).map(([k, u]) => [k, { name: u.name, desc: u.desc, coindescs: (u.coindescs || []).map((c) => [...c]) }]));
     for (let p of x.passives || []) for (; p; p = p.prev) ps[p.id] = p.desc;
   }
   const gn = {};

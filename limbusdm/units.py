@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 16  # bump when the database layout changes (cached per snapshot)
+VERSION = 17  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -106,6 +106,7 @@ def _inflicts(d: dict) -> list:
 # status abilities the breakdown reads: game name → short kind (dmg % / Offense Level / Final Power / Coin Power, target side: takes % / Defense)
 BUFF_AB = {"AtkDamageMultiplierByStack": "dmg", "AtkDamageMultiplier": "dmg1", "AttackDmgMultiplier": "dmg1",
            "AtkAdderByStack": "ol", "AtkAdder": "ol1", "SkillPowerResultAdderAsStack": "fp", "SkillPowerResultAdder": "fp1",
+           "AtkSkillPowerResultAdderAsStack": "fp", "SkillPowerAdderAsStack": "bp",
            "CoinScaleAdderByStack": "cp", "TakeAtkDamageMultiplierByStack": "take", "TakeAtkDamageMultiplier": "take1",
            "DefAdderByStack": "def", "DefAdder": "def1"}
 
