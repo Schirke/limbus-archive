@@ -481,7 +481,24 @@ SOURCES = {"music": _music_sources, "voices": _voices_sources, "langs": _lang_so
 
 def _langs_hold(ex, old: dict) -> bool:
     from . import langs
-    return bool(old) and not langs.own(ex.svc)
+    if not old or langs.own(ex.svc):
+        return False
+    # (lists an older app made: given the links the pages read now)
+    add = {"/api/langs": lambda j: {**j, "langs": [{**x, "tables": {g: links.lang_table(x["id"], g) for g in langs.GROUPS}} if "tables" not in x
+                                                  else x for x in j.get("langs") or []]},
+           "/api/ui_langs": lambda j: j if "urls" in j else {**j, "urls": {c: links.ui_lang(c) for c in j.get("langs") or []}}}
+    changed = False
+    for key, fn in add.items():
+        rel = (old.get("urls") or {}).get(key)
+        if rel:
+            j = ex._stored(rel)
+            n = fn(j)
+            if n != j:
+                old["urls"][key] = ex._store(json.dumps(n, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
+                changed = True
+    if changed:
+        ex.write_manifest("langs", old)
+    return True
 
 
 def _story_hold(ex, old: dict) -> bool:
@@ -1593,6 +1610,41 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         with open(path, "w", encoding="utf-8") as f:
             json.dump(idx, f, ensure_ascii=False)
 
+    def renew_reports(self):
+        """Reports made by an older app (here or on another computer): the answer gets the links the page reads now."""
+        from .server import _report_links
+        mine = {r["id"] for r in self.svc.reports()}
+        for fn in sorted(os.listdir(os.path.join(self.out, "d", "m"))):
+            if not (fn.startswith("report-") and fn.endswith(".json.gz")):
+                continue
+            name = fn[:-8]
+            m = self.read_manifest(name)
+            key = url_key("/api/report", id=m.get("id") or "")
+            try:
+                r = self._stored(m["urls"][key])
+            except (KeyError, OSError, ValueError):
+                continue
+            if "notes" in r:  # (made with links)
+                continue
+            if m["id"] in mine:  # (its report is here: made again, files kept)
+                self.report(m["id"])
+                continue
+            r = _report_links(r, {k: self.cfg[k] for k in ("full_images", "video", "audio")})
+            here = lambda u: u and links.key(u) in m["urls"]  # noqa: E731
+            for items in r["sections"].values():
+                for it in items:
+                    for f in ("open", "blob", "thumb", "tree", "container"):
+                        if f in it and not here(it[f]):
+                            del it[f]  # (the site has no such file: the page leaves it out)
+                    if "pics" in it:
+                        it["pics"] = {k: u if here(u) else "" for k, u in it["pics"].items()}
+                    sd = it.get("sounds")
+                    if isinstance(sd, dict):
+                        for k in ("added", "changed"):
+                            sd[k] = [[*s[:3], s[3] if here(s[3]) else ""] if len(s) > 3 else s for s in sd.get(k, [])]
+            m["urls"][key] = self._store(json.dumps(r, ensure_ascii=False).encode("utf-8"), "application/json", gz=True)
+            self.write_manifest(name, m)
+
     def remove_report(self, rid: str):
         name = "report-" + hashlib.sha1(rid.encode()).hexdigest()[:12]
         for p in (self._manifest_path(name), os.path.join(self.out, "d", "tr", name + ".json.gz")):
@@ -2137,6 +2189,7 @@ def _publish(svc, base_url: str, report: str | None, progress) -> dict:
     for r in svc.reports():
         if r["id"] != report and r["id"] not in gone | empty and taken(r) > newest and not there(r) and _pair(r["id"]) not in has:
             ex.report(r["id"])
+    ex.renew_reports()
     ex.pages()
     # what changed since the last send that went through: nothing → nothing to write, pack, check or upload
     sent_path = own_file(svc, "site_sent.json")

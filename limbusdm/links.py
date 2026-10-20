@@ -20,11 +20,6 @@ def img(path: str) -> str:
     return f"/api/asset_img?path={_q(path)}" if path else ""
 
 
-def obj(bundle: str, pid) -> str:
-    """A picture of a bundle by its object id."""
-    return f"/api/object?bundle={_q(bundle)}&pid={pid}" if bundle else ""
-
-
 def bank(path: str, i) -> str:
     """One sound of a sound bank."""
     return f"/api/bank?path={_q(path)}&i={i}" if path else ""
