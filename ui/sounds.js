@@ -63,8 +63,9 @@ routes.sounds = async (args) => {
 };
 
 function sndSearchBox(wide) {
+  const where = snd.path.length ? `Search in ${snd.path[snd.path.length - 1].split(" · ")[0]}` : "Search all sounds";
   return `<label class="sndq${wide ? " wide" : ""}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-    <input type="search" id="sndq" placeholder="Search all sounds: a name, a speaker, words of a line…" value="${esc(snd.q)}" aria-label="Search all sounds"></label>`;
+    <input type="search" id="sndq" placeholder="${esc(where)}: a name, a speaker, words of a line…" value="${esc(snd.q)}" aria-label="${esc(where)}"></label>`;
 }
 
 async function sndDraw() {
@@ -143,12 +144,13 @@ async function sndLeaf(path, node) {
 async function sndSearch() {
   const body = $("#sndbody");
   body.innerHTML = `<div class="muted">Searching…</div>`;
-  const q = snd.q, rows = await api(`/api/sounds?q=${encodeURIComponent(q)}`).catch(() => []);
-  if (q !== snd.q) return;
+  const q = snd.q, path = snd.path.join("/");
+  const rows = await api(`/api/sounds?q=${encodeURIComponent(q)}${snd.path.length ? `&path=${encodeURIComponent(JSON.stringify(snd.path))}` : ""}`).catch(() => []);
+  if (q !== snd.q || path !== snd.path.join("/")) return;
   snd.rows = rows;
   snd.pics = {};
   snd.img = "";
-  body.innerHTML = `<div class="sndmeta" style="margin-bottom:8px">${rows.length}${rows.length >= 300 ? "+" : ""} found</div><div id="sndrows" class="sndrows"></div>`;
+  body.innerHTML = `<div class="sndmeta" style="margin-bottom:8px">${sndNum(rows.length)}${rows.length >= 3000 ? "+" : ""} found</div><div id="sndrows" class="sndrows"></div>`;
   snd.shown = 0;
   sndMore(true);
 }

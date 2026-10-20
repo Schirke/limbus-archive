@@ -672,7 +672,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 from . import soundlib
                 db = svc.sound_lib()
                 if q.get("q"):
-                    return self._json(soundlib.search(db, q["q"]))
+                    return self._json(soundlib.search(db, q["q"], path=json.loads(q["path"]) if q.get("path") else None))
                 if q.get("path"):
                     node = soundlib.find(db, json.loads(q["path"]))
                     return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {}})

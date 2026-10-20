@@ -9,6 +9,7 @@ from .quiz import _rows, _text, _where
 
 VERSION = 5
 SAVE_MAX = 500  # sounds one "Save folder" writes at most (Battle effects: ~9000)
+SEARCH_MAX = 3000  # (the page shows them 200 at a time)
 FX, STORY, VOICE, OST = "Sound Effects", "Story", "Voicefiles", "Soundtracks"
 TOP = [FX, STORY, VOICE, OST]  # (the folders' order)
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion",
@@ -195,9 +196,10 @@ def items(db: dict, node: dict) -> list:
     return [[db["banks"][it[0]], *it[1:]] for it in node.get("items") or []]
 
 
-def search(db: dict, q: str, limit: int = 300) -> list:
-    """Sounds whose name, speaker or text has every word of q."""
+def search(db: dict, q: str, limit: int = SEARCH_MAX, path: list[str] | None = None) -> list:
+    """Sounds whose name, speaker or text has every word of q (inside the folder at path, if given)."""
     words, out = q.lower().split(), []
+    root = find(db, path or [])
 
     def walk(node, path):
         for it in node.get("items") or []:
@@ -208,6 +210,6 @@ def search(db: dict, q: str, limit: int = 300) -> list:
                     return True
         return any(walk(k, path + [k["name"]]) for k in node.get("kids") or [])
 
-    if words:
-        walk(db["tree"], [])
+    if words and root:
+        walk(root, list(path or []))
     return out
