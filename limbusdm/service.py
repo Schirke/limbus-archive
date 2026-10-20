@@ -17,6 +17,7 @@ from .snapshot import DEFAULT_IGNORE, Snapshotter, bundle_logical_name, list_sna
 from .store import Store
 from .translate import Translator
 
+APPS_V = 2  # enemy_apps / enemy_content caches: bump when their names or labels change (2: battle names first)
 DEFAULT_SETTINGS = {
     "game_dir": "",
     "auto_on_start": True,
@@ -730,7 +731,7 @@ class Service:
         cached = getattr(self, "_content", None)
         if cached and cached[0] == sid:
             return cached[1]
-        rel = f"enemy_content/{sid}.json.gz"
+        rel = f"enemy_content/{sid}_v{APPS_V}.json.gz"
         if not build:
             if not self.store.exists(rel):
                 return None
@@ -745,7 +746,7 @@ class Service:
                 apps = content.appearance_content(
                     self.static_tables(list(content.UNIT_TABLES) + content.STAGE_TABLES),
                     content.load_chapters(loc), content.load_unit_names(loc))
-                self.store.write_json(f"enemy_apps/{sid}.json.gz", apps)
+                self.store.write_json(f"enemy_apps/{sid}_v{APPS_V}.json.gz", apps)
                 cabs = self.cab_index()
                 links = self._appearance_links(snap)
                 result = {}
@@ -818,7 +819,7 @@ class Service:
         cached = getattr(self, "_apps", None)
         if cached and cached[0] == sid:
             return cached[1]
-        rel = f"enemy_apps/{sid}.json.gz"
+        rel = f"enemy_apps/{sid}_v{APPS_V}.json.gz"
         apps = self.store.read_json(rel)
         if apps is None:
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")

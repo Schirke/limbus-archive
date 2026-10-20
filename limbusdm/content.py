@@ -188,10 +188,13 @@ def appearance_content(tables: dict[str, dict[str, object]], chapters: dict, nam
                         if isinstance(uid, int) and (uid not in best or lab < best[uid]):
                             best[uid] = lab
     out: dict[str, dict] = {}
+    spare: dict[str, str] = {}  # (a look's name from a unit no stage uses, when the staged ones have none)
     for table, kind in UNIT_TABLES.items():
         for data in (tables.get(table) or {}).values():
             for u in (data.get("list") or []) if isinstance(data, dict) else []:
                 app, uid = (u or {}).get("appearance"), (u or {}).get("id")
+                if app and names.get(uid):
+                    spare.setdefault(app, names[uid])
                 if not app or uid not in best:
                     continue
                 prio, order, label = best[uid]
@@ -201,4 +204,6 @@ def appearance_content(tables: dict[str, dict[str, object]], chapters: dict, nam
                                 "name": names.get(uid) or (cur or {}).get("name")}
                 elif not cur.get("name") and names.get(uid):
                     cur["name"] = names[uid]
+    for app, info in out.items():
+        info["name"] = info["name"] or spare.get(app)
     return out
