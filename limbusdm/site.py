@@ -1410,7 +1410,8 @@ class Exporter:
 
     def open_routes(self) -> list[str]:
         a = admin(self.svc)
-        got = _read_json(os.path.join(self.out, "d", "check.json")).get("open") or BASE_OPEN
+        # (BASE_OPEN always: a page added since the last site check would stay shut until the next one)
+        got = (_read_json(os.path.join(self.out, "d", "check.json")).get("open") or []) + BASE_OPEN
         # (the big games: open once their data is sent; who sees them is beta.json "games")
         big = [r for r, p in PAGES.items() if p.get("beta") and os.path.exists(self._manifest_path(p["part"]))]
         return [r for r in dict.fromkeys(got + a["on"] + big) if r not in a["off"]]
