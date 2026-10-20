@@ -334,7 +334,7 @@ class BuffFx:
 
     def _failed(self) -> list[str]:
         try:
-            with open(os.path.join(self.folder(), "failed2.json"), encoding="utf-8") as f:
+            with open(os.path.join(self.folder(), "failed3.json"), encoding="utf-8") as f:
                 return json.load(f)
         except (OSError, ValueError):
             return []
@@ -402,7 +402,7 @@ class BuffFx:
                         bad = batch
                 if bad:
                     bad = sorted(set(self._failed()) | set(bad))
-                    with open(os.path.join(self.folder(), "failed2.json"), "w", encoding="utf-8") as f:
+                    with open(os.path.join(self.folder(), "failed3.json"), "w", encoding="utf-8") as f:
                         json.dump(bad, f)
         except Exception as e:
             self.error = str(e)
