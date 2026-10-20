@@ -226,7 +226,7 @@ async function pfPng(c) {
 
 // ------------------------------------------------------------------ the save code
 // What goes under the code: the games' own storage, and nothing else (live rooms left out).
-const PF_BIG = ["rf_best", "rf_camp", "sl_best"];  // big games' records
+const PF_BIG = ["rf_best", "rf_camp", "sl_best", "sv_star"];  // big games' records
 const pfMine = (k) => (k.startsWith("games") && !k.startsWith("games_live")) || PF_BIG.includes(k);
 function pfSave() {
   const out = {};
