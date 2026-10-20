@@ -505,11 +505,11 @@ function dcbFor(x, sk) {
 
 // ---- Automatic rows: skill, coin, passive and status texts read by a small grammar (condition, effect, "for every N", max); coin scripts give what lands on the target
 const DCA_G = { neg: ["Negative effect types on target", 0, 10], spd: ["Speed over the target", 0, 10], speed: ["Speed", 1, 20], res: ["Highest Resonance", 0, 10], sp: ["SP", -45, 45],
-  mhp: ["Missing HP %", 0, 99], mhpT: ["Missing HP % of the target", 0, 99], crack: ["Cracked Coins", 0, 5], crit: ["Critical Hits (0 none, 1 every coin)", 0, 1], clash: ["Clash count (Clash won)", 0, 10], aw: ["Atk Weight over one target", 0, 6], ally: ["Allies that count", 0, 6] };
+  mhp: ["Missing HP %", 0, 99], mhpT: ["Missing HP % of the target", 0, 99], crack: ["Cracked Coins", 0, 5], crit: ["Critical Hits (0 none, 1 every coin)", 0, 1], clash: ["Clash count (Clash won)", 0, 10], aw: ["Atk Weight over one target", 0, 6], ally: ["Allies that count", 0, 6], tm: ["Time Moratorium stacks on target", 0, 2] };
 // plain status names in texts
 const DCA_NAMES = { Burn: "Combustion", Bleed: "Laceration", Tremor: "Vibration", Rupture: "Burst", Sinking: "Sinking", Poise: "Breath", Charge: "Charge" };
 const DCA_TYPES = /\b(Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)\s+(?:damage|Skills?)\b/i;
-const DCA_EFF = { cp: "Coin Power", fp: "Final Power", bp: "Base Power", ol: "Offense Level", dyn: "damage", take: "damage taken", reuse: "Reuse" };
+const DCA_EFF = { cp: "Coin Power", fp: "Final Power", bp: "Base Power", ol: "Offense Level", dyn: "damage", take: "damage taken", reuse: "Reuse", tm: "Time Moratorium: damage +15% per stack, as Sloth" };
 const dcaPlain = (t) => String(t || "").replace(/<[^>]*>/g, "").replace(/\{\/?hl\}/g, "").replace(/\s+/g, " ").trim();
 const dcaG = (k) => UNITS.glossary[k] || {};
 // English texts (the page may show another language)
@@ -815,7 +815,8 @@ function dcaNeeds(f, conds, out) {
   conds.forEach((c) => c.q && !c.lt && put(c.q, c.max != null ? c.max : c.n));
   if (f && f.per && f.v > 0) {
     const mx = (q) => q.kw && dcaG(q.kw).max;
-    const n = (f.cap != null && f.v ? (f.every ? f.every * Math.ceil(Math.abs(f.cap / f.v)) : Math.ceil(Math.abs(f.cap / f.v))) : mx(f.per) || (f.every || 1) * 5) - (f.off || 0);
+    const n = f.k === "reuse" && f.cap == null ? (f.every || 1) * 2 - (f.off || 0)  // uncapped Reuse count: 2
+      : (f.cap != null && f.v ? (f.every ? f.every * Math.ceil(Math.abs(f.cap / f.v)) : Math.ceil(Math.abs(f.cap / f.v))) : mx(f.per) || (f.every || 1) * 5) - (f.off || 0);
     put(f.per, f.per.g === "sp" ? 45 : f.per.g && f.cap == null ? DCA_G[f.per.g][2] : f.per.cap != null ? Math.min(f.per.cap, n) : n);
   }
 }
@@ -980,10 +981,8 @@ function dcaModel(x, sk, up) {
   };
   // statuses this unit has can give others ("Coffin: gain 2 Damage Up for every 3 Value (max 6)")
   for (const e of [...gains.values()]) if (e.side === "self" && (e.p || e.c)) { const d = dcaEn("gl", e.kw, dcaG(e.kw).desc); if (d) gainsOf(dcaPlain(d), e.from[0] || "P1"); }
-  // given only by other skills: the row is there, its slider starts at 0
-  const mineOrPassive = (f) => f === short || f.startsWith(`${short} coin`) || /^(P\d+|S)$/.test(f);
-  // a negative status on self (Damage Down …) is a cost: there, at 0
-  gains.forEach((e) => tryStatus(e.side, e.kw, e.from, !e.from.some(mineOrPassive) || e.side === "self" && dcaG(e.kw).type === "neg" ? -1 : e.p || e.c));
+  // statuses the kit gives (any skill or passive) start at that value; a negative one on self (Damage Down …) is a cost: there, at 0
+  gains.forEach((e) => tryStatus(e.side, e.kw, e.from, e.side === "self" && dcaG(e.kw).type === "neg" ? -1 : e.p || e.c));
   // statuses the rows check also count by themselves
   const walk = (q) => { if (!q) return; if (q.sum) q.sum.forEach(walk); else if (q.kw) tryStatus(q.side, q.kw, [], 0); };
   [...rows].forEach((r) => r.parts.forEach(({ f, conds }) => { walk(f.per); conds.forEach((c) => walk(c.q)); }));
@@ -995,6 +994,12 @@ function dcaModel(x, sk, up) {
     const unk = r.parts.flatMap(({ conds }) => conds.filter((c) => c.unk).map((c) => c.unk));
     if (unk.length) r.note = `counted as met: ${esc(unk.join("; "))}`; });
 
+  // Time Moratorium (T Corp): the stored damage comes back +15% per stack as Sloth damage
+  if (/\[TimeSuspend\]/.test(JSON.stringify([x.skills.map((q) => Object.values(q.up).map((v) => [v.desc, v.coindescs])), (x.passives || []).map((p) => p.desc)]))) {
+    rows.push({ k: "tm", stack: "skill", title: `${dcbK("TimeSuspend")} on target`, from: "this Identity's kit", parts: [{ f: { k: "tm", v: 1, per: { g: "tm" }, every: 1, scope: "all" }, conds: [] }], text: dcaEn("gl", "TimeSuspend", dcaG("TimeSuspend").desc) || "",
+      fx: [DCA_EFF.tm], need: (s) => s.g_tm ? "" : "needs Time Moratorium on the target" });
+    needs.g_tm = 2;
+  }
   if ("g_aw" in needs) needs.g_aw = Math.max(0, (u.targets || 1) - 1);
   // Critical Hits: a Poise Identity (the game's own tag) or this skill's text talks of Poise / crits
   if ((x.statuses || []).includes("Breath") || /Critical|\[Breath\]|\bPoise\b/i.test([u.desc, ...(u.coindescs || []).flat()].join("\n"))
@@ -1035,6 +1040,7 @@ function dcaModel(x, sk, up) {
           const v = vs[i];
           if (!v) return;
           if (f.k === "take") return;  // this unit takes more
+          if (f.k === "tm") { out.tm = (out.tm || 0) + v; return; }
           if (f.k === "flat") { if (typeof f.scope === "number") (out.coinFlat[f.scope] ||= []).push([v, f.sin]); else out.flatAll.push([v, f.sin]); return; }
           if (f.k === "reuse") { const at = f.at ?? f.scope, c = typeof at === "number" ? at : u.coins - 1; for (let j = 0; j < v; j++) out.reuseAt.push(c); return; }
           if (typeof f.scope === "number") { const arr = { dyn: out.coinDyn, cp: out.coinCp, fp: out.coinFp }[f.k]; if (arr) arr[f.scope] = (arr[f.scope] || 0) + v; else out[order[f.k]] += v; }
@@ -1079,7 +1085,8 @@ function dcbCalc(m, u, s, o, env, face = "best") {
     // flat adders and status damage through their sin's resistance
     const fl2 = [...(x.coinFlat[ci] || []), ...x.flatAll], fsin = fl2.length ? fl2[0][1] : m.flatSin;
     const flat = (fin && x.flatLast ? dcFloor(x.flatLast * res(m.flatSin)) : 0) + fl2.reduce((a, [v, k]) => a + dcFloor(v * res(k)), 0), sdmg = sd[i] ? dcFloor(sd[i] * (m.stn === "Gloom" ? res("Gloom") : 1)) : 0;
-    const one = hit(d) + flat + (x.targets - 1) * hit(d + x.subDyn) + sdmg;
+    let one = hit(d) + flat + (x.targets - 1) * hit(d + x.subDyn) + sdmg;
+    if (x.tm) one = dcFloor(one * (1 + 0.15 * x.tm) * res("Sloth"));  // Time Moratorium
     coins.push({ r, one, d, heads, flat, fsin, sdmg, reuse: again, ci, t: x.targets });
     total += one;
   }
