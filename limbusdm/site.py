@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -722,19 +723,34 @@ def _buffs_final(ex, got: dict, old: dict):
 FINALS = {"buffs": _buffs_final}
 
 _APP: list[str] = []
+CODE_SIG = "code_sig.txt"  # (written by build.ps1 next to the built app's modules)
+
+
+def code_sig() -> str:
+    """The code the app's answers come from: limbusdm/*.py and the private modules, without __init__ (its version number)."""
+    import limbusdm
+    files = {fn: os.path.join(d, fn) for d in limbusdm.__path__ if os.path.isdir(d)
+             for fn in os.listdir(d) if fn.endswith(".py") and fn != "__init__.py"}
+    h = hashlib.sha1()
+    for fn in sorted(files):
+        with open(files[fn], "rb") as f:
+            h.update(fn.encode() + f.read().replace(bytes([13, 10]), bytes([10])))  # (same on any checkout)
+    return h.hexdigest()[:16]
 
 
 def app_sig() -> str:
-    """The app's version and, run from the source, its code (one version, many edits)."""
+    """What the app's answers come from: its code. A release that changes only pages or the version number keeps it, so the
+    send after it asks nothing again."""
     if not _APP:
         import limbusdm
-        h = hashlib.sha1(limbusdm.__version__.encode())
-        for d in limbusdm.__path__:
-            for fn in sorted(os.listdir(d)) if os.path.isdir(d) else []:
-                if fn.endswith(".py"):
-                    with open(os.path.join(d, fn), "rb") as f:
-                        h.update(fn.encode() + f.read())
-        _APP.append(h.hexdigest()[:16])
+        sig = None
+        if getattr(sys, "frozen", False):
+            try:
+                with open(os.path.join(os.path.dirname(limbusdm.__file__), CODE_SIG), encoding="utf-8") as f:
+                    sig = f.read().strip() or "v" + limbusdm.__version__
+            except OSError:  # (built without it: the version stands in)
+                sig = "v" + limbusdm.__version__
+        _APP.append(sig or code_sig())
     return _APP[0]
 
 
@@ -881,7 +897,7 @@ class Exporter:
 
     def _journal_head(self) -> str:
         # (another game version or another app: the answers may differ)
-        return json.dumps({"game": _game(self.svc.latest_snapshot_id()), "app": __import__("limbusdm").__version__})
+        return json.dumps({"game": _game(self.svc.latest_snapshot_id()), "app": app_sig()})
 
     def _journal_read(self) -> dict:
         out = {}
@@ -1090,7 +1106,7 @@ class Exporter:
         by level. sec: a manifest that is no part (a report) brings its own."""
         sec = sec or PARTS[name]["crawl"]
         stage = "site: " + sec["stage"]
-        old, app = self.read_manifest(name), __import__("limbusdm").__version__
+        old, app = self.read_manifest(name), app_sig()
         if sec.get("hold") and HOLDS[sec["hold"]](self, old):
             return old
         ver = VERSIONS[sec["versions"]](self) if sec.get("versions") else {}

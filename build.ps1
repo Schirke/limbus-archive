@@ -23,16 +23,19 @@ if (Test-Path "unity\LimbusViewer\Web\ship.py") {
 } else {
   Write-Warning "unity\LimbusViewer\Web not found: no big games"
 }
+# What the site's send compares to know whether the answers may have changed (site.app_sig): the code, not the version
+uv run python -c "from limbusdm.site import code_sig, CODE_SIG; open('limbusdm/' + CODE_SIG, 'w').write(code_sig())"
 try {
   uv run pyinstaller --noconfirm --clean --windowed --name LimbusArchive --icon ui/icon.ico `
     --distpath . --workpath build @hidden `
-    --add-data "ui;ui" `
+    --add-data "ui;ui" --add-data "limbusdm\code_sig.txt;limbusdm" `
     --collect-all UnityPy --collect-all fmod_toolkit --collect-all pyfmodex `
     --collect-all texture2ddecoder --collect-all etcpak --collect-all astc_encoder --collect-all archspec `
     --collect-all webview --collect-all clr_loader --collect-all pythonnet --collect-all imageio_ffmpeg `
     run.py
 } finally {
   $pyd | Remove-Item -ErrorAction SilentlyContinue
+  Remove-Item "limbusdm\code_sig.txt" -ErrorAction SilentlyContinue
 }
 Remove-Item LimbusArchive.spec -ErrorAction SilentlyContinue
 
