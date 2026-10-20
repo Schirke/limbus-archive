@@ -1531,19 +1531,19 @@ def _drawn_thumbs(svc, enemies: list, spines: dict, done: set) -> int:
     if not spines:  # (which ones are Spine-drawn is known only once the skeletons are linked)
         return 0
     from .viewer import _safe_name, fighter_pic_dir
-    bare = [a for a in dict.fromkeys(e.get("app") for e in enemies if not e.get("pic"))
-            if a and not spines.get(a) and _safe(a) not in done]
+    bare = [a for a in dict.fromkeys(e.get("app") for e in enemies if not e.get("pic")) if a and not spines.get(a)]
     if not bare:
         return 0
     todo = []
     for a in bare:
-        src = os.path.join(fighter_pic_dir(svc), _safe_name(a) + ".png")
+        src, dst = os.path.join(fighter_pic_dir(svc), _safe_name(a) + ".png"), os.path.join(_thumb_dir(svc), _safe(a) + ".png")
         if os.path.isfile(src):
-            os.makedirs(_thumb_dir(svc), exist_ok=True)
-            shutil.copyfile(src, os.path.join(_thumb_dir(svc), _safe(a) + ".png"))
-            done.add(_safe(a))
+            if _safe(a) not in done or os.path.getmtime(src) > os.path.getmtime(dst):  # newer drawing
+                os.makedirs(_thumb_dir(svc), exist_ok=True)
+                shutil.copyfile(src, dst)
+                done.add(_safe(a))
         else:
-            todo.append(a)
+            todo.append(a)  # old one shown meanwhile
     if not todo:
         return 0
     st = svc.fx.fighter_pics(todo)
