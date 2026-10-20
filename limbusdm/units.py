@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 17  # bump when the database layout changes (cached per snapshot)
+VERSION = 18  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -108,16 +108,21 @@ BUFF_AB = {"AtkDamageMultiplierByStack": "dmg", "AtkDamageMultiplier": "dmg1", "
            "AtkAdderByStack": "ol", "AtkAdder": "ol1", "SkillPowerResultAdderAsStack": "fp", "SkillPowerResultAdder": "fp1",
            "AtkSkillPowerResultAdderAsStack": "fp", "SkillPowerAdderAsStack": "bp",
            "CoinScaleAdderByStack": "cp", "TakeAtkDamageMultiplierByStack": "take", "TakeAtkDamageMultiplier": "take1",
-           "DefAdderByStack": "def", "DefAdder": "def1"}
+           "DefAdderByStack": "def", "DefAdder": "def1", "AtkAdderPerStack": "olper",
+           "DefaultSkillDmgMultiplierViaBuffCheckDevideByStack": "dmg"}
 
 
 def _buff_fx(b: dict) -> list:
-    """[[kind, value, Slash/Pierce/Blunt or sin or ""]] of a status."""
+    """[[kind, value, Slash/Pierce/Blunt or sin or "", cap %]] of a status ("olper": +1 Offense Level per value Stacks)."""
     out = []
     for a in b.get("list") or []:
-        k = BUFF_AB.get(a.get("ability"))
+        name, cap = a.get("ability") or "", None
+        m = re.fullmatch(r"(?:DefaultAtkSkill)?(AtkDamageMultiplierByStack)WithLimit_(\d+)", name)
+        if m:
+            name, cap = m.group(1), int(m.group(2))
+        k = BUFF_AB.get(name)
         if k and a.get("coinOperator", "ADD") == "ADD":
-            out.append([k, a.get("value") or 0, ATK.get(a.get("atk"), "") or SINS.get(a.get("attribute"), "")])
+            out.append([k, a.get("value") or 0, ATK.get(a.get("atk"), "") or SINS.get(a.get("attribute"), "")] + ([cap] if cap else []))
     return out
 
 

@@ -838,6 +838,18 @@ function dcaWhy(row, s) {
   return "";
 }
 
+// how many Identities name a status in their texts (a few = their own mechanic)
+let DCA_USE = null;
+function dcaUse(kw) {
+  if (!DCA_USE) {
+    DCA_USE = new Map();
+    for (const x of UNITS.ids) {
+      const t = JSON.stringify([x.skills.map((s) => Object.values(s.up).map((v) => [v.desc, v.coindescs])), (x.passives || []).map((p) => p.desc)]);
+      for (const k of new Set((t.match(/\[(\w+)\]/g) || []).map((s) => s.slice(1, -1)))) DCA_USE.set(k, (DCA_USE.get(k) || 0) + 1);
+    }
+  }
+  return DCA_USE.get(kw) || 0;
+}
 // the skill at an Uptie with its English texts
 function dcaEnU(sk, u) {
   const e = UNITS.en && UNITS.en.sk[sk.id], k = e && Object.keys(sk.up).find((n) => sk.up[n] === u);
@@ -942,28 +954,36 @@ function dcaModel(x, sk, up) {
     const g = dcaG(kw), fit = (f) => !f[2] || f[2] === u.atk || f[2] === u.sin;
     const q = { kw, side, part: "s" }, parts = [];
     const own = (g.fx || []).filter(fit).filter((f) => side === "self" ? /^(dmg|ol|fp|cp|bp)/.test(f[0]) : /^(take|def)/.test(f[0]));
-    if (own.length) for (const [k, v] of own) {
+    if (own.length) for (const [k, v, , lim] of own) {
+      if (k === "olper") { parts.push({ f: { k: "ol", v: 1, per: q, every: v, scope: "all" }, conds: [] }); continue; }  // +1 per v Stacks
       const one = /1$/.test(k), kk = k.replace(/1$/, ""), map = { dmg: "dyn", take: "dyn", ol: "ol", def: "ol", fp: "fp", cp: "cp", bp: "bp" }[kk];
       const val2 = kk === "dmg" || kk === "take" ? v * 100 : kk === "def" ? -v : v;
-      parts.push({ f: one ? { k: map, v: val2, scope: "all" } : { k: map, v: val2, per: q, every: 1, scope: "all", cap: g.max && (kk === "dmg" || kk === "take") ? +(val2 * g.max).toFixed(2) : undefined }, conds: one ? [{ q, n: 1 }] : [] });
+      const cap = lim ?? (g.max && (kk === "dmg" || kk === "take") ? +(val2 * g.max).toFixed(2) : undefined);
+      parts.push({ f: one ? { k: map, v: val2, scope: "all" } : { k: map, v: val2, per: q, every: 1, scope: "all", cap }, conds: one ? [{ q, n: 1 }] : [] });
     }
-    else if (dcaEn("gl", kw, g.desc) && !(g.fx || []).length) {
+    // its text: everything when the game lists no abilities we read, else only kinds the abilities don't cover
+    const covered = new Set(parts.map(({ f }) => f.k));
+    if (dcaEn("gl", kw, g.desc) && (!(g.fx || []).length || own.length)) {
       const c = { ...kind, own: kw, ownSide: side };
       String(dcaEn("gl", kw, g.desc)).split("\n").forEach((l) => { const r = dcaLine(l, c); if (!r || !r.fx || r.late) return;
-        const fx = r.fx.filter((f) => side === "self" ? f.k !== "take" : f.k === "take");
+        const fx = r.fx.filter((f) => (side === "self" ? f.k !== "take" : f.k === "take") && !covered.has(f.k === "take" ? "dyn" : f.k));
         fx.forEach((f) => parts.push({ f: { ...f, k: f.k === "take" ? "dyn" : f.k, scope: "all" }, conds: r.conds })); });
     }
     if (!parts.length) return;
-    // its own number: what the kit gives (else 1); other terms: what the effect needs
-    parts.forEach(({ f, conds }) => dcaNeeds((own.length || f.cap == null && !(g.max <= 10)) && f.per && f.per.kw === kw ? null : f, conds, needs));
+    // its own number: what the kit gives (else 1); a status whose game ability has its own cap goes to that cap
+    const rare = own.some((f) => f[3] != null);
+    parts.forEach(({ f, conds }) => dcaNeeds(!rare && (own.length || f.cap == null && !(g.max <= 10)) && f.per && f.per.kw === kw ? null : f, conds, needs));
     const mine = `${side[0]}_${kw}`;
     if (needs[mine] > (g.max || 99)) needs[mine] = g.max;
     if (val >= 0) dcaNeeds(null, [{ q, n: Math.min(val || 1, g.max || 99) }], needs);
     stRows.push({ k: `st.${id}`, stack: "skill", title: `${dcbK(kw)} on ${side}`, from: from.length ? `from ${from.slice(0, 3).join(", ")}` : "status", parts, text: dcaEn("gl", kw, g.desc) || "" });
   };
+  // statuses this unit has can give others ("Coffin: gain 2 Damage Up for every 3 Value (max 6)")
+  for (const e of [...gains.values()]) if (e.side === "self" && (e.p || e.c)) { const d = dcaEn("gl", e.kw, dcaG(e.kw).desc); if (d) gainsOf(dcaPlain(d), e.from[0] || "P1"); }
   // given only by other skills: the row is there, its slider starts at 0
   const mineOrPassive = (f) => f === short || f.startsWith(`${short} coin`) || /^(P\d+|S)$/.test(f);
-  gains.forEach((e) => tryStatus(e.side, e.kw, e.from, !e.from.some(mineOrPassive) ? -1 : e.p || e.c));
+  // a negative status on self (Damage Down …) is a cost: there, at 0
+  gains.forEach((e) => tryStatus(e.side, e.kw, e.from, !e.from.some(mineOrPassive) || e.side === "self" && dcaG(e.kw).type === "neg" ? -1 : e.p || e.c));
   // statuses the rows check also count by themselves
   const walk = (q) => { if (!q) return; if (q.sum) q.sum.forEach(walk); else if (q.kw) tryStatus(q.side, q.kw, [], 0); };
   [...rows].forEach((r) => r.parts.forEach(({ f, conds }) => { walk(f.per); conds.forEach((c) => walk(c.q)); }));
