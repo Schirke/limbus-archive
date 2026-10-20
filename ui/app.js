@@ -1332,7 +1332,7 @@ async function openFx(c, body) {
   const save = (items) => exportObj({ fxvideo: { id: c.id, v, items, folder: `${c.id} ${c.title}${tags ? ` (${tags})` : ""}` } });
   // Built once per character / options / mods; then videos update card by card.
   const base = `${c.id}:${v}:${modList.join(",")}:${levels.length}`;
-  const src = (n, stamp) => `/api/fx_video?${q}&name=${encodeURIComponent(n)}&t=${stamp}`;
+  const src = (n, stamp) => `${st.urls?.[n] || `/api/fx_video?${q}&name=${encodeURIComponent(n)}`}&t=${stamp}`;
   let grid = body.querySelector(".fxgrid");
   if (body.dataset.fx !== base || !grid || !$("#fxnote")) {
     body.dataset.fx = base;

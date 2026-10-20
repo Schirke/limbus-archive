@@ -106,7 +106,7 @@ SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
 # PARTS: the site's data, one manifest each (d/m/<name>.json.gz), made in this order by Exporter.pages()
 #   cfg     made only when this site setting is on
 #   taken   pull() takes it from the site when this computer can't go on from its own (langs, buffs, fx: own rules there)
-#   crawl   made by following links (Exporter.crawl): the lists to start from, and packs by request (first match wins;
+#   crawl   made by following links (Exporter.crawl): the lists to start from (or a name in STARTS: found when sending), and packs by request (first match wins;
 #           a tuple of patterns = one group in that order); without it: the Exporter method of the part's name
 #   by      "verify": made by the check (verify), not by pages()
 #   always  made every time (from the internet, or one request); any other part is skipped while what it is made from
@@ -152,7 +152,9 @@ PARTS = {
                              (r"/api/bank\?", VOICE_PACK)]}},
     "abnologs": {"cfg": "story", "taken": True, "uses": ["enemy pictures", "abno authors"], "crawl": {"stage": "Abnormality logs", "start": ["/api/abno_logs"],
                  "packs": [(r"/api/abno_logs$", PACK), ((r"/api/asset_thumb\?", r"/api/enemy_thumb\?"), GAME_PACK)]}},
-    "biggames": {"taken": True, "uses": ["big games"]},
+    # the big games (ui/big, built): every request they make, found by running them in a hidden window; the lists are asked every time
+    "biggames": {"taken": True, "uses": ["big games"], "crawl": {"stage": "Big games", "start": "biggames", "versions": "biggames", "ask": r"/api/(frames|sounds)\b",
+                 "packs": [(r"/api/(frames|sounds)\b", PACK), (r"/api/(?!frames\b|sounds\b|bank\b)", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
     "extra": {"taken": True, "by": "verify"},  # (requests the check found unanswered: Exporter.extra)
 }
 TAKEN_PARTS = tuple(n for n, p in PARTS.items() if p.get("taken"))
@@ -495,7 +497,7 @@ def _story_versions(ex) -> dict:
     return {"mv": getattr(story, "MODEL_VERSION", 1)}  # (standing models placed anew: asked again)
 
 
-VERSIONS = {"story": _story_versions, "anim": lambda ex: {"av": 1}}  # (anim 1: its answers carry links)
+VERSIONS = {"story": _story_versions, "anim": lambda ex: {"av": 1}, "biggames": lambda ex: _big_made(ex)}  # (anim 1: its answers carry links)
 
 
 def _anim_shape(ex, got: dict):
@@ -525,6 +527,40 @@ def _anim_shape(ex, got: dict):
 
 # PARTS "shape": a part's lists as the site keeps them, before their links are followed (ex, {list: file})
 SHAPES = {"anim": _anim_shape}
+
+def _big_made(ex) -> dict:
+    """What the big games' requests depend on: the game data and the built scripts (one dict per send: a failed run clears it)."""
+    if hasattr(ex, "_big"):
+        return ex._big
+    big = os.path.join(resource_dir(), "ui", "big")
+    names = sorted(fn for fn in os.listdir(big) if fn.endswith(".js")) if os.path.isdir(big) else []
+    h = hashlib.sha1()
+    for fn in names:
+        with open(os.path.join(big, fn), "rb") as f:
+            h.update(f.read())
+    ex._big = {"made": f"{ex.svc.latest_snapshot_id()}|{h.hexdigest()[:12]}"} if names else {}
+    return ex._big
+
+
+def _big_start(ex, old: dict) -> list[str]:
+    """The requests the big games make, as found by running them in a hidden window (bigNeeds); the old manifest's when
+    nothing they depend on changed or they can't run."""
+    made = _big_made(ex)
+    if made and old.get("made") != made["made"]:
+        try:
+            keys = []
+            for u in _big_needs(ex.base, ex.progress):
+                path, _, qs = u.partition("?")
+                if path in BIG_ASKS:
+                    keys.append(url_key(path, **dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))))
+            return list(dict.fromkeys(keys))
+        except Exception as e:
+            ex.failed.append(("big games", str(e)))
+            made.clear()  # (not recorded: tried again next time)
+    return list(old.get("urls") or {})
+
+
+STARTS = {"biggames": _big_start}
 
 
 def _story_packs(ex, got: dict) -> list:
@@ -1041,14 +1077,16 @@ class Exporter:
         if sec.get("hold") and HOLDS[sec["hold"]](self, old):
             return old
         ver = VERSIONS[sec["versions"]](self) if sec.get("versions") else {}
-        have = {k: f for k, f in (old.get("urls") or {}).items() if k not in sec["start"]} if sec.get("keep_all") else self.kept(old, sec["start"])  # (the lists: asked every time)
+        start = STARTS[sec["start"]](self, old) if isinstance(sec["start"], str) else sec["start"]  # (a name: found when sending)
+        ask = [k for k in start if re.match(sec["ask"], k)] if sec.get("ask") else start  # (the lists: asked every time)
+        have = {k: f for k, f in (old.get("urls") or {}).items() if k not in ask} if sec.get("keep_all") else self.kept(old, ask)
         if old.get("app") != app and not sec.get("keep_all"):  # (another app may answer differently: its answers asked again, pictures kept)
             have = {k: f for k, f in have.items() if ".json" not in f}
         fresh = list(sec.get("fresh") or []) + [p for v, p in (sec.get("renew") or {}).items() if old.get(v) != ver.get(v)]
         if fresh:  # …and these
             have = {k: f for k, f in have.items() if not any(re.match(p, k) for p in fresh)}
         self.progress(stage, 0, 0)
-        got, todo, srcs = {}, list(sec["start"]), {}
+        got, todo, srcs = {}, list(start), {}
         seen = set(todo)
         while todo:
             level_have = have
@@ -1056,7 +1094,7 @@ class Exporter:
                 src = (SOURCES[sec["sources"]] if isinstance(sec["sources"], str) else sec["sources"])(self.svc, todo)
                 srcs.update(src)
                 level_have = {k: f for k, f in have.items() if k not in src}
-                level_have.update((k, old["urls"][k]) for k, s in src.items() if (old.get("src") or {}).get(k) == s and k in (old.get("urls") or {}) and k not in sec["start"])
+                level_have.update((k, old["urls"][k]) for k, s in src.items() if (old.get("src") or {}).get(k) == s and k in (old.get("urls") or {}) and k not in ask)
             level = self.fetch_all(todo, level_have, stage, srcs)
             if sec.get("shape") and not got:  # (the lists as the site shows them)
                 SHAPES[sec["shape"]](self, level)
@@ -1125,43 +1163,6 @@ class Exporter:
         """A JSON answer back from the file it was stored in."""
         with (gzip.open if rel.endswith(".gz") else open)(os.path.join(self.out, "d", rel), "rt", encoding="utf-8") as f:
             return json.load(f)
-
-    def biggames(self) -> dict:
-        """The big games (ui/big): what each asks the app for, found by running them in a hidden window (bigNeeds)."""
-        old = self.read_manifest("biggames")
-        sid = self.svc.latest_snapshot_id()
-        big = os.path.join(resource_dir(), "ui", "big")
-        names = sorted(fn for fn in os.listdir(big) if fn.endswith(".js")) if os.path.isdir(big) else []
-        if not names:
-            return old
-        h = hashlib.sha1()
-        for fn in names:
-            with open(os.path.join(big, fn), "rb") as f:
-                h.update(f.read())
-        made = f"{sid}|{h.hexdigest()[:12]}"
-        have = self.kept(old)
-        if old.get("made") == made and all(os.path.exists(os.path.join(self.out, "d", f)) for f in have.values()):
-            return old  # (same game data, same games: nothing new to ask)
-        try:
-            asked = _big_needs(self.base, self.progress)
-        except Exception as e:
-            self.failed.append(("big games", str(e)))
-            return old
-        keys = []
-        for u in asked:
-            path, _, qs = u.partition("?")
-            if path not in BIG_ASKS:
-                continue
-            q = dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))
-            keys.append(url_key(path, **q))
-        keys = list(dict.fromkeys(keys))
-        lists = [k for k in keys if k.split("?")[0] in ("/api/frames", "/api/sounds")]
-        got = self.fetch_all(keys, {k: f for k, f in have.items() if k not in lists}, "site: Big games")
-        sounds = [k for k in keys if k.startswith("/api/bank")]
-        urls, groups = _grouped(got, [(lists, PACK), ([k for k in keys if k not in lists and k not in sounds], GAME_PACK), (sounds, VOICE_PACK)])
-        m = {"kind": "biggames", "id": sid, "made": made, "urls": urls, "groups": groups}
-        self.write_manifest("biggames", m)
-        return m
 
     def extra(self, keys: list[str]) -> int:
         """Requests the check found unanswered (manifest "extra") plus the pictures their lists name; returns how many got

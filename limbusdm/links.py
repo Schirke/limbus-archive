@@ -70,6 +70,11 @@ def buff_video(name: str) -> str:
     return f"/api/buff_video?name={_q(name)}"
 
 
+def fx_video(cid, v: str, name: str) -> str:
+    """A skill's video rendered with the game's effects (v: the render options)."""
+    return f"/api/fx_video?id={_q(cid)}{'&v=' + _q(v) if v else ''}&name={_q(name)}"
+
+
 def lang_table(lid: str, group: str) -> str:
     """A language's text table (core / story)."""
     return f"/api/lang?id={_q(lid)}&g={group}"

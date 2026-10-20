@@ -399,7 +399,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._json([{**c, "url": links.clip(c["bundle"], c["clip"], c["animator_go"]),
                                     "allUrl": links.clip(c["bundle"], c["clip"], c["animator_go"], 1)} for c in svc.owner_clips(int(q["id"]))])
             if p == "/api/fx":
-                return self._json(svc.fx.status(_fx_id(q["id"]), _fx_variant(q)))
+                cid, v = _fx_id(q["id"]), _fx_variant(q)
+                st = svc.fx.status(cid, v)
+                return self._json({**st, "urls": {n: links.fx_video(cid, st.get("v") or "", n) for n in st["videos"]}})
             if p == "/api/fx_buffs":  # the buff levels its renders can show, and which buff switches each effect on
                 from .viewer import buff_levels
                 from .buffs import unit_buffs

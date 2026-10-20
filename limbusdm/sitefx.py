@@ -21,7 +21,10 @@ def _made(svc) -> str:
 
 
 def _key(path: str, cid, v: str = "", **q) -> str:
+    from . import links
     from .site import url_key
+    if path == "/api/fx_video":  # (the one address: links.fx_video)
+        return links.key(links.fx_video(cid, v, q["name"]))
     return url_key(path, id=cid, **({"v": v} if v else {}), **q)
 
 
@@ -94,11 +97,13 @@ def _take(ex, m: dict, cid: int, v: str) -> int:
 
 def _lists(ex, m: dict, before: dict):
     """What the tab asks before a video: video lists, skill names, buffs, and /api/site_fx."""
+    from . import links
     cids = sorted(m["have"], key=lambda c: (not c.isdigit(), int(c) if c.isdigit() else 0, c))
     want = []
     for c in cids:
         for v in VARIANTS:
-            st = {"state": "idle", "videos": m["have"][c].get(v) or [], "available": True, "v": v, "kinds": {}}
+            names = m["have"][c].get(v) or []
+            st = {"state": "idle", "videos": names, "available": True, "v": v, "kinds": {}, "urls": {n: links.fx_video(c, v, n) for n in names}}
             m["urls"][_key("/api/fx", c, v)] = ex._store(json.dumps(st).encode(), "application/json")
         k = _key("/api/fx_buffs", c)
         if k not in m["urls"] or before.get(c) != m["have"][c]:
