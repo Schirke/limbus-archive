@@ -1,7 +1,7 @@
 // Database → Sounds: every bank sound in four folders with speaker and text; one plays at a time, folders save as WAVs.
 "use strict";
 
-const snd = { tree: null, path: [], rows: [], pics: {}, img: "", shown: 0, q: "", cur: -1, all: false, list: [] };
+const snd = { tree: null, path: [], rows: [], pics: {}, img: "", shown: 0, q: "", cur: -1, all: false, list: [], key: "" };
 const SND_PAGE = 200;
 const SND_TOP = {  // (the four folders' pictures: the game's own art)
   "Sound Effects": "Assets/Resources_moved/Story/Backgrounds/Ep10_1/story_b1_foodcourt.png",
@@ -53,7 +53,7 @@ routes.sounds = async (args) => {
   $("#sndnext").onclick = () => snd.cur + 1 < snd.list.length && sndPlay(snd.cur + 1);
   $("#sndclose").onclick = () => {  // stops the sound and hides the bar (playing another brings it back)
     a.pause(); a.removeAttribute("src"); a.load();
-    snd.cur = -1; snd.all = false;
+    snd.cur = -1; snd.all = false; snd.key = "";
     $("#sndbar").hidden = true;
     sndMark();
   };
@@ -177,7 +177,7 @@ function sndMore(first) {
   }
   el.querySelectorAll("[data-play]:not([data-on])").forEach((b) => { b.dataset.on = "1"; b.onclick = () => {
     const r = snd.rows[+b.dataset.play], a = $("#sndaudio");
-    if (snd.list === snd.rows && snd.list[snd.cur] === r && a && !a.paused) return a.pause();
+    if (snd.key === sndKey(r) && a && !a.paused) return a.pause();
     snd.all = false;
     sndPlay(+b.dataset.play, true);
   }; });
@@ -191,8 +191,8 @@ function sndPlay(n, fresh) {
   if (fresh || snd.list !== snd.rows) snd.list = snd.rows;
   const r = snd.list[n];
   if (!a || !r) return;
-  if (snd.list[snd.cur] === r && snd.cur === n && a.src) { a.play().catch(() => {}); return; }
-  snd.cur = n;
+  if (snd.key === sndKey(r) && a.src) { snd.cur = n; a.play().catch(() => {}); sndMark(); return; }
+  snd.cur = n; snd.key = sndKey(r);
   a.src = `/api/bank?path=${encodeURIComponent(r[1])}&i=${r[2]}`;
   a.play().catch(() => {});
   const pic = r[8] || snd.pics[r[5]] || snd.img;
