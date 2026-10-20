@@ -387,7 +387,7 @@ def _big_needs(base: str, progress=None) -> list[str]:
         raise RuntimeError("no Edge or Chrome to run the games in")
     port, prof = _free_port(), new_profile("limbus-big-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
-                             "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-background-timer-throttling",
+                             "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-extensions", "--disable-sync", "--disable-background-timer-throttling",
                              "--disable-renderer-backgrounding", "--autoplay-policy=no-user-gesture-required", "about:blank"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     tab = None
@@ -401,7 +401,8 @@ def _big_needs(base: str, progress=None) -> list[str]:
                 time.sleep(0.25)
         if not tabs:
             raise RuntimeError("the browser didn't start")
-        tab = _Tab(next(t for t in tabs if t["type"] == "page")["webSocketDebuggerUrl"])
+        tab = _Tab((next((t for t in tabs if t["type"] == "page" and t["url"] == "about:blank"), None)  # (not a page a profile opened)
+                    or next(t for t in tabs if t["type"] == "page"))["webSocketDebuggerUrl"])
         tab.call("Page.enable")
         tab.call("Page.navigate", url=base + "/#/biggames")
         end = time.time() + 60

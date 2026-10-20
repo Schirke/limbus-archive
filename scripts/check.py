@@ -366,7 +366,7 @@ def check_pages(rep, base, only=None, shots=False):
         return
     port, prof = _free_port(), new_profile("limbus-check-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
-                             "--window-size=1600,1000", "--remote-allow-origins=*", "--mute-audio", "--no-first-run",
+                             "--window-size=1600,1000", "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-extensions", "--disable-sync",
                              "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE cdn.jsdelivr.net",
                              "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "about:blank"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
@@ -381,7 +381,8 @@ def check_pages(rep, base, only=None, shots=False):
                 time.sleep(0.25)
         if not tabs:
             raise RuntimeError("the browser didn't start")
-        tab = Cdp(first(tabs, lambda t: t["type"] == "page")["webSocketDebuggerUrl"])
+        tab = Cdp((first(tabs, lambda t: t["type"] == "page" and t["url"] == "about:blank")  # (not a page a profile opened)
+                   or first(tabs, lambda t: t["type"] == "page"))["webSocketDebuggerUrl"])
         for d in ("Page", "Runtime", "Network", "Log"):
             tab.call(d + ".enable")
         visit(tab, base, "", 0)

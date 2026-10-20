@@ -92,7 +92,7 @@ def check(root: str, routes: list[str] | None = None, progress=None, settle: flo
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
     port, prof = _free_port(), new_profile("limbus-sitecheck-")
     proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
-                             "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-background-timer-throttling",
+                             "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-extensions", "--disable-sync", "--disable-background-timer-throttling",
                              "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "about:blank"],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     tab, more = None, []
@@ -106,7 +106,8 @@ def check(root: str, routes: list[str] | None = None, progress=None, settle: flo
                 time.sleep(0.25)
         if not tabs:
             raise RuntimeError("the browser didn't start")
-        tab = _Tab(next(t for t in tabs if t["type"] == "page")["webSocketDebuggerUrl"])
+        tab = _Tab((next((t for t in tabs if t["type"] == "page" and t["url"] == "about:blank"), None)  # (not a page a profile opened)
+                    or next(t for t in tabs if t["type"] == "page"))["webSocketDebuggerUrl"])
         tab.call("Page.enable")
 
         def visit(route: str, n: int, tab=tab) -> dict:
