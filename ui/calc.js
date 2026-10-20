@@ -717,6 +717,9 @@ function dcaClause(rest, ctx) {
   if (both) return [{ k: "dyn", v: +both[1] }];
   const dmgUp = /^Damage \+(\d+(?:\.\d+)?)%$/i.exec(rest.trim());  // "[WinDuel] Damage +40%"
   if (dmgUp) return [{ k: "dyn", v: +dmgUp[1] }];
+  // "Boost damage by 5% of target's missing HP (Max 20)": extra damage, at most 20
+  const boost = /Boost damage by [\d.]+% of (?:the )?target.?s missing HP \(Max (\d+)\)/i.exec(rest);
+  if (boost && ctx.sin) return [{ k: "flat", v: +boost[1], sin: ctx.sin }];
   // "gains Offense Level equal to (highest Reson.) (max 6)", "gains (highest Reson. / 2) Offense Level (max 3)"
   const KIND = { "coin power": "cp", "final power": "fp", "base power": "bp", "offense level": "ol" };
   const eqTo = /(Offense Level|Coin Power|Final Power|Base Power) equal to \(?([^()]+?)\)?\s*\(max (\d+)/i.exec(rest);
@@ -847,18 +850,6 @@ function dcaWhy(row, s) {
   return "";
 }
 
-// how many Identities name a status in their texts (a few = their own mechanic)
-let DCA_USE = null;
-function dcaUse(kw) {
-  if (!DCA_USE) {
-    DCA_USE = new Map();
-    for (const x of UNITS.ids) {
-      const t = JSON.stringify([x.skills.map((s) => Object.values(s.up).map((v) => [v.desc, v.coindescs])), (x.passives || []).map((p) => p.desc)]);
-      for (const k of new Set((t.match(/\[(\w+)\]/g) || []).map((s) => s.slice(1, -1)))) DCA_USE.set(k, (DCA_USE.get(k) || 0) + 1);
-    }
-  }
-  return DCA_USE.get(kw) || 0;
-}
 // the skill at an Uptie with its English texts
 function dcaEnU(sk, u) {
   const e = UNITS.en && UNITS.en.sk[sk.id], k = e && Object.keys(sk.up).find((n) => sk.up[n] === u);
@@ -1006,7 +997,7 @@ function dcaModel(x, sk, up) {
     if (unk.length) r.note = `counted as met: ${esc(unk.join("; "))}`; });
 
   // Time Moratorium (T Corp): the stored damage comes back +15% per stack as Sloth damage
-  if (/\[TimeSuspend\]/.test(JSON.stringify([x.skills.map((q) => Object.values(q.up).map((v) => [v.desc, v.coindescs])), (x.passives || []).map((p) => p.desc)]))) {
+  if (/\[TimeSuspend\]/.test(JSON.stringify([x.skills.map((q) => Object.values(q.up).map((v) => { const e = dcaEnU(q, v); return [e.desc, e.coindescs]; })), (x.passives || []).map((p) => dcaEn("ps", p.id, p.desc))]))) {
     rows.push({ k: "tm", stack: "skill", title: `${dcbK("TimeSuspend")} on target`, from: "this Identity's kit", parts: [{ f: { k: "tm", v: 1, per: { g: "tm" }, every: 1, scope: "all" }, conds: [] }], text: dcaEn("gl", "TimeSuspend", dcaG("TimeSuspend").desc) || "",
       fx: [DCA_EFF.tm], need: (s) => s.g_tm ? "" : "needs Time Moratorium on the target" });
     needs.g_tm = 2;
@@ -1234,7 +1225,7 @@ function dcbRefresh() {
   const hv = m.auto ? (dcPresets(x, label, u, dcSlots(x)).find((p) => p.fit) || { v: {} }).v.damage ?? null : his && his[m.bat.key] ? his[m.bat.key].damage : null;
   $("#dcbbat").innerHTML = `<div><span>Game values (bare skill)</span><b>${calc(zero).total}</b></div>
     <div><span><a href="https://github.com/BaTyANl/ElderCalc" target="_blank" rel="noopener">BaTyANl calc</a> max</span><b>${dc.ecMap ? hv ?? "—" : "…"} · ours ${atBat}</b></div>
-    <div class="dcbcmp${hv === atBat ? " ok" : ""}">${!dc.ecMap ? "Loading BaTyANl calc…" : hv == null ? "No BaTyANl calc preset for this skill" : hv === atBat ? "✓ same as ours with his settings" : m.auto ? "Rows read from the game texts; his fight state can differ (ours: the starting sliders, every row on)" : esc(m.bat.note)}</div>`;
+    <div class="dcbcmp${hv === atBat ? " ok" : ""}">${!dc.ecMap ? "Loading BaTyANl calc…" : hv == null ? "No BaTyANl calc preset for this skill" : hv === atBat ? "✓ same as ours with his settings" : m.auto ? "Rows read from the game texts; his fight state can differ (ours: the starting sliders, rows as they start)" : esc(m.bat.note)}</div>`;
   $("#dcbmods").innerHTML = `<label>Base power<input type="number" value="${u.base + now.x.base}" readonly></label>
     <label>Damage up, all coins %<input type="number" value="${+now.x.dyn.toFixed(1)}" readonly></label>
     <label>Crit adds %<input type="number" value="20" readonly></label><label>Clashes won<input type="number" value="0" readonly></label>`;
