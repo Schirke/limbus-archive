@@ -593,6 +593,7 @@ function dcaCond(c, ctx) {
   if (/(?:2|two) or more targets|multiple targets|several targets/i.test(t)) return { never: t, why: "only when hitting several targets" };
   if (/\b(?:is|was|gets) defeated\b/i.test(t)) return { never: t, why: "only after a defeat" };
   if ((m = /^(\d+)\+ (?:combined )?Stacks?$/i.exec(t)) && ctx.headTerm) return { q: ctx.headTerm, n: +m[1] };  // "- 3+ Stack: …" under "based on (…)"
+  if ((m = /with a Coin that gains \[(\w+)\]$/i.exec(t))) return { coinGains: m[1] };
   if ((m = /^(?:if (?:the )?(?:main )?target has|if this unit has|at) less than (\d+) (.+)$/i.exec(t)) && !/%/.test(m[2])) {
     const q = dcaTerm(/target has/i.test(t) && !/ on /.test(m[2]) ? m[2] + " on target" : m[2], /target has/i.test(t) ? "target" : "self", ctx);
     if (q) return { q, n: +m[1], lt: true };
@@ -675,7 +676,7 @@ function dcaLine(raw, ctx) {
   if (!fx.length && crit) return { none: t, why: "crit only" };
   if (!fx.length) {
     const toSkill = /following effects? (?:to|for) ["“]([^"”]+)["”]/i.exec(rest), basedOn = /following effects? based on (.+?):?$/i.exec(rest);
-    if (rest.endsWith(":") || use || toSkill || basedOn) {
+    if (rest.endsWith(":") || use || toSkill || basedOn || !rest && conds.length) {
       ctx.head = conds; ctx.headMark = mark; ctx.headSkill = toSkill ? toSkill[1].trim() : null;
       ctx.headTerm = basedOn ? dcaTerm(basedOn[1].replace(/ Stacks?$/i, ""), null, ctx) : null;  // "based on (A + B)": what "N+ Stack" counts
       // "For every 10 [X], gain the following effects:" — the bullets count per 10
@@ -687,13 +688,20 @@ function dcaLine(raw, ctx) {
     if (/damage|\bPower\b|Offense Level|Reuse/i.test(rest) && !/Clash Power|heal|SP damage|Stagger|Shield|less damage|damage taken|Defense Level|\btakes? -|\btakes? damage|cannot|can't|nullify|Unopposed Attack against|Atk Weight|defeated|collectively received|can be used up to/i.test(rest) && !gain) return { unk: t };
     return gain ? { gain: t } : { none: t };
   }
-  if (conds.some((c) => c.q === undefined && !c.unk && !c.never)) return { unk: t };
+  if (conds.some((c) => c.q === undefined && !c.unk && !c.never && !c.coinGains)) return { unk: t };
   const scope = /final Coin/i.test(rest) && !fx.every((f) => f.k === "reuse" && f.last && ctx.coin == null) ? "last" : ctx.coin ?? "all";
   if (bullet && ctx.headPer) {
     const times = /\((\d+) times per Skill\)/i.exec(rest);
     fx.forEach((f) => { if (f.per) return; f.per = ctx.headPer.q; f.every = ctx.headPer.every; if (f.k === "reuse") { f.v = 1; if (times) f.cap = +times[1]; } });
   }
   const keep = /\binstead\b/i.test(rest) ? fx.filter((f, i) => !fx.slice(i + 1).some((g) => g.k === f.k)) : fx;
+  // "When hitting with a Coin that gains [X]:" — only those coins of this skill
+  const cg = conds.find((c) => c.coinGains);
+  if (cg && ctx.coinTexts) {
+    const at = ctx.coinTexts.map((x, i) => new RegExp(`gain[^.]*\\[${cg.coinGains}\\]`, "i").test(x) ? i : -1).filter((i) => i >= 0);
+    if (!at.length) return { none: t, why: `no coin of this skill gains it`, quiet: 1 };
+    return { fx: at.flatMap((i) => keep.map((f) => ({ ...f, scope: i, crit }))), conds: conds.filter((c) => c !== cg), late, t, inst: /\binstead\b/i.test(rest) };
+  }
   return { fx: keep.map((f) => ({ ...f, scope, crit })), conds, late, t, inst: /\binstead\b/i.test(rest) };
 }
 // first top-level match of a one-character separator, or -1
@@ -912,7 +920,8 @@ function dcaModel(x, sk, up) {
   // what the coins spend ("Spend 2 [Bullet]"), for "… about to be spent by this Skill"
   const spent = {};
   for (const m of (u.coindescs || []).flat().join("\n").matchAll(/Spend (?:up to )?(\d+|all of) \[(\w+)\]/gi)) spent[m[2]] = (spent[m[2]] || 0) + (/all/i.test(m[1]) ? Infinity : +m[1]);
-  const kind ={ atk: u.atk, sin: u.sin, op: u.op, tier: (/^Skill (\d)/.exec(label) || [])[1], spent, name: dcaPlain(u.name) }, sctx = { ...kind };
+  const kind = { atk: u.atk, sin: u.sin, op: u.op, tier: (/^Skill (\d)/.exec(label) || [])[1], spent, name: dcaPlain(u.name),
+    coinTexts: (u.coindescs || []).map((cd) => dcaNames(dcaPlain(cd.join(" ")))) }, sctx = { ...kind };
   let n = 0;
   read(u.desc, sctx, (r, l) => { gainsOf(dcaPlain(l), short); if (!r.gain) skillRow(r, l, `s${n++}`, short); });
   (u.coindescs || []).forEach((cd, i) => {
@@ -982,7 +991,9 @@ function dcaModel(x, sk, up) {
   // statuses this unit has can give others ("Coffin: gain 2 Damage Up for every 3 Value (max 6)")
   for (const e of [...gains.values()]) if (e.side === "self" && (e.p || e.c)) { const d = dcaEn("gl", e.kw, dcaG(e.kw).desc); if (d) gainsOf(dcaPlain(d), e.from[0] || "P1"); }
   // statuses the kit gives (any skill or passive) start at that value; a negative one on self (Damage Down …) is a cost: there, at 0
-  gains.forEach((e) => tryStatus(e.side, e.kw, e.from, e.side === "self" && dcaG(e.kw).type === "neg" ? -1 : e.p || e.c));
+  // on the target: only what this skill or a passive puts there starts on (another skill's Fragile etc. starts at 0)
+  const tgt0 = (e) => e.side === "target" && !e.from.some((f) => /^(P\d+|S)$/.test(f) || f === short || f.startsWith(`${short} coin`));
+  gains.forEach((e) => tryStatus(e.side, e.kw, e.from, e.side === "self" && dcaG(e.kw).type === "neg" || tgt0(e) ? -1 : e.p || e.c));
   // statuses the rows check also count by themselves
   const walk = (q) => { if (!q) return; if (q.sum) q.sum.forEach(walk); else if (q.kw) tryStatus(q.side, q.kw, [], 0); };
   [...rows].forEach((r) => r.parts.forEach(({ f, conds }) => { walk(f.per); conds.forEach((c) => walk(c.q)); }));
