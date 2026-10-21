@@ -30,6 +30,8 @@
 
 /* the stage: the player's window is laid over this box, so nothing is drawn on it */
 .pl-center { min-width: 0; }
+/* the stage stays in view while the settings beside it scroll: the player's window is laid over it and cannot follow a scroll */
+@media (min-height: 600px) and (min-width: 1261px) { .pl-center { position: sticky; top: 0; align-self: start; } }
 .pl-head { display: flex; align-items: center; gap: 10px; padding: 0 2px 8px; flex-wrap: wrap; }
 .pl-head h2 { margin: 0; font: 24px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #fff; }
 .pl-badge { font: 11px Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; padding: 2px 8px; border: 1px solid #6b4a2c; color: var(--cream); }

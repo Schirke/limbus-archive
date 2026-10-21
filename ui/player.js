@@ -360,7 +360,10 @@ function plPlaceWindow() {
   const l = Math.max(r.left, host.left), t = Math.max(r.top, host.top), rt = Math.min(r.right, host.right), b = Math.min(r.bottom, host.bottom);
   const seen = r.width > 40 && rt - l > 8 && b - t > 8;
   const covered = !!document.querySelector(".an-modal, #modal:not(.hidden), #modal.open, #whatsnew:not(.hidden)");
-  const show = pl.ready && seen && !covered;
+  // (the window cannot move in step with a scrolling page: it is hidden while the box moves and laid back when it is still)
+  const sample = [r.left, r.top, r.width, r.height].map(Math.round).join();
+  if (sample !== pl.sample) { pl.sample = sample; pl.moveAt = performance.now(); }
+  const show = pl.ready && seen && !covered && performance.now() - pl.moveAt > 130;
   const dpr = window.devicePixelRatio || 1;
   const clip = show && (l > r.left + 1 || t > r.top + 1 || rt < r.right - 1 || b < r.bottom - 1) ? [l - r.left, t - r.top, rt - r.left, b - r.top] : null;
   const key = show ? [r.left, r.top, r.width, r.height, dpr, ...(clip || [])].map((x) => Math.round(x * 10)).join() : "hide";
