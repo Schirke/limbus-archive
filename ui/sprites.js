@@ -109,7 +109,7 @@ async function spDraw() {
     try {
       const r = await api("/api/sprites/load", { zip: sp.zip, id, mod: sp.mod });
       animMods.kept = {};
-      toast(`${r.count} frame${r.count === 1 ? "" : "s"} loaded into mod “${esc(sp.mod)}” of ${esc(id)} — pick it in Animations → Play`, 7000);
+      toast(`Frames loaded into mod “${esc(sp.mod)}” of ${esc(id)}: ${r.count} — pick it in Animations → Play`, 7000);
     } catch (e) { toast(esc(e.message)); }
   };
   spGrid();
