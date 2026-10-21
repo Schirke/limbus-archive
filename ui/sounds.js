@@ -183,7 +183,7 @@ function sndMore(first) {
     return `<div class="sndrow${sndKey(r) === playing ? " on" : ""}" data-key="${esc(sndKey(r))}">
       <button class="sndplay" data-play="${n}" aria-label="Play">${SND_PLAY}</button>
       ${pic ? `<img class="sndpic" src="${imgThumb(pic)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
-      <div class="sndtxt">${title ? `<b data-from="${esc(title)}" title="Only this speaker's lines">${esc(title)}</b>${sub ? ` <small>${esc(sub)}</small>` : ""}` : `<b class="mono">${esc(name)}</b>`}
+      <div class="sndtxt">${title ? `<b data-from="${esc(langEn(title))}" title="Only this speaker's lines">${esc(title)}</b>${sub ? ` <small>${esc(sub)}</small>` : ""}` : `<b class="mono">${esc(name)}</b>`}
         ${text ? `<div>${esc(text)}</div>` : ""}
         ${where ? `<a class="sndwhere" href="${sndHash(where)}">${esc(where.map((w) => w.split(" · ")[0]).join(" / "))}</a>` : ""}</div>
       ${title ? `<span class="sndname mono">${esc(name)}</span>` : ""}<span class="sndlen mono">${sndT(ms)}</span>

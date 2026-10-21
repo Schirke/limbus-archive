@@ -107,6 +107,14 @@ async function langApply(path, data) {
   // {name: picture} lists follow translated names
   if (data && data.pics && typeof data.pics === "object" && !Array.isArray(data.pics))
     for (const [k, v] of Object.entries(data.pics)) { const x = put(k, ""); if (x !== null && !(x in data.pics)) data.pics[x] = v; }
+  // Sounds rows are plain lists: their speaker and title are names however short ("Heathcliff", "???")
+  if (/^\/api\/sounds\b/.test(path) && data) {
+    const rows = Array.isArray(data) ? data : data.items || [], at = Array.isArray(data) ? 5 : 4;
+    for (const r of rows) for (const k of [at, at + 1]) {
+      const x = typeof r[k] === "string" && r[k] ? look(r[k]) : null;
+      if (x !== null && x !== r[k] && x.length < 200) { LANG.back.set(x, r[k]); r[k] = x; }
+    }
+  }
   return data;
 }
 // the English skill, passive and status texts, before the translation goes over them (ui/calc.js dcaModel)
