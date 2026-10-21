@@ -571,7 +571,7 @@ tr.clickrow { cursor: pointer; } tr.clickrow:hover td { background: var(--panel2
 .enres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 6px; }
 .enres.sin { grid-template-columns: repeat(7, 1fr); }
 .enres > div { border: 1px solid var(--line); background: var(--panel); padding: 8px 10px; display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--text); }
-.enres small { display: block; font: 11px Consolas, monospace; letter-spacing: 1.5px; color: var(--muted); }
+.enres small { display: block; font: 11px Consolas, monospace; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
 .enres.sin > div { flex-direction: column; gap: 3px; padding: 8px 2px; font: 15px Consolas, monospace; }
 .enres > div.rfatal, .enres > div.rweak { border-color: #8f3a33; color: var(--text); } .enres .rfatal small { color: #ff6b5b; } .enres .rweak small { color: #e8a23a; }
 .enres > div.rend, .enres > div.rineff { color: var(--text); } .enres .rend small { color: #7fbf7f; } .enres .rineff small { color: #6aa8ff; }

@@ -99,13 +99,12 @@ function markEnemy() {
   document.querySelectorAll("#engrid .entile").forEach((a) => a.classList.toggle("on", +a.dataset.e === env.sel));
 }
 
-const enRes = (v) => { const [l, c] = RESIST(v); return [l.toUpperCase(), c]; };
 // the two resistance rows of a unit or of one part of an abnormality
 function enResists(b) {
   const atk = ["Slash", "Pierce", "Blunt"].filter((k) => b.atk[k] != null), sins = UNITS.sins.filter((k) => b.sin[k] != null);
-  return (atk.length ? `<div class="enres">${atk.map((k) => { const [w, c] = enRes(b.atk[k]);
-      return `<div class="${c}">${ico(`res_${k}`, "s28", k, k)}<span>${k} ×${b.atk[k]}<small>${w}</small></span></div>`; }).join("")}</div>` : "")
-    + (sins.length ? `<div class="enres sin">${sins.map((k) => { const [w, c] = enRes(b.sin[k]);
+  return (atk.length ? `<div class="enres">${atk.map((k) => { const [w, c] = RESIST(b.atk[k]);
+      return `<div class="${c}">${ico(`res_${k}`, "s28", k, k)}<span><span>${k}</span> ×${b.atk[k]}<small>${w}</small></span></div>`; }).join("")}</div>` : "")
+    + (sins.length ? `<div class="enres sin">${sins.map((k) => { const [w, c] = RESIST(b.sin[k]);
       return `<div class="${c}">${sinIcon(k, "s24")}×${b.sin[k]}<small>${w}</small></div>`; }).join("")}</div>` : "");
 }
 const enStagger = (b, level) => b.stagger.length ? b.stagger.map((p) => `${Math.floor(enHp(b, level) * p / 100)} <small>${p}%</small>`).join(" · ") : "—";
