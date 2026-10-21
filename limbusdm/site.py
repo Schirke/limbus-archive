@@ -407,6 +407,8 @@ def _big_needs(base: str, progress=None) -> list[str]:
         tab = _Tab((next((t for t in tabs if t["type"] == "page" and t["url"] == "about:blank"), None)  # (not a page a profile opened)
                     or next(t for t in tabs if t["type"] == "page"))["webSocketDebuggerUrl"])
         tab.call("Page.enable")
+        # (a language already chosen: the first visit would reload the page mid-run)
+        tab.call("Page.addScriptToEvaluateOnNewDocument", source="try { localStorage.getItem('lang') === null && localStorage.setItem('lang', 'en'); } catch {}")
         tab.call("Page.navigate", url=base + "/#/biggames")
         end = time.time() + 60
         while tab.js("window.bigLoaded === true && typeof bigNeeds === 'function'") is not True:
@@ -417,7 +419,7 @@ def _big_needs(base: str, progress=None) -> list[str]:
         tab.js("window.__need = null; bigNeeds().then((l) => { window.__need = l; }, (e) => { window.__need = String(e); }); 0")
         end, t0 = time.time() + 1800, time.time()
         while True:
-            got = tab.js("window.__need")
+            got = tab.js("'__need' in window ? window.__need : 'the page reloaded'")
             if isinstance(got, list):
                 return got
             if isinstance(got, str) or time.time() > end:
