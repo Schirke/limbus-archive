@@ -1104,9 +1104,10 @@ routes.anim = async () => {
       <span class="muted small">Skills with the game's own effects and sounds, battle clips, single effects, and your mods — all for the one you pick.</span></div></div></div>`;
   $("#alist").innerHTML = `<div class="muted" style="padding:10px">Loading…</div>`;
   setTimeout(() => loadSpinePlayer().catch(() => {}), 0);  // (the Spine player's script, meanwhile: a skeleton opens without waiting for it)
-  if (!anim.data) anim.data = await api("/api/characters");
-  await units().catch(() => null);
-  anim.owned = new Set(await api("/api/mods_owned").catch(() => []));
+  // (asked at once, not one after the other)
+  const [data, , owned] = await Promise.all([anim.data || api("/api/characters"), units().catch(() => null), api("/api/mods_owned").catch(() => [])]);
+  anim.data = data;
+  anim.owned = new Set(owned);
   $("#aq").oninput = (e) => { anim.q = e.target.value; drawAnimTree(); };
   // (the list folds to its pictures: the player gets the room)
   const fold = (on) => { $(".an-app").classList.toggle("rail", on); $("#arail").textContent = on ? "›" : "‹"; try { localStorage.setItem("anim.rail", on ? "1" : ""); } catch (e) { /* private mode */ } };
@@ -1268,8 +1269,10 @@ async function openAnimEntry(sel) {
   }
   const c = findChar(sel.cid);
   if (!c) { v.innerHTML = `<div class="empty">Not found.</div>`; return; }
-  if (!sel.videos) sel.videos = await api(`/api/owner_videos?id=${c.id}`).catch(() => []);
-  if (!sel.slots) sel.slots = await api(`/api/skill_slots?id=${c.id}`).catch(() => ({}));
+  if (!sel.videos || !sel.slots) {
+    const [vids, slots] = await Promise.all([sel.videos || api(`/api/owner_videos?id=${c.id}`).catch(() => []), sel.slots || api(`/api/skill_slots?id=${c.id}`).catch(() => ({}))]);
+    sel.videos = vids; sel.slots = slots;
+  }
   anim.slots = sel.slots;
   // (Play = Skills, Effects and Battle clips, a switch inside)
   const tabs = [["fx", "Play"], ["mod", "Edit mod"], ...(sel.videos.length ? [["videos", `Videos (${sel.videos.length})`]] : []),

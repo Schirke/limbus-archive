@@ -11,7 +11,7 @@ const dcSign = (n) => n > 0 ? `+${n}` : `${n}`;
 
 routes.calc = async (args) => {
   $("#main").innerHTML = `<div class="muted">Loading…</div>`;
-  try { await units(); if (!ENEMIES) ENEMIES = await api("/api/enemies"); } catch (e) { $("#main").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  try { await Promise.all([units(), ENEMIES || api("/api/enemies").then((j) => { ENEMIES = j; })]); } catch (e) { $("#main").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (!UNITS.ids.length) { $("#main").innerHTML = `<div class="empty">Take a snapshot first — the database is read from it.</div>`; return; }
   dc.lv ||= MAX_LEVEL;
   const x = unitById(+args[0]);

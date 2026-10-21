@@ -675,6 +675,12 @@ class Service:
             finally:
                 self._content_bg_on = False
                 self._chars_cache = None
+            # (the lists the Animations, Enemies and Calc pages ask for first, ready before the first visit)
+            for fn in (self.unit_db, self.enemy_spines, self.enemy_db, self.characters):
+                try:
+                    fn()
+                except Exception:
+                    traceback.print_exc()
         threading.Thread(target=run, daemon=True).start()
 
     # ------------------------------------------------------------ cross-bundle references

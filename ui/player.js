@@ -6,10 +6,10 @@ const PL_MODE_NAMES = [["fx", "Skills"], ["effects", "Effects"], ["battle", "Bat
 const PL_SPEEDS = [0.25, 0.5, 1, 2];
 const PL_SPEC = { fps: 60 };
 const pl = { c: null, site: false, group: "", names: [], st: null, state: null, key: "", poll: 0, rect: 0, shown: "", paused: false, loop: true,
-  speed: 1, scrub: false, sets: null, ready: false, idle: 0, video: null, rendering: null };
+  speed: 1, scrub: false, sets: null, ready: false, idle: 0, video: null, rendering: null, seekTo: null, seekCmd: 0, seekAt: 0, sending: false, again: null };
 
 // a character the player can show: an Identity (E.G.O and enemies keep the list of videos)
-const plEligible = (c) => /^\d+$/.test(String(c.id)) && String(c.id)[0] !== "2";
+const plEligible = (c) => !!c.owner || /^\d+$/.test(String(c.id)) && String(c.id)[0] !== "2";  // (a second form: its prefab, owner = its Identity)
 const plMode = () => (PLAY_MODES.includes(anim.tab) ? anim.tab : "fx");
 
 function plModeBar() {
@@ -21,7 +21,7 @@ function plModeClicks(root) {
 
 // the options that need a new player: the others are commands
 function plKey() {
-  return [anim.fxOpt?.tails && "tails", anim.fxOpt?.nobloom && "nobloom", anim.fxLevel > 0 && `lv${anim.fxLevel}`, anim.fxMod && `m-${anim.fxMod}`].filter(Boolean).join("_");
+  return [anim.fxOpt?.tails && "tails", anim.fxOpt?.nobloom && "nobloom", anim.fxOpt?.alpha && "alpha", anim.fxOpt?.alpha && anim.fxOpt?.skillbg && "skillbg", anim.fxLevel > 0 && `lv${anim.fxLevel}`, anim.fxMod && `m-${anim.fxMod}`].filter(Boolean).join("_");
 }
 const plSlot = (n) => {
   const s = anim.slots?.[n];
@@ -54,29 +54,33 @@ async function openPlay(c, body) {
   Object.assign(pl, { c, site, group: "", ready: false, state: null, key: "", idle: 0, rendering: null });
   const mine = () => $("#abody") && anim.sel?.cid === (c.owner || c.id) && PLAY_MODES.includes(anim.tab);
   clearTimeout(pl.killTimer);
+  // (everything this page needs is asked at once, the skill list included: it is the slow one)
+  anim.fxBuffs = anim.fxBuffs || {};
+  anim.formSlots = anim.formSlots || {};
+  const names = site ? null : api(`/api/preview?id=${encodeURIComponent(c.id)}`).then((j) => j.groups.map((g) => g.name));
+  if (names) names.catch(() => {});  // (its error is shown where it is read)
+  const [slots, mods, sets] = await Promise.all([
+    !site && c.owner ? anim.formSlots[c.id] || api(`/api/skill_slots?id=${encodeURIComponent(c.id)}`).catch(() => ({})) : null,  // (a form's skills have names of their own)
+    site ? null : animMods(c.id),
+    site ? api("/api/site_fx").then((j) => j[c.id] || []).catch(() => []) : null,
+    anim.fxBuffs[c.id] ? null : api(`/api/fx_buffs?id=${encodeURIComponent(c.id)}`).catch(() => ({ levels: [], notes: {}, own: [] })).then((j) => { anim.fxBuffs[c.id] = j; }),
+  ]);
   if (!site) {
-    if (c.owner) {  // (a form's skills have names of their own)
-      anim.formSlots = anim.formSlots || {};
-      if (!anim.formSlots[c.id]) anim.formSlots[c.id] = await api(`/api/skill_slots?id=${encodeURIComponent(c.id)}`).catch(() => ({}));
-      anim.slots = anim.formSlots[c.id];
-    } else if (anim.sel?.slots) anim.slots = anim.sel.slots;
+    if (c.owner) { anim.formSlots[c.id] = slots; anim.slots = slots; } else if (anim.sel?.slots) anim.slots = anim.sel.slots;
     // the options of this character only: a character's mods that are gone
-    const modList = (await animMods(c.id)).mods.map((m) => m.name);
-    if (anim.fxMod && !modList.includes(anim.fxMod)) anim.fxMod = "";
+    if (anim.fxMod && !mods.mods.some((m) => m.name === anim.fxMod)) anim.fxMod = "";
   } else {
-    pl.sets = await api("/api/site_fx").then((j) => j[c.id] || []).catch(() => []);
+    pl.sets = sets;
     anim.fxSolo = false; anim.fxLevel = 0; anim.fxMod = "";
     anim.fxOpt = { buffs: pl.sets.includes("buffs") && (!!anim.fxOpt?.buffs || !pl.sets.includes("")) };  // (buffs on when that is the only set)
   }
-  anim.fxBuffs = anim.fxBuffs || {};
-  if (!anim.fxBuffs[c.id]) anim.fxBuffs[c.id] = await api(`/api/fx_buffs?id=${encodeURIComponent(c.id)}`).catch(() => ({ levels: [], notes: {}, own: [] }));
   if (!mine()) return;
   body.innerHTML = `<div class="pl-error" id="plerr" hidden></div>
     <div class="pl-ws" id="plws">
       <section class="pl-panel pl-listbox"><h3 class="pl-h">Play <small id="plcount"></small></h3><div class="pl-modebox">${plModeBar()}</div><div class="pl-list" id="pllist"></div>
         <div class="pl-legend"><span class="pl-dot ok"></span><span id="pllegend"></span></div></section>
       <section class="pl-center">
-        <div class="pl-head"><h2 id="plname"></h2><span class="pl-badge" id="plbadge"></span><span class="pl-badge" id="pltag" hidden></span><span class="grow"></span><span class="muted small mono" id="pldur"></span></div>
+        <div class="pl-head"><h2 id="plname"></h2><span class="pl-badge" id="plbadge"></span><span class="grow"></span><span class="muted small mono" id="pldur"></span></div>
         <div class="pl-stage" id="plstage"><div class="pl-overlay" id="plload"><div><div class="pl-spin"></div><b id="plloadt"></b><div class="muted small" id="plloads"></div></div></div>
           <div class="pl-overlay" id="plnone" hidden><div><b>No video of this set</b><div class="muted small" style="margin:6px 0 0">Only the sets the app rendered and sent here can play. Change an option, or render it in the desktop app.</div></div></div>
           ${site ? `<video id="plvideo" playsinline muted preload="auto"></video>` : ""}</div>
@@ -96,14 +100,19 @@ async function openPlay(c, body) {
   if (!mine()) return;
   if (!site && pl.st.available === false) { plError("The effects renderer (LimbusViewer) isn't part of this build."); return; }
   if (!site) {
-    try { pl.names = (await api(`/api/preview?id=${encodeURIComponent(c.id)}`)).groups.map((g) => g.name); }
+    try { pl.names = await names; }
     catch (e) { plError(e.message); return; }
+    if (!mine()) return;
   } else pl.names = pl.st.videos.slice();
   pl.names.sort((a, b) => { const x = plKeyOf(a), y = plKeyOf(b); return x[0] - y[0] || x[1] - y[1] || String(x[2]).localeCompare(String(y[2]), undefined, { numeric: true }); });
   pl.group = pl.names.includes(anim.plGroup) ? anim.plGroup : pl.names[0] || "";
   plDrawAll();
   if (site) plSiteLoad(); else plLaunch();
-  if (!pl.rect) pl.rect = setInterval(plPlaceWindow, 150);
+  if (!pl.rect) pl.rect = setInterval(plPlaceWindow, 60);
+  if (!plPlaceSoon.hooked) {  // (a scroll or a resize moves the window within the frame, not a poll later)
+    plPlaceSoon.hooked = true;
+    for (const ev of ["scroll", "resize"]) window.addEventListener(ev, plPlaceSoon, true);
+  }
 }
 const plKeyOf = (n) => { const m = /(?:^|_)S(\d+)(?:_(\d{5})|_Time?line[ _]?(.*))?$/.exec(n); return m ? [0, slotOrder(+m[1]), m[2] || m[3] || ""] : [1, 0, n]; };
 
@@ -189,10 +198,10 @@ function plDrawScene() {
   root.querySelectorAll("[data-g=alpha] button").forEach((b) => b.onclick = () => plOption(() => {
     anim.fxOpt = { ...anim.fxOpt, alpha: +b.dataset.v === 1 };
     if (!anim.fxOpt.alpha) anim.fxOpt.skillbg = false;
-  }));
+  }, "restart"));
   root.querySelectorAll("[data-g=lv] button").forEach((b) => b.onclick = () => plOption(() => { anim.fxLevel = +b.dataset.v; }, "restart"));
   root.querySelectorAll("[data-g=form] button").forEach((b) => b.onclick = () => { anim.fxForm = b.dataset.v; openAnimEntry(anim.sel); });
-  root.querySelectorAll("input[data-opt]").forEach((i) => i.onchange = () => plOption(() => { anim.fxOpt = { ...anim.fxOpt, [i.dataset.opt]: i.checked }; }, ["tails", "nobloom"].includes(i.dataset.opt) ? "restart" : ""));
+  root.querySelectorAll("input[data-opt]").forEach((i) => i.onchange = () => plOption(() => { anim.fxOpt = { ...anim.fxOpt, [i.dataset.opt]: i.checked }; }, ["tails", "nobloom", "skillbg"].includes(i.dataset.opt) ? "restart" : ""));
 }
 
 // the card under the settings: what a render would be, and the buttons
@@ -250,8 +259,6 @@ function plDrawStage() {
   const b = $("#plbadge");
   b.className = "pl-badge " + (pl.site ? "vid" : "live");
   b.textContent = pl.site ? "Video from the app" : "Live player";
-  const t = $("#pltag"), a = anim.fxOpt?.alpha ? "transparent in the render" : "";
-  t.hidden = !a; t.textContent = a;
   $("#plplay").innerHTML = pl.paused ? PL_ICON.play : PL_ICON.pause;
 }
 
@@ -275,7 +282,15 @@ function plPick(n) {
 }
 
 // ---------------------------------------------------------------- the desktop app: the player's window
-const plCmd = (c) => api("/api/preview_cmd", c).then((s) => plState(s)).catch(() => {});
+const plCmd = (c) => api("/api/preview_cmd", c).then((s) => { plState(s); return s; }).catch(() => {});
+// a jump: the knob stays where it was dropped until the player has been there (a way back is a replay from the start, the
+// frame counter runs up from 0 meanwhile)
+async function plSeek(frame, paused) {
+  pl.seekTo = frame; pl.seekCmd = Infinity; pl.seekAt = performance.now();
+  plProgress(frame, pl.total || 0, pl.fps || 60);
+  const s = await plCmd({ op: "seek", group: pl.group, seek: frame, paused });
+  if (pl.seekTo === frame) pl.seekCmd = s && s.seq || 0;
+}
 async function plLaunch() {
   pl.ready = false;
   pl.key = plKey();
@@ -328,8 +343,15 @@ function plPlaceWindow() {
   const clip = show && (l > r.left + 1 || t > r.top + 1 || rt < r.right - 1 || b < r.bottom - 1) ? [l - r.left, t - r.top, rt - r.left, b - r.top] : null;
   const key = show ? [r.left, r.top, r.width, r.height, dpr, ...(clip || [])].map((x) => Math.round(x * 10)).join() : "hide";
   if (key === pl.shown) return;
+  if (pl.sending) { pl.again = true; return; }  // (one request at a time: the next one carries where the box is by then)
+  pl.sending = true;
   pl.shown = key;
-  api("/api/preview_rect", show ? { x: r.left, y: r.top, w: r.width, h: r.height, dpr, clip, show: true } : { show: false }).catch(() => { pl.shown = ""; });
+  api("/api/preview_rect", show ? { x: r.left, y: r.top, w: r.width, h: r.height, dpr, clip, show: true } : { show: false }).catch(() => { pl.shown = ""; })
+    .finally(() => { pl.sending = false; if (pl.again) { pl.again = false; plPlaceWindow(); } });
+}
+function plPlaceSoon() {
+  if (!$("#plstage") || pl.frameReq) return;
+  pl.frameReq = requestAnimationFrame(() => { pl.frameReq = 0; plPlaceWindow(); });
 }
 
 // ---------------------------------------------------------------- the website: videos
@@ -353,6 +375,11 @@ function plSiteLoad() {
 // ---------------------------------------------------------------- controls
 function plProgress(frame, total, fps) {
   if (pl.scrub || !$("#plfill")) return;
+  if (pl.seekTo != null) {
+    const st = pl.state || {};
+    if ((st.cmd >= pl.seekCmd && frame >= pl.seekTo - 1) || performance.now() - pl.seekAt > 10000) pl.seekTo = null;
+    else frame = pl.seekTo;
+  }
   const dur = total / fps, t = frame / fps, k = total ? Math.min(1, frame / total) : 0;
   $("#plfill").style.width = `${100 * k}%`;
   $("#plknob").style.left = `${100 * k}%`;
@@ -374,7 +401,7 @@ function plWire(root) {
   const step = (d) => {
     if (pl.site) { if (v()) { v().pause(); v().currentTime = Math.max(0, v().currentTime + d / 30); } return; }
     if (d > 0) { if (!pl.paused) live({ op: "pause" }); live({ op: "step" }); }
-    else { plMsg("Back one frame replays the skill up to it."); live({ op: "seek", group: pl.group, seek: Math.max(0, (pl.frame || 0) - 2), paused: true }); }
+    else if (pl.ready) plSeek(Math.max(0, (pl.seekTo ?? pl.frame ?? 0) - 2), true);
   };
   $("#plback").onclick = () => step(-1);
   $("#plfwd").onclick = () => step(1);
@@ -392,7 +419,7 @@ function plWire(root) {
     const total = pl.total || 0;
     $("#plfill").style.width = `${100 * k}%`; $("#plknob").style.left = `${100 * k}%`;
     if (pl.site) { if (v() && v().duration) v().currentTime = k * v().duration; return; }
-    if (final) { plMsg("Jumped by replaying the skill up to there."); live({ op: "seek", group: pl.group, seek: Math.round(k * total), paused: pl.scrubWas }); }
+    if (final && pl.ready) plSeek(Math.round(k * total), pl.scrubWas);
   };
   scrub.onpointerdown = (e) => { scrub.setPointerCapture(e.pointerId); pl.scrub = true; pl.scrubWas = pl.paused; jump(at(e), false); };
   scrub.onpointermove = (e) => { if (pl.scrub) jump(at(e), false); };
