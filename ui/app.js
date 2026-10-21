@@ -190,8 +190,8 @@ async function langMenu() {
   btn.title = l ? `${l.label} — ${l.name}` : "Language";
   if (l) document.documentElement.lang = l.lang;
   langFonts(l && l.fonts);
-  // the lines' table (voice games, Sounds, Extraction) is fetched while nothing else is asked
-  if (l) setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => langTable("story")), 4000);
+  // the lines' table (voice games, Sounds, Extraction) is fetched while nothing else is asked; on the site when a page needs it
+  if (l && typeof SITE === "undefined") setTimeout(() => (window.requestIdleCallback || ((f) => f()))(() => langTable("story")), 4000);
 })();
 function toast(html, ms = 4000) {
   const t = $("#toast");

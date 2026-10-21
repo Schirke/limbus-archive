@@ -58,7 +58,7 @@ function drawBuffGrid() {
   const arr = bfFiltered();
   $("#bfcount").textContent = `${arr.length} of ${bfShown().length}`;
   $("#bfgrid").innerHTML = arr.map((b) => `<a class="entile bftile ${b.type}" href="#/buffs/${encodeURIComponent(b.id)}" data-b="${esc(b.id)}" title="${esc(`${bfName(b)} · ${BF_WORD[b.type]}`)}">
-      ${b.icon ? `<img loading="lazy" src="${imgThumb(b.icon)}" onerror="this.remove()">` : ""}<span>${BF_WORD[b.type]}</span><b>${esc(bfName(b))}</b></a>`).join("")
+      ${b.icon ? `<img loading="lazy" src="${b.iconUrl || imgThumb(b.icon)}" onerror="this.remove()">` : ""}<span>${BF_WORD[b.type]}</span><b>${esc(bfName(b))}</b></a>`).join("")
     || `<div class="empty">Nothing matches.</div>`;
   if (!arr.some((b) => b.id === bfv.sel) && arr.length) bfv.sel = arr[0].id;
   bfMark();
@@ -107,14 +107,14 @@ function drawBuff() {
   const same = bfShown().filter((x) => x !== b && x.fx.some((n) => b.fx.includes(n)));
   const link = (w) => w.k === "enemy" ? `#/enemies/${w.id}` : `#/db/${w.k === "ego" ? "ego" : "id"}/${w.id}`;
   // enemy by its handbook picture, else portrait
-  const pic = (w) => { const p = w.pic ? imgThumb(w.pic) : "", t = w.app ? `/api/enemy_thumb?app=${encodeURIComponent(w.app)}` : "";
+  const pic = (w) => { const p = w.picUrl || (w.pic ? imgThumb(w.pic) : ""), t = w.appUrl || (w.app ? `/api/enemy_thumb?app=${encodeURIComponent(w.app)}` : "");
     return t || p ? `<img loading="lazy" src="${t || p}" data-alt="${t ? p : ""}" onerror="if (this.dataset.alt) { this.src = this.dataset.alt; this.dataset.alt = ''; } else this.remove()">` : ""; };
   const group = (k, title) => {
     const ws = b.who.filter((w) => w.k === k);
     return ws.length ? `<h4>${title}</h4><div class="bfwho">${ws.map((w) =>
       `<a href="${link(w)}" title="${esc(w.name)}">${pic(w)}<span>${esc(w.name)}</span></a>`).join("")}</div>` : "";
   };
-  box.innerHTML = `<div class="bfhead">${b.icon ? `<img src="${imgThumb(b.icon)}" onerror="this.remove()">` : ""}
+  box.innerHTML = `<div class="bfhead">${b.icon ? `<img src="${b.iconUrl || imgThumb(b.icon)}" onerror="this.remove()">` : ""}
       <div class="grow"><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div>${typeof siteLink === "function" ? siteLink(`buffs/${b.id}`) : ""}<span id="bfsaveall">${bfSaveBtn(b)}</span></div>
     <div class="bfvids">${b.fx.map((n) => `<figure data-fx="${esc(n)}">${bfFig(b, n)}</figure>`).join("")}</div>
     ${b.desc ? `<div class="panel"><div class="kwdesc">${fmtDesc(b.desc)}</div>${b.flavor ? `<div class="kwflavor">${esc(b.flavor)}</div>` : ""}</div>` : ""}

@@ -137,7 +137,9 @@ PARTS = {
     # the planner's gifts then theme packs with its list, the history with the rest
     "tools": {"taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
               "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
-    "buffs": {"uses": ["buff videos"], "crawl": {"stage": "Buff effects", "start": ["/api/buffs"], "packs": [], "final": "buffs"}},
+    # the list, its icons in its order (the grid), then who has them
+    "buffs": {"uses": ["buff videos"], "crawl": {"stage": "Buff effects", "start": ["/api/buffs"], "final": "buffs",
+              "packs": [(r"/api/buffs$", PACK), (r"/api/asset_thumb\?path=[^&]*/Buf/", WORD_PACK)]}},
     "fx": {"cfg": "spine", "uses": ["skill videos"]},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
     # the Animations list, its Spine skeletons with their illustrations' layers, battle clips with their sprites
     "anim": {"cfg": "spine", "taken": True, "uses": ["fx"], "crawl": {"stage": "Animations", "start": ["/api/characters"], "shape": "anim",
@@ -2268,6 +2270,7 @@ HOST_MAX = 24 << 20  # host limit 25 MiB: bigger files go up in parts
 # videos in parts too, so the worker can answer the range a player asks for
 VIDEO_WHOLE = 4 << 20  # (a smaller one comes whole: about a second)
 VIDEO_PART = 2 << 20
+ALONE = ("mp4", "webm")  # (a video is opened one at a time: never in a pack)
 ANNOUNCER_LINES = 8  # Guess the sound on the site: lines of each announcer
 FRESH_FACES = 32  # the newest Identities' pictures (two per Identity) in a pack of their own
 LINK = re.compile(r"/(api|spine)/")
@@ -2275,7 +2278,7 @@ LINK = re.compile(r"/(api|spine)/")
 START = (r"^/api/(font\?|langs$|ui_langs$|site_fx$|music$)", r"^/api/gacha_ui\?n=(icon_lunacy|%s)$", r"^/api/ui_icon\?k=(sinner|rank|st)_", r"^/api/units$")
 
 
-def _start_groups(src: str) -> list[list[tuple[str, int]]]:
+def _start_groups(src: str, size) -> list[list[tuple[str, int]]]:
     """The START files of every manifest, as packs [[(file, size)]]."""
     from .gacha import SKIN
     skin = "|".join(n for n in SKIN if "PersonalityStory" not in n)  # (those are one page's big pictures)
@@ -2286,23 +2289,65 @@ def _start_groups(src: str) -> list[list[tuple[str, int]]]:
             urls = json.load(f).get("urls", {})
         for k, rel in urls.items():
             i = next((i for i, rx in enumerate(kinds) if rx.search(k)), None)
-            if i is not None and isinstance(rel, str) and os.path.getsize(os.path.join(src, "d", rel)) < PACK:
-                found[i].setdefault(rel, os.path.getsize(os.path.join(src, "d", rel)))
+            if i is not None and isinstance(rel, str) and size(rel) < PACK:
+                found[i].setdefault(rel, size(rel))
     groups, seen = [], set()
     for d in found:
         cur, n = [], 0
-        for rel, size in d.items():
+        for rel, n1 in d.items():
             if rel in seen:
                 continue
             seen.add(rel)
-            if cur and n + size > PACK:
+            if cur and n + n1 > PACK:
                 groups.append(cur)
                 cur, n = [], 0
-            cur.append((rel, size))
-            n += size
+            cur.append((rel, n1))
+            n += n1
         if cur:
             groups.append(cur)
     return groups
+
+
+def _layout(src: str, size, ms: dict | None = None) -> tuple[dict, list, list, set]:
+    """Where the files of all manifests go: (the manifests, START packs, the other packs [[(file, size)]], files alone).
+    A file is packed once: with the files the same manifests list, in the order (and the pack sizes) of the smallest of
+    them ("extra" orders nothing it shares); videos and big files stay alone. ms: the manifests, when read already."""
+    if ms is None:
+        ms = {}
+        for fn in sorted(os.listdir(os.path.join(src, "d", "m"))):
+            with gzip.open(os.path.join(src, "d", "m", fn), "rt", encoding="utf-8") as f:
+                ms[fn[:-8]] = json.load(f)
+    start = _start_groups(src, size)
+    first = {rel for g in start for rel, _ in g}
+    users, loose = {}, set()
+    for name, m in ms.items():
+        runs = [(i, n) for i, (count, n) in enumerate(m.get("groups") or []) for _ in range(count)]  # per request: its run and pack size
+        for i, rel in enumerate(m.get("urls", {}).values()):
+            if rel in first or rel in loose:
+                continue
+            if size(rel) >= PACK or rel.split(".", 1)[1] in ALONE:
+                loose.add(rel)
+                continue
+            users.setdefault(rel, {}).setdefault(name, (i,) + (runs[i] if i < len(runs) else (-1, PACK)))
+    lines = {}
+    for rel, by in users.items():
+        same = tuple(sorted(n for n in by if n != "extra")) or ("extra",)
+        owner = min(same, key=lambda n: (len(ms[n].get("urls") or {}), n))
+        lines.setdefault((same, owner), []).append(by[owner] + (rel,))
+    groups = []
+    for line in sorted(lines):
+        cur, n, at = [], 0, None
+        for _, run, limit, rel in sorted(lines[line]):
+            n1 = size(rel)
+            if cur and (n + n1 > limit or run != at):
+                groups.append(cur)
+                cur, n = [], 0
+            at = run
+            cur.append((rel, n1))
+            n += n1
+        if cur:
+            groups.append(cur)
+    return ms, start, groups, loose
 
 
 def packed_dir(svc) -> str:
@@ -2454,20 +2499,26 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
         os.makedirs(os.path.join(dst, "d", sub), exist_ok=True)
     shutil.copyfile(os.path.join(src, "d", "index.json"), os.path.join(dst, "d", "index.json"))
     shutil.copytree(os.path.join(src, "d", "tr"), os.path.join(dst, "d", "tr"), dirs_exist_ok=True)
-    packs, loose, parts = set(), set(), {}  # parts: {a part's file: (the big file, where the part starts in it)}
+    packs, parts = set(), {}  # parts: {a part's file: (the big file, where the part starts in it)}
     packed_urls = {}
+    sizes = {}
+
+    def size(rel):
+        if rel not in sizes:
+            sizes[rel] = os.path.getsize(os.path.join(src, "d", rel))
+        return sizes[rel]
 
     def glue(g) -> dict:
         name = hashlib.sha1("\n".join(rel for rel, _ in g).encode()).hexdigest()[:20] + ".bin"
         packs.add(name)
         full, off, at = os.path.join(dst, "d", "p", name), 0, {}
-        write = not os.path.exists(full) or os.path.getsize(full) != sum(size for _, size in g)
+        write = not os.path.exists(full) or os.path.getsize(full) != sum(n for _, n in g)
         out = open(full + ".tmp", "wb") if write else None
-        for rel, size in g:
-            at[rel] = [name, off, size, rel.split(".", 1)[1]]
+        for rel, n in g:
+            at[rel] = [name, off, n, rel.split(".", 1)[1]]
             if idx:
                 idx.add(name, off, rel)
-            off += size
+            off += n
             if out:
                 with open(os.path.join(src, "d", rel), "rb") as f:
                     shutil.copyfileobj(f, out)
@@ -2475,46 +2526,22 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
             out.close()
             os.replace(full + ".tmp", full)
         return at
-    start = {}
-    for g in _start_groups(src):
-        start.update(glue(g))
-    for fn in sorted(os.listdir(os.path.join(src, "d", "m"))):
-        with gzip.open(os.path.join(src, "d", "m", fn), "rt", encoding="utf-8") as f:
-            m = json.load(f)
-        groups, cur, n, seen = [], [], 0, set()
-        runs = [(i, size) for i, (count, size) in enumerate(m.get("groups") or []) for _ in range(count)]  # per request: its run and pack size
-        at = None
-        for i, rel in enumerate(m.get("urls", {}).values()):
-            if rel in seen or rel in start:
-                continue
-            seen.add(rel)
-            run, limit = runs[i] if i < len(runs) else (-1, PACK)
-            size = os.path.getsize(os.path.join(src, "d", rel))
-            if size >= PACK:
-                loose.add(rel)
-                continue
-            if cur and (n + size > limit or run != at):
-                groups.append(cur)
-                cur, n = [], 0
-            at = run
-            cur.append((rel, size))
-            n += size
-        if cur:
-            groups.append(cur)
-        where = {**start, **{rel: rel for rel in loose}}
-        for rel in loose:  # in parts: {"parts": […], "size", "part": a part's size, "ext"} (ui/site/sw.js)
-            size, ext = os.path.getsize(os.path.join(src, "d", rel)), rel.rsplit(".", 1)[-1]
-            step = VIDEO_PART if ext in ("mp4", "webm") and size > VIDEO_WHOLE else HOST_MAX if size > HOST_MAX else 0
-            if step:
-                # (a part's name says how the file was cut: a visitor's browser keeps parts by their names)
-                names = [f"{rel}.{step >> 10}k.{i}" for i in range(-(-size // step))]
-                where[rel] = {"parts": names, "size": size, "part": step, "ext": ext}
-                parts.update({p: (rel, i * step, min(step, size - i * step)) for i, p in enumerate(names)})
-        for g in groups:
-            where.update(glue(g))
+    ms, start, groups, loose = _layout(src, size)
+    where = {rel: rel for rel in loose}
+    for rel in loose:  # in parts: {"parts": […], "size", "part": a part's size, "ext"} (ui/site/sw.js)
+        n, ext = size(rel), rel.rsplit(".", 1)[-1]
+        step = VIDEO_PART if ext in ("mp4", "webm") and n > VIDEO_WHOLE else HOST_MAX if n > HOST_MAX else 0
+        if step:
+            # (a part's name says how the file was cut: a visitor's browser keeps parts by their names)
+            names = [f"{rel}.{step >> 10}k.{i}" for i in range(-(-n // step))]
+            where[rel] = {"parts": names, "size": n, "part": step, "ext": ext}
+            parts.update({p: (rel, i * step, min(step, n - i * step)) for i, p in enumerate(names)})
+    for g in start + groups:
+        where.update(glue(g))
+    for name, m in ms.items():
         m["urls"] = {k: where[rel] for k, rel in m.get("urls", {}).items()}
-        packed_urls[fn[:-8]] = m["urls"]
-        with gzip.open(os.path.join(dst, "d", "m", fn), "wt", encoding="utf-8") as f:
+        packed_urls[name] = m["urls"]
+        with gzip.open(os.path.join(dst, "d", "m", name + ".json.gz"), "wt", encoding="utf-8") as f:
             json.dump(m, f, ensure_ascii=False)
     whole = {v[0] for v in parts.values()}
     for rel in loose - whole:

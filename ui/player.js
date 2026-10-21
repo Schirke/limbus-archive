@@ -283,6 +283,28 @@ function plPick(n) {
 
 // ---------------------------------------------------------------- the desktop app: the player's window
 const plCmd = (c) => api("/api/preview_cmd", c).then((s) => { plState(s); return s; }).catch(() => {});
+// dragging the knob: the player jumps to where it is, one jump at a time (the latest place wins), paused there
+async function plScrubTo(f) {
+  pl.scrubWant = f;
+  if (pl.scrubBusy) return;
+  pl.scrubBusy = true;
+  try {
+    while (pl.scrub && pl.scrubWant != null) {
+      const w = pl.scrubWant;
+      pl.scrubWant = null;
+      if (w === pl.scrubDone) continue;
+      const s = await plCmd({ op: "seek", group: pl.group, seek: w, paused: true });
+      const t0 = performance.now();
+      for (;;) {  // (until the player shows it: then the next one)
+        const st = await api("/api/preview").catch(() => null);
+        if (st) pl.state = st;
+        if (!st || !pl.scrub || performance.now() - t0 > 3000 || (st.cmd >= (s?.seq || 0) && st.frame >= w - 1)) break;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      pl.scrubDone = w;
+    }
+  } finally { pl.scrubBusy = false; }
+}
 // a jump: the knob stays where it was dropped until the player has been there (a way back is a replay from the start, the
 // frame counter runs up from 0 meanwhile)
 async function plSeek(frame, paused) {
@@ -416,12 +438,17 @@ function plWire(root) {
   const scrub = $("#plscrub");
   const at = (e) => { const r = scrub.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
   const jump = (k, final) => {
-    const total = pl.total || 0;
+    const f = Math.round(k * (pl.total || 0));
     $("#plfill").style.width = `${100 * k}%`; $("#plknob").style.left = `${100 * k}%`;
     if (pl.site) { if (v() && v().duration) v().currentTime = k * v().duration; return; }
-    if (final && pl.ready) plSeek(Math.round(k * total), pl.scrubWas);
+    if (!pl.ready) return;
+    if (!final) { plScrubTo(f); return; }  // (the picture follows the knob while it is dragged)
+    if (pl.scrubDone === f) {  // (the picture is already there: only go on, if it was playing)
+      pl.seekTo = null;
+      if (!pl.scrubWas) plCmd({ op: "resume" });
+    } else plSeek(f, pl.scrubWas);
   };
-  scrub.onpointerdown = (e) => { scrub.setPointerCapture(e.pointerId); pl.scrub = true; pl.scrubWas = pl.paused; jump(at(e), false); };
+  scrub.onpointerdown = (e) => { scrub.setPointerCapture(e.pointerId); pl.scrub = true; pl.scrubWas = pl.paused; pl.scrubDone = pl.scrubWant = null; jump(at(e), false); };
   scrub.onpointermove = (e) => { if (pl.scrub) jump(at(e), false); };
   scrub.onpointerup = (e) => { if (!pl.scrub) return; pl.scrub = false; jump(at(e), true); };
   if (!plWire.keys) {
