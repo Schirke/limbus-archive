@@ -1697,6 +1697,8 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .sndtitle span { font-size: 15px; color: var(--cream); }
 .sndwho { display: flex; align-items: center; gap: 6px; margin-top: 8px; font: 13px var(--snd-b); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
 .sndwho img { width: 32px; height: 32px; background: #1f1612; clip-path: var(--cut); }
+.sndwho img[data-face] { cursor: pointer; } .sndwho img[data-face]:hover { filter: brightness(1.35); }
+.sndrow.hit { animation: sndhit 1.6s ease-out; } @keyframes sndhit { 0%, 40% { background: rgba(232, 180, 80, .22); } 100% { background: transparent; } }
 .sndrows { background: rgba(12, 8, 7, .82); border: 1px solid var(--line); }
 .sndrow { position: relative; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 1px solid #2a1f19; }
 .sndrow:last-child { border-bottom: 0; } .sndrow:hover { background: rgba(31, 22, 18, .85); }

@@ -135,9 +135,26 @@ async function sndLeaf(path, node) {
   snd.rows = got.items.map((r) => [null, ...r]);
   snd.pics = got.pics || {};
   snd.img = node.img || "";
-  const who = Object.keys(snd.pics);
-  if (who.length) $("#sndwho").insertAdjacentHTML("beforeend", `<span>· who speaks</span>${who.map((w) => `<img src="${imgThumb(snd.pics[w])}" alt="${esc(w)}" title="${esc(w)}">`).join("")}`);
+  const who = Object.keys(snd.pics).filter((w, i, all) => all.findLastIndex((v) => snd.pics[v] === snd.pics[w]) === i);  // (one face once: a translated name is the same picture)
+  if (who.length) $("#sndwho").insertAdjacentHTML("beforeend", `<span>· who speaks</span>${who.map((w) => `<img src="${imgThumb(snd.pics[w])}" alt="${esc(w)}" title="${esc(w)}" data-face="${esc(w)}">`).join("")}`);
+  // a face: that speaker's next line in the folder (first click: the first one)
+  $("#sndwho").querySelectorAll("[data-face]").forEach((im) => im.onclick = () => {
+    const face = snd.pics[im.dataset.face], from = snd.faceAt && snd.faceAt[0] === face ? snd.faceAt[1] + 1 : 0;
+    const pics = snd.rows.map((r) => r[8] || snd.pics[r[5]] || snd.img);
+    let n = pics.indexOf(face, from);
+    if (n < 0) n = pics.indexOf(face);
+    if (n < 0) return;
+    snd.faceAt = [face, n];
+    while (snd.shown <= n && snd.shown < snd.rows.length) sndMore();
+    const row = $("#sndrows").children[n];
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    $("#sndrows").querySelectorAll(".hit").forEach((d) => d.classList.remove("hit"));
+    void row.offsetWidth;
+    row.classList.add("hit");
+  });
   snd.shown = 0;
+  snd.faceAt = null;
   sndMore(true);
 }
 
