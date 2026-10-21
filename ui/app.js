@@ -1142,6 +1142,64 @@ const animThumb = (id) => {
 };
 // enemy picture from the handbook, else grey
 const animEnemyThumb = (app) => `<img loading="lazy" src="/api/enemy_thumb?app=${encodeURIComponent(app)}" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'an-ph' }))">`;
+// a list row's picture (server's `tile`); a pose still to take waits for the row to come into view
+const animTile = (x) => x.tile ? `<img loading="lazy" src="${x.tile}" onerror="this.replaceWith(Object.assign(document.createElement('span'), { className: 'an-ph' }))">`
+  : `<span class="an-ph"${x.draw && typeof SITE === "undefined" ? ` data-draw="${esc(x.draw)}"` : ""}></span>`;
+const animShots = { queue: [], asked: new Set(), io: null, busy: false };
+function animShotsWatch() {
+  if (animShots.io && animShots.io.root !== $("#alist")) animShots.io.disconnect(), animShots.io = null;  // (the page was drawn again)
+  if (!animShots.io) animShots.io = new IntersectionObserver((es) => es.forEach((e) => {
+    const a = e.target.dataset.draw;
+    if (!e.isIntersecting || animShots.asked.has(a)) return;
+    animShots.asked.add(a);
+    animShots.queue.push(a);
+    e.target.classList.add("drawing");
+    animShotsRun();
+  }), { root: $("#alist") });
+  animShots.io.disconnect();
+  $("#alist").querySelectorAll("[data-draw]").forEach((d) => {
+    if (animShots.asked.has(d.dataset.draw)) d.classList.add("drawing");
+    animShots.io.observe(d);
+  });
+  if (animShots.queue.length) animShotsRun();
+}
+// as the Enemies page: the idle pose pictured off screen, the app keeps it
+async function animShotsRun() {
+  if (animShots.busy) return;
+  animShots.busy = true;
+  const done = (a, url) => {
+    for (const g of anim.data.groups) for (const arr of Object.values(g.kinds)) for (const x of arr) {
+      if (x.draw !== a) continue;
+      delete x.draw;
+      if (url) x.tile = url;
+    }
+    $("#alist") && $("#alist").querySelectorAll(`[data-draw="${CSS.escape(a)}"]`).forEach((d) => d.outerHTML = url ? `<img src="${url}">` : `<span class="an-ph"></span>`);
+  };
+  const work = async (sp) => {
+    const host = Object.assign(document.createElement("div"), { className: "enshot" });
+    document.body.appendChild(host);
+    while (animShots.queue.length && $("#alist")) {
+      const a = animShots.queue.shift();
+      const { look: x } = await api(`/api/enemy_look?app=${encodeURIComponent(a)}`).catch(() => ({}));
+      if (!x) { api("/api/enemy_thumb", { app: a, none: true }).catch(() => {}); done(a, ""); continue; }
+      host.innerHTML = "";
+      const p = await addSpinePlayer(sp, host, x.bundle, x.atlas, null, { files: x.files }).catch(() => null);
+      if (!p) { done(a, ""); continue; }  // (the player didn't start: tried again another time)
+      await new Promise((ok) => setTimeout(ok, 1200));  // (the player fades its loading logo out first)
+      const data = host.querySelector("canvas").toDataURL("image/png");
+      p.dispose();
+      const r = await api("/api/enemy_thumb", { app: a, data }).catch(() => null);
+      done(a, r && r.url ? `${r.url}&t=${Date.now()}` : "");
+    }
+    host.remove();
+  };
+  try {
+    const sp = await loadSpinePlayer();
+    await Promise.all([0, 1].map(() => work(sp)));
+  } catch (e) { /* no player (offline): the rows keep their grey */ }
+  animShots.busy = false;
+  if (animShots.queue.length && $("#alist")) animShotsRun();
+}
 const AN_FILTERS = [["all", "All"], ["ids", "Identities"], ["egos", "E.G.O"], ["enemies", "Enemies"], ["mine", "★ Mine"]];
 function drawAnimTree() {
   const q = anim.q.trim().toLowerCase();
@@ -1184,14 +1242,15 @@ function drawAnimTree() {
       kinds.forEach(([k, arr]) => {
         g2 += `<div class="an-sub">${esc(k)}</div>` + arr.map((x) => x.app
           // a battle prefab: its skills with the game's effects
-          ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects">${animEnemyThumb(x.app)}<div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
-          : `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-g="${gi}" data-k="${esc(k)}" data-a="${x.atlas}" data-b="${esc(x.bundle)}">${x.of ? animEnemyThumb(x.of) : `<span class="an-ph"></span>`}<div class="an-t">${x.name ? esc(x.name) : esc(x.base)}<small>${x.name ? esc(x.base) : "Spine"}</small></div></div>`).join("");
+          ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects">${animTile(x)}<div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
+          : `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-g="${gi}" data-k="${esc(k)}" data-a="${x.atlas}" data-b="${esc(x.bundle)}">${animTile(x)}<div class="an-t">${x.name ? esc(x.name) : esc(x.base)}<small>${x.name ? esc(x.base) : "Spine"}</small></div></div>`).join("");
       });
     });
     if (g2 || f !== "mine") h += `<div class="an-grp">Enemies, abnormalities &amp; others</div>` + (anim.data.pending ? `<div class="muted small" style="padding:0 8px 6px">Sorting enemies by chapter…</div>` : "") + g2;
   }
   if (!h.replace(/<div class="an-grp">[^<]*<\/div>/g, "").trim()) h = `<div class="muted" style="padding:10px">${f === "mine" ? "No mods yet: open a character, pick “+ New mod” in the Mod box." : "Nothing found."}</div>`;
   $("#alist").innerHTML = h;
+  animShotsWatch();
   $("#alist").querySelectorAll("[data-toggle]").forEach((d) => d.onclick = () => { anim.open[d.dataset.toggle] = !anim.open[d.dataset.toggle]; drawAnimTree(); });
   $("#alist").querySelectorAll("[data-c]").forEach((d) => d.onclick = () => { openAnimEntry({ key: `c${d.dataset.c}`, cid: +d.dataset.c }); drawAnimTree(); });
   $("#alist").querySelectorAll("[data-r]").forEach((d) => d.onclick = () => {

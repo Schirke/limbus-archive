@@ -347,7 +347,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 extra = {"Content-Disposition": f'attachment; filename="{fn}"'} if q.get("download") else {}
                 return self._send(200, wav, "audio/wav", extra)
             if p == "/api/characters":
-                return self._json(_char_links(svc))
+                return self._json(_char_tiles(svc, _char_links(svc)))
             m = re.match(r"^/api/ext/(\w+)$", p)
             if m:  # the extension's own data (ext.py next to ext.js; any other: its own .py)
                 f = os.path.join(svc.data_dir, "ext", "ext.py" if m.group(1) == "games" else m.group(1) + ".py")
@@ -833,6 +833,9 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
             if p == "/api/enemy_thumb":
                 path = os.path.join(_thumb_dir(svc), _safe(q.get("app", "")) + ".png")
                 return self._file_live(path, "image/png") if os.path.exists(path) else self._send(404, b"", "text/plain")
+            if p == "/api/enemy_look":  # the idle pose of any battle look, for the Animations list's picture
+                look = _idle_look(svc.enemy_spines().get(q.get("app", "")) or [])
+                return self._json({"look": look and {**look, "files": links.spine(look["bundle"], look["atlas"])}})
             if p == "/api/enemy":
                 db = svc.enemy_db()
                 e = next((x for x in db["list"] if str(x["id"]) == q.get("id")), None)
@@ -842,8 +845,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 sk = {s for b in bodies for s in b["skills"] + b.get("defense", [])}
                 pa = {x for b in bodies for x in b["passives"]}
                 spine = svc.enemy_spines().get(e["app"]) or []
-                # idle pose: not a death one
-                look = next((x for x in spine if not re.search(r"destroy|dead|broken|_die", x["base"], re.I)), spine[0] if spine else None)
+                look = _idle_look(spine)
                 # (the cache turns the ids into strings)
                 return self._json({"spine": spine, "look": look and {**look, "files": links.spine(look["bundle"], look["atlas"])},
                                    "skills": {s: _skill_links(svc, db["skills"].get(s) or db["skills"].get(str(s)), s, e.get("pic")) for s in sk},
@@ -880,7 +882,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 import io
                 from PIL import Image
                 app = _safe(b.get("app", ""))
-                if not any(e["app"] == app for e in svc.enemy_db()["list"]):
+                if not any(e["app"] == app for e in svc.enemy_db()["list"]) and app not in svc.enemy_spines():
                     return self._json({"error": "unknown"}, 404)
                 if b.get("none"):  # nothing to take a picture of: not tried again at every start
                     return self._json({"ok": True, "nothumb": _no_thumbs(svc, app)})
@@ -1317,6 +1319,31 @@ def _char_links(svc) -> dict:
            "groups": [{**g, "kinds": {k: [item(x) for x in arr] for k, arr in g["kinds"].items()}} for g in ch.get("groups", [])]}
     svc._chars_linked = (ch, spines, out)
     return out
+
+
+def _idle_look(spine: list) -> dict | None:
+    """A look's idle skeleton: not a death one."""
+    return next((x for x in spine if not re.search(r"destroy|dead|broken|_die", x["base"], re.I)), spine[0] if spine else None)
+
+
+def _char_tiles(svc, out: dict) -> dict:
+    """The list's enemy pictures as they are now: the drawn idle pose, else the handbook portrait; `draw`: a pose the page
+    can still take."""
+    d = _thumb_dir(svc)
+    done = {f[:-4] for f in os.listdir(d) if f.endswith(".png")} if os.path.isdir(d) else set()
+    pics, spines, none = {}, svc.enemy_spines(), set(_no_thumbs(svc))
+    for e in svc.enemy_db()["list"]:
+        if e.get("pic"):
+            pics.setdefault(e["app"], e["pic"])
+
+    def tile(x):
+        a = x.get("app") or x.get("of")
+        if not a:
+            return x
+        if _safe(a) in done:
+            return {**x, "tile": links.enemy_thumb(a)}
+        return {**x, **({"tile": links.thumb(pics[a])} if a in pics else {}), **({"draw": a} if spines.get(a) and a not in none else {})}
+    return {**out, "groups": [{**g, "kinds": {k: [tile(x) for x in arr] for k, arr in g["kinds"].items()}} for g in out.get("groups", [])]}
 
 
 def _scene_links(data: bytes, bundle: str) -> bytes:

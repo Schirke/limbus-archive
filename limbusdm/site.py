@@ -142,7 +142,7 @@ PARTS = {
               "packs": [(r"/api/buffs$", PACK), (r"/api/asset_thumb\?path=[^&]*/Buf/", WORD_PACK)]}},
     "fx": {"cfg": "spine", "uses": ["skill videos"]},  # (the Animations page: its "With effects" tab — limbusdm/sitefx.py)
     # the Animations list, its Spine skeletons with their illustrations' layers, battle clips with their sprites
-    "anim": {"cfg": "spine", "taken": True, "uses": ["fx"], "crawl": {"stage": "Animations", "start": ["/api/characters"], "shape": "anim",
+    "anim": {"cfg": "spine", "taken": True, "uses": ["fx", "enemy pictures"], "crawl": {"stage": "Animations", "start": ["/api/characters"], "shape": "anim",
              "versions": "anim", "renew": {"av": r"/api/(spine_scene|owner_clips|clip)\?"}, "packs": "anim"}},  # (av: answers with links)
     "enemies": {"cfg": "enemies", "taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Enemies", "start": ["/api/enemies"],
                 "packs": [(r"/api/enemies$", PACK), (r"/api/enemy_thumb\?", VOICE_PACK)]}},
@@ -677,7 +677,8 @@ def _anim_packs(ex, got: dict) -> list:
     lists = [K(c["clips"]) for c in units if c.get("clips")]
     clips = list(dict.fromkeys(K(cl[f]) for k in lists for cl in read(k, []) for f in ("url", "allUrl") if cl.get(f)))
     sprites = [K(s["url"]) for k in clips for s in (read(k, {}).get("sprites") or {}).values() if s.get("url")]
-    return [(keys + lists + clips + sprites + ["/api/characters"], PACK)]
+    tiles = [K(x["tile"]) for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("tile")]
+    return [(keys + lists + clips + sprites + ["/api/characters"], PACK), (tiles, GAME_PACK)]
 
 
 PACKERS = {"story": _story_packs, "units": _units_packs, "anim": _anim_packs}

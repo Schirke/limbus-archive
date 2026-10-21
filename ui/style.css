@@ -935,6 +935,9 @@ a.kw.big { text-decoration: none; }
 .an-n small, .an-t small { color: var(--muted); font-size: 11.5px; margin-left: 6px; }
 .an-it { display: flex; align-items: center; gap: 8px; margin-left: 14px; padding: 4px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
 .an-it img, .an-ph { width: 34px; height: 34px; border-radius: 5px; flex: none; object-fit: cover; background: #2a2428; }
+.an-ph.drawing { position: relative; overflow: hidden; }
+.an-ph.drawing::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255, 210, 140, .18) 50%, transparent 80%); animation: anshot 1.2s infinite; }
+@keyframes anshot { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
 .an-t { flex: 1; min-width: 0; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; }
 .an-t small { display: block; margin: 0; }
 .an-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); flex: none; }
