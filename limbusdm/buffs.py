@@ -21,7 +21,7 @@ class _Viewer:
 viewer = _Viewer()
 
 VERSION = 2  # bump to remake the videos
-LIST = 2  # bump to remake the list
+LIST = 3  # bump to remake the list
 HOST = 10101  # the battle prefab the effects are loaded next to (the player needs one; it is not drawn)
 SIZE = (960, 540)
 BATCH = 6  # effects per run of the player
@@ -117,10 +117,10 @@ def build(svc) -> dict:
     udb = svc.unit_db()
     for x in udb.get("ids") or []:
         for b in of(x):
-            who.setdefault(b, []).append({"k": "id", "id": x["id"], "name": f"{x['title']} {x['sinnerName']}", "pic": x["img"].get("thumb")})
+            who.setdefault(b, []).append({"k": "id", "id": x["id"], "name": f"{x['title']} {x['sinnerName']}", "title": x["title"], "sinnerName": x["sinnerName"], "pic": x["img"].get("thumb")})
     for x in udb.get("egos") or []:
         for b in of(x):
-            who.setdefault(b, []).append({"k": "ego", "id": x["id"], "name": f"{x['name']} ({x['sinnerName']})", "pic": x["img"].get("thumb")})
+            who.setdefault(b, []).append({"k": "ego", "id": x["id"], "name": f"{x['name']} ({x['sinnerName']})", "title": x["name"], "sinnerName": x["sinnerName"], "pic": x["img"].get("thumb")})
     edb = svc.enemy_db()
     for e in edb.get("list") or []:
         got: set = set()

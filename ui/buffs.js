@@ -109,10 +109,12 @@ function drawBuff() {
   // enemy by its handbook picture, else portrait
   const pic = (w) => { const p = w.picUrl || (w.pic ? imgThumb(w.pic) : ""), t = w.appUrl || (w.app ? `/api/enemy_thumb?app=${encodeURIComponent(w.app)}` : "");
     return t || p ? `<img loading="lazy" src="${t || p}" data-alt="${t ? p : ""}" onerror="if (this.dataset.alt) { this.src = this.dataset.alt; this.dataset.alt = ''; } else this.remove()">` : ""; };
+  // (title and Sinner come apart so each is translated; an E.G.O's name is its "title")
+  const wn = (w) => !w.title ? w.name : w.k === "ego" ? `${w.title} (${w.sinnerName})` : `${w.title} ${w.sinnerName}`;
   const group = (k, title) => {
     const ws = b.who.filter((w) => w.k === k);
     return ws.length ? `<h4>${title}</h4><div class="bfwho">${ws.map((w) =>
-      `<a href="${link(w)}" title="${esc(w.name)}">${pic(w)}<span>${esc(w.name)}</span></a>`).join("")}</div>` : "";
+      `<a href="${link(w)}" title="${esc(wn(w))}">${pic(w)}<span>${esc(wn(w))}</span></a>`).join("")}</div>` : "";
   };
   box.innerHTML = `<div class="bfhead">${b.icon ? `<img src="${b.iconUrl || imgThumb(b.icon)}" onerror="this.remove()">` : ""}
       <div class="grow"><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div>${typeof siteLink === "function" ? siteLink(`buffs/${b.id}`) : ""}<span id="bfsaveall">${bfSaveBtn(b)}</span></div>
