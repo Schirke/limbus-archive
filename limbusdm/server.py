@@ -1833,9 +1833,13 @@ def _story_lines(svc: Service) -> bytes:
     return body
 
 
+class _Server(ThreadingHTTPServer):
+    request_queue_size = 128  # a page opens its connections in one burst; 5 (the default) refuses some on Windows
+
+
 def serve(svc: Service, port: int, on_show=None) -> ThreadingHTTPServer:
     ui_dir = os.path.join(resource_dir(), "ui")
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), make_handler(svc, ui_dir, on_show))
+    httpd = _Server(("127.0.0.1", port), make_handler(svc, ui_dir, on_show))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     if getattr(svc, "fx", None) is not None:
         threading.Thread(target=svc.fx.prewarm, daemon=True).start()
