@@ -1119,14 +1119,7 @@ class Service:
             story, portraits, path = {}, {}, self.ensure_browse()  # the story's own files: which voice file a line plays
             if path:
                 con = sqlite3.connect(path)
-                # a speaker's picture in the story's log: scenario-asset names the sprite of every model
-                files = {name: c for c, name in con.execute(
-                    "select c, name from o where type = 'Texture2D' and c like 'Assets/Resources_moved/Story/StoryPortrait/%'")}
-                for data in (self.static_tables(["scenario-asset"]).get("scenario-asset") or {}).values():
-                    for rows in data.values() if isinstance(data, dict) else []:
-                        for m in rows if isinstance(rows, list) else []:
-                            if isinstance(m, dict) and files.get(m.get("portraitSpritePath")):
-                                portraits[str(m.get("name"))] = files[m["portraitSpritePath"]]
+                portraits = self._story_portraits(con)
                 for name, h in con.execute("select name, h from o where type = 'TextAsset' and c like 'Assets/Resources_moved/Story/Effect/%'"):
                     try:
                         story[name.upper()] = [r for r in json.loads(self.store.get_blob(h).decode("utf-8-sig")).get("dataList", []) if r.get("voice")]
@@ -1138,6 +1131,18 @@ class Service:
             self.store.write_json(rel, db)
         self._quiz = (sid, db)
         return db
+
+    def _story_portraits(self, con) -> dict:
+        """{story model: its picture in the story's log} (scenario-asset names the sprite of every model)"""
+        files = {name: c for c, name in con.execute(
+            "select c, name from o where type = 'Texture2D' and c like 'Assets/Resources_moved/Story/StoryPortrait/%'")}
+        out = {}
+        for data in (self.static_tables(["scenario-asset"]).get("scenario-asset") or {}).values():
+            for rows in data.values() if isinstance(data, dict) else []:
+                for m in rows if isinstance(rows, list) else []:
+                    if isinstance(m, dict) and files.get(m.get("portraitSpritePath")):
+                        out[str(m.get("name"))] = files[m["portraitSpritePath"]]
+        return out
 
     def sound_lib(self) -> dict:
         """Database → Sounds (see soundlib.build)."""
@@ -1170,9 +1175,10 @@ class Service:
                 sounds = (snap["files"].get(t["bank"]) or {}).get("sounds") or []
                 if t["i"] < len(sounds):
                     music[(t["bank"], sounds[t["i"]][0].lower())] = t
-            story, path = {}, self.ensure_browse()  # the story's own files: which voice file a line plays
+            story, models, path = {}, {}, self.ensure_browse()  # the story's own files: which voice file a line plays
             if path:
                 con = sqlite3.connect(path)
+                models = self._story_portraits(con)
                 for name, h in con.execute("select name, h from o where type = 'TextAsset' and c like 'Assets/Resources_moved/Story/Effect/%'"):
                     try:
                         story[name.upper()] = [r for r in json.loads(self.store.get_blob(h).decode("utf-8-sig")).get("dataList", []) if r.get("voice")]
@@ -1182,7 +1188,7 @@ class Service:
             units = self.unit_db()
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize")
             pics = {c["name"]: c["pic"] for c in self.quiz().get("chars") or [] if c.get("pic")}  # (story speakers' pictures)
-            db = soundlib.build(samples, loc, story, units.get("ids") or [], units.get("egos") or [], music, pics)
+            db = soundlib.build(samples, loc, story, units.get("ids") or [], units.get("egos") or [], music, pics, models)
             self.store.write_json(rel, db)
         self._sound_lib = (sid, db)
         return db

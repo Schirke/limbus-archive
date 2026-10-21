@@ -7,7 +7,7 @@ import re
 
 from .quiz import _rows, _text, _where
 
-VERSION = 5
+VERSION = 6
 SAVE_MAX = 500  # sounds one "Save folder" writes at most (Battle effects: ~9000)
 SEARCH_MAX = 3000  # (the page shows them 200 at a time)
 FX, STORY, VOICE, OST = "Sound Effects", "Story", "Voicefiles", "Soundtracks"
@@ -30,7 +30,7 @@ def _sinner_of(uid: int) -> str:
 
 
 def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], egos: list[dict], music: dict,
-          portraits: dict | None = None) -> dict:
+          portraits: dict | None = None, models: dict | None = None) -> dict:
     """Build the sound tree {"v", "banks", "tree"} from the bank samples and texts."""
     en = os.path.join(loc_root, "en")
     banks, bank_n = [], {}
@@ -96,8 +96,9 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
         who = _text(t.get("teller") or (codes.get(str(t.get("model") or "")) or {}).get("name"))
         folder(STORY, label, order=order)
         put([STORY, label, scene], s, who, _text(t.get("title")), _text(t.get("content")), line if line is not None else 1e9)
-        if who in (portraits or {}):
-            folder(STORY, label, scene).setdefault("pics", {})[who] = portraits[who]
+        pic = (models or {}).get(str(t.get("model") or "")) or (portraits or {}).get(who)  # (the line's own model first: two can share a name)
+        if pic:
+            folder(STORY, label, scene).setdefault("pics", {})[who] = pic
 
     seen = set()
     for s in samples:
