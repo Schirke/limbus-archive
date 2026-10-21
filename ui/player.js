@@ -370,9 +370,22 @@ function plPlaceWindow() {
   if (key === pl.shown) return;
   if (pl.sending) { pl.again = true; return; }  // (one request at a time: the next one carries where the box is by then)
   pl.sending = true;
+  // (a window that goes away while its box is still seen leaves its last picture on the page meanwhile)
+  const snap = !show && !!pl.shown && pl.shown !== "hide" && pl.ready && seen;
   pl.shown = key;
-  api("/api/preview_rect", show ? { x: r.left, y: r.top, w: r.width, h: r.height, dpr, clip, show: true } : { show: false }).catch(() => { pl.shown = ""; })
+  api("/api/preview_rect", show ? { x: r.left, y: r.top, w: r.width, h: r.height, dpr, clip, show: true } : { show: false, snap })
+    .then((j) => plSnap(show ? "" : j && j.snap || (snap ? "" : null))).catch(() => { pl.shown = ""; })
     .finally(() => { pl.sending = false; if (pl.again) { pl.again = false; plPlaceWindow(); } });
+}
+// the still picture under the window: url shows it, "" takes it away, null leaves it as it is
+function plSnap(url) {
+  const st = $("#plstage");
+  if (!st || url === null) return;
+  let im = $("#plsnap");
+  if (!url) { if (im) im.hidden = true; return; }
+  if (!im) { im = Object.assign(document.createElement("img"), { id: "plsnap", className: "pl-snap", alt: "" }); st.appendChild(im); }
+  im.src = url;
+  im.hidden = false;
 }
 function plPlaceSoon() {
   if (!$("#plstage") || pl.frameReq) return;

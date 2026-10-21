@@ -402,6 +402,8 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 cid, v = _fx_id(q["id"]), _fx_variant(q)
                 st = svc.fx.status(cid, v)
                 return self._json({**st, "urls": {n: links.fx_video(cid, st.get("v") or "", n) for n in st["videos"]}})
+            if p == "/api/preview_snap":  # the player's last picture, shown on the page while its window is hidden
+                return self._send(200, getattr(svc, "_pv_snap", (0, b""))[1], "image/jpeg")
             if p == "/api/preview":  # the interactive skill player: its state; with ?id= the skills it plays
                 return self._json({**svc.fx.preview_status(), **({"groups": svc.fx.preview_groups(_fx_id(q["id"]))} if q.get("id") else {})})
             if p == "/api/fx_buffs":  # the buff levels its renders can show, and which buff switches each effect on
@@ -1058,8 +1060,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 svc.fx.preview_cmd(b)
                 return self._json(svc.fx.preview_status())
             if p == "/api/preview_rect":  # the stage box in the app window's pixels: the player's window is laid over it ({show: false}: hidden)
-                svc.preview_place(b)
-                return self._json({"ok": True})
+                return self._json({"ok": True, **(svc.preview_place(b) or {})})
             if p == "/api/versus_live_stop":
                 svc.fx.stop_live()
                 return self._json(svc.fx.live_status())

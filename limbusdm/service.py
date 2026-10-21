@@ -61,8 +61,22 @@ class Service:
             d = float(b.get("dpr") or 1)
             c = b.get("clip")  # (the seen part: left, top, right, bottom in the box's CSS pixels)
             embed.place(hwnd, b["x"] * d, b["y"] * d, b["w"] * d, b["h"] * d, [v * d for v in c] if c else None)
-        else:
-            embed.hide(hwnd)
+            return {}
+        # (snap: its last picture is kept for the page to show while the window is away — a scroll moves the page)
+        pic = None
+        if b.get("snap"):
+            try:
+                pic = embed.grab(hwnd)
+            except Exception:
+                pic = None
+        embed.hide(hwnd)
+        if pic is None:
+            return {}
+        import io
+        buf = io.BytesIO()
+        pic.convert("RGB").save(buf, "JPEG", quality=85)
+        self._pv_snap = (getattr(self, "_pv_snap", (0, b""))[0] + 1, buf.getvalue())
+        return {"snap": f"/api/preview_snap?n={self._pv_snap[0]}"}
 
     def __init__(self, data_dir: str):
         self.data_dir = data_dir

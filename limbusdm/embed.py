@@ -36,6 +36,22 @@ def place(hwnd: int, x: int, y: int, w: int, h: int, clip=None):
         _u.EnableWindow(hwnd, False)  # (clicks on the picture don't take the keys from the page)
 
 
+def grab(hwnd: int):
+    """The window's picture as it is on the screen now (a PIL image), None when it isn't shown."""
+    if not _u or not hwnd or not _u.IsWindowVisible(hwnd):
+        return None
+    from PIL import ImageGrab
+    old = _u.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))  # (screen pixels, as the grab reads them)
+    try:
+        r = wintypes.RECT()
+        if not _u.GetWindowRect(hwnd, ctypes.byref(r)) or r.right - r.left < 8 or r.bottom - r.top < 8:
+            return None
+        return ImageGrab.grab(bbox=(r.left, r.top, r.right, r.bottom), all_screens=True)
+    finally:
+        if old:
+            _u.SetThreadDpiAwarenessContext(ctypes.c_void_p(old))
+
+
 def hide(hwnd: int):
     if _u and hwnd:
         _u.ShowWindow(hwnd, SW_HIDE)

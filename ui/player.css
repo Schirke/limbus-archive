@@ -40,6 +40,7 @@
 .pl-badge.vid { border-color: var(--hot); color: var(--hot); }
 @keyframes plPulse { 50% { opacity: .25; } }
 .pl-stage { position: relative; aspect-ratio: 16 / 9; width: min(100%, max(420px, calc((100vh - 330px) * 16 / 9))); margin-inline: auto; background: #080605; border: 1px solid #6b4a2c; overflow: hidden; }
+.pl-snap { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
 .pl-stage video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; object-fit: contain; }
 .pl-overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; background: rgba(8, 6, 5, .9); padding: 20px; z-index: 2; }
 .pl-overlay[hidden] { display: none; }
