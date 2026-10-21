@@ -1710,6 +1710,7 @@ button.sndplay:hover, .sndrow.on button.sndplay, button.sndplay.on { border-imag
 .sndtxt { flex: 1; min-width: 0; }
 .sndtxt b { font: 18px var(--snd-b); letter-spacing: .08em; text-transform: uppercase; font-weight: normal; color: var(--cream); }
 .sndtxt b.mono { font: 13px Consolas, monospace; letter-spacing: 0; text-transform: none; }
+.sndtxt b[data-from] { cursor: pointer; } .sndtxt b[data-from]:hover { color: var(--gold); text-decoration: underline; }
 .sndrow.on .sndtxt b { color: var(--gold); } .sndrow.on .sndtxt > div { color: #fff; }
 .sndtxt small { font-size: 13px; color: var(--muted); }
 .sndwhere { display: block; font: 13px var(--snd-b); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-decoration: none; margin-top: 2px; }

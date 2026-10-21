@@ -166,7 +166,7 @@ function sndMore(first) {
     return `<div class="sndrow${sndKey(r) === playing ? " on" : ""}" data-key="${esc(sndKey(r))}">
       <button class="sndplay" data-play="${n}" aria-label="Play">${SND_PLAY}</button>
       ${pic ? `<img class="sndpic" src="${imgThumb(pic)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
-      <div class="sndtxt">${title ? `<b>${esc(title)}</b>${sub ? ` <small>${esc(sub)}</small>` : ""}` : `<b class="mono">${esc(name)}</b>`}
+      <div class="sndtxt">${title ? `<b data-from="${esc(title)}" title="Only this speaker's lines">${esc(title)}</b>${sub ? ` <small>${esc(sub)}</small>` : ""}` : `<b class="mono">${esc(name)}</b>`}
         ${text ? `<div>${esc(text)}</div>` : ""}
         ${where ? `<a class="sndwhere" href="${sndHash(where)}">${esc(where.map((w) => w.split(" · ")[0]).join(" / "))}</a>` : ""}</div>
       ${title ? `<span class="sndname mono">${esc(name)}</span>` : ""}<span class="sndlen mono">${sndT(ms)}</span>
@@ -182,6 +182,12 @@ function sndMore(first) {
     if (snd.key === sndKey(r) && a && !a.paused) return a.pause();
     snd.all = false;
     sndPlay(+b.dataset.play, true);
+  }; });
+  // a speaker's name: search their own lines (from:)
+  el.querySelectorAll("[data-from]:not([data-on])").forEach((b) => { b.dataset.on = "1"; b.onclick = () => {
+    const w = b.dataset.from;
+    snd.q = `from:${/[\s"]/.test(w) ? `"${w.replace(/"/g, "")}"` : w}`;
+    sndDraw();
   }; });
   el.querySelectorAll("[data-save]:not([data-on])").forEach((b) => { b.dataset.on = "1"; b.onclick = () => { const r = snd.rows[+b.dataset.save]; exportObj({ bank: r[1], i: r[2] }); }; });
   sndMark();

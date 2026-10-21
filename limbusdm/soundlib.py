@@ -7,7 +7,7 @@ import re
 
 from .quiz import _rows, _text, _where
 
-VERSION = 6
+VERSION = 7
 SAVE_MAX = 500  # sounds one "Save folder" writes at most (Battle effects: ~9000)
 SEARCH_MAX = 3000  # (the page shows them 200 at a time)
 FX, STORY, VOICE, OST = "Sound Effects", "Story", "Voicefiles", "Soundtracks"
@@ -22,6 +22,12 @@ def _story_where(stem: str) -> tuple[float, str]:
         return int(m.group(1)) + 0.3, f"Canto {int(m.group(1))} RPG"
     order, label = _where(stem)
     return (order, label) if label != "Story" else (99.0, "Other story")
+
+
+def _scene_order(name: str) -> str:
+    """A story file's letter after its number in story order: B (before the fight), A (after it), I (between)."""
+    m = re.match(r"(\S*?\d+)([ABI])(?![A-Za-z0-9])(.*)", name)
+    return f"{m[1].lower()}{'BAI'.index(m[2])}{m[3].lower()}" if m else name.lower()
 
 
 def _sinner_of(uid: int) -> str:
@@ -51,12 +57,12 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
     for name in TOP:
         folder(name)
 
-    def put(path, s, title="", sub="", text="", key=None, order=None):
+    def put(path, s, title="", sub="", text="", key=None, order=None, pic=None):
         b = bank_n.setdefault(s[0], len(banks))
         if b == len(banks):
             banks.append(s[0])
         node = folder(*path, order=order)
-        node.setdefault("items", []).append([b, s[1], s[2], s[3], title, sub, text, key])
+        node.setdefault("items", []).append([b, s[1], s[2], s[3], title, sub, text, key, pic])
 
     # who says what: the voice tables, the story's lines
     voice = {str(r["id"]).lower(): r for sub in ("PersonalityVoiceDlg", "EGOVoiceDig", "BattleAnnouncerDlg")
@@ -95,10 +101,13 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
         t = rows.get(line) or {}
         who = _text(t.get("teller") or (codes.get(str(t.get("model") or "")) or {}).get("name"))
         folder(STORY, label, order=order)
-        put([STORY, label, scene], s, who, _text(t.get("title")), _text(t.get("content")), line if line is not None else 1e9)
         pic = (models or {}).get(str(t.get("model") or "")) or (portraits or {}).get(who)  # (the line's own model first: two can share a name)
-        if pic:
-            folder(STORY, label, scene).setdefault("pics", {})[who] = pic
+        put([STORY, label, scene], s, who, _text(t.get("title")), _text(t.get("content")), line if line is not None else 1e9, pic=pic)
+        if pic:  # (the folder's "who speaks": each face once, a second one of a name by its title)
+            pics = folder(STORY, label, scene).setdefault("pics", {})
+            if pic not in pics.values():
+                k = who if who not in pics else " · ".join(x for x in (who, _text(t.get("title"))) if x)
+                pics[k if k not in pics else f"{who} ({len(pics) + 1})"] = pic
 
     seen = set()
     for s in samples:
@@ -158,11 +167,13 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
         if "items" in node:
             node["items"].sort(key=lambda it: (it[7] if it[7] is not None else 0, it[2].lower()))
             for it in node["items"]:
-                it.pop()
+                del it[7]  # (the order key)
+                if it[-1] is None:
+                    it.pop()
         kids = node.get("kids") or []
         for k in kids:
             tidy(k)
-        kids.sort(key=lambda k: (k.get("o", 50), k["name"].lower()))
+        kids.sort(key=lambda k: (k.get("o", 50), _scene_order(k["name"])))
         for k in kids:
             k.pop("o", None)
         if not kids:
@@ -198,19 +209,21 @@ def items(db: dict, node: dict) -> list:
 
 
 def search(db: dict, q: str, limit: int = SEARCH_MAX, path: list[str] | None = None) -> list:
-    """Sounds whose name, speaker or text has every word of q (inside the folder at path, if given)."""
-    words, out = q.lower().split(), []
+    """Sounds whose name, speaker or text has every word of q (inside the folder at path, if given); from:name keeps one speaker."""
+    who = [(a or b).lower() for a, b in re.findall(r'(?i)\bfrom:(?:"([^"]+)"|(\S+))', q)]
+    words, out = re.sub(r'(?i)\bfrom:(?:"[^"]+"|\S+)', " ", q).lower().split(), []
     root = find(db, path or [])
 
     def walk(node, path):
         for it in node.get("items") or []:
             hay = f"{it[2]} {it[4]} {it[5]} {it[6]}".lower()
-            if all(w in hay for w in words):
-                out.append([path, db["banks"][it[0]], *it[1:], (node.get("pics") or {}).get(it[4]) or node.get("img") or ""])
+            if all(w in hay for w in words) and all(w in it[4].lower() for w in who):
+                pic = it[7] if len(it) > 7 else (node.get("pics") or {}).get(it[4]) or node.get("img") or ""
+                out.append([path, db["banks"][it[0]], *it[1:7], pic])
                 if len(out) >= limit:
                     return True
         return any(walk(k, path + [k["name"]]) for k in node.get("kids") or [])
 
-    if words and root:
+    if (words or who) and root:
         walk(root, list(path or []))
     return out
