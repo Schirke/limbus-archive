@@ -216,6 +216,10 @@ routes.gamebuff = async (args = []) => {
       if (!x.fx.length && by.get(x.name) === x) by.delete(x.name);
     }
     gb.pool = [...by.values()];
+    // effects that look the same (/api/buffs "alike"): never offered together, either name counts when typed
+    const grp = new Map();
+    ((r || {}).alike || []).forEach((g, i) => g.forEach((n) => grp.set(n, i)));
+    for (const x of gb.pool) x.look = x.fx.map((n) => grp.has(n) ? grp.get(n) : n);
     gb.vid = (r || {}).videos || {};
     if (!r) setTimeout(() => { gb.pool = null; });  // (not read: asked again the next time)
   }
@@ -250,11 +254,12 @@ function gbRound() {
   for (let k = 0; k < 40 && (!ans || g.asked.has(ans.key)); k++) ans = g.pool[Math.floor(g.rnd() * g.pool.length)];
   g.asked.add(ans.key);
   // wrong answers: others of its kind (a buff among buffs)
-  const same = gzMix(g.pool.filter((x) => x !== ans && x.type === ans.type), g.rnd), rest = gzMix(g.pool.filter((x) => x !== ans && x.type !== ans.type), g.rnd);
+  const same = gzMix(g.pool.filter((x) => x !== ans && x.type === ans.type && !gbLike(x, ans)), g.rnd), rest = gzMix(g.pool.filter((x) => x !== ans && x.type !== ans.type && !gbLike(x, ans)), g.rnd);
   Object.assign(g, { ans, fx: ans.fx[Math.floor(g.rnd() * ans.fx.length)], opts: gzMix([ans, ...same.concat(rest).slice(0, 3)], g.rnd), hints: {}, done: null });
   gbDraw();
 }
 
+const gbLike = (a, b) => !!a && !!b && a.look.some((l) => b.look.includes(l));
 const gbWorth = (g) => Math.max(100, GB_WORTH - GB_HINT * Object.keys(g.hints).length) * (g.hard ? 2 : 1);
 
 function gbDraw() {
@@ -290,7 +295,7 @@ function gbDraw() {
 }
 
 function gbAnswer(key) {
-  const g = gb.game, ok = key === g.ans.key;
+  const g = gb.game, ok = key === g.ans.key || gbLike(g.ans, g.pool.find((x) => x.key === key));
   if (g.done) return;
   gzScore(g, ok, ok ? gbWorth(g) : 0, { ans: g.ans, pick: key, said: key || "—", hints: Object.keys(g.hints).length, clean: !Object.keys(g.hints).length });
   gbDraw();

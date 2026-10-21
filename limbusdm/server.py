@@ -797,7 +797,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     return self._json(st)
                 lst = [{**b, "iconUrl": links.thumb(b.get("icon") or ""), "who": [{**w, "picUrl": links.thumb(w.get("pic") or ""),
                         "appUrl": links.enemy_thumb(w.get("app") or "")} for w in b.get("who") or []]} for b in svc.buff_fx.db()["list"]]
-                return self._json({"list": lst, **st})
+                return self._json({"list": lst, **st, "alike": svc.buff_fx.alike()})
             if p == "/api/buff_video":
                 full = svc.buff_fx.video(q.get("name", ""))
                 return self._file_live(full, "video/webm") if full else self._json({"error": "not rendered"}, 404)

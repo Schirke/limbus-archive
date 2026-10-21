@@ -303,12 +303,52 @@ def _blank(ff: str, path: str) -> bool:
     return bool(out) and max(out) < 26
 
 
+LOOK = 48  # side of a video's look: its frames averaged, alpha over black
+ALIKE = 0.08  # looks closer than this are one effect (two models' copies 0-0.05, different icons in one frame from 0.11)
+
+
+def _look(ff: str, path: str) -> bytes | None:
+    """A video's frames (up to ~24) averaged into a LOOK×LOOK RGB picture."""
+    import subprocess
+    try:
+        raw = subprocess.run([ff, "-v", "error", "-c:v", "libvpx-vp9", "-i", path, "-vf", f"scale={LOOK}:{LOOK}:flags=area,format=rgba",
+                              "-f", "rawvideo", "-"], capture_output=True, timeout=120,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout
+    except Exception:
+        return None
+    size = LOOK * LOOK * 4
+    n = len(raw) // size
+    if not n:
+        return None
+    acc = [0] * (LOOK * LOOK * 3)
+    picked = range(0, n, max(1, n // 24))
+    for j in picked:
+        f = raw[j * size:(j + 1) * size]
+        for i in range(LOOK * LOOK):
+            a = f[i * 4 + 3]
+            for c in range(3):
+                acc[i * 3 + c] += f[i * 4 + c] * a
+    k = len(picked) * 255
+    return bytes(min(255, round(v / k)) for v in acc)
+
+
+def _shrink(x: bytes, to: int = 8) -> list[float]:
+    s = LOOK // to
+    return [sum(x[((by * s + y) * LOOK + bx * s + xx) * 3 + c] for y in range(s) for xx in range(s)) / (s * s)
+            for by in range(to) for bx in range(to) for c in range(3)]
+
+
+def _apart(a, b) -> float:
+    return sum(abs(x - y) for x, y in zip(a, b)) / max(1, sum(a) + sum(b))
+
+
 class BuffFx:
     """Effect videos: made on request, kept until the next patch."""
 
     def __init__(self, svc):
         self.svc = svc
         self.lock = threading.Lock()
+        self.look_lock = threading.Lock()
         self.queue: list[str] = []
         self.current: list[str] = []
         self.busy = False
@@ -352,6 +392,59 @@ class BuffFx:
                     "current": list(self.current), "busy": self.busy, "error": self.error,
                     "available": bool(viewer.viewer_exe()),
                     "videos": {names[f]: links.buff_video(names[f]) for f in have if f in names}}  # (made ones)
+
+    def alike(self) -> list[list[str]]:
+        """Effects that look the same: one picture, or numbered stages of one buff (looks kept in looks.json)."""
+        with self.look_lock:
+            return self._alike()
+
+    def _alike(self) -> list[list[str]]:
+        import base64
+        d = self.folder()
+        if not os.path.isdir(d):
+            return []
+        names = {viewer._safe_name(n): n for n in self.db()["fx"]}
+        path = os.path.join(d, "looks.json")
+        try:
+            with open(path, encoding="utf-8") as f:
+                kept = json.load(f)
+        except (OSError, ValueError):
+            kept = {}
+        looks, ff, changed = {}, None, False
+        for fn in sorted(os.listdir(d)):
+            if not fn.endswith(".webm") or fn[:-5] not in names:
+                continue
+            st = os.stat(os.path.join(d, fn))
+            key = f"{st.st_size}:{int(st.st_mtime)}"
+            if (kept.get(fn) or [None])[0] != key:
+                if ff is None:
+                    import imageio_ffmpeg
+                    ff = imageio_ffmpeg.get_ffmpeg_exe()
+                x = _look(ff, os.path.join(d, fn))
+                kept[fn], changed = [key, base64.b64encode(x).decode() if x else ""], True
+            if kept[fn][1]:
+                looks[names[fn[:-5]]] = base64.b64decode(kept[fn][1])
+        if changed:
+            with open(path + ".tmp", "w", encoding="utf-8") as f:
+                json.dump(kept, f)
+            os.replace(path + ".tmp", path)
+        ids: dict[str, set] = {}
+        for b in self.db()["list"]:
+            for n in b["fx"]:
+                ids.setdefault(n, set()).add(b["id"])
+        stem = lambda n: re.sub(r"[\s_]*\d+$", "", n)
+        kin = lambda a, b: any(x.startswith(y) or y.startswith(x) for x in ids.get(a, ()) for y in ids.get(b, ()))
+        top = {n: _shrink(x) for n, x in looks.items()}
+        ns, up = sorted(looks), {}
+        find = lambda n: n if up.get(n, n) == n else find(up[n])
+        for i, a in enumerate(ns):
+            for b in ns[i + 1:]:
+                if (stem(a) == stem(b) and kin(a, b)) or (_apart(top[a], top[b]) < ALIKE and _apart(looks[a], looks[b]) < ALIKE):
+                    up[find(b)] = find(a)
+        groups: dict[str, list] = {}
+        for n in ns:
+            groups.setdefault(find(n), []).append(n)
+        return [g for g in groups.values() if len(g) > 1]
 
     def start(self, names: list[str] | None = None, first: bool = False):
         """Queue these effects (None: every one not made yet); `first`: ahead of the ones waiting."""
