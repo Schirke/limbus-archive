@@ -5,14 +5,18 @@ const MP_KEEP = "mirror";
 const MP_MODES = [["Normal", 5, "0"], ["Hard", 5, "1"], ["Hard", 10, "2"], ["Hard", 15, "3"]];  // (name, floors, the game's typeIndex)
 const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g" };
 // a keyword chip's picture: the status icon, or the damage type's for Hit / Penetrate / Slash (the name on hover)
-const mpKwIco = (k) => { const atk = { Hit: "Blunt", Penetrate: "Pierce", Slash: "Slash" }[k];
-  return atk ? ico(`atk_${atk}`, "s22", mpKw(k), mpKw(k)) : ico(`st_${k}`, "s22", mpKw(k), mpKw(k)); };
+const MP_ATK = { Hit: "Blunt", Penetrate: "Pierce", Slash: "Slash" };
+const mpKwIco = (k) => (MP_ATK[k] ? ico(`atk_${MP_ATK[k]}`, "s22", mpKw(k), mpKw(k)) : ico(`st_${k}`, "s22", mpKw(k), mpKw(k)));
+// the game's gift search order: sins' statuses, then damage types
+const MP_KW_ORDER = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath", "Charge", "Slash", "Penetrate", "Hit"];
+const mpKwRank = (k) => { const i = MP_KW_ORDER.indexOf(k); return i < 0 ? 50 : i; };
+const mpKwCmp = (a, b) => (!a - !b) || mpKwRank(a) - mpKwRank(b) || mpKw(a).localeCompare(mpKw(b));
 (() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {} }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
 const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want] })); } catch { /* not kept */ } };
 const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, tile: "", kw: "", tier: 0, desc: "" };
 const mpGi = (id, cls = "", info = true) => (mpG(id).tile ? `<img class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""} src="${mpG(id).tile}" loading="lazy">` : `<i class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""}></i>`);
 const MP_TAP = matchMedia("(hover: none)").matches;  // phones: a tap on a picker tile opens the gift's card
-const mpKw = (k) => ((UNITS.glossary || {})[k] || {}).name || statusName(k);
+const mpKw = (k) => MP_ATK[k] || ((UNITS.glossary || {})[k] || {}).name || statusName(k);
 // which floor list of a pack a floor reads
 const mpSpec = (f) => (mp.mode === 0 ? ["0", f] : f < 5 ? ["1", f] : f < 10 ? ["2", -1] : ["3", -1]);
 const mpAllowed = (p, f) => { const [d, lf] = mpSpec(f), fl = p.floors[d]; return !!fl && (lf < 0 || fl.includes(lf)); };
@@ -95,12 +99,12 @@ function mpPicker() {
   const N = MP_MODES[mp.mode][1], avail = new Set(MIRROR.packs.filter((p) => [...Array(N).keys()].some((f) => mpAllowed(p, f))).flatMap((p) => [...p.pool, ...p.excl]).concat(Object.keys(MIRROR.fus).map(Number))
     .concat(Object.keys(MIRROR.gifts).filter((g) => MIRROR.gifts[g].how && (MIRROR.gifts[g].min || 0) < N).map(Number)));
   const all = Object.entries(MIRROR.gifts).filter(([id]) => avail.has(+id));
-  const kws = [...new Set(all.map(([, g]) => g.kw).filter(Boolean))].sort((a, b) => mpKw(a).localeCompare(mpKw(b)));
+  const kws = [...new Set(all.map(([, g]) => g.kw).filter(Boolean))].sort(mpKwCmp);
   const q = mp.q.trim().toLowerCase();
   const list = all.filter(([id, g]) => (!mp.kw || g.kw === mp.kw || (mp.kw === "-" && !g.kw)) && (!q || g.name.toLowerCase().includes(q)) && (mp.only !== "fuse" || MIRROR.fus[id])
     && (mp.only !== "pack" || MIRROR.excl.has(+id)) && (mp.only !== "deep" || MIRROR.deep.has(+id)));
-  const key = { kw: (g) => (g.kw ? mpKw(g.kw) : "~") + (9 - g.tier), tier: (g) => String(9 - g.tier) + g.name, name: (g) => g.name }[mp.sort];
-  list.sort((a, b) => key(a[1]).localeCompare(key(b[1])));
+  const key = { kw: (g) => String(9 - g.tier) + g.name, tier: (g) => String(9 - g.tier) + g.name, name: (g) => g.name }[mp.sort];
+  list.sort((a, b) => (mp.sort === "kw" && mpKwCmp(a[1].kw, b[1].kw)) || key(a[1]).localeCompare(key(b[1])));
   const tg = (on, attr, label, cls = "") => `<button class="toggle ${cls} ${on ? "on" : ""}" ${attr}>${label}</button>`;
   return `<div class="card mpcard"><input type="text" id="mpq" placeholder="Search a gift…" value="${esc(mp.q)}">
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}${N > 10 ? tg(mp.only === "deep", 'data-o="deep" title="Gifts found on floors 11–15 only"', "Floors 11–15") : ""}</div>
