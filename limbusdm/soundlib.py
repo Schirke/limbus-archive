@@ -7,7 +7,7 @@ import re
 
 from .quiz import _rows, _text, _where
 
-VERSION = 7
+VERSION = 8
 SAVE_MAX = 500  # sounds one "Save folder" writes at most (Battle effects: ~9000)
 SEARCH_MAX = 3000  # (the page shows them 200 at a time)
 FX, STORY, VOICE, OST = "Sound Effects", "Story", "Voicefiles", "Soundtracks"
@@ -25,9 +25,9 @@ def _story_where(stem: str) -> tuple[float, str]:
 
 
 def _scene_order(name: str) -> str:
-    """A story file's letter after its number in story order: B (before the fight), A (after it), I (between)."""
-    m = re.match(r"(\S*?\d+)([ABI])(?![A-Za-z0-9])(.*)", name)
-    return f"{m[1].lower()}{'BAI'.index(m[2])}{m[3].lower()}" if m else name.lower()
+    """A story file's letter after its number in story order: B (before the fight), I (between), A (after it)."""
+    m = re.match(r"(\S*?\d+)([ABI])(\d*)(?![A-Za-z0-9])(.*)", name)  # (I2, I3: the next intermissions)
+    return f"{m[1].lower()}{'BIA'.index(m[2])}{m[3].zfill(2)}{m[4].lower()}" if m else name.lower()
 
 
 def _sinner_of(uid: int) -> str:
@@ -123,8 +123,14 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
             put([OST, group], s, t["name"] if t else "", " · ".join(x for x in ((t or {}).get("where"), (t or {}).get("by")) if x),
                 key=(t["name"] if t else "~" + name).lower(), order={"Battle themes": 0, "Story": 1}.get(group, 2))
         elif bank.startswith(("SFX", "UI")) or bank.startswith("CP10-RPG"):
-            group = ("Story" if bank.startswith(("SFX_Story", "CP10-RPG")) else "Interface" if bank.startswith(("UI", "SFX_Title"))
-                     else "Battle")
+            if "_battleui_" in low:  # (the battle interface is split over the UI and SFX banks: one set, each name once)
+                if low in seen:
+                    continue
+                seen.add(low)
+                group = "Interface"
+            else:
+                group = ("Story" if bank.startswith(("SFX_Story", "CP10-RPG")) else "Interface" if bank.startswith(("UI", "SFX_Title"))
+                         else "Battle")
             put([FX, group], s, order={"Battle": 0, "Story": 1}.get(group, 2))
         elif bank.startswith("Voice"):
             r = voice.get(low) or {}
