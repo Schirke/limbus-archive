@@ -1315,9 +1315,22 @@ def _char_links(svc) -> dict:
 
     def unit(c):
         return {**c, "spine": [_spine_links(x) for x in c["spine"]], "clips": links.owner_clips(c["id"])}
+    groups = [{**g, "kinds": {k: [dict(item(x)) for x in arr] for k, arr in g["kinds"].items()}} for g in ch.get("groups", [])]
+    # a battle look's Spine goes into its entry (tabs), not a row of its own
+    looks = {x["app"]: x for g in groups for arr in g["kinds"].values() for x in arr if x.get("app")}
+    for g in groups:
+        for k, arr in g["kinds"].items():
+            keep = []
+            for x in arr:
+                if not x.get("app") and x.get("of") in looks:
+                    looks[x["of"]].setdefault("spine", []).append(x)
+                else:
+                    keep.append(x)
+            g["kinds"][k] = keep
+        g["kinds"] = {k: arr for k, arr in g["kinds"].items() if arr}
     out = {**ch, "sinners": [{**s, **{k: [unit(c) for c in s.get(k) or []] for k in ("ids", "egos", "events")},
                               "spine": [_spine_links(x) for x in s.get("spine") or []]} for s in ch.get("sinners", [])],
-           "groups": [{**g, "kinds": {k: [item(x) for x in arr] for k, arr in g["kinds"].items()}} for g in ch.get("groups", [])]}
+           "groups": [g for g in groups if g["kinds"]]}
     svc._chars_linked = (ch, spines, out)
     return out
 

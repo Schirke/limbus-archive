@@ -658,7 +658,8 @@ def _anim_packs(ex, got: dict) -> list:
     read = lambda k, empty: ex._stored(got[k]) if k in got else empty  # noqa: E731
     ch = read("/api/characters", {})
     units = [c for s in ch.get("sinners") or [] for c in s["ids"] + s["egos"] + (s.get("events") or [])]
-    todo = [x for c in units for x in c["spine"]] + [x for s in ch.get("sinners") or [] for x in s.get("spine") or []] + [x for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("files")]
+    todo = [x for c in units for x in c["spine"]] + [x for s in ch.get("sinners") or [] for x in s.get("spine") or []]
+    todo += [y for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr for y in x.get("spine") or []] + [x for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("files")]
     keys, seen = [], set()
 
     def skeleton(files):

@@ -562,7 +562,7 @@ class Service:
     def characters(self) -> dict:
         """{"sinners": [...], "spine_other": {...}}"""
         import re
-        from .characters import FOOLS, bundle_date, owner_bundles, season_label, spine_place, tag_label
+        from .characters import FOOLS, bundle_date, owner_bundles, season_label, spine_owner, spine_place, tag_label
         sid = self.latest_snapshot_id()
         snap = self.load_snapshot(sid) if sid else None
         if not snap:
@@ -625,8 +625,14 @@ class Service:
             e["spine"] = e["spine"] + kid_spine.pop(x["sinner"], [])
             if e["bundles"]:
                 sinners.setdefault(x["sinner"], {"ids": [], "egos": []}).setdefault("events", []).append(e)
-        for n, arr in sinner_spine.items():  # a Sinner's old Spine no Identity names
-            sinners.setdefault(n, {"ids": [], "egos": []})["spine"] = sorted(arr, key=lambda x: x["base"].lower())
+        for n, arr in sinner_spine.items():  # a Sinner's old Spine: on its Identity's card when its name says which, else apart
+            s = sinners.setdefault(n, {"ids": [], "egos": []})
+            loose = []
+            for x in sorted(arr, key=lambda x: x["base"].lower()):
+                owner = spine_owner(x.get("base") or "", n, s["ids"])
+                e = next((e for e in s["ids"] if e["id"] == owner), None)
+                (e["spine"] if e else loose).append(x)
+            s["spine"] = loose
         rest += [x for arr in kid_spine.values() for x in arr]
         out_sinners = [{"sid": s, "name": nm.sinner_name(s), "events": [], "spine": [], **v} for s, v in sorted(sinners.items()) if 1 <= s <= 12]
 

@@ -124,8 +124,9 @@ def spine_place(bundle: str, base: str) -> tuple[str, object] | None:
         return "kid", SPINE_SINNERS.index(m.group(1)) + 1
     if base.startswith("aff25_"):
         return "group", FOOLS
-    if bundle.startswith("spine_s1_"):
-        return "group", "Season 1 illustrations"
+    if bundle.startswith("spine_s1_"):  # (Season 1 Identities' animated art: its Sinner's, else a group)
+        n = _spine_sinner(base)
+        return ("sinner", n) if n else ("group", "Season 1 illustrations")
     if bundle.startswith("sd_deadscene"):
         return "group", "Death scenes"
     m = re.match(r"sd_(?:p|ego)(\d+)_assets", bundle)
@@ -134,6 +135,39 @@ def spine_place(bundle: str, base: str) -> tuple[str, object] | None:
     if bundle.startswith("shaderv2") and "meursault" in base.lower():
         return "sinner", SPINE_SINNERS.index("meursault") + 1
     return None
+
+
+_SPINE_SINNER_WORDS = [("yisang", "yis"), ("faust", "fau"), ("donquixote", "don"), ("ryoshu", "ryo"), ("meursault", "meu", "mer", "maur"),
+                       ("honglu", "hongju", "honhlu", "hong"), ("heathcliff", "heath"), ("ishmael", "ismael", "ism"),
+                       ("rodion", "rodya"), ("sinclair", "sinc"), ("outis", "otis"), ("gregor", "greg")]
+# words in a Spine's name → words of an Identity's title (only these: a guess on other words would put art on the wrong card)
+SPINE_ORGS = {"wcorp": "w corp", "rcorp": "r corp", "gcorp": "g corp", "ncorp": "n corp", "kurokumo": "kurokumo",
+              "darkcloud": "kurokumo", "seven": "seven assoc", "zwei": "zwei assoc", "shi": "shi assoc", "liu": "liu assoc",
+              "liuasso": "liu assoc", "blade": "blade lineage", "mexico": "los mariachis"}
+_SPINE_PARTS = {"idle", "default", "back", "front", "fx", "illust", "illust2", "2"}
+
+
+def _spine_words(base: str) -> list[str]:
+    b = re.sub(r"^default(?=[a-z])", "default_", base.lower())  # ("defaultdonquixote")
+    return [w for w in re.split(r"[_\s#-]+|(?<=[a-z])(?=\d)|(?<=\d)(?=[a-z])", b) if w]
+
+
+def _spine_sinner(base: str) -> int | None:
+    words = set(_spine_words(base))
+    hit = [i + 1 for i, names in enumerate(_SPINE_SINNER_WORDS) if words & set(names)]
+    return hit[0] if len(hit) == 1 else None
+
+
+def spine_owner(base: str, sinner: int, ids: list[dict]) -> int | None:
+    """The Identity a Sinner's loose Spine belongs to (by the organisation in its name; none = the LCB Sinner), or None."""
+    names = {w for w in _SPINE_SINNER_WORDS[sinner - 1]}
+    words = [w for w in _spine_words(base) if w not in names and w not in _SPINE_PARTS and not w.isdigit()]
+    if not words:
+        return next((x["id"] for x in ids if x["id"] % 100 == 1), None)
+    if len(words) != 1 or words[0] not in SPINE_ORGS:
+        return None
+    hit = [x["id"] for x in ids if SPINE_ORGS[words[0]] in (x.get("title") or "").lower().replace(".", "")]
+    return hit[0] if len(hit) == 1 else None
 
 
 def season_label(bundle: str) -> str:

@@ -1245,7 +1245,7 @@ function drawAnimTree() {
   if (f === "all" || f === "enemies" || f === "mine") {
     let g2 = "";
     anim.data.groups.forEach((g, gi) => {
-      const kinds = Object.entries(g.kinds).map(([k, arr]) => [k, arr.filter((x) => (f !== "mine" || (x.app && owned.has(String(x.app)))) && hit(`${g.label} ${k} ${x.name || ""} ${x.base} ${x.bundle}`))]).filter(([, arr]) => arr.length);
+      const kinds = Object.entries(g.kinds).map(([k, arr]) => [k, arr.filter((x) => (f !== "mine" || (x.app && owned.has(String(x.app)))) && hit(`${g.label} ${k} ${x.name || ""} ${x.base} ${x.bundle} ${(x.spine || []).map((s) => s.base).join(" ")}`))]).filter(([, arr]) => arr.length);
       if (!kinds.length) return;
       const n = kinds.reduce((a, [, arr]) => a + arr.length, 0);
       const open = q || f === "mine" || anim.open[`g${gi}`];
@@ -1254,7 +1254,7 @@ function drawAnimTree() {
       kinds.forEach(([k, arr]) => {
         g2 += `<div class="an-sub">${esc(k)}</div>` + arr.map((x) => x.app
           // a battle prefab: its skills with the game's effects
-          ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects">${animTile(x)}<div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
+          ? `<div class="an-it ${sel(`e${x.app}`)}" data-g="${gi}" data-k="${esc(k)}" data-e="${esc(x.app)}" title="Skills with effects">${animTile(x)}<div class="an-t">⚔ ${x.name ? esc(x.name) : esc(x.app)}<small>${x.name ? esc(x.app) : ""}${x.spine?.length ? " · spine" : ""}</small></div>${owned.has(String(x.app)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`
           : `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-g="${gi}" data-k="${esc(k)}" data-a="${x.atlas}" data-b="${esc(x.bundle)}">${animTile(x)}<div class="an-t">${x.name ? esc(x.name) : esc(x.base)}<small>${x.name ? esc(x.base) : "Spine"}</small></div></div>`).join("");
       });
     });
@@ -1336,10 +1336,11 @@ async function openAnimEntry(sel) {
     // an enemy / abnormality: its battle prefab's skills played with the game's effects
     const x = sel.enemy, c = { id: x.app, title: x.name || x.app.replace(/^\d+_|Appearance$/g, ""), enemy: true };
     anim.slots = {};
-    const tabs = [["fx", "Play"], ["mod", "Edit mod"]];
+    const tabs = [["fx", "Play"], ["mod", "Edit mod"], ...(x.spine || []).map((s, i) => [`spine${i}`, `Spine · ${s.base}`])];
     if (!tabs.some(([k]) => k === anim.tab)) anim.tab = "fx";
     recentAdd(sel, c.title, `${x.kind} · ${x.app}`);
     if (!await animHead(v, sel, { title: c.title, sub: `${x.kind} · ${x.app}`, pic: animEnemyThumb(x.app), tabs, cid: x.app })) return;
+    if (anim.tab.startsWith("spine")) return openSpine(x.spine[+anim.tab.slice(5)], $("#abody"));
     if (anim.tab === "mod") return openMod(c, $("#abody"), () => { anim.tab = "fx"; openAnimEntry(sel); });
     return plEligible(c) ? openPlay(c, $("#abody")) : openFx(c, $("#abody"));
   }
@@ -2734,7 +2735,7 @@ function vsChars() {
   return out;
 }
 const vsChar = (id) => vsChars().find((c) => c.id === String(id));
-const vsIcon = (id) => `/api/char_icon?id=${encodeURIComponent(id)}`;
+const vsIcon = (id) => `/api/char_icon?id=${encodeURIComponent(id)}&v=2`;  // (v: pictures of 4000xx came wrong before)
 // fallback picture from the database
 function vsImgErr(img) {
   const id = img.dataset.id || "", own = (anim.data && vsChar(id) || {}).owner || id;  // (a second form: its Identity's)
