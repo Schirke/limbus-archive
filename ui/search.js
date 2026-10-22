@@ -25,11 +25,29 @@ const sxEn = (s) => s == null || !LANG.id || !sx.back ? "" : (sx.back.m.get(Stri
 
 // ------------------------------------------------------------------ the box over everything
 const SX_ORDER = ["Pages", "Keywords", "Identities", "E.G.O", "Passives", "Skills", "Enemies", "Buff effects", "Announcers", "Story", "Music", "Games"];
-async function sxData() {
-  if (sx.rows && sx.rows.lang === LANG.id) return sx.rows;
-  const [, en, bf, mus, sto] = await Promise.all([units(), api("/api/enemies").catch(() => null), api("/api/buffs").catch(() => null),
-    api("/api/music").catch(() => []), api("/api/story").catch(() => null), sxBack(), api("/api/announcers").then((d) => { sx.ann = d.list || []; }).catch(() => { sx.ann = []; })]);
-  const thumbs = new Set(en?.thumbs || []), season = (x) => x.season && x.season < 100 ? ` · Season ${x.season}` : "";
+// each list joins the rows when it comes (onPart redraws the box): the database's rows don't wait for the slow lists
+function sxData(onPart) {
+  sx.onPart = onPart;
+  if (sx.rows && sx.rows.lang === LANG.id) return sx.rows.ready;
+  const rows = sx.rows = [], back = sxBack();
+  rows.lang = LANG.id;
+  const part = (p, make) => Promise.all([p, back]).then(([d]) => {
+    const add = make(d);
+    for (const r of add) { r.en = sxEn(r.t); r.nt = sxNorm(r.t); r.nk = sxNorm(r.k.join(" ") + " " + r.k.map(sxEn).join(" ")); }
+    rows.push(...add);
+    if (sx.rows === rows && rows.ready && rows.first) sx.onPart?.();
+  });
+  rows.ready = part(units(), sxUnitRows).then(() => { rows.first = 1; });
+  part(api("/api/enemies"), sxEnemyRows).catch(() => {});
+  part(api("/api/buffs"), (bf) => (bf?.list || []).map((b) => ({ g: "Buff effects", t: b.name, s: sxPlain(b.desc).split("\n")[0].slice(0, 70), pic: b.icon ? imgThumb(b.icon) : "", go: `#/buffs/${b.id}`, k: [b.name, b.id] }))).catch(() => {});
+  part(api("/api/music"), (mus) => (Array.isArray(mus) ? mus : []).map((m, n) => ({ g: "Music", t: m.name, s: [m.by, m.where].filter(Boolean).join(" · "), icon: "♪", play: n, k: [m.name, m.by, m.where] }))).catch(() => {});
+  part(api("/api/story"), sxStoryRows).catch(() => {});
+  part(api("/api/announcers"), (d) => (d?.list || []).map((a) => ({ g: "Announcers", t: a.name, s: `Announcer · ${a.lines.length} lines`, pic: a.tile, go: `#/announcers/${a.id}`, k: [a.name, "announcer"] }))).catch(() => {});
+  rows.ready.catch(() => { if (sx.rows === rows) sx.rows = null; });
+  return rows.ready;
+}
+function sxUnitRows() {
+  const season = (x) => x.season && x.season < 100 ? ` · Season ${x.season}` : "";
   const rows = [];
   // every keyword, buff and debuff the Identities' and E.G.O's texts name: opens the database searched by it
   const used = new Map(Object.keys(UNITS.keywords || {}).map((k) => [k, 1e6]));
@@ -57,29 +75,31 @@ async function sxData() {
   for (const x of UNITS.ids) rows.push({ g: "Identities", t: x.title, s: x.sinnerName + season(x), pic: x.pics.thumb, go: `#/db/ids/${x.id}`, k: [x.title, x.sinnerName, x.id] });
   for (const x of UNITS.egos) rows.push({ g: "E.G.O", t: x.name, s: `${x.sinnerName} · ${x.grade}`, pic: x.pics.thumb, go: `#/db/ego/${x.id}`, k: [x.name, x.sinnerName, x.grade, x.id] });
   rows.push(...own);
-  const seen = new Set();
+  for (const g of GM_GAMES) rows.push({ g: "Games", t: g[2], s: g[3], icon: "🎲", go: g[1], k: [g[2], g[3], "game"] });
+  for (const a of document.querySelectorAll("#nav a[href^='#/'], #subnav a[href^='#/']")) {
+    const t = a.textContent.trim().replace(/\s+/g, " ");
+    if (t && !a.hidden && !a.classList.contains("apponly")) rows.push({ g: "Pages", t, s: "Page", icon: "↗", go: a.getAttribute("href"), k: [t] });
+  }
+  return rows;
+}
+function sxEnemyRows(en) {
+  const thumbs = new Set(en?.thumbs || []), seen = new Set(), rows = [];
   for (const e of en?.list || []) {
     if (seen.has(e.name + "|" + e.group)) continue;
     seen.add(e.name + "|" + e.group);
     rows.push({ g: "Enemies", t: e.name, s: e.group + (e.kind ? ` · ${e.kind}` : ""), go: `#/enemies/${e.id}`, k: [e.name, e.group],
       pic: thumbs.has(e.app) ? `/api/enemy_thumb?app=${encodeURIComponent(e.app)}` : e.pic ? imgThumb(e.pic) : "" });
   }
-  for (const b of bf?.list || []) rows.push({ g: "Buff effects", t: b.name, s: sxPlain(b.desc).split("\n")[0].slice(0, 70), pic: b.icon ? imgThumb(b.icon) : "", go: `#/buffs/${b.id}`, k: [b.name, b.id] });
-  (Array.isArray(mus) ? mus : []).forEach((m, n) => rows.push({ g: "Music", t: m.name, s: [m.by, m.where].filter(Boolean).join(" · "), icon: "♪", play: n, k: [m.name, m.by, m.where] }));
+  return rows;
+}
+function sxStoryRows(sto) {
+  const rows = [];
   for (const c of [...(sto?.main || []), ...(sto?.other || [])]) {
     rows.push({ g: "Story", t: `${c.label} · ${c.title}`, s: [c.company, c.area].filter(Boolean).join(" · "), pic: c.tile || "", go: `#/story/main/${c.id}`, k: [c.label, c.title, c.company, c.area] });
     for (const e of c.eps || []) if (e.parts?.[0]) rows.push({ g: "Story", t: e.title || `Episode ${e.n}`, s: `${c.label} · episode ${e.n}`, minor: 1,
       pic: e.parts[0][5] || "", go: `#/story/read/${encodeURIComponent(e.parts[0][0])}`, k: [e.title, c.label] });
   }
-  for (const a of sx.ann || []) rows.push({ g: "Announcers", t: a.name, s: `Announcer · ${a.lines.length} lines`, pic: a.tile, go: `#/announcers/${a.id}`, k: [a.name, "announcer"] });
-  for (const g of GM_GAMES) rows.push({ g: "Games", t: g[2], s: g[3], icon: "🎲", go: g[1], k: [g[2], g[3], "game"] });
-  for (const a of document.querySelectorAll("#nav a[href^='#/'], #subnav a[href^='#/']")) {
-    const t = a.textContent.trim().replace(/\s+/g, " ");
-    if (t && !a.hidden && !a.classList.contains("apponly")) rows.push({ g: "Pages", t, s: "Page", icon: "↗", go: a.getAttribute("href"), k: [t] });
-  }
-  for (const r of rows) { r.en = sxEn(r.t); r.nt = sxNorm(r.t); r.nk = sxNorm(r.k.join(" ") + " " + r.k.map(sxEn).join(" ")); }
-  rows.lang = LANG.id;
-  return sx.rows = rows;
+  return rows;
 }
 function sxFindAll(q) {
   const w = sxWords(q);
@@ -118,9 +138,9 @@ function sxOpen() {
     location.hash = r.go;
     if (r.kw) setTimeout(() => { const i = $("#main input.dbq") || $("#main input"); if (i) { i.value = r.kw; i.dispatchEvent(new Event("input", { bubbles: true })); } }, 700);
   };
-  const draw = () => {
-    const q = inp.value.trim();
-    if (!sx.rows || sx.rows.lang !== LANG.id) { $("#sxres").innerHTML = `<div class="sxhint">Loading…</div>`; return; }
+  const draw = (keep) => {
+    const q = inp.value.trim(), was = keep && sx.items[sx.sel];
+    if (!sx.rows || sx.rows.lang !== LANG.id || !sx.rows.first) { $("#sxres").innerHTML = `<div class="sxhint">Loading…</div>`; return; }
     sx.items = [];
     const rx = sxRx(q), w = sxWords(q);
     let h = sxFindAll(q).map(([g, list]) => {
@@ -138,10 +158,10 @@ function sxOpen() {
     }
     $("#sxres").innerHTML = h || (q ? `<div class="sxhint">Nothing found.</div>` : `<div class="sxhint">Type a name in your language or in English.</div>`);
     $("#sxres").querySelectorAll(".sxrow").forEach((r) => { r.onmouseenter = () => sel(+r.dataset.i); r.onclick = () => go(sx.items[+r.dataset.i]); });
-    sel(0);
+    sel(was ? Math.max(0, sx.items.indexOf(was)) : 0);
   };
-  sxData().then(() => { if ($("#sxbox")) draw(); }).catch((e) => { $("#sxres").innerHTML = `<div class="sxhint">${esc(e.message)}</div>`; });
-  inp.oninput = draw;
+  sxData(() => { if ($("#sxbox") && inp.value.trim()) draw(true); }).then(() => { if ($("#sxbox")) draw(); }).catch((e) => { if ($("#sxbox")) $("#sxres").innerHTML = `<div class="sxhint">${esc(e.message)}</div>`; });
+  inp.oninput = () => draw();
   inp.onkeydown = (e) => {
     if (e.key === "ArrowDown") { e.preventDefault(); sel(sx.sel + 1); }
     else if (e.key === "ArrowUp") { e.preventDefault(); sel(sx.sel - 1); }
