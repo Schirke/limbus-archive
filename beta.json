@@ -1,6 +1,5 @@
 {
  "routes": [
-  "anim",
   "autobattler",
   "compare",
   "vsmirror"
