@@ -664,8 +664,13 @@ class Service:
         for x in self.battle_prefabs():
             b, info = x["bundle"], apps.get(x["app"])
             kind = info["kind"] if info else ("Boss / Abnormality" if "abnormality" in b.lower() else "Enemy")
+            fm = re.match(r"Fools_(\d+)_", x["app"])  # (April Fools' 2025: the Sinners in each other's bodies, Vergilius)
+            if fm and len(fm.group(1)) == 5:
+                kind, info = "Sinners", {**(info or {}), "name": nm.sinner_name(int(fm.group(1)[1:3]))}
+            elif fm:
+                kind = "Boss / Abnormality"
             siblings = by_bundle.get(b, set())
-            label, order = ((FOOLS, 0) if x["app"].split("_")[0] in fools else None) or (tag_label(b) or ((info["label"], info["order"]) if info else None)
+            label, order = ((FOOLS, 0) if fm or x["app"].split("_")[0] in fools else None) or (tag_label(b) or ((info["label"], info["order"]) if info else None)
                             or (next(iter(siblings)) if len(siblings) == 1 else (season_label(b), 0)))
             m = re.match(r"^s(\d+)_", b)
             date = bundle_date(b) or (season_end.get(m.group(1)) if m else None)
@@ -912,7 +917,8 @@ class Service:
         for bundle, name in sorted(rows):
             low = bundle.lower()
             if (re.match(r"^(?:sd_)?[pe]\d{5}_", bundle) or re.match(r"^sd_p\d+_", bundle) or re.match(r"^1\d{4}_", name)
-                    or any(k in low for k in ("produce", "skinpreview", "_temp_")) or bundle not in snap["bundles"]):
+                    or any(k in low for k in ("produce", "skinpreview", "_temp_")) and not name.startswith("Fools_")
+                    or bundle not in snap["bundles"]):  # (Fools_…: April Fools' 2025 looks, kept in a "temp" bundle)
                 continue
             out.setdefault(name, {"bundle": bundle, "app": name})
         return list(out.values())
