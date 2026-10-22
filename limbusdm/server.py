@@ -1054,11 +1054,11 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                     over.pop(cid, None)
                 T.save_tag_overrides(svc, over)
                 return self._json({"over": over})
-            if p == "/api/preview":  # {id, v} starts the player (set up once; the same one again is left as it is), {stop: 1} closes it
+            if p == "/api/preview":  # {id, v, view} starts the player (set up once; the same one again is left as it is), {stop: 1} closes it
                 if b.get("stop"):
                     svc.fx.preview_stop()
                     return self._json(svc.fx.preview_status())
-                return self._json(svc.fx.preview_start(_fx_id(b["id"]), _fx_variant(b), svc.app_handle()))
+                return self._json(svc.fx.preview_start(_fx_id(b["id"]), _fx_variant(b), svc.app_handle(), str(b.get("view") or "")))
             if p == "/api/preview_cmd":  # one command for the player (viewer.Renderer.preview_cmd)
                 svc.fx.preview_cmd(b)
                 return self._json(svc.fx.preview_status())

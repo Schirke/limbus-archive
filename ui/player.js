@@ -14,12 +14,15 @@ const plAuto = () => { try { return localStorage.getItem(PL_AUTO_KEY) === "1"; }
 const pl = { c: null, site: false, group: "", names: [], st: null, state: null, key: "", poll: 0, rect: 0, shown: "", paused: false, loop: true,
   speed: 1, scrub: false, sets: null, ready: false, idle: 0, video: null, rendering: null, seekTo: null, seekCmd: 0, seekAt: 0, sending: false, again: null };
 
-// a character the player can show: Identities, their second forms and enemies (Skills only); E.G.O keep the list of videos
-const plEligible = (c) => !!c.owner || c.enemy || /^\d+$/.test(String(c.id)) && String(c.id)[0] !== "2";
+// a character the player can show: Identities, their second forms; enemies and E.G.O (Skills only: an E.G.O's cut-ins, then
+// its corroded form's skills)
+const plEligible = (c) => !!c.owner || c.enemy || /^\d+$/.test(String(c.id));
+const plEgo = (c) => /^2\d{4}$/.test(String(c?.id));
+const plView = (n) => /^SkillViewEGO_/.test(n);
 const plMode = () => (PLAY_MODES.includes(anim.tab) ? anim.tab : "fx");
 
 function plModeBar(c) {
-  return `<span class="seg pl-modes">${PL_MODE_NAMES.filter(([k]) => !c?.enemy || k === "fx").map(([k, l]) => `<button class="toggle ${plMode() === k ? "on" : ""}" data-mode="${k}">${l}</button>`).join("")}</span>`;
+  return `<span class="seg pl-modes">${PL_MODE_NAMES.filter(([k]) => !c?.enemy && !plEgo(c) || k === "fx").map(([k, l]) => `<button class="toggle ${plMode() === k ? "on" : ""}" data-mode="${k}">${l}</button>`).join("")}</span>`;
 }
 function plModeClicks(root) {
   root.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { anim.tab = b.dataset.mode; openAnimEntry(anim.sel); });
@@ -38,7 +41,7 @@ const plBadge = (name) => {
   const m = /(?:^|_)S(\d+)(?:_\d{5})?$/.exec(name);
   const slot = m ? plSlot(m[1]) : "";
   const k = /^Skill (\d)/.exec(slot);
-  return k ? k[1] : /^Defense/.test(slot) ? "D" : "·";
+  return k ? k[1] : /^Defense/.test(slot) ? "D" : plView(name) ? "E" : "·";
 };
 const plWhole = (name) => /(?:^|_)S\d+(?:_\d{5})?$/.test(name);
 
@@ -57,13 +60,16 @@ async function openPlay(c, body) {
   clearTimeout(anim.fxTimer);
   plStop(false);
   const site = typeof siteDl === "function";
-  Object.assign(pl, { c, site, group: "", ready: false, picked: false, state: null, key: "", idle: 0, rendering: null });
+  Object.assign(pl, { c, site, group: "", views: {}, view: "", ready: false, picked: false, state: null, key: "", idle: 0, rendering: null });
   const mine = () => $("#abody") && anim.sel?.cid === (c.owner || c.id) && PLAY_MODES.includes(anim.tab);
   clearTimeout(pl.killTimer);
   // (everything this page needs is asked at once, the skill list included: it is the slow one)
   anim.fxBuffs = anim.fxBuffs || {};
   anim.formSlots = anim.formSlots || {};
-  const names = site ? null : api(`/api/preview?id=${encodeURIComponent(c.id)}`).then((j) => j.groups.map((g) => g.name));
+  const names = site ? null : api(`/api/preview?id=${encodeURIComponent(c.id)}`).then((j) => {
+    pl.views = Object.fromEntries(j.groups.filter((g) => g.view).map((g) => [g.name, g.view]));  // (a cut-in: a scene of its own)
+    return j.groups.map((g) => g.name);
+  });
   if (names) names.catch(() => {});  // (its error is shown where it is read)
   const [slots, mods, sets] = await Promise.all([
     !site && c.owner ? anim.formSlots[c.id] || api(`/api/skill_slots?id=${encodeURIComponent(c.id)}`).catch(() => ({})) : null,  // (a form's skills have names of their own)
@@ -114,6 +120,7 @@ async function openPlay(c, body) {
   } else pl.names = pl.st.videos.slice();
   pl.names.sort((a, b) => { const x = plKeyOf(a), y = plKeyOf(b); return x[0] - y[0] || x[1] - y[1] || String(x[2]).localeCompare(String(y[2]), undefined, { numeric: true }); });
   pl.group = pl.names.includes(anim.plGroup) ? anim.plGroup : pl.names[0] || "";
+  pl.view = pl.views[pl.group] || "";
   plDrawAll();
   if (site) plSiteLoad(); else plLaunch();
   if (!pl.rect) pl.rect = setInterval(plPlaceWindow, 60);
@@ -122,7 +129,7 @@ async function openPlay(c, body) {
     for (const ev of ["scroll", "resize"]) window.addEventListener(ev, plPlaceSoon, true);
   }
 }
-const plKeyOf = (n) => { const m = /(?:^|_)S(\d+)(?:_(\d{5})|_Time?line[ _]?(.*))?$/.exec(n); return m ? [0, slotOrder(+m[1]), m[2] || m[3] || ""] : [1, 0, n]; };
+const plKeyOf = (n) => { if (plView(n)) return [-1, 0, n]; const m = /(?:^|_)S(\d+)(?:_(\d{5})|_Time?line[ _]?(.*))?$/.exec(n); return m ? [0, slotOrder(+m[1]), m[2] || m[3] || ""] : [1, 0, n]; };
 
 const PL_ICON = {
   restart: `<svg viewBox="0 0 24 24"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"/></svg>`,
@@ -154,7 +161,7 @@ const plSrc = (n) => `${pl.st?.urls?.[n] || `/api/fx_video?id=${encodeURICompone
 function plDrawList() {
   let h = "", g = "";
   for (const n of pl.names) {
-    const grp = plWhole(n) ? "Skills" : "Clash and guard";
+    const grp = plView(n) ? "E.G.O" : plWhole(n) ? "Skills" : "Clash and guard";
     if (grp !== g) { g = grp; h += `<h6>${grp}</h6>`; }
     h += `<div class="pl-it ${n === pl.group ? "on" : ""}" data-n="${esc(n)}" tabindex="0"><span class="pl-sin">${esc(plBadge(n))}</span><div><b>${esc(fxLabel(n))}</b><small>${esc(n)}</small></div><span class="pl-dot ${plHas(n) ? "ok" : ""}"></span></div>`;
   }
@@ -283,6 +290,12 @@ async function plOption(change, how) {
 }
 function plPick(n) {
   pl.group = anim.plGroup = n; pl.picked = true;
+  if (!pl.site && (pl.views[n] || "") !== pl.view) {  // (another cut-in: the player is set up for it)
+    pl.view = pl.views[n] || "";
+    plDrawList(); plDrawRender(); plDrawStage();
+    plLaunch();
+    return;
+  }
   plDrawList(); plDrawRender(); plDrawStage();
   if (pl.site) plSiteLoad(); else plCmd({ op: "play", group: n, seek: 0, paused: false });
   pl.paused = false;
@@ -326,7 +339,7 @@ async function plLaunch() {
   pl.key = plKey();
   plLoading("Loading the character", "First time takes a few seconds. After that skills play at once.");
   let s;
-  try { s = await api("/api/preview", { id: pl.c.id, v: pl.key }); } catch (e) { plError(e.message); return; }
+  try { s = await api("/api/preview", { id: pl.c.id, v: pl.key, view: pl.view }); } catch (e) { plError(e.message); return; }
   plState(s);
   clearInterval(pl.poll);
   pl.poll = setInterval(async () => {
