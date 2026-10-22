@@ -132,8 +132,8 @@ def spine_place(bundle: str, base: str) -> tuple[str, object] | None:
     m = re.match(r"sd_(?:p|ego)(\d+)_assets", bundle)
     if m and 1 <= int(m.group(1)) <= 12:
         return "sinner", _spine_sinner(base) or int(m.group(1))  # (darkkromer_sinclair sits in Meursault's bundle)
-    if bundle.startswith("shaderv2") and "meursault" in base.lower():
-        return "sinner", SPINE_SINNERS.index("meursault") + 1
+    if bundle.startswith("shaderv2") and "meursault" in base.lower():  # (Canto 10's RPG scenes)
+        return "group", "Canto 10 · RPG"
     return None
 
 
@@ -167,7 +167,10 @@ SPINE_NAMES = {"dol_yisang": 20103, "성이": 20102, "물파": 20202, "teddy_fau
                "sparkdog_heathcliff": 20702, "히스클리프_시협회_스탠딩(레이어 분리)": 10702, "ishmael_firefly": 20803,
                "ismael_pinkshoes_idle": 20802, "ishmael_sod_idle": 10804, "rodion_Babajaga_idle": 20903, "rodion_fire_idle": 20902,
                "rodion_epi_idle": 10903, "10_zwei_sinclair": 11003, "cooker_sinclair": 21003, "buddha_outis": 21103,
-               "outis_apple_idle": 21102, "fairy_gregor": 21203, "jack_gregor": 11204}
+               "outis_apple_idle": 21102, "fairy_gregor": 21203, "jack_gregor": 11204,
+               # (named by Vlad)
+               "faust_yuri_idle": 10203, "meursault_superhuman_idle": 20502, "wing_meursault": 20503, "darkkromer_sinclair": 11005,
+               "sinclair_aztec_idle": 21002, "gregor_apple_idle": 21202}
 
 
 def spine_owner(base: str, sinner: int, ids: list[dict]) -> int | None:
