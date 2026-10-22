@@ -8,12 +8,12 @@ const PL_SPEC = { fps: 60 };
 const pl = { c: null, site: false, group: "", names: [], st: null, state: null, key: "", poll: 0, rect: 0, shown: "", paused: false, loop: true,
   speed: 1, scrub: false, sets: null, ready: false, idle: 0, video: null, rendering: null, seekTo: null, seekCmd: 0, seekAt: 0, sending: false, again: null };
 
-// a character the player can show: an Identity (E.G.O and enemies keep the list of videos)
-const plEligible = (c) => !!c.owner || /^\d+$/.test(String(c.id)) && String(c.id)[0] !== "2";  // (a second form: its prefab, owner = its Identity)
+// a character the player can show: Identities, their second forms and enemies (Skills only); E.G.O keep the list of videos
+const plEligible = (c) => !!c.owner || c.enemy || /^\d+$/.test(String(c.id)) && String(c.id)[0] !== "2";
 const plMode = () => (PLAY_MODES.includes(anim.tab) ? anim.tab : "fx");
 
-function plModeBar() {
-  return `<span class="seg pl-modes">${PL_MODE_NAMES.map(([k, l]) => `<button class="toggle ${plMode() === k ? "on" : ""}" data-mode="${k}">${l}</button>`).join("")}</span>`;
+function plModeBar(c) {
+  return `<span class="seg pl-modes">${PL_MODE_NAMES.filter(([k]) => !c?.enemy || k === "fx").map(([k, l]) => `<button class="toggle ${plMode() === k ? "on" : ""}" data-mode="${k}">${l}</button>`).join("")}</span>`;
 }
 function plModeClicks(root) {
   root.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { anim.tab = b.dataset.mode; openAnimEntry(anim.sel); });
@@ -77,7 +77,7 @@ async function openPlay(c, body) {
   if (!mine()) return;
   body.innerHTML = `<div class="pl-error" id="plerr" hidden></div>
     <div class="pl-ws" id="plws">
-      <section class="pl-panel pl-listbox"><h3 class="pl-h">Play <small id="plcount"></small></h3><div class="pl-modebox">${plModeBar()}</div><div class="pl-list" id="pllist"></div>
+      <section class="pl-panel pl-listbox"><h3 class="pl-h">Play <small id="plcount"></small></h3><div class="pl-modebox">${plModeBar(c)}</div><div class="pl-list" id="pllist"></div>
         <div class="pl-legend"><span class="pl-dot ok"></span><span id="pllegend"></span></div></section>
       <section class="pl-center">
         <div class="pl-head"><h2 id="plname"></h2><span class="pl-badge" id="plbadge"></span><span class="grow"></span><span class="muted small mono" id="pldur"></span></div>

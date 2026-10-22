@@ -1228,7 +1228,9 @@ function drawAnimTree() {
     anim.data.sinners.forEach((s) => {
       const ids = f === "egos" ? [] : s.ids.filter((x) => mine(x.id) && hit(`${s.name} ${x.title} ${x.id}`));
       const egos = f === "ids" ? [] : s.egos.filter((x) => mine(x.id) && hit(`${s.name} ${x.title} ${x.id} ego`));
-      if (!ids.length && !egos.length) return;
+      const kids = f === "egos" ? [] : (s.events || []).filter((x) => mine(x.id) && hit(`${s.name} ${x.title} ${x.id} sinnerling`));
+      const spines = f !== "all" ? [] : (s.spine || []).filter((x) => hit(`${s.name} ${x.base} ${x.bundle} spine`));
+      if (!ids.length && !egos.length && !kids.length && !spines.length) return;
       const open = q || f === "mine" || anim.open[`s${s.sid}`];
       h += `<div class="an-sn" data-toggle="s${s.sid}"><span class="an-av">${ico(`sinner_${s.sid}`, "s22", s.name, s.name.slice(0, 2))}</span><span class="an-n"><b>${esc(s.name)}</b>
         <small>${ids.length} ID · ${egos.length} E.G.O</small></span><span class="muted">${open ? "▾" : "▸"}</span></div>`;
@@ -1236,6 +1238,8 @@ function drawAnimTree() {
       const leaf = (x, ego) => `<div class="an-it ${sel(`c${x.id}`)}" data-c="${x.id}">${animThumb(x.id)}<div class="an-t">${esc(x.title)}<small>${ego ? "E.G.O " : ""}${x.id}${x.spine.length ? " · spine" : ""}</small></div>${owned.has(String(x.id)) ? `<span class="an-dot" title="has a mod"></span>` : ""}</div>`;
       if (ids.length) h += `<div class="an-sub">Identities</div>` + ids.map((x) => leaf(x, false)).join("");
       if (egos.length) h += `<div class="an-sub">E.G.O</div>` + egos.map((x) => leaf(x, true)).join("");
+      if (kids.length) h += `<div class="an-sub" title="Identities of an event only, not in the main game">Sinnerlings</div>` + kids.map((x) => leaf(x, false)).join("");
+      if (spines.length) h += `<div class="an-sub" title="The Sinner's Spine that no Identity names">Spine</div>` + spines.map((x) => `<div class="an-it ${sel(`s${x.bundle}/${x.atlas}`)}" data-ss="${s.sid}" data-a2="${x.atlas}" data-b="${esc(x.bundle)}">${animTile(x)}<div class="an-t">${esc(x.base)}<small>Spine</small></div></div>`).join("");
     });
   }
   if (f === "all" || f === "enemies" || f === "mine") {
@@ -1274,6 +1278,11 @@ function drawAnimTree() {
     openAnimEntry({ key: `e${x.app}`, cid: x.app, enemy: x });
     drawAnimTree();
   });
+  $("#alist").querySelectorAll("[data-ss]").forEach((d) => d.onclick = () => {
+    const x = anim.data.sinners.find((s) => s.sid === +d.dataset.ss).spine.find((s) => s.atlas === d.dataset.a2 && s.bundle === d.dataset.b);
+    openAnimEntry({ key: `s${x.bundle}/${x.atlas}`, spine: x });
+    drawAnimTree();
+  });
   $("#alist").querySelectorAll("[data-a]").forEach((d) => d.onclick = () => {
     const x = anim.data.groups[+d.dataset.g].kinds[d.dataset.k].find((s) => s.atlas === d.dataset.a && s.bundle === d.dataset.b);
     openAnimEntry({ key: `s${x.bundle}/${x.atlas}`, spine: x });
@@ -1281,7 +1290,7 @@ function drawAnimTree() {
   });
 }
 function findChar(cid) {
-  for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos]) if (x.id === cid) return { ...x, sinner: s.name, isEgo: String(cid)[0] === "2" };
+  for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos, ...s.events || []]) if (x.id === cid) return { ...x, sinner: s.name, isEgo: String(cid)[0] === "2" };
   return null;
 }
 // Header of the open character: picture, title, Mod box, tabs; mods list cached until a mod changes.
@@ -1325,14 +1334,14 @@ async function openAnimEntry(sel) {
   }
   if (sel.enemy) {
     // an enemy / abnormality: its battle prefab's skills played with the game's effects
-    const x = sel.enemy, c = { id: x.app, title: x.name || x.app.replace(/^\d+_|Appearance$/g, "") };
+    const x = sel.enemy, c = { id: x.app, title: x.name || x.app.replace(/^\d+_|Appearance$/g, ""), enemy: true };
     anim.slots = {};
     const tabs = [["fx", "Play"], ["mod", "Edit mod"]];
     if (!tabs.some(([k]) => k === anim.tab)) anim.tab = "fx";
     recentAdd(sel, c.title, `${x.kind} · ${x.app}`);
     if (!await animHead(v, sel, { title: c.title, sub: `${x.kind} · ${x.app}`, pic: animEnemyThumb(x.app), tabs, cid: x.app })) return;
     if (anim.tab === "mod") return openMod(c, $("#abody"), () => { anim.tab = "fx"; openAnimEntry(sel); });
-    return openFx(c, $("#abody"));
+    return plEligible(c) ? openPlay(c, $("#abody")) : openFx(c, $("#abody"));
   }
   const c = findChar(sel.cid);
   if (!c) { v.innerHTML = `<div class="empty">Not found.</div>`; return; }
@@ -1843,7 +1852,7 @@ async function modEffects(c, m, host, refresh, cached) {
 function fxPicker(done) {
   const V = "alpha_effects";
   const chars = [];
-  for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos]) chars.push({ key: String(x.id), label: `${s.name} · ${x.title}`, pic: animThumb(x.id) });
+  for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos, ...s.events || []]) chars.push({ key: String(x.id), label: `${s.name} · ${x.title}`, pic: animThumb(x.id) });
   for (const g of anim.data.groups) for (const arr of Object.values(g.kinds)) for (const x of arr) if (x.app) chars.push({ key: x.app, label: `${g.label} · ${x.name || x.app}`, pic: animEnemyThumb(x.app) });
   const box = document.createElement("div");
   box.className = "an-modal";
@@ -2086,7 +2095,7 @@ async function modFrames(c, m, box, refresh, part = "frames") {
 // another character's frame for `target`: pick a character, one of its skills, a frame
 async function pickFrame(target, host, done) {
   const chars = [];
-  for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos]) chars.push([String(x.id), `${s.name} · ${x.title}`]);
+  for (const s of anim.data.sinners) for (const x of [...s.ids, ...s.egos, ...s.events || []]) chars.push([String(x.id), `${s.name} · ${x.title}`]);
   for (const g of anim.data.groups) for (const arr of Object.values(g.kinds)) for (const x of arr) if (x.app) chars.push([x.app, `${g.label} · ${x.name || x.app}`]);
   const st = { who: anim.pickWho || chars[0][0] };
   const draw = async () => {
@@ -2712,6 +2721,7 @@ function vsChars() {
       for (const f of x.forms || []) out.push({ id: f.id, label: `${s.name} · ${x.title} · ${f.name}`, group: "Identities", pg: s.name, short: `${x.title} · ${f.name}`,
         type: "ids", sinner: s.sid, season: season(x.id), owner: String(x.id) });
     }
+    for (const x of s.events || []) out.push({ id: String(x.id), label: `${s.name} · ${x.title}`, group: "Identities", pg: s.name, short: x.title, type: "ids", sinner: s.sid, season: "" });
     for (const x of s.egos) out.push({ id: String(x.id), label: `${s.name} · ${x.title} (E.G.O)`, group: "E.G.O", pg: s.name, short: `${x.title} (E.G.O)`, type: "egos", sinner: s.sid, season: season(x.id) });
   }
   for (const g of anim.data.groups) for (const [kind, arr] of Object.entries(g.kinds)) for (const x of arr)

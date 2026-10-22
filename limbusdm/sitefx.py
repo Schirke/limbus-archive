@@ -168,7 +168,7 @@ def drop(svc, base_url: str, cid, v: str = "") -> int:
 
 def _ids(svc) -> list[int | str]:
     """Identities (each followed by its second forms' prefabs) and E.G.O."""
-    return [x for s in svc.characters().get("sinners", []) for c in s["ids"] + s["egos"]
+    return [x for s in svc.characters().get("sinners", []) for c in s["ids"] + s["egos"] + (s.get("events") or [])
             for x in [c["id"]] + [f["id"] for f in c.get("forms") or []]]
 
 

@@ -1315,7 +1315,8 @@ def _char_links(svc) -> dict:
 
     def unit(c):
         return {**c, "spine": [_spine_links(x) for x in c["spine"]], "clips": links.owner_clips(c["id"])}
-    out = {**ch, "sinners": [{**s, "ids": [unit(c) for c in s["ids"]], "egos": [unit(c) for c in s["egos"]]} for s in ch.get("sinners", [])],
+    out = {**ch, "sinners": [{**s, **{k: [unit(c) for c in s.get(k) or []] for k in ("ids", "egos", "events")},
+                              "spine": [_spine_links(x) for x in s.get("spine") or []]} for s in ch.get("sinners", [])],
            "groups": [{**g, "kinds": {k: [item(x) for x in arr] for k, arr in g["kinds"].items()}} for g in ch.get("groups", [])]}
     svc._chars_linked = (ch, spines, out)
     return out

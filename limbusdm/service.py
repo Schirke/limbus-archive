@@ -562,7 +562,7 @@ class Service:
     def characters(self) -> dict:
         """{"sinners": [...], "spine_other": {...}}"""
         import re
-        from .characters import bundle_date, owner_bundles, season_label, tag_label
+        from .characters import FOOLS, bundle_date, owner_bundles, season_label, spine_place, tag_label
         sid = self.latest_snapshot_id()
         snap = self.load_snapshot(sid) if sid else None
         if not snap:
@@ -574,13 +574,18 @@ class Service:
         bundles = list(snap["bundles"])
         spine = self.spine_list()
         spine_by_owner: dict[int, list] = {}
-        rest = []
+        rest, kid_spine, sinner_spine = [], {}, {}
         for x in spine:
             m = re.match(r"^(?:sd_)?([pe])(\d{5})_", x["bundle"])
+            place = None if m else spine_place(x["bundle"], x.get("base") or "")
             if m:
                 spine_by_owner.setdefault(int(m.group(2)), []).append(x)
-            else:
-                rest.append(x)
+            elif place and place[0] == "kid":
+                kid_spine.setdefault(place[1], []).append(x)
+            elif place and place[0] == "sinner":
+                sinner_spine.setdefault(place[1], []).append(x)
+            elif not place or place[0] == "group":
+                rest.append({**x, "_group": place[1]} if place else x)
 
         def entry(cid, title):
             bs = owner_bundles(bundles, cid)
@@ -615,11 +620,15 @@ class Service:
             e = entry(cid, nm.ego_title(cid))
             if e["bundles"] or e["spine"] or cid in playable:
                 sinners.setdefault(nm.sinner_of(cid), {"ids": [], "egos": []})["egos"].append(e)
-        for x in db.get("events") or [] if playable else []:  # an event's Identities (Sinnerlings): own models, after the rest
-            e = {**entry(x["id"], x["title"]), "bundles": self.appearance_bundles(x["id"])}
+        for x in db.get("events") or [] if playable else []:  # an event's Identities (Sinnerlings): their own list
+            e = {**entry(x["id"], x["title"]), "bundles": self.appearance_bundles(x["id"]), "event": True}
+            e["spine"] = e["spine"] + kid_spine.pop(x["sinner"], [])
             if e["bundles"]:
-                sinners.setdefault(x["sinner"], {"ids": [], "egos": []})["ids"].append({**e, "event": True})
-        out_sinners = [{"sid": s, "name": nm.sinner_name(s), **v} for s, v in sorted(sinners.items()) if 1 <= s <= 12]
+                sinners.setdefault(x["sinner"], {"ids": [], "egos": []}).setdefault("events", []).append(e)
+        for n, arr in sinner_spine.items():  # a Sinner's old Spine no Identity names
+            sinners.setdefault(n, {"ids": [], "egos": []})["spine"] = sorted(arr, key=lambda x: x["base"].lower())
+        rest += [x for arr in kid_spine.values() for x in arr]
+        out_sinners = [{"sid": s, "name": nm.sinner_name(s), "events": [], "spine": [], **v} for s, v in sorted(sinners.items()) if 1 <= s <= 12]
 
         # the rest grouped by content: bundle name, else the enemy's chapter, else the update date
         cmap = self.enemy_content(build=False)
@@ -636,12 +645,12 @@ class Service:
                 season_end[m.group(1)] = d
         groups: dict[str, dict] = {}
         for x in rest:
-            b = x["bundle"]
+            b, forced = x["bundle"], x.pop("_group", None)
             info = cmap.get(f"{b}|{x['atlas']}")
             if info:
                 x = {**x, "kind": info["kind"], "name": info.get("name") or ""}
             siblings = by_bundle.get(b, set())
-            label, order = (tag_label(b) or ((info["label"], info["order"]) if info else None)
+            label, order = ((forced, 0) if forced else None) or (tag_label(b) or ((info["label"], info["order"]) if info else None)
                             or (next(iter(siblings)) if len(siblings) == 1 else (season_label(b), 0)))
             m = re.match(r"^s(\d+)_", b)
             date = bundle_date(b) or (season_end.get(m.group(1)) if m else None)
@@ -650,11 +659,13 @@ class Service:
             g["kinds"].setdefault(x["kind"], []).append(x)
         # battle prefabs grouped the same way
         apps = self.enemy_apps() if cmap else {}
+        fools = {str(r.get("id")) for f, d in (self.static_tables(["abnormality-unit"]).get("abnormality-unit") or {}).items()
+                 if "fools" in f for r in (d.get("list") or []) if isinstance(r, dict)}  # (its boss's prefab: "<unit id>_…")
         for x in self.battle_prefabs():
             b, info = x["bundle"], apps.get(x["app"])
             kind = info["kind"] if info else ("Boss / Abnormality" if "abnormality" in b.lower() else "Enemy")
             siblings = by_bundle.get(b, set())
-            label, order = (tag_label(b) or ((info["label"], info["order"]) if info else None)
+            label, order = ((FOOLS, 0) if x["app"].split("_")[0] in fools else None) or (tag_label(b) or ((info["label"], info["order"]) if info else None)
                             or (next(iter(siblings)) if len(siblings) == 1 else (season_label(b), 0)))
             m = re.match(r"^s(\d+)_", b)
             date = bundle_date(b) or (season_end.get(m.group(1)) if m else None)

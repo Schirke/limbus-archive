@@ -537,9 +537,9 @@ def _anim_shape(ex, got: dict):
         chars = json.loads(ex._get("/api/characters")[0])
     if not ex.cfg["clips"]:
         for s in chars["sinners"]:
-            s["ids"] = [x for x in s["ids"] if x.get("spine")]
-            s["egos"] = [x for x in s["egos"] if x.get("spine")]
-            for x in s["ids"] + s["egos"]:
+            for k in ("ids", "egos", "events"):
+                s[k] = [x for x in s.get(k) or [] if x.get("spine")]
+            for x in s["ids"] + s["egos"] + s["events"]:
                 x.pop("clips", None)
     sent = set(ex.read_manifest("fx").get("have") or {})
     for g in chars["groups"]:
@@ -657,8 +657,8 @@ def _anim_packs(ex, got: dict) -> list:
     K = links.key
     read = lambda k, empty: ex._stored(got[k]) if k in got else empty  # noqa: E731
     ch = read("/api/characters", {})
-    units = [c for s in ch.get("sinners") or [] for c in s["ids"] + s["egos"]]
-    todo = [x for c in units for x in c["spine"]] + [x for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("files")]
+    units = [c for s in ch.get("sinners") or [] for c in s["ids"] + s["egos"] + (s.get("events") or [])]
+    todo = [x for c in units for x in c["spine"]] + [x for s in ch.get("sinners") or [] for x in s.get("spine") or []] + [x for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("files")]
     keys, seen = [], set()
 
     def skeleton(files):

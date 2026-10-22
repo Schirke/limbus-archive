@@ -108,6 +108,34 @@ def bundle_date(bundle: str) -> str | None:
     return f"{sm.group(2)}{sm.group(3)}{sm.group(4)}" if sm else None
 
 
+SPINE_SINNERS = ["yisang", "faust", "donquixote", "ryoshu", "meursault", "honglu", "heathcliff", "ishmael", "rodion", "sinclair",
+                 "outis", "gregor"]
+SPINE_JUNK = re.compile(r"(?i)^(?:skeleton|test|0-1|(?:back|front|fx)(?: #\d+)?)$")  # (nameless layers and leftovers)
+FOOLS = "April Fools' Day"
+
+
+def spine_place(bundle: str, base: str) -> tuple[str, object] | None:
+    """Where a Spine no owner names goes: ("hide", None), ("kid", sinner) = a Sinnerling's, ("sinner", n) = under the
+    Sinner, ("group", label); None = by its bundle as before."""
+    if SPINE_JUNK.match(base):
+        return "hide", None
+    m = re.match(r"baby_(\w+?)_idle$", base)
+    if bundle.startswith("skinpreview") and m and m.group(1) in SPINE_SINNERS:
+        return "kid", SPINE_SINNERS.index(m.group(1)) + 1
+    if base.startswith("aff25_"):
+        return "group", FOOLS
+    if bundle.startswith("spine_s1_"):
+        return "group", "Season 1 illustrations"
+    if bundle.startswith("sd_deadscene"):
+        return "group", "Death scenes"
+    m = re.match(r"sd_(?:p|ego)(\d+)_assets", bundle)
+    if m and 1 <= int(m.group(1)) <= 12:
+        return "sinner", int(m.group(1))
+    if bundle.startswith("shaderv2") and "meursault" in base.lower():
+        return "sinner", SPINE_SINNERS.index("meursault") + 1
+    return None
+
+
 def season_label(bundle: str) -> str:
     """Fallback group of a bundle nothing else could place: the update it shipped with."""
     sm = SEASON_RE.match(bundle)
