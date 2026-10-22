@@ -5,6 +5,9 @@ const PLAY_MODES = ["fx", "effects", "battle"];
 const PL_MODE_NAMES = [["fx", "Skills"], ["effects", "Effects"], ["battle", "Battle clips"]];
 const PL_SPEEDS = [0.25, 0.5, 1, 2];
 const PL_SPEC = { fps: 60 };
+// the sound's volume, kept per viewer; the site starts muted (its videos play by themselves)
+const PL_VOL_KEY = "plVol";
+const plVol = () => { let x = null; try { x = localStorage.getItem(PL_VOL_KEY); } catch {} return x === null ? (typeof siteDl === "function" ? 0 : 1) : Math.max(0, Math.min(1, +x || 0)); };
 const pl = { c: null, site: false, group: "", names: [], st: null, state: null, key: "", poll: 0, rect: 0, shown: "", paused: false, loop: true,
   speed: 1, scrub: false, sets: null, ready: false, idle: 0, video: null, rendering: null, seekTo: null, seekCmd: 0, seekAt: 0, sending: false, again: null };
 
@@ -88,7 +91,8 @@ async function openPlay(c, body) {
           <div class="pl-tr"><button class="pl-ibtn" id="plrestart" title="Restart (Home)" aria-label="Restart">${PL_ICON.restart}</button><button class="pl-ibtn" id="plback" title="One frame back (Left)" aria-label="One frame back">${PL_ICON.back}</button>
             <button class="pl-ibtn pl-play" id="plplay" title="Play / pause (Space)" aria-label="Play or pause"></button><button class="pl-ibtn" id="plfwd" title="One frame forward (Right)" aria-label="One frame forward">${PL_ICON.fwd}</button>
             <button class="toggle" id="plloop" title="Loop (L)">Loop</button><span class="pl-time" id="pltime"></span>
-            <span class="seg pl-speeds" id="plspeeds"></span></div>
+            <span class="seg pl-speeds" id="plspeeds"></span>
+            <label class="pl-vol" title="Volume"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2"/></svg><input type="range" id="plvol" min="0" max="1" step="0.05" aria-label="Volume"></label></div>
           <div class="pl-hint"><span><kbd>Space</kbd> play / pause</span><span><kbd>←</kbd> <kbd>→</kbd> frame</span><span><kbd>1</kbd>–<kbd>4</kbd> speed</span><span id="plmsg"></span></div></div></section>
       <aside class="pl-side"><section class="pl-panel"><h3 class="pl-h">Scene <small id="plscenenote"></small></h3><div id="plscene"></div></section>
         <section class="pl-render"><h3 class="pl-h" id="plrtitle"></h3><div class="pl-rbody" id="plrbody"></div></section></aside></div>`;
@@ -344,7 +348,7 @@ function plState(s) {
     $("#plload").hidden = true;
     if (pl.group) plCmd({ op: "play", group: pl.group, seek: 0, paused: false });
     plCmd({ op: "loop", loop: pl.loop }); plCmd({ op: "speed", speed: pl.speed });
-    plCmd({ op: "target", on: !anim.fxSolo }); plCmd({ op: "camera", on: !!anim.fxOpt?.static });
+    plCmd({ op: "target", on: !anim.fxSolo }); plCmd({ op: "camera", on: !!anim.fxOpt?.static }); plCmd({ op: "volume", volume: plVol() });
     pl.shown = "";
   }
   pl.paused = !!s.paused || s.play === "ended";
@@ -402,7 +406,7 @@ function plSiteLoad() {
   v.hidden = none;
   pl.video = none ? null : v;
   if (none) { v.removeAttribute("src"); plProgress(0, 0, 30); return; }
-  v.loop = pl.loop; v.playbackRate = pl.speed;
+  v.loop = pl.loop; v.playbackRate = pl.speed; v.volume = plVol(); v.muted = !plVol();
   v.src = plSrc(n);
   v.ontimeupdate = () => plProgress(Math.round(v.currentTime * 30), Math.round((v.duration || 0) * 30), 30);
   v.onloadedmetadata = () => plProgress(0, Math.round(v.duration * 30), 30);
@@ -451,6 +455,14 @@ function plWire(root) {
     live({ op: "speed", speed: s });
   };
   $("#plspeeds").querySelectorAll("[data-s]").forEach((b) => b.onclick = () => setSpeed(+b.dataset.s));
+  const vol = $("#plvol");
+  vol.value = plVol();
+  vol.oninput = () => {
+    const x = +vol.value;
+    try { localStorage.setItem(PL_VOL_KEY, String(x)); } catch {}
+    if (v()) { v().volume = x; v().muted = !x; }
+    live({ op: "volume", volume: x });
+  };
   const scrub = $("#plscrub");
   const at = (e) => { const r = scrub.getBoundingClientRect(); return Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
   const jump = (k, final) => {

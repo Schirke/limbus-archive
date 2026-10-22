@@ -1412,6 +1412,7 @@ const slotOrder = (n, slots = anim.slots) => {
   return !x ? n : x[1] ? +x[1] + (+x[2] || 0) / 10 : 50 + n / 100;
 };
 function fxLabel(name, slots = anim.slots) {
+  if (!name) return "";
   // an E.G.O's cut-in: SkillViewEGO_<id>11 its use, …21 corroded
   const view = /^SkillViewEGO_\d{5}(\d)(\d)$/.exec(name);
   if (view) return view[1] === "1" ? "E.G.O" : view[1] === "2" ? "E.G.O · Corrosion" : `E.G.O · ${view[1]}${view[2]}`;
@@ -2726,7 +2727,7 @@ function vsChars() {
   }
   for (const g of anim.data.groups) for (const [kind, arr] of Object.entries(g.kinds)) for (const x of arr)
     if (x.app) {
-      const name = `${x.name || x.app.replace(/^\d+_|Appearance$/g, "")}`;
+      const name = `${x.name || x.app.replace(/^\d+_|Appearance$/g, "")}` + (/^Fools_\d{5}_/.test(x.app) ? " (April Fools)" : "");
       out.push({ id: x.app, label: name, group: g.label, pg: g.label, short: name, type: /boss|abno/i.test(kind) ? "boss" : "enemy" });
     }
   vsChars.cache = [anim.data, U, out];

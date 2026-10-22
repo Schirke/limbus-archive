@@ -61,6 +61,9 @@
 .pl-speeds { margin-left: auto; display: inline-flex; }
 .pl-speeds .toggle { clip-path: none; padding: 5px 10px 4px; font: 13px Consolas, monospace; margin-left: -1px; }
 .pl-speeds .toggle:first-child { margin-left: 0; }
+.pl-vol { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.pl-vol svg { width: 18px; height: 18px; fill: currentColor; }
+.pl-vol input { width: 90px; accent-color: var(--gold); }
 .pl-hint { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .pl-hint kbd { font: 11px Consolas, monospace; border: 1px solid #6b4a2c; padding: 0 5px; color: var(--cream); background: #120d0b; }
 #plmsg { color: var(--hot); min-height: 18px; }

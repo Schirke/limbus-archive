@@ -627,7 +627,7 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 cid = q.get("id", "")
                 cid = str(svc.form_owner(cid) or cid)  # (a second form: its Identity's)
                 base = "Assets/Resources_moved/Sprite/Unit/"
-                if _re.fullmatch(r"1\d{4}", cid):
+                if _re.fullmatch(r"1\d{4}|4\d{5}", cid):  # (4000xx: Sinnerlings)
                     path = f"{base}Profile/Normal/{cid}_normal_profile.png"
                 elif _re.fullmatch(r"2\d{4}", cid):
                     path = f"{base}Profile/Ego/{cid}_awaken_profile.png"
