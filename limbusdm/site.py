@@ -830,6 +830,7 @@ class Exporter:
         self.fresh: dict[str, int] = {}  # what was asked from the app this time (not kept from before), by part of the site
         self.same: list[str] = []  # parts skipped: made from the same as last time
         self._same: dict[str, object] = {}  # unchanged() by the game version a manifest was made from
+        self._card_paths: set[str] = set()  # card pages for search engines (card_pages)
         os.makedirs(os.path.join(self.out, "d", "m"), exist_ok=True)
         self._jlock = threading.Lock()
         self.journal = self._journal_read()
@@ -1294,6 +1295,8 @@ class Exporter:
         scripts = re.findall(r'<script src="([^"]+)"></script>\s*', html)
         html = re.sub(r'<script src="[^"]+"></script>\s*', "", html)
         stamp = str(int(time.time()))
+        url = (self.cfg.get("url") or "").rstrip("/")
+        cards = self.card_pages(url)  # (before the sections: their lists link to the cards)
         pages = self.section_pages(html)
         script_urls = [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]
         boot = f"""<script>
@@ -1341,13 +1344,11 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             if fn.endswith(".html") and fn != "index.html":
                 os.remove(os.path.join(self.out, fn))
         shutil.rmtree(os.path.join(self.out, "games"), ignore_errors=True)
-        url = (self.cfg.get("url") or "").rstrip("/")
         for route in pages:
             path = "index.html" if route == "home" else route + ".html"
             os.makedirs(os.path.dirname(os.path.join(self.out, path)) or self.out, exist_ok=True)
             with open(os.path.join(self.out, path), "w", encoding="utf-8") as f:
                 f.write(self._page(html, pages, route, url))
-        cards = self.card_pages(url)
         # search engines are kept out unless the site's settings say "index": true
         with open(os.path.join(self.out, "robots.txt"), "w") as f:
             f.write(("User-agent: *\nAllow: /\nDisallow: /api/\n" +(f"Sitemap: {url}/sitemap.xml\n" if url else "")) if self.cfg.get("index") else "User-agent: *\nDisallow: /\n")
@@ -1403,11 +1404,19 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         e = lambda v: html_escape(str(v or ""))  # noqa: E731
         out = []
 
+        def names(v):  # each name once; (name, card page) is a link when that page is listed
+            got = {}
+            for x in v:
+                n, p = x if isinstance(x, tuple) else (x, "")
+                if n and (n not in got or p in self._card_paths):
+                    got[n] = f'<a href="/{p}">{e(n)}</a>' if p in self._card_paths else e(n)
+            return list(got.values())
+
         def group(head, rows):  # rows: [(sub-heading, [names])]
-            rows = [(k, list(dict.fromkeys(x for x in v if x))) for k, v in rows]
+            rows = [(k, names(v)) for k, v in rows]
             rows = [(k, v) for k, v in rows if v]
             if rows:
-                out.append(f"<h2>{e(head)}</h2>" + "".join(f"<p>{f'<b>{e(k)}</b>: ' if k else ''}{', '.join(e(x) for x in v)}</p>" for k, v in rows))
+                out.append(f"<h2>{e(head)}</h2>" + "".join(f"<p>{f'<b>{e(k)}</b>: ' if k else ''}{', '.join(v)}</p>" for k, v in rows))
 
         def by(items, key, name):
             rows = {}
@@ -1416,17 +1425,18 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             return list(rows.items())
         if route in ("db", "teams", "anim"):
             u = self._answer("/api/units") or {}
-            group("Identities", by(u.get("ids") or [], lambda x: x.get("sinnerName"), lambda x: x.get("title")))
-            group("E.G.O", by(u.get("egos") or [], lambda x: x.get("sinnerName"), lambda x: f"{x.get('name')} ({x.get('grade')})"))
+            group("Identities", by(u.get("ids") or [], lambda x: x.get("sinnerName"), lambda x: (x.get("title"), f"db/id/{x.get('id')}")))
+            group("E.G.O", by(u.get("egos") or [], lambda x: x.get("sinnerName"),
+                              lambda x: (f"{x.get('name')} ({x.get('grade')})", f"db/ego/{x.get('id')}")))
         elif route == "enemies":
             d = self._answer("/api/enemies") or {}
-            group("Enemies and Abnormalities", by(d.get("list") or [], lambda x: x.get("group"), lambda x: x.get("name")))
+            group("Enemies and Abnormalities", by(d.get("list") or [], lambda x: x.get("group"), lambda x: (x.get("name"), f"enemies/{x.get('id')}")))
         elif route == "stages":
             d = self._answer("/api/stages") or {}
             group("Chapters", [("", [c.get("label") for c in d.get("chapters") or []])])
         elif route == "buffs":
             d = self._answer("/api/buffs") or {}
-            group("Statuses", [("", [b.get("name") for b in d.get("list") or []])])
+            group("Statuses", [("", [(b.get("name"), f"buffs/{b.get('id')}") for b in d.get("list") or []])])
         elif route == "mirror":
             d = self._answer("/api/mirror") or {}
             group("Theme packs", [("", [p.get("name") for p in d.get("packs") or []])])
@@ -1496,7 +1506,7 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             except (AttributeError, OSError, ValueError):
                 return None
 
-        e, open_, used, out = html_escape, set(self.open_routes()), set(), []
+        e, open_, used, pages = html_escape, set(self.open_routes()), set(), {}
         units = (load("/api/units") or {}) if "db" in open_ else {}
         gl, tags = units.get("glossary") or {}, units.get("tags") or {}
         word = lambda k: tags.get(k) or (gl.get(k) or {}).get("name") or k  # noqa: E731
@@ -1508,74 +1518,128 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
         def short(t, n=190):
             return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + "…"
 
-        def skill(s):  # (name, text) at its last uptie
+        def last(s):
             up = s.get("up") or {}
-            last = up[max(up, key=int)] if up else {}
-            return last.get("name") or "", plain(last.get("desc"))
+            return up[max(up, key=int)] if up else {}
 
-        def skills_html(list_, passives=()):
-            rows = list(dict.fromkeys(f"<li><b>{e(n)}</b>{': ' + e(t) if t else ''}</li>" for n, t in (skill(s) for s in list_) if n))
-            rows += [f"<li><b>{e(p.get('name') or '')}</b>: {e(plain(p.get('desc')))}</li>" for p in passives if p.get("name")]
-            return f"<ul>{''.join(rows)}</ul>" if rows else ""
+        def skill(s):  # (name, text) at its last uptie
+            u = last(s)
+            return u.get("name") or "", plain(u.get("desc"))
 
-        def card(path, route, title, desc, body, pic, big=True):
-            src = pic and self._og_picture(urls.get(pic), big)
-            if src:
-                used.add(src)
-            here = f"{url}/{quote(path)}"
-            head = [f'<meta name="description" content="{e(desc)}">', f'<link rel="canonical" href="{e(here)}">',
-                    '<meta property="og:type" content="website">', '<meta property="og:site_name" content="Limbus Archive">',
-                    f'<meta property="og:title" content="{e(title)}">', f'<meta property="og:description" content="{e(desc)}">',
-                    f'<meta property="og:url" content="{e(here)}">', '<meta name="theme-color" content="#e8b33a">',
-                    f'<meta name="twitter:card" content="{"summary_large_image" if big and src else "summary"}">']
-            if src:
-                head.append(f'<meta property="og:image" content="{e(url)}/og/{src}">')
-            if not self.cfg.get("index"):
-                head.append('<meta name="robots" content="noindex, nofollow">')
-            full = os.path.join(self.out, *path.split("/")) + ".html"
-            os.makedirs(os.path.dirname(full), exist_ok=True)
-            with open(full, "w", encoding="utf-8") as f:
-                f.write(CARD_PAGE.format(full=e(f"{title} · Limbus Company · Limbus Archive"), head="\n".join(head),
-                                         to=json.dumps("/#/" + route), title=e(title), desc=e(desc), body=body, route=e(route)))
-            out.append(path)
+        def skill_row(s):
+            u = last(s)
+            if not u.get("name"):
+                return ""
+            kind = " · ".join(x for x in (u.get("sin") if u.get("sin") != "None" else "", u.get("atk") or u.get("def") or "",
+                                          f"{u.get('base')} + {u.get('coin')} × {u.get('coins')} coins" if u.get("coins") else "") if x)
+            coins = [f"Coin {i + 1}: " + "; ".join(t for t in map(plain, c) if t) for i, c in enumerate(u.get("coindescs") or []) if any(c)]
+            text = " ".join(filter(None, [plain(u.get("desc"))] + coins))
+            return f"<li><b>{e(u['name'])}</b>{f' ({e(kind)})' if kind else ''}{': ' + e(text) if text else ''}</li>"
+
+        def skills_html(list_, passives=(), head="Skills"):
+            rows = list(dict.fromkeys(filter(None, map(skill_row, list_))))
+            out = f"<h2>{head}</h2><ul>{''.join(rows)}</ul>" if rows else ""
+            rows = [f"<li><b>{e(p.get('name') or '')}</b>: {e(plain(p.get('desc')))}</li>" for p in passives if p.get("name")]
+            return out + (f"<h2>Passives</h2><ul>{''.join(rows)}</ul>" if rows else "")
+
+        def stats(x):
+            sp = x.get("speed") or []
+            sp = sp[-1] if sp and isinstance(sp[0], list) else sp
+            rs = ", ".join(f"{k} ×{v:g}" for k, v in (x.get("resist") or x.get("atk") or {}).items() if isinstance(v, (int, float)))
+            bits = [f"HP {x['hp']}" if x.get("hp") else "", f"Speed {sp[0]}–{sp[1]}" if len(sp) == 2 else "",
+                    "Stagger at " + ", ".join(f"{s}%" for s in x["stagger"]) + " HP" if x.get("stagger") else "",
+                    f"Resistances: {rs}" if rs else ""]
+            return f"<p>{e(' · '.join(b for b in bits if b))}</p>" if any(bits) else ""
+
+        def card(path, title, desc, body, pic, big=True, more=(), back=("", ""), canon=""):
+            pages[path] = (title, desc, body, pic, big, more, back, canon)
 
         thumb = lambda p: p and url_key("/api/asset_thumb", path=p)  # noqa: E731
         seasons = units.get("seasons") or {}
         season = lambda x: (seasons.get(str(x.get("season"))) or {}).get("name") or ""  # noqa: E731
+        buffs = [x for x in (load("/api/buffs") or {}).get("list") or [] if re.fullmatch(r"[\w-]+", x.get("id") or "")] if "buffs" in open_ else []
+        has = {}  # (kind, id) -> the statuses it has
+        for b in buffs:
+            for w in b.get("who") or []:
+                has.setdefault((w.get("k"), w.get("id")), []).append((f"buffs/{b['id']}", b.get("name") or b["id"]))
+        db = ("db", "All Identities & E.G.O")
+        kin = {}  # sinner -> its Identities and E.G.O
+        for x in units.get("ids") or []:
+            kin.setdefault(x.get("sinnerName"), []).append((f"db/id/{x['id']}", f"{x.get('title')} {x.get('sinnerName')}"))
+        for x in units.get("egos") or []:
+            kin.setdefault(x.get("sinnerName"), []).append((f"db/ego/{x['id']}", f"{x.get('name')} (E.G.O)"))
         for x in units.get("ids") or []:
             names = [n for n, _ in (skill(s) for s in x.get("skills") or []) if n]
             desc = " ".join(filter(None, [
                 f"{'0' * (x.get('rank') or 1)} Identity of {x.get('sinnerName')}" + (f" · {season(x)}." if season(x) else "."),
                 f"Keywords: {', '.join(word(k) for k in x.get('statuses') or [])}." if x.get("statuses") else "",
                 f"Skills: {' · '.join(dict.fromkeys(names))}." if names else ""]))
-            card(f"db/id/{x['id']}", f"db/id/{x['id']}", f"{x.get('title')} {x.get('sinnerName')}", short(desc),
-                 skills_html(x.get("skills") or [], x.get("passives") or []), links.key((x.get("pics") or {}).get("art") or ""))
+            card(f"db/id/{x['id']}", f"{x.get('title')} {x.get('sinnerName')}", short(desc),
+                 stats(x) + skills_html(x.get("skills") or [], x.get("passives") or []) + skills_html(x.get("defense") or [], head="Defense"),
+                 links.key((x.get("pics") or {}).get("art") or ""),
+                 more=[("Statuses", has.get(("id", x["id"]), [])), (f"More of {x.get('sinnerName')}", kin.get(x.get("sinnerName"), []))], back=db)
         for x in units.get("egos") or []:
             cost = ", ".join(f"{c['sin']} ×{c['n']}" for c in x.get("cost") or [])
             names = [n for n, _ in (skill(s) for s in x.get("skills") or []) if n]
             desc = " ".join(filter(None, [
                 f"{x.get('grade')} E.G.O of {x.get('sinnerName')}" + (f" · {season(x)}." if season(x) else "."),
                 f"Cost: {cost}." if cost else "", f"Skills: {' · '.join(dict.fromkeys(names))}." if names else ""]))
-            card(f"db/ego/{x['id']}", f"db/ego/{x['id']}", f"{x.get('name')} · {x.get('sinnerName')} E.G.O", short(desc),
-                 skills_html(x.get("skills") or [], x.get("passives") or []), links.key((x.get("pics") or {}).get("art") or ""))
+            card(f"db/ego/{x['id']}", f"{x.get('name')} · {x.get('sinnerName')} E.G.O", short(desc),
+                 stats({"resist": x.get("resist")}) + skills_html(x.get("skills") or [], x.get("passives") or []),
+                 links.key((x.get("pics") or {}).get("art") or ""),
+                 more=[("Statuses", has.get(("ego", x["id"]), [])), (f"More of {x.get('sinnerName')}", kin.get(x.get("sinnerName"), []))], back=db)
         if "enemies" in open_:
-            for x in (load("/api/enemies") or {}).get("list") or []:
+            enemies, first, near = (load("/api/enemies") or {}).get("list") or [], {}, {}
+            for x in enemies:  # (one name, one page for search engines: the others point to it)
+                if x.get("name") and x["name"] != "???":
+                    first.setdefault(x["name"], f"enemies/{x['id']}")
+                    near.setdefault(x.get("group") or "", {}).setdefault(x["name"], f"enemies/{x['id']}")
+            for x in enemies:
                 texts = load(links.key(x.get("info") or "")) or {}
-                sk = list((texts.get("skills") or {}).values())
-                names = [n for n, _ in (skill(s or {}) for s in sk) if n]
+                sk = [s or {} for s in (texts.get("skills") or {}).values()]
+                names = [n for n, _ in (skill(s) for s in sk) if n]
                 desc = f"{x.get('kind') or 'Enemy'} · {x.get('label')}." + (f" Skills: {' · '.join(dict.fromkeys(names))}." if names else "")
                 pic = next((k for k in (links.key(x[f]) for f in ("tile", "big") if x.get(f)) if k in urls), "")
-                card(f"enemies/{x['id']}", f"enemies/{x['id']}", x.get("name") or str(x["id"]), short(desc),
-                     skills_html([s or {} for s in sk]), pic, big=False)
-        if "buffs" in open_:
-            for x in (load("/api/buffs") or {}).get("list") or []:
-                if not re.fullmatch(r"[\w-]+", x.get("id") or ""):
-                    continue
-                desc = plain(x.get("desc")) or x.get("flavor") or "A Limbus Company status."
-                who = ", ".join(w.get("name") or "" for w in (x.get("who") or [])[:12])
-                body = f"<p>{e(plain(x.get('desc')))}</p>" + (f"<p>Who has it: {e(who)}</p>" if who else "")
-                card(f"buffs/{x['id']}", f"buffs/{x['id']}", f"{x.get('name') or x['id']} · Status", short(desc), body,
-                     thumb(x.get("icon")), big=False)
+                path, main = f"enemies/{x['id']}", first.get(x.get("name"), "-")
+                card(path, x.get("name") or str(x["id"]), short(desc), stats((x.get("variants") or [{}])[0]) + skills_html(sk, [v for v in (texts.get("passives") or {}).values() if isinstance(v, dict)]),
+                     pic, big=False, more=[("Statuses", has.get(("enemy", x["id"]), [])),
+                                           (f"Also in {x.get('group')}", [(p, n) for n, p in near.get(x.get("group") or "", {}).items()][:40])],
+                     back=("enemies", "All enemies"), canon="" if main == path else main)
+        for x in buffs:
+            desc = plain(x.get("desc")) or x.get("flavor") or "A Limbus Company status."
+            body = f"<p>{e(plain(x.get('desc')))}</p>" + (f"<p><i>{e(x['flavor'])}</i></p>" if x.get("flavor") else "")
+            who = [({"id": "db/id/", "ego": "db/ego/", "enemy": "enemies/"}.get(w.get("k"), "?") + str(w.get("id")), w.get("name") or "")
+                   for w in x.get("who") or []]
+            card(f"buffs/{x['id']}", f"{x.get('name') or x['id']} · Status", short(desc), body, thumb(x.get("icon")), big=False,
+                 more=[("Who has it", who)], back=("buffs", "All statuses"))
+        out = [p for p, c in pages.items() if not c[7]]  # (in the sitemap and the sections' lists)
+        self._card_paths = set(out)
+        for path, (title, desc, body, pic, big, more, back, canon) in pages.items():
+            src = pic and self._og_picture(urls.get(pic), big)
+            if src:
+                used.add(src)
+            here = f"{url}/{quote(path)}"
+            head = [f'<meta name="description" content="{e(desc)}">',
+                    f'<link rel="canonical" href="{e(url + "/" + quote(canon) if canon and canon != "-" else here)}">',
+                    '<meta property="og:type" content="website">', '<meta property="og:site_name" content="Limbus Archive">',
+                    f'<meta property="og:title" content="{e(title)}">', f'<meta property="og:description" content="{e(desc)}">',
+                    f'<meta property="og:url" content="{e(here)}">', '<meta name="theme-color" content="#e8b33a">',
+                    f'<meta name="twitter:card" content="{"summary_large_image" if big and src else "summary"}">']
+            if src:
+                head.append(f'<meta property="og:image" content="{e(url)}/og/{src}">')
+            if not self.cfg.get("index") or canon == "-":  # (no name: nothing for a search to find)
+                head.append('<meta name="robots" content="noindex, nofollow">')
+            for h, rows in more:
+                rows = list(dict.fromkeys((p, n) for p, n in rows if p != path and p in self._card_paths))
+                if rows:
+                    body += f"<h2>{e(h)}</h2><p>" + " · ".join(f'<a href="/{quote(p)}">{e(n)}</a>' for p, n in rows) + "</p>"
+            if back[0]:
+                body += f'<p><a href="/{back[0]}">{e(back[1])}</a> · <a href="/">Limbus Archive</a></p>'
+            full = os.path.join(self.out, *path.split("/")) + ".html"
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w", encoding="utf-8") as f:
+                f.write(CARD_PAGE.format(full=e(f"{title} · Limbus Company · Limbus Archive"), head="\n".join(head),
+                                         to=json.dumps("/#/" + path), title=e(title), desc=e(desc), body=body, route=e(path)))
         og = os.path.join(self.out, "og")
         for fn in os.listdir(og) if os.path.isdir(og) else []:
             if fn not in used:
