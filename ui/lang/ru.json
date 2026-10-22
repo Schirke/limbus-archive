@@ -3199,6 +3199,8 @@
 "Sinnerlings": "Грешнята",
 "Identities of an event only, not in the main game": "Идентичности только из ивента, в основной игре их нет",
 "The Sinner's Spine that no Identity names": "Spine Грешника, не привязанный ни к одной Идентичности",
-"(April Fools)": "(1 апреля)"
+"(April Fools)": "(1 апреля)",
+"Autoplay": "Автозапуск",
+"Play the first skill on its own when the page opens": "Сразу проигрывать первый навык, когда открываешь страницу"
 }
 }

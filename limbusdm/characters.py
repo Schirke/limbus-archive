@@ -131,7 +131,7 @@ def spine_place(bundle: str, base: str) -> tuple[str, object] | None:
         return "group", "Death scenes"
     m = re.match(r"sd_(?:p|ego)(\d+)_assets", bundle)
     if m and 1 <= int(m.group(1)) <= 12:
-        return "sinner", int(m.group(1))
+        return "sinner", _spine_sinner(base) or int(m.group(1))  # (darkkromer_sinclair sits in Meursault's bundle)
     if bundle.startswith("shaderv2") and "meursault" in base.lower():
         return "sinner", SPINE_SINNERS.index("meursault") + 1
     return None
@@ -158,8 +158,23 @@ def _spine_sinner(base: str) -> int | None:
     return hit[0] if len(hit) == 1 else None
 
 
+# a Sinner's old Spine named after a nickname (an Abnormality, a story name), checked by its pictures
+SPINE_NAMES = {"dol_yisang": 20103, "성이": 20102, "물파": 20202, "teddy_faust": 20203, "sparkdog_faust": 20204,
+               "cooker_donquixote": 20304, "donquixote_fish_idle": 20302, "plate_don": 10304, "시협회_돈키호테_idle": 10303,
+               "Pierre_ryoshu": 10404, "성냥불 료슈 침식": 20402, "guido_maur": 10504, "guido_mer": 10504,
+               "honglu_kongkong_idle": 10603, "kongkong_honglu_back": 10603, "kongkong_honglu_front": 10603,
+               "kongkong_honglu_fx": 10603, "kongkong_honhlu_illust": 10603, "분홍신 홍루 침식": 20602,
+               "sparkdog_heathcliff": 20702, "히스클리프_시협회_스탠딩(레이어 분리)": 10702, "ishmael_firefly": 20803,
+               "ismael_pinkshoes_idle": 20802, "ishmael_sod_idle": 10804, "rodion_Babajaga_idle": 20903, "rodion_fire_idle": 20902,
+               "rodion_epi_idle": 10903, "10_zwei_sinclair": 11003, "cooker_sinclair": 21003, "buddha_outis": 21103,
+               "outis_apple_idle": 21102, "fairy_gregor": 21203, "jack_gregor": 11204}
+
+
 def spine_owner(base: str, sinner: int, ids: list[dict]) -> int | None:
-    """The Identity a Sinner's loose Spine belongs to (by the organisation in its name; none = the LCB Sinner), or None."""
+    """The Identity / E.G.O a Sinner's loose Spine belongs to (by its nickname, the organisation in its name; none = the LCB
+    Sinner), or None."""
+    if base in SPINE_NAMES:
+        return SPINE_NAMES[base] if any(x["id"] == SPINE_NAMES[base] for x in ids) else None
     names = {w for w in _SPINE_SINNER_WORDS[sinner - 1]}
     words = [w for w in _spine_words(base) if w not in names and w not in _SPINE_PARTS and not w.isdigit()]
     if not words:
@@ -168,6 +183,34 @@ def spine_owner(base: str, sinner: int, ids: list[dict]) -> int | None:
         return None
     hit = [x["id"] for x in ids if SPINE_ORGS[words[0]] in (x.get("title") or "").lower().replace(".", "")]
     return hit[0] if len(hit) == 1 else None
+
+
+# a layer of an illustration cut into skeletons (wcorp_donquixote_back): drawn with it, in the same place
+_LAYER = re.compile(r"(?i)^(.+?)[_ -](back|backfx|backhair|front|fx|bladefx|eyelight|smoke|hand)$")
+
+
+def _art_key(base: str) -> str:
+    words = [next((n[0] for n in _SPINE_SINNER_WORDS if w in n), w) for w in _spine_words(base)]  # (kongkong_honhlu)
+    return "_".join(w for w in words if w not in ("illust", "idle")).rstrip("0123456789_")
+
+
+def spine_layers(rows: list[dict]) -> list[dict]:
+    """Spine rows with an illustration's layers folded into its main skeleton (`layers`, back ones first)."""
+    out, by_key = [], {}
+    for x in rows:
+        if not _LAYER.match(x["base"]):
+            by_key.setdefault((x["bundle"], _art_key(x["base"])), x)
+    for x in rows:
+        m = _LAYER.match(x["base"])
+        main = m and by_key.get((x["bundle"], _art_key(m.group(1))))
+        if main:
+            main.setdefault("layers", []).append({**x, "z": -1 if m.group(2).lower().startswith("back") else 1})
+        else:
+            out.append(x)
+    for x in out:
+        if x.get("layers"):
+            x["layers"].sort(key=lambda l: l["z"])
+    return out
 
 
 def season_label(bundle: str) -> str:

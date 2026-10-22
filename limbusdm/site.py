@@ -660,6 +660,7 @@ def _anim_packs(ex, got: dict) -> list:
     units = [c for s in ch.get("sinners") or [] for c in s["ids"] + s["egos"] + (s.get("events") or [])]
     todo = [x for c in units for x in c["spine"]] + [x for s in ch.get("sinners") or [] for x in s.get("spine") or []]
     todo += [y for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr for y in x.get("spine") or []] + [x for g in ch.get("groups") or [] for arr in g["kinds"].values() for x in arr if x.get("files")]
+    todo += [l for x in todo for l in x.get("layers") or []]
     keys, seen = [], set()
 
     def skeleton(files):

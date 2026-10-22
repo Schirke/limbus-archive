@@ -8,6 +8,9 @@ const PL_SPEC = { fps: 60 };
 // the sound's volume, kept per viewer; the site starts muted (its videos play by themselves)
 const PL_VOL_KEY = "plVol";
 const plVol = () => { let x = null; try { x = localStorage.getItem(PL_VOL_KEY); } catch {} return x === null ? (typeof siteDl === "function" ? 0 : 1) : Math.max(0, Math.min(1, +x || 0)); };
+// the first skill plays by itself when the page opens: off unless the viewer turns it on
+const PL_AUTO_KEY = "plAuto";
+const plAuto = () => { try { return localStorage.getItem(PL_AUTO_KEY) === "1"; } catch { return false; } };
 const pl = { c: null, site: false, group: "", names: [], st: null, state: null, key: "", poll: 0, rect: 0, shown: "", paused: false, loop: true,
   speed: 1, scrub: false, sets: null, ready: false, idle: 0, video: null, rendering: null, seekTo: null, seekCmd: 0, seekAt: 0, sending: false, again: null };
 
@@ -54,7 +57,7 @@ async function openPlay(c, body) {
   clearTimeout(anim.fxTimer);
   plStop(false);
   const site = typeof siteDl === "function";
-  Object.assign(pl, { c, site, group: "", ready: false, state: null, key: "", idle: 0, rendering: null });
+  Object.assign(pl, { c, site, group: "", ready: false, picked: false, state: null, key: "", idle: 0, rendering: null });
   const mine = () => $("#abody") && anim.sel?.cid === (c.owner || c.id) && PLAY_MODES.includes(anim.tab);
   clearTimeout(pl.killTimer);
   // (everything this page needs is asked at once, the skill list included: it is the slow one)
@@ -90,7 +93,7 @@ async function openPlay(c, body) {
         <div class="pl-transport"><div class="pl-scrub" id="plscrub" tabindex="0" role="slider" aria-label="Position"><div class="pl-rail"></div><div class="pl-fill" id="plfill"></div><div class="pl-knob" id="plknob"></div></div>
           <div class="pl-tr"><button class="pl-ibtn" id="plrestart" title="Restart (Home)" aria-label="Restart">${PL_ICON.restart}</button><button class="pl-ibtn" id="plback" title="One frame back (Left)" aria-label="One frame back">${PL_ICON.back}</button>
             <button class="pl-ibtn pl-play" id="plplay" title="Play / pause (Space)" aria-label="Play or pause"></button><button class="pl-ibtn" id="plfwd" title="One frame forward (Right)" aria-label="One frame forward">${PL_ICON.fwd}</button>
-            <button class="toggle" id="plloop" title="Loop (L)">Loop</button><span class="pl-time" id="pltime"></span>
+            <button class="toggle" id="plloop" title="Loop (L)">Loop</button><button class="toggle" id="plauto" title="Play the first skill on its own when the page opens">Autoplay</button><span class="pl-time" id="pltime"></span>
             <span class="seg pl-speeds" id="plspeeds"></span>
             <label class="pl-vol" title="Volume"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2"/></svg><input type="range" id="plvol" min="0" max="1" step="0.05" aria-label="Volume"></label></div>
           <div class="pl-hint"><span><kbd>Space</kbd> play / pause</span><span><kbd>←</kbd> <kbd>→</kbd> frame</span><span><kbd>1</kbd>–<kbd>4</kbd> speed</span><span id="plmsg"></span></div></div></section>
@@ -98,6 +101,7 @@ async function openPlay(c, body) {
         <section class="pl-render"><h3 class="pl-h" id="plrtitle"></h3><div class="pl-rbody" id="plrbody"></div></section></aside></div>`;
   plModeClicks(body);
   $("#plloop").classList.toggle("on", pl.loop);
+  $("#plauto").classList.toggle("on", plAuto());
   $("#plspeeds").innerHTML = PL_SPEEDS.map((s) => `<button class="toggle ${s === pl.speed ? "on" : ""}" data-s="${s}">×${s}</button>`).join("");
   plWire(body);
   await plVideos();
@@ -278,7 +282,7 @@ async function plOption(change, how) {
   else if (how === "restart") plLaunch();
 }
 function plPick(n) {
-  pl.group = anim.plGroup = n;
+  pl.group = anim.plGroup = n; pl.picked = true;
   plDrawList(); plDrawRender(); plDrawStage();
   if (pl.site) plSiteLoad(); else plCmd({ op: "play", group: n, seek: 0, paused: false });
   pl.paused = false;
@@ -346,7 +350,7 @@ function plState(s) {
   if (!pl.ready) {
     pl.ready = true;
     $("#plload").hidden = true;
-    if (pl.group) plCmd({ op: "play", group: pl.group, seek: 0, paused: false });
+    if (pl.group) plCmd({ op: "play", group: pl.group, seek: 0, paused: !plAuto() && !pl.picked });
     plCmd({ op: "loop", loop: pl.loop }); plCmd({ op: "speed", speed: pl.speed });
     plCmd({ op: "target", on: !anim.fxSolo }); plCmd({ op: "camera", on: !!anim.fxOpt?.static }); plCmd({ op: "volume", volume: plVol() });
     pl.shown = "";
@@ -411,7 +415,8 @@ function plSiteLoad() {
   v.ontimeupdate = () => plProgress(Math.round(v.currentTime * 30), Math.round((v.duration || 0) * 30), 30);
   v.onloadedmetadata = () => plProgress(0, Math.round(v.duration * 30), 30);
   v.onplay = v.onpause = () => { pl.paused = v.paused; if ($("#plplay")) $("#plplay").innerHTML = v.paused ? PL_ICON.play : PL_ICON.pause; };
-  v.play().catch(() => {});
+  if (plAuto() || pl.picked) v.play().catch(() => {});
+  else pl.paused = true;
 }
 
 // ---------------------------------------------------------------- controls
@@ -434,6 +439,7 @@ function plWire(root) {
   const v = () => pl.video;
   const live = (c) => { if (pl.ready) plCmd(c); };
   $("#plplay").onclick = () => {
+    pl.picked = true;
     if (pl.site) { if (!v()) return; v().paused ? v().play() : v().pause(); return; }
     const ended = pl.state?.play === "ended";
     if (ended) live({ op: "play", group: pl.group, seek: 0, paused: false });
@@ -447,6 +453,7 @@ function plWire(root) {
   };
   $("#plback").onclick = () => step(-1);
   $("#plfwd").onclick = () => step(1);
+  $("#plauto").onclick = () => { const on = !plAuto(); try { localStorage.setItem(PL_AUTO_KEY, on ? "1" : "0"); } catch {} $("#plauto").classList.toggle("on", on); };
   $("#plloop").onclick = () => { pl.loop = !pl.loop; $("#plloop").classList.toggle("on", pl.loop); if (v()) v().loop = pl.loop; live({ op: "loop", loop: pl.loop }); };
   const setSpeed = (s) => {
     pl.speed = s;

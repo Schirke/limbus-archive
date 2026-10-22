@@ -2255,6 +2255,7 @@ async function openSpine(x, host) {
     host.querySelector(".spfull").onchange = (e) => { spn.full = e.target.checked; openSpine(x, host); };
   }
   const sel = host.querySelector(".spanim");
+  if (!full && x.layers?.length) { await spineCut(sp, x, host); return; }
   if (!full) {
     spn.player = await addSpinePlayer(sp, host.querySelector(".spbox"), x.bundle, x.atlas, null, { controls: true, files: x.files });
     spn.players = [spn.player]; spn.stack = [{ player: spn.player }];
@@ -2289,6 +2290,26 @@ async function openSpine(x, host) {
     sel.style.display = "";
     sel.onchange = () => { spn.player.setAnimation(sel.value, true); spn.players.forEach((p) => p.play()); };
   }
+}
+// an illustration cut into skeletons (…_back, …_front): all of them over each other in one frame, as the game draws it
+async function spineCut(sp, x, host) {
+  const rows = [...x.layers.filter((l) => l.z < 0), x, ...x.layers.filter((l) => l.z > 0)];
+  rows.forEach((l) => spineAtlas(l.bundle, l.atlas, l.files));
+  const heads = (await Promise.all(rows.map((l) => fetch(l.files.json).then((r) => r.json()).then((j) => j.skeleton).catch(() => null)))).filter((h) => h && h.width > 0);
+  if (!host.isConnected || !heads.length) return;
+  const x0 = Math.min(...heads.map((h) => h.x)), y0 = Math.min(...heads.map((h) => h.y));
+  const w = Math.max(...heads.map((h) => h.x + h.width)) - x0, h = Math.max(...heads.map((h) => h.y + h.height)) - y0;
+  host.querySelector(".spstage").innerHTML = `<div class="spscene animstage" style="aspect-ratio:${w} / ${h};height:auto;width:min(100%, calc(62vh * ${w / h}))">
+    ${rows.map((_, i) => `<div class="spbox" data-i="${i}"></div>`).join("")}</div>`;
+  const stage = host.querySelector(".spscene");
+  const vp = { x: x0, y: y0, width: w, height: h, padLeft: "0%", padRight: "0%", padTop: "0%", padBottom: "0%", transitionTime: 0 };
+  const players = await Promise.all(rows.map((l, i) => addSpinePlayer(sp, stage.querySelector(`[data-i="${i}"]`), l.bundle, l.atlas, vp, { files: l.files })));
+  if (!stage.isConnected) { players.forEach((p) => p && p.dispose()); return; }
+  players.forEach((p) => { const t = p && p.animationState.getCurrent(0); if (t) t.trackTime = 0; });  // (in step)
+  spn.stack = players.map((p) => ({ player: p }));
+  spn.players = players.filter(Boolean);
+  spn.player = players[rows.indexOf(x)] || spn.players[0] || null;
+  host.querySelector(".sphint").hidden = true;  // (one picture: no drag and zoom)
 }
 // skeleton files' address; atlas asked once
 const spineBase = (bundle, atlas) => `/spine/${encodeURIComponent(bundle)}/${atlas}.2/skeleton`;  // .2: pages scaled back to the atlas size (old cached copies are stretched)

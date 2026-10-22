@@ -14,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import links
 from .extra import file_of as extra_file
+from .characters import spine_layers
 from .extract import extract
 from .paths import resource_dir
 from .service import Service
@@ -1313,8 +1314,11 @@ def _char_links(svc) -> dict:
             x = {**x, "of": of[(x["bundle"], str(x.get("atlas")))]}
         return _spine_links(x) if x.get("atlas") else x
 
+    def rows(arr):
+        return spine_layers([_spine_links(x) for x in arr])
+
     def unit(c):
-        return {**c, "spine": [_spine_links(x) for x in c["spine"]], "clips": links.owner_clips(c["id"])}
+        return {**c, "spine": rows(c["spine"]), "clips": links.owner_clips(c["id"])}
     groups = [{**g, "kinds": {k: [dict(item(x)) for x in arr] for k, arr in g["kinds"].items()}} for g in ch.get("groups", [])]
     # a battle look's Spine goes into its entry (tabs), not a row of its own
     looks = {x["app"]: x for g in groups for arr in g["kinds"].values() for x in arr if x.get("app")}
@@ -1329,7 +1333,7 @@ def _char_links(svc) -> dict:
             g["kinds"][k] = keep
         g["kinds"] = {k: arr for k, arr in g["kinds"].items() if arr}
     out = {**ch, "sinners": [{**s, **{k: [unit(c) for c in s.get(k) or []] for k in ("ids", "egos", "events")},
-                              "spine": [_spine_links(x) for x in s.get("spine") or []]} for s in ch.get("sinners", [])],
+                              "spine": rows(s.get("spine") or [])} for s in ch.get("sinners", [])],
            "groups": [g for g in groups if g["kinds"]]}
     svc._chars_linked = (ch, spines, out)
     return out

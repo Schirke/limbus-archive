@@ -629,8 +629,8 @@ class Service:
             s = sinners.setdefault(n, {"ids": [], "egos": []})
             loose = []
             for x in sorted(arr, key=lambda x: x["base"].lower()):
-                owner = spine_owner(x.get("base") or "", n, s["ids"])
-                e = next((e for e in s["ids"] if e["id"] == owner), None)
+                owner = spine_owner(x.get("base") or "", n, s["ids"] + s["egos"])
+                e = next((e for e in s["ids"] + s["egos"] if e["id"] == owner), None)
                 (e["spine"] if e else loose).append(x)
             s["spine"] = loose
         rest += [x for arr in kid_spine.values() for x in arr]
