@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 18  # bump when the database layout changes (cached per snapshot)
+VERSION = 19  # bump when the database layout changes (cached per snapshot)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -220,12 +220,13 @@ def build(tables: dict, loc_dir: str) -> dict:
     id_passives = {r.get("personalityID"): r for d in (tables.get("personality-passive") or {}).values()
                    for r in (d.get("list") or []) if isinstance(r, dict)}
 
-    ids = []
+    ids, events = [], []
     for pid, r in sorted(_records(tables, "personality").items()):
-        if not isinstance(pid, int) or not 10000 <= pid < 20000 or pid not in loc_ids:
+        if not isinstance(pid, int) or pid not in loc_ids:
             continue  # test / unreleased records without a name stay out
+        event = not 10000 <= pid < 20000  # (an event's own Identities, 4000xx Sinnerlings: not playable in the main game)
         loc = loc_ids[pid]
-        sinner = int(str(pid)[1:3])
+        sinner = r.get("characterId") or 0 if event else int(str(pid)[1:3])
         sk = [skill_info(a["skillId"], skills, loc_skills, a.get("number")) for a in r.get("attributeList") or []]
         # extra skills the game never names are internal (helper / unused entries): leave them out
         sk = [s for s in sk if s and (s.get("copies") or any(u["name"] != str(s["id"]) for u in s["up"].values()))]
@@ -245,7 +246,7 @@ def build(tables: dict, loc_dir: str) -> dict:
                     got[info["name"]] = info
             pas += got.values()
         kws = r.get("skillKeywordList") or []
-        ids.append({
+        (events if event else ids).append({
             "id": pid, "sinner": sinner, "sinnerName": SINNERS[sinner - 1] if 1 <= sinner <= 12 else _one_line(loc.get("name")),
             "title": _one_line(loc.get("title")), "rank": r.get("rank"), "season": r.get("season"),
             "date": _date(r.get("updatedDate") or r.get("releaseDate")),
@@ -261,10 +262,14 @@ def build(tables: dict, loc_dir: str) -> dict:
             "resist": {ATK.get(x.get("type"), x.get("type")): x.get("value")
                        for x in (r.get("resistInfo") or {}).get("atkResistList") or []},
             "skills": [s for s in sk if s], "defense": [s for s in dk if s], "passives": pas,
-            "img": {"thumb": f"{ASSET}UnitCgThumbnail/Default/{pid}_normal.png",
+            "img": {"thumb": f"{ASSET}Unit/Profile/Normal/{pid}_normal_profile.png"} if event else
+                   {"thumb": f"{ASSET}UnitCgThumbnail/Default/{pid}_normal.png",
                     "art": f"{ASSET}Unit/CG/{pid}_normal.png", "art2": f"{ASSET}Unit/CG/{pid}_gacksung.png"},
         })
-        ids[-1]["speed"] = ids[-1]["speed"][0]
+        x = (events if event else ids)[-1]
+        x["speed"] = x["speed"][0]
+        if event:
+            x["event"], x["appearance"] = True, r.get("appearance") or ""
 
     egos = []
     for eid, r in sorted(_records(tables, "ego").items()):
@@ -303,7 +308,7 @@ def build(tables: dict, loc_dir: str) -> dict:
             "img": {"thumb": f"{ASSET}Unit/Profile/Ego/{eid}_awaken_profile.png", "art": f"{ASSET}Unit/EgoCG/{eid}_cg.png"},
         })
 
-    used = {k for x in ids for k in x["keywords"]} | set(STATUSES)
+    used = {k for x in ids + events for k in x["keywords"]} | set(STATUSES)
     kw = {k: _one_line((keywords.get(k) or {}).get("name")) or k for k in used}
     tag_names = {k: _one_line(v.get("name")) for k, v in tags.items() if v.get("name")}
     # [Keyword] tokens: name, description, kind, icon
@@ -323,6 +328,6 @@ def build(tables: dict, loc_dir: str) -> dict:
                 glossary[k]["max"] = b["maxStack"]
             if fx := _buff_fx(b):
                 glossary[k]["fx"] = fx
-    return {"ids": ids, "egos": egos, "keywords": kw, "statuses": STATUSES, "tags": tag_names,
+    return {"ids": ids, "egos": egos, "events": events, "keywords": kw, "statuses": STATUSES, "tags": tag_names,
             "glossary": glossary, "sins": [v for k, v in SINS.items() if k not in ("WHITE", "BLACK", "NEUTRAL")],
             "sinners": SINNERS}

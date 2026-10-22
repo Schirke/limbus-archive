@@ -1395,7 +1395,7 @@ def _unit_links(svc) -> dict:
 
     def unit(x):
         return {**x, "pics": pics(x), **{k: list(skills(x, k)) for k in ("skills", "defense") if k in x}}
-    out = {**db, **{k: [unit(x) for x in db[k]] for k in ("ids", "egos") if k in db}}
+    out = {**db, **{k: [unit(x) for x in db[k]] for k in ("ids", "egos", "events") if k in db}}
     if "glossary" in db:
         out["glossary"] = {k: {**g, "iconUrl": links.thumb(g["icon"])} if g.get("icon") else g for k, g in db["glossary"].items()}
     svc._units_linked = (db, out)

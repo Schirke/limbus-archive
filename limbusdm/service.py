@@ -1067,6 +1067,8 @@ class Service:
                                 or find(f"{i}_normal_profile.png", "Profile") or img["thumb"])
                 img["art"] = find(f"{i}_normal.png", "Unit/CG") or img["thumb"]
                 img["art2"] = find(f"{i}_gacksung.png", "Unit/CG")
+            for x in db.get("events") or []:
+                x["img"]["thumb"] = x["img"]["art"] = find(f"{x['id']}_normal_profile.png", "Profile") or x["img"]["thumb"]
             # keyword icons live in Buf/<icon>.png; drop the ones the game doesn't ship
             buf = {p.rsplit("/", 1)[-1][:-4]: p for p in self.load_snapshot(sid)["assets"] if "/Buf/" in p and p.endswith(".png")}
             for g in db["glossary"].values():

@@ -8,7 +8,9 @@ async function units() {
   if (!UNITS) UNITS = await api("/api/units");
   return UNITS;
 }
-const unitById = (id) => UNITS && (UNITS.ids.find((x) => x.id === id) || UNITS.egos.find((x) => x.id === id));
+const unitById = (id) => UNITS && (UNITS.ids.find((x) => x.id === id) || UNITS.egos.find((x) => x.id === id) || (UNITS.events || []).find((x) => x.id === id));
+// the Database tab's list: Identities, E.G.O or an event's own Identities (Sinnerlings)
+const dbList = () => dbv.tab === "egos" ? UNITS.egos : dbv.tab === "events" ? UNITS.events || [] : UNITS.ids;
 const statusName = (k) => (UNITS && UNITS.keywords[k]) || k;
 const imgThumb = (path) => `/api/asset_thumb?path=${encodeURIComponent(path)}`;
 const imgFull = (path) => `/api/asset_img?path=${encodeURIComponent(path)}`;
@@ -63,24 +65,25 @@ routes.db = async (args) => {
   main.innerHTML = `<div class="muted">Loading the database…</div>`;
   try { await units(); } catch (e) { main.innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (!UNITS.ids.length) { main.innerHTML = `<div class="empty">Take a snapshot first — the database is read from it.</div>`; return; }
-  if (args[0]) dbv.tab = args[0] === "ego" ? "egos" : "ids";
+  if (args[0]) dbv.tab = args[0] === "ego" ? "egos" : args[0] === "event" && (UNITS.events || []).length ? "events" : "ids";
   drawDb();
   if (args[1]) openUnit(+args[1]);
 };
 function drawDb() {
   const main = $("#main");
-  const isId = dbv.tab === "ids";
-  const assocs = [...new Set(UNITS.ids.flatMap((x) => x.assoc))].sort();
+  const isId = dbv.tab !== "egos";
+  const assocs = [...new Set(dbList().flatMap((x) => x.assoc || []))].sort();
   const chip = (key, val, label, on, title = "") => `<button class="toggle ${on ? "on" : ""}" data-f="${key}" data-v="${esc(val)}" title="${esc(title)}">${label}</button>`;
   // this tab's seasons in the game's order
-  const have = new Set((isId ? UNITS.ids : UNITS.egos).map((x) => seasonKey(x.season)));
+  const have = new Set(dbList().map((x) => seasonKey(x.season)));
   const seasons = Object.keys(UNITS.seasons || {}).filter((k) => have.has(k)).sort((a, b) => a - b);
   const seasonChip = (k) => { const d = UNITS.seasons[k], on = dbv.season.includes(k);
     return `<button class="toggle schip ${on ? "on" : ""} ${lightColor(d.color) ? "lt" : ""}" data-f="season" data-v="${k}" title="${esc(d.title || d.name)}" style="--sc:${d.color}">${esc(d.name)}</button>`; };
   main.innerHTML = `<h1>Identities & E.G.O</h1>
     <div class="sub">Read from the game's own files — new Identities and changes show up here after every patch.</div>
-    <div class="tabs"><button data-tab="ids" class="${isId ? "active" : ""}">Identities<span class="n">${UNITS.ids.length}</span></button>
-      <button data-tab="egos" class="${!isId ? "active" : ""}">E.G.O<span class="n">${UNITS.egos.length}</span></button></div>
+    <div class="tabs"><button data-tab="ids" class="${dbv.tab === "ids" ? "active" : ""}">Identities<span class="n">${UNITS.ids.length}</span></button>
+      <button data-tab="egos" class="${!isId ? "active" : ""}">E.G.O<span class="n">${UNITS.egos.length}</span></button>
+      ${(UNITS.events || []).length ? `<button data-tab="events" class="${dbv.tab === "events" ? "active" : ""}" title="Identities of an event only, not in the main game">Sinnerlings<span class="n">${UNITS.events.length}</span></button>` : ""}</div>
     <input type="search" id="dbq" class="dbq" placeholder="Search: name, skill, passive, keyword…" value="${esc(dbv.q)}">
     <div class="dbrow">
       ${isId ? [3, 2, 1].map((r) => chip("rank", r, rankIcons(r, "rank"), dbv.rank.includes(r), RANKS[r])).join("") : GRADES.map((g) => chip("grade", g, ico(`grade_${g}`, "s22", g, g), dbv.grade.includes(g), g)).join("")}
@@ -100,7 +103,7 @@ function drawDb() {
       <button class="toggle" id="dbreset">Reset</button>
     </div>
     <div id="dbgrid"></div>`;
-  main.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => { dbv.tab = b.dataset.tab; dbv.shown = 120; location.hash = dbv.tab === "egos" ? "#/db/ego" : "#/db"; });
+  main.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => { dbv.tab = b.dataset.tab; dbv.shown = 120; location.hash = dbv.tab === "egos" ? "#/db/ego" : dbv.tab === "events" ? "#/db/event" : "#/db"; });
   main.querySelectorAll("[data-f]").forEach((b) => b.onclick = () => {
     const f = b.dataset.f, v = ["sinner", "rank"].includes(f) ? +b.dataset.v : b.dataset.v;
     if (DB_MULTI.includes(f)) dbv[f] = dbv[f].includes(v) ? dbv[f].filter((x) => x !== v) : [...dbv[f], v];
@@ -126,8 +129,8 @@ const pasVersions = (p) => p.prev ? [p, ...pasVersions(p.prev)] : [p];
 const pasAt = (p, up) => { while (p.prev && up < p.uptie) p = p.prev; return p; };
 const topUp = (s) => s.up[Math.max(...Object.keys(s.up))];
 function dbFiltered() {
-  const isId = dbv.tab === "ids", q = dbv.q.trim().toLowerCase();
-  let arr = (isId ? UNITS.ids : UNITS.egos).filter((x) =>
+  const isId = dbv.tab !== "egos", q = dbv.q.trim().toLowerCase();
+  let arr = dbList().filter((x) =>
     (!dbv.sinner || x.sinner === dbv.sinner)
     && (!isId || !dbv.rank.length || dbv.rank.includes(x.rank)) && (isId || !dbv.grade.length || dbv.grade.includes(x.grade))
     && dbv.sin.every((sin) => x.skills.some((s) => topUp(s).sin === sin))
@@ -245,7 +248,7 @@ function dbCard(x, newest) {
   const line = isId ? x.statuses.map((k) => `<span class="arch">${statusIcon(k, "s18")}${esc(statusName(k))}</span>`).join("")
     : (x.cost || []).map((c) => `<span class="arch">${sinIcon(c.sin, "s18")}${c.n}</span>`).join("");
   // tile: art, emblem, rank, season; who, title, archetype
-  const sid = Math.floor(x.id / 100) % 100;
+  const sid = x.sinner || Math.floor(x.id / 100) % 100;
   return `<div class="ucard dcard d2" data-u="${x.id}"><div class="uimg"><img loading="lazy" src="${x.pics.thumb}" onerror="this.style.visibility='hidden'">
       <span class="uem">${ico(`sinner_${sid}`, "s36", x.sinnerName, "")}</span>
       <span class="urank">${isId ? rankIcons(x.rank) : ico(`grade_${x.grade}`, "s22", x.grade, x.grade)}</span>${seasonTag(x.season)}</div>
@@ -255,8 +258,8 @@ function dbCard(x, newest) {
 }
 function drawDbGrid() {
   const arr = dbFiltered();
-  const all = dbv.tab === "ids" ? UNITS.ids : UNITS.egos;
-  const newest = all.reduce((m, x) => (x.date || "") > m ? x.date : m, "");
+  const all = dbList();
+  const newest = dbv.tab === "events" ? "" : all.reduce((m, x) => (x.date || "") > m ? x.date : m, "");
   const found = `<div class="muted small" style="margin:10px 0 8px">${arr.length} found${dbv.status.length > 1 || dbv.sin.length > 1 || dbv.atk.length > 1 ? " · with all the picked statuses / sins / attack types" : ""}</div>`;
   $("#dbgrid").innerHTML = (arr.length ? `${found}<div class="ugrid dgrid">${arr.slice(0, dbv.shown).map((x) => dbCard(x, newest)).join("")}</div>` : `${found}<div class="empty">Nothing matches.</div>`)
     + (arr.length > dbv.shown ? `<button class="more" id="dbmore">Show more (${arr.length - dbv.shown} left)</button>` : "");
@@ -362,7 +365,7 @@ function openUnit(id) {
     modal(`<div class="ud${hl ? "" : " nohl"}"><div class="udhead">${isId ? rankIcons(x.rank, "rankbig") : ico(`grade_${x.grade}`, "s36", x.grade, x.grade)}
         <div class="grow copyable"><div class="udtitle">${esc(isId ? x.title : x.name)}</div>
         <div class="muted small">${esc(x.sinnerName)} · id ${x.id}${x.date ? ` · updated ${esc(x.date)}` : ""}</div></div>
-        ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}<button id="tocmp">⇄ Compare</button>${isId ? `<button id="toanim">Battle animations →</button>` : ""}</div>
+        ${typeof siteLink === "function" ? siteLink(`db/${isId ? "id" : "ego"}/${x.id}`) : ""}<button id="tocmp">⇄ Compare</button>${isId && !x.event ? `<button id="toanim">Battle animations →</button>` : ""}</div>
       <div class="udcols"><div class="udleft" id="udleft">${left()}</div><div class="udright" id="udright">${right()}</div></div></div>`);
     bind();
   };
