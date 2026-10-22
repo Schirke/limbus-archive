@@ -7,7 +7,7 @@ import json
 import os
 import re
 
-VERSION = 8
+VERSION = 9
 CHAR_LINES, CHAR_MIN = 40, 5  # lines kept of a story character (spread over the story), fewest to be asked about
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"]
 # developers' nicknames for bosses → English name start
@@ -56,6 +56,7 @@ def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], po
     """Story speakers with their voiced lines (Story/Effect rows joined with StoryData by id) and their log portrait."""
     en = os.path.join(loc_root, "en")
     codes = {str(r["id"]): r for r in _rows(en, r"EN_ScenarioModelCodes.*\.json$")}
+    people = {_text(r.get("name")) for r in codes.values()}
     found: dict[str, dict] = {}
     for stem in sorted(story, key=lambda s: (_where(s)[0], s)):
         try:
@@ -68,6 +69,9 @@ def characters(loc_root: str, sounds: dict, story: dict, enemies: list[dict], po
             sample, t = str(r.get("voice") or "").lower(), loc.get(r.get("id")) or {}
             code = codes.get(str(t.get("model") or "")) or {}
             name, text = _text(t.get("teller") or code.get("name")), _text(t.get("content"))
+            own = _text(code.get("name"))
+            if name not in people and own.strip("?"):  # "Radio", "Loudspeaker": the one whose model speaks
+                name = own
             if not sample or sample not in sounds or not name or not name.strip("?") or not 12 <= len(text) <= 240:
                 continue
             c = found.setdefault(name, {"name": name, "roles": collections.Counter(), "pics": collections.Counter(),
