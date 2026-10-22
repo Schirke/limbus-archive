@@ -8,7 +8,7 @@ import re
 
 from . import content, units
 
-VERSION = 4
+VERSION = 5
 NEAR = 60  # ms an event's length may differ from its sample's
 BOSS_FIGHTS = 3  # a theme heard in so few story fights is somebody's own: named after who is fought there
 STORY_TABLES = ("battle-story", "battle-ab", "battle-dungeon")
@@ -162,6 +162,15 @@ def build(tables: dict, loc_dir: str, samples: list[tuple]) -> dict:
         if not add(ev, name + (f" {used[name]}" if used[name] > 1 else ""), "", True):
             missing.append(ev)
     return {"tracks": tracks, "missing": missing, "events": events_of}
+
+
+def story_where(db: dict, heard: list[tuple[str, str]]) -> None:
+    """A track no fight places gets the chapter where the story first plays it; heard = [(chapter, bgm)] in story order."""
+    by_norm = {_norm(t["event"]): n for n, t in enumerate(db["tracks"])}
+    for label, bgm in heard:
+        n = db["events"].get(bgm, by_norm.get(_norm(bgm)))
+        if n is not None and not db["tracks"][n]["where"]:
+            db["tracks"][n]["where"] = label
 
 
 KEEP = 40  # tracks kept converted in data/music_cache (about 4 MB each)

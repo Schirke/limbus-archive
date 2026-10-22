@@ -1099,10 +1099,32 @@ class Service:
             samples = [(name, ms, path, i) for path, rec in self.load_snapshot(sid)["files"].items()
                        if os.path.basename(path).lower().startswith("bgm") for i, (name, ms) in enumerate(rec.get("sounds") or [])]
             db = music.build(self.static_tables(["lobby-bgm", "abnormality-unit"] + content.STAGE_TABLES), loc, samples)
+            try:
+                music.story_where(db, self._story_bgm())
+            except Exception:
+                pass  # (story songs keep no chapter)
             db["v"] = music.VERSION
             self.store.write_json(rel, db)
         self._music = (sid, db)
         return db
+
+    def _story_bgm(self) -> list[tuple[str, str]]:
+        """[(chapter, bgm)] of every story file's music: the main Cantos first, then Intervallos and other side stories."""
+        from . import story
+        idx = story.index(self)
+        out = []
+        for c in sorted(idx["main"] + idx["other"], key=lambda c: (c["kind"] != "main", c.get("order") or 0)):
+            num = int(c["number"]) if str(c.get("number") or "").isdigit() else -1
+            label = (("Canto %d" % num if num else "Prologue") if c["kind"] == "main" and num >= 0
+                     else c.get("title") if c["kind"] in ("intervallo", "restored") else "")
+            if not label:
+                continue
+            for e in c["eps"]:
+                for p in e["parts"]:
+                    for ln in (story.episode_of(self, p[0]) or {}).get("lines") or []:
+                        if ln.get("bgm"):
+                            out.append((label, ln["bgm"]))
+        return out
 
     def quiz(self) -> dict:
         """Voice lines for Games -> Guess the Identity (see quiz.build)."""
