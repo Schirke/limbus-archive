@@ -2639,6 +2639,7 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
         f.write("/*\n  X-Content-Type-Options: nosniff\n  X-Frame-Options: SAMEORIGIN\n  Content-Security-Policy: frame-ancestors 'self'\n"
                 "  Referrer-Policy: strict-origin-when-cross-origin\n")
         f.write("".join(f"/d/{sub}/*\n  Cache-Control: public, max-age=31536000, immutable\n" for sub in ("p", "f", "k")))
+        f.write("".join(f"/{sub}/*\n  X-Robots-Tag: noindex\n" for sub in ("ui", "d")))  # (scripts and data: not search results)
     keep_k = {n for n in shards["f"] if n} | {shards["files"]}
     for sub, keep in (("p", packs), ("k", keep_k), ("m", set(os.listdir(os.path.join(src, "d", "m")))), ("tr", set(os.listdir(os.path.join(src, "d", "tr"))))):
         for fn in os.listdir(os.path.join(dst, "d", sub)):
