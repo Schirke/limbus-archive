@@ -60,6 +60,7 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site .enwrap .encard { max-height: none; min-height: 0; overflow: visible; padding: 0; }
   body.site .enwrap .enlv { flex-wrap: wrap; } body.site .enwrap .enlv select { flex: 1 1 100%; max-width: none; min-width: 0; } body.site .enwrap .enlv .lvlabel.lv { margin-left: 0; }
   body.site .enwrap .enres.sin { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; } body.site .enwrap .enres.sin > div { font-size: 12px; } body.site .enwrap .enstage { flex-wrap: wrap; }
+  body.site .enwrap .enres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   body.site .enwrap:not(.enopen) .encard, body.site .enwrap.enopen > :not(.encard):not(.en-back) { display: none; }
   body.site .enwrap.enopen .en-back { display: block; margin-bottom: 10px; padding: 8px 12px; border: 1px solid var(--line); color: var(--cream); text-decoration: none;
     font: 17px "LC Bebas", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
@@ -218,3 +219,9 @@ body.site #fxnote { flex-basis: 100%; }
 .seo p { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
 .seo p b { color: var(--text); }
 .seonav { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 24px; font-size: 13px; }
+/* phones: resistance words ("ОБЫЧНОЕ") don't fit 7 sins a row */
+@media (max-width: 520px) {
+  body.site .enwrap .enres.sin { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  body.site .enwrap .enres:not(.sin) > div { flex-direction: column; gap: 3px; padding: 8px 4px; text-align: center; }
+  body.site .enwrap .enres small { letter-spacing: 0.5px; }
+}
