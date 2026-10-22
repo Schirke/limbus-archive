@@ -61,7 +61,7 @@ class Names:
     def clip_label(self, owner: int, kind: str, n: int, clip_name: str, slot: str | None = None) -> str:
         """How the game names a skill's slot ("Skill 3.2", "Defense"), else "Skill <n>"."""
         if kind == "skill":
-            if str(owner).startswith("1"):
+            if str(owner).startswith(("1", "4")):  # (4000xx: an event's Identities)
                 name = self.skills.get(owner * 100 + n)
                 return (slot or f"Skill {n}") + (f" · {name}" if name else "")
             # E.G.O: S1 awakening (..11), S2 corrosion (..21)

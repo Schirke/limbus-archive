@@ -615,6 +615,10 @@ class Service:
             e = entry(cid, nm.ego_title(cid))
             if e["bundles"] or e["spine"] or cid in playable:
                 sinners.setdefault(nm.sinner_of(cid), {"ids": [], "egos": []})["egos"].append(e)
+        for x in db.get("events") or [] if playable else []:  # an event's Identities (Sinnerlings): own models, after the rest
+            e = {**entry(x["id"], x["title"]), "bundles": self.appearance_bundles(x["id"])}
+            if e["bundles"]:
+                sinners.setdefault(x["sinner"], {"ids": [], "egos": []})["ids"].append({**e, "event": True})
         out_sinners = [{"sid": s, "name": nm.sinner_name(s), **v} for s, v in sorted(sinners.items()) if 1 <= s <= 12]
 
         # the rest grouped by content: bundle name, else the enemy's chapter, else the update date
@@ -984,9 +988,10 @@ class Service:
         """An Identity's skill videos as the game names them: {n: {slot, name}} (n is not the tier)."""
         own = self.form_skills(cid)
         owner = self.form_owner(cid) or cid
-        if not isinstance(owner, int) or not str(owner).startswith("1"):
+        if not isinstance(owner, int) or not str(owner).startswith(("1", "4")):
             return {}
-        u = next((x for x in self.unit_db().get("ids", []) if x.get("id") == owner), None)
+        db = self.unit_db()
+        u = next((x for x in db.get("ids", []) + db.get("events", []) if x.get("id") == owner), None)
         if not u:
             return {}
 
@@ -1461,7 +1466,7 @@ class Service:
             db = sqlite3.connect(db_path)
             m: dict[int, set] = {}
             for bundle, name in db.execute("select bundle, name from o where type='GameObject' and name like '%Appearance'"):
-                mm = re.match(r"^(\d{5})_", name or "")
+                mm = re.match(r"^(\d{5,6})_", name or "")  # (4000xx: an event's Identities)
                 if mm:
                     m.setdefault(int(mm.group(1)), set()).add(bundle)
             db.close()
