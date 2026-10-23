@@ -25,6 +25,12 @@ KEEP = "max-age=3600"
 # lists only a new snapshot changes: kept in memory after the first time
 PER_SNAPSHOT = {"/api/battle_maps", "/api/bgm_tracks", "/api/game_pics", "/api/types", "/api/stages", "/api/gacha", "/api/mirror",
                 "/api/game_voices", "/api/announcers", "/api/growth"}
+# Windows takes these from the registry, where some programs write text/plain (the window then drops every stylesheet)
+for _t, _exts in {"text/css": ".css", "text/javascript": ".js .mjs", "application/json": ".json", "text/html": ".html .htm",
+                  "image/svg+xml": ".svg", "font/woff2": ".woff2", "font/woff": ".woff", "font/ttf": ".ttf",
+                  "image/webp": ".webp", "image/png": ".png", "video/webm": ".webm", "video/mp4": ".mp4"}.items():
+    for _e in _exts.split():
+        mimetypes.add_type(_t, _e)
 
 
 def _etag(svc) -> str:
