@@ -1645,7 +1645,7 @@ function dcaModel(x, sk, up) {
     },
     target: (s0, o, face = "best") => {
       const s = link(s0).s, x2 = m.mods(s0, o), seq = dcbSeq(u, x2), heads = face === "best" ? u.op !== "SUB" : face === "heads";
-      const stag = [], blog = [], bflat = [], on = s.tb !== 0;
+      const stag = [], blog = [], bflat = [], gone = [], on = s.tb !== 0;
       // one-number statuses on the target (Promised Nail …): what coins inflict, what they consume, what they deal on a Tremor Burst
       const one = Object.fromEntries(t1.map((kw) => [kw, s[`t_${kw}`] || 0])), one0 = { ...one }, used = new Set(), paid = {};
       const T = dcbSim([...tKws].map((kw) => [kw, s[`t_${kw}_p`] || 0, s[`t_${kw}_c`] || 0]), seq.map(([ci], j) => ({
@@ -1655,7 +1655,7 @@ function dcaModel(x, sk, up) {
             if (!one[kw] || !dcaDeathOk(d, s)) continue;
             one[kw]--;
             if (d.cnt) f.addC("Burst", d.cnt, dcaG(kw).name || kw);
-            if (one[kw] <= 0) { (bflat[j] ||= []).push([p, d.sin[0].toUpperCase() + d.sin.slice(1).toLowerCase()]); blog.push({ lab: dcaG(kw).name || kw, hit: p, sin: d.sin, kw }); }
+            if (one[kw] <= 0) { (bflat[j] ||= []).push([p, d.sin[0].toUpperCase() + d.sin.slice(1).toLowerCase()]); blog.push({ lab: dcaG(kw).name || kw, hit: p, sin: d.sin, kw }); gone.push([kw, j]); }
           }
         },
         post: (f) => {
@@ -1689,7 +1689,7 @@ function dcaModel(x, sk, up) {
           }
           eat1.forEach(([i, kw]) => { if (i === ci && one[kw]) { blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, eat: one[kw] }); one[kw] = 0; } });  // "Consume all [X] on target"
         } })));
-      return { dmg: T.dmg, log: T.log, stag, blog, bflat, end: T.t, st: [...[...tKws].map((kw) => [kw, { p: s[`t_${kw}_p`] || 0, c: s[`t_${kw}_c`] || 0 }, T.t[kw]]), ...t1.map((kw) => [kw, one0[kw], one[kw]])], extra: [] };
+      return { dmg: T.dmg, log: T.log, stag, blog, bflat, gone, end: T.t, st: [...[...tKws].map((kw) => [kw, { p: s[`t_${kw}_p`] || 0, c: s[`t_${kw}_c`] || 0 }, T.t[kw]]), ...t1.map((kw) => [kw, one0[kw], one[kw]])], extra: [] };
     },
     deaths: deaths.length ? deaths : null,
     nodmg, chains: [...new Set(chains.map((c) => c.from))], chainNote: (s) => link(s).notes, linked: (s) => link(s).s,
@@ -1712,11 +1712,15 @@ function dcbCalc(m, u, s, o, env, face = "best") {
   const seq = dcbSeq(u, x), n = seq.length, diff = env.diff0 + x.diff;
   const mod = 1 + diff / (Math.abs(diff) + 25) + dcRmod(res(u.atk)) + dcRmod(res(u.sin)) + (x.crit ? 0.2 : 0) + 0.03 * (x.clash || 0);
   let roll = u.base + x.base, total = 0;
+  const xg = {};
   const coins = [];
   for (let i = 0; i < n; i++) {
     const [ci, again] = seq[i];
     if (heads) roll += add ? u.coin + x.cp + (x.coinCp[ci] || 0) : -u.coin;  // a Reuse tosses again
-    const fin = i === n - 1, r = roll + x.fp + (fin ? x.last : 0) + (x.coinFp[ci] || 0), d = x.dyn + (fin ? x.lastDyn : 0) + (i === 0 ? x.firstDyn || 0 : 0) + (x.coinDyn[ci] || 0) + (x.powDyn || []).reduce((a, p) => a + Math.min(p.cap ?? 1e9, p.v * Math.max(0, r)), 0)
+    // a Deathrite that went off on an earlier coin is gone: its "target has [X]" damage bonus stops
+    const gk = T && T.gone ? T.gone.filter(([, j]) => j < i).map(([kw]) => kw) : [];
+    const gdyn = gk.length ? (xg[gk.join()] ??= m.mods({ ...s, ...Object.fromEntries(gk.map((kw) => [`t_${kw}`, 0])) }, o)).dyn - x.dyn : 0;
+    const fin = i === n - 1, r = roll + x.fp + (fin ? x.last : 0) + (x.coinFp[ci] || 0), d = gdyn + x.dyn + (fin ? x.lastDyn : 0) + (i === 0 ? x.firstDyn || 0 : 0) + (x.coinDyn[ci] || 0) + (x.powDyn || []).reduce((a, p) => a + Math.min(p.cap ?? 1e9, p.v * Math.max(0, r)), 0)
       + (i > 0 ? (x.hpDyn || []).reduce((a, p) => a + (typeof p.scope !== "number" || p.scope === ci ? Math.min(p.cap ?? 1e9, p.v * 100 * coins[0].main / DCA_HP) : 0), 0) : 0);
     const sh = (x.share || 0) + (fin ? x.lastShare || 0 : 0) + ((x.coinShare || [])[ci] || 0);
     // "N% of this Coin's final damage": its own hit on top of the coin's
