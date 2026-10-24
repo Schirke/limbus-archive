@@ -919,6 +919,7 @@ function dcaLine(raw, ctx) {
   ctx.last = conds;
   const late = tags.some((g) => /^(OnSucceedAttack|OnWinDuel|OnLoseDuel|OnEndSkill|EndSkill|OnKill|AfterAttack|OnEndTurn|OnDie)/i.test(g));
   if (tags.some((g) => /^(EnemyKill|OnKill)$/i.test(g)) || /^\(Does not activate on Reuse/i.test(rest) || /^If this Coin defeated the target|^If 1 or more targets are killed/i.test(t)) return { none: t, why: "only after a kill" };
+  if (tags.some((g) => /^(DefeatDuel|OnLoseDuel)$/i.test(g))) return { none: t, why: "only on Clash Lose (then this Skill does not hit)" };
   const crit = /Critical Hit/i.test(rest);
   const ty = DCA_TYPES.exec(rest);
   if (ty && ctx.atk && ty[1] !== ctx.atk && ty[1] !== ctx.sin && !/bonus|equal to|of (?:this|each|the)? ?(?:Coin's final damage|damage dealt)/i.test(rest)) return { none: t, why: `${ty[1]} only` };
