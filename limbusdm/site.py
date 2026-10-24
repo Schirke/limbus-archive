@@ -1284,6 +1284,17 @@ class Exporter:
         return sitefx.export(self)
 
     # -- the site around the data
+    def _small_icon(self):
+        """The site's ui/icon.png at the size it's shown (the app's is 256 px for the exe's icon)."""
+        from PIL import Image
+        path = os.path.join(self.out, "ui", "icon.png")
+        try:
+            im = Image.open(os.path.join(resource_dir(), "ui", "icon.png")).convert("RGBA")
+            im.thumbnail((96, 96), Image.LANCZOS)
+            im.quantize(256, method=Image.FASTOCTREE).save(path, optimize=True)  # (~5 KB, was 80)
+        except OSError:
+            pass  # (the full one stays)
+
     def shell(self):
         """index.html, UI files, service worker, d/index.json."""
         ui = os.path.join(resource_dir(), "ui")
@@ -1297,10 +1308,13 @@ class Exporter:
         stamp = str(int(time.time()))
         url = (self.cfg.get("url") or "").rstrip("/")
         cards = self.card_pages(url)  # (before the sections: their lists link to the cards)
+        # (styles named by the build too: sw.js keeps them until the next one)
+        html = re.sub(r'(<link rel="stylesheet" href="/ui/[^"?]+\.css)"', rf'\1?{stamp}"', html)
+        self._small_icon()
         pages = self.section_pages(html)
         script_urls = [s + "?" + stamp for s in scripts + ["/ui/site/site.js"]]
         boot = f"""<script>
-const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "titles": {r: t for r, (t, _, _) in pages.items()}, "scripts": script_urls})};
+const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(self.svc), "open": self.open_routes(), "stats": "key" if self.cfg.get("stats_key") else "all", "titles": {r: t for r, (t, _, _) in pages.items()}, "scripts": script_urls, "stamp": stamp})};
 (async () => {{
   // come from the site's old address (ui/site/worker.js moved): what the browser kept there, where nothing is kept here
   if (location.hash.startsWith("#move=")) {{
@@ -1316,13 +1330,25 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
   // (a section's page keeps the text it was written with: what a search engine reads, the app not starting)
   const fail = (m) => {{ document.getElementById("main").insertAdjacentHTML("afterbegin", '<div class="empty">' + m + '</div>'); }};
   if (!("serviceWorker" in navigator)) return fail("This site needs service workers — open it in a normal (not private) window of a current browser.");
+  const again = [];  // (a first visit's styles and scripts, come before the worker)
   try {{
     await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
     if (!navigator.serviceWorker.controller) {{
-      // the first visit: the page (its fonts, its pictures) started before the worker could answer — start again with it
-      if (!sessionStorage.getItem("sw-reload")) {{ sessionStorage.setItem("sw-reload", "1"); return location.reload(); }}
-      await new Promise((ok) => navigator.serviceWorker.addEventListener("controllerchange", ok, {{ once: true }}));
+      // the first visit: the worker takes this page over (sw.js claims it); the styles' fonts and pictures, asked before it could
+      // answer, are asked again. Not taken over in time: start again with it
+      const took = await new Promise((ok) => {{
+        navigator.serviceWorker.addEventListener("controllerchange", () => ok(true), {{ once: true }});
+        setTimeout(() => ok(!!navigator.serviceWorker.controller), 4000);
+        if (navigator.serviceWorker.controller) ok(true);
+      }});
+      if (took) {{
+        for (const l of document.querySelectorAll('link[rel="stylesheet"]')) {{
+          again.push(l.href);
+          const n = l.cloneNode(); n.href = l.href + (l.href.includes("?") ? "&" : "?") + "sw"; n.onload = n.onerror = () => l.remove(); l.after(n); }}
+        again.push(...SITE.scripts);
+      }} else if (!sessionStorage.getItem("sw-reload")) {{ sessionStorage.setItem("sw-reload", "1"); return location.reload(); }}
+      else await new Promise((ok) => navigator.serviceWorker.addEventListener("controllerchange", ok, {{ once: true }}));
     }}
     sessionStorage.removeItem("sw-reload");
     navigator.serviceWorker.controller.postMessage("reload");
@@ -1332,6 +1358,8 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
   // (all asked for at once; "async = false" keeps the order they run in — one after another they cost a round trip each)
   await Promise.all(SITE.scripts.map((src) => new Promise((ok, bad) => {{
     const s = document.createElement("script"); s.src = src; s.async = false; s.onload = ok; s.onerror = bad; document.body.appendChild(s); }})));
+  // (asked once more through the worker, later: it keeps them for the next visit)
+  if (again.length) setTimeout(() => {{ for (const u of again) fetch(u).catch(() => {{}}); }}, 6000);
 }})();
 </script>
 """

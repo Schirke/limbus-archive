@@ -204,11 +204,29 @@ async function packed(req, [pack, off, len, ext]) {
   return part(req, blob, off, len, type);
 }
 
+// the site's scripts and styles, named by the build (?<stamp>): kept until the next build, not asked again each visit
+let uiBuild = null;
+async function uiFile(req, build) {
+  const cache = await caches.open("ui").catch(() => null);
+  const hit = cache && await cache.match(req.url).catch(() => null);
+  if (hit) return hit;
+  const r = await fetch(req);
+  if (r.ok && r.status === 200 && cache) {
+    cache.put(req.url, r.clone()).catch(() => {});
+    if (uiBuild !== build) {  // (an older build's go)
+      uiBuild = build;
+      cache.keys().then((ks) => ks.forEach((k) => { if (new URL(k.url).search !== build) cache.delete(k); })).catch(() => {});
+    }
+  }
+  return r;
+}
+
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener("message", (e) => { if (e.data === "reload") ready(true); });
 self.addEventListener("fetch", (e) => {
   const u = new URL(e.request.url);
+  if (u.origin === location.origin && e.request.method === "GET" && /^\/ui\/[^?]+\.(js|css)$/.test(u.pathname) && /^\?\d+$/.test(u.search)) return e.respondWith(uiFile(e.request, u.search));
   if (u.origin !== location.origin || !/^\/(api|spine)\//.test(u.pathname)) return;
   if (u.pathname === "/api/_busy") { const w = work(e.clientId); return e.respondWith(json({ n: w.keys.size, busy: w.busy })); }
   if (u.pathname === "/api/_misses" || !e.clientId) return e.respondWith(answer(e.request, u, e));

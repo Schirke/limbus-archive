@@ -271,16 +271,29 @@ async function refresh() {
   snapGate();
   if (typeof bigSync === "function") bigSync();  // (admins see the hidden pages)
   const had = new Set(Object.keys(routes));
-  if (!window.bigLoaded) {  // the big games (ui/big, built: biggames.js); true once all are in
-    let left = (STATE.big || []).length;
-    window.bigLoaded = left ? "loading" : true;
-    for (const n of STATE.big || []) {
-      const s = document.createElement("script"); s.src = `/ui/big/${n}.js`; s.async = false; document.head.appendChild(s);
-      s.onload = s.onerror = () => {
-        if (!--left) window.bigLoaded = true;
-        const name = location.hash.split("/")[1]; if (routes[name] && (!had.has(name) || (!left && name === "biggames"))) route(); Object.keys(routes).forEach((k) => had.add(k));
-      };
-    }
+  if (!window.bigLoaded && !refresh.bigLater) {  // the big games (ui/big, built: biggames.js); true once all are in
+    const big = STATE.big || [];
+    const load = () => {
+      if (window.bigLoaded) return;
+      const had = new Set(Object.keys(routes));
+      let left = big.length;
+      window.bigLoaded = left ? "loading" : true;
+      for (const n of big) {
+        const s = document.createElement("script"); s.src = `/ui/big/${n}.js` + (typeof SITE !== "undefined" && SITE.stamp ? "?" + SITE.stamp : ""); s.async = false; document.head.appendChild(s);
+        s.onload = s.onerror = () => {
+          if (!--left) window.bigLoaded = true;
+          const name = location.hash.split("/")[1]; if (routes[name] && (!had.has(name) || (!left && name === "biggames"))) route(); Object.keys(routes).forEach((k) => had.add(k));
+        };
+      }
+    };
+    // (on the site a page that shows none of them doesn't wait for them: fetched when such a page opens or a bit later)
+    const page = () => location.hash.split("/")[1] || "patches";
+    const needs = (p) => !routes[p] || p.startsWith("game") || ["biggames", "workshop", "versus", "vsroom", "music", "profile"].includes(p);
+    if (STATE.site && big.length && !needs(page())) {
+      refresh.bigLater = true;
+      window.addEventListener("hashchange", () => { if (needs(page())) load(); });
+      setTimeout(() => (window.requestIdleCallback || setTimeout)(load), 4000);
+    } else load();
   }
   if (STATE.ext && !window.extLoaded) {  // optional extensions (the ext folder in the data folder, not part of the app's files)
     window.extLoaded = true;
