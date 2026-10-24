@@ -538,7 +538,7 @@ const DC_STAG = new Proxy({}, { get: () => 2 });  // resistances of a Staggered 
 // plain status names in texts
 const DCA_NAMES = { Burn: "Combustion", Bleed: "Laceration", Tremor: "Vibration", Rupture: "Burst", Sinking: "Sinking", Poise: "Breath", Charge: "Charge", Haste: "Agility", Fragile: "Vulnerable", Fanatic: "AssemblePersonality", Nails: "NailPersonality" };
 const DCA_TYPES = /\b(Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)\s+(?:damage|Skills?)\b/i;
-const DCA_EFF = { cp: "Coin Power", fp: "Final Power", bp: "Base Power", ol: "Offense Level", dyn: "damage", sub: "damage to the other targets", only: "only one kind of target", force: "every Reuse effect", take: "damage taken", reuse: "Reuse", tm: "Time Moratorium: damage +15% per stack, as Sloth" };
+const DCA_EFF = { cp: "Coin Power", fp: "Final Power", bp: "Base Power", ol: "Offense Level", dyn: "damage", sub: "damage to the other targets", only: "only one kind of target", force: "every Reuse effect", take: "damage taken", reuse: "Reuse", aw: "Atk Weight", tm: "Time Moratorium: damage +15% per stack, as Sloth" };
 const dcaPlain = (t) => String(t || "").replace(/<[^>]*>/g, "").replace(/\{\/?hl\}/g, "").replace(/\s+/g, " ").trim();
 const dcaG = (k) => { const g = UNITS.glossary[k]; if (g && k === "KnowledgeExplored" && g.max == null) g.max = 3; return g || {}; };  // Insight = a Skill's rank, 1-3
 // English texts (the page may show another language)
@@ -1138,9 +1138,9 @@ function dcaClause(rest, ctx) {
   const rx2 = /Reuse (?:this )?Coin \(\((.+?)\s*\/\s*(\d+)\) - (\d+)\) times/i.exec(rest);  // "Reuse this Coin (([X] consumed / 10) - 1) times (3 times max)"
   if (rx2) { const q = dcaT2(rx2[1], null, ctx), mx = /(\d+) times max|max (\d+) times/i.exec(rest); return q ? [{ k: "reuse", v: 1, per: q, every: +rx2[2], off: -rx2[2] * rx2[3], cap: mx ? +(mx[1] || mx[2]) : undefined }] : "unk"; }
   if (rx) { const q = dcaT2(rx[1], null, ctx), mx = /(\d+) times max|max (\d+) times/i.exec(rest); return q ? [{ k: "reuse", v: 1, per: q, every: 1, off: -rx[2], cap: mx ? +(mx[1] || mx[2]) : undefined }] : "unk"; }
-  const EFF = /(Coin Power|Final Power|Base Power|Offense Level|Clash Power|Skill Power)\s*([+-])\s*(\d+)|deals?\s+(?:an additional\s+)?\+\(([^%]*?)\)%\s+(?:more\s+)?(?:\w+\s+)?damage|takes?\s+\+(\d+(?:\.\d+)?)%\s+(?:more\s+)?damage|(?:deals?\s+(?:an additional\s+)?)?\+(\d+(?:\.\d+)?)%\s*(?:more\s+)?(?:\w+\s+)?damage|Reuse (?:this |the final )?Coin|([+-]\d+) (Final Power|Coin Power|Offense Level|Base Power|Skill Power)|deals?\s+\w+\s+damage equal to (?:(\d+(?:\.\d+)?)|\(([^%]*?)\))% of this Coin's final damage/gi;
+  const EFF = /(Coin Power|Final Power|Base Power|Offense Level|Clash Power|Skill Power|Atk Weight)\s*([+-])\s*(\d+)|deals?\s+(?:an additional\s+)?\+\(([^%]*?)\)%\s+(?:more\s+)?(?:\w+\s+)?damage|takes?\s+\+(\d+(?:\.\d+)?)%\s+(?:more\s+)?damage|(?:deals?\s+(?:an additional\s+)?)?\+(\d+(?:\.\d+)?)%\s*(?:more\s+)?(?:\w+\s+)?damage|Reuse (?:this |the final )?Coin|([+-]\d+) (Final Power|Coin Power|Offense Level|Base Power|Skill Power|Atk Weight)|deals?\s+\w+\s+damage equal to (?:(\d+(?:\.\d+)?)|\(([^%]*?)\))% of this Coin's final damage/gi;
   for (let m; (m = EFF.exec(rest));) {
-    if (m[1]) { if (/clash/i.test(m[1])) continue; fx.push({ k: { "coin power": "cp", "final power": "fp", "skill power": "fp", "base power": "bp", "offense level": "ol" }[m[1].toLowerCase()], v: (m[2] === "-" ? -1 : 1) * +m[3] }); }  // "Skill Power" = older word for Final Power
+    if (m[1]) { if (/clash/i.test(m[1])) continue; fx.push({ k: { "coin power": "cp", "final power": "fp", "skill power": "fp", "base power": "bp", "offense level": "ol", "atk weight": "aw" }[m[1].toLowerCase()], v: (m[2] === "-" ? -1 : 1) * +m[3] }); }  // "Skill Power" = older word for Final Power
     else if (m[4] != null) {
       let e = m[4].replace(/\s+/g, " ").trim().replace(/\[(\w+)\] Potency x Count\b/i, "[$1] Potency x [$1] Count"), off = 0;
       // "+(50 + [Poise] on self + [Rupture] on target)%": a number plus counts
@@ -1167,7 +1167,7 @@ function dcaClause(rest, ctx) {
       if (!q) return "unk";
       fx.push({ k: "dyn", v: +mm[2], per: q, every: 0, own: 1 });
     }
-    else if (m[7] != null) fx.push({ k: { "coin power": "cp", "final power": "fp", "skill power": "fp", "base power": "bp", "offense level": "ol" }[m[8].toLowerCase()], v: +m[7] });
+    else if (m[7] != null) fx.push({ k: { "coin power": "cp", "final power": "fp", "skill power": "fp", "base power": "bp", "offense level": "ol", "atk weight": "aw" }[m[8].toLowerCase()], v: +m[7] });
     else if (/cannot|can't/i.test(rest)) return "none";
     else if (/\b(?:final|with (?:the|a)|by (?:the|a)|each|on)\s*$/i.test(rest.slice(0, m.index))) continue;  // "On Hit with the final Reuse Coin, …": names a coin, no Reuse
     else { const n = /Coin once/i.test(rest) ? 1 : +((/(\d+) times? max|max (\d+) times?|(\d+) times/i.exec(rest) || []).slice(1).find(Boolean) || (/twice/i.test(rest) ? 2 : 1));
@@ -1485,6 +1485,13 @@ function dcaModel(x, sk, up) {
     ks.forEach((z) => { if (!(z in needs)) needs[z] = 0; });
     dcaNeeds(null, [{ q: c.q, n: c.every * 5 }], needs);
   }
+  // "Gain 1 [X] every time this unit consumes 10 cumulative [X] Count" (passive) + this Skill consumes [X] Count: Potency up for the checks after it
+  const cu = /At (\d+)\+ \[(\w+)\] Count, consume up to (\d+) \[\2\] Count/i.exec(dcaPlain(u.desc));
+  if (cu && dcaG(cu[2]).st === 2) for (const p of x.passives || []) {
+    if (p.kind !== "battle") continue;
+    const g = new RegExp(`Gain (\\d+) \\[${cu[2]}\\] every time this unit consumes (\\d+) cumulative \\[${cu[2]}\\] Count`, "i").exec(dcaPlain(dcaEn("ps", p.id, p.desc) || ""));
+    if (g) chains.push({ from: cu[2], to: cu[2], side: "self", part: "p", v: +g[1], every: +g[2], at: +cu[1], q: { kw: cu[2], side: "self", part: "c", cap: +cu[3] }, name: `${dcaPlain(p.name)} (Count consumed)` });
+  }
   // statuses the rows check also count by themselves
   const walk = (q) => { if (!q) return; if (q.sum) q.sum.forEach(walk); else if (q.kw) tryStatus(q.side, q.kw, [], 0); };
   [...rows].forEach((r) => r.parts.forEach(({ f, conds }) => { walk(f.per); conds.forEach((c) => walk(c.q)); }));
@@ -1595,7 +1602,7 @@ function dcaModel(x, sk, up) {
   // chained slider values
   const link = (s0) => {
     // targets hit → excess Atk Weight
-    const tw = u.targets || 1, hit = Math.max(1, Math.min(tw, s0.g_hit || 1)), s = { ...s0, g_hit: hit, g_aw: tw - hit };
+    const tw = (u.targets || 1) + (s0.g_awAdd || 0), hit = Math.max(1, Math.min(tw, s0.g_hit || 1)), s = { ...s0, g_hit: hit, g_aw: tw - hit };
     if (!chains.length) return { s, notes: {} };
     const s2 = { ...s }, notes = {};
     for (const c of chains) {
@@ -1615,7 +1622,11 @@ function dcaModel(x, sk, up) {
     auto: true, rows, stn: stk === "Sinking" ? "Gloom" : stk ? "Rupture" : "", stk, u: u.into ? u : undefined, bursts: bursts.length ? bursts : null,
     bat: { auto: true },
     mods: (s0, o) => {
-      const s = link(s0).s, out = { base: 0, cp: 0, fp: 0, last: 0, dyn: 0, diff: 0, lastDyn: 0, firstDyn: 0, subDyn: 0, coinDyn: [], coinCp: [], coinFp: [], reuseAt: [], coinFlat: [], flatAll: [] };
+      let s = link(s0).s;
+      // "gain +N Atk Weight": more targets or excess Atk Weight
+      const awAdd = rows.reduce((a, r) => !o[r.k] || r.seq ? a : r.parts.reduce((b, { f, conds }) => f.k === "aw" ? b + dcaEff(f, conds, s) : b, a), 0);
+      if (awAdd) s = link({ ...s0, g_awAdd: awAdd }).s;
+      const out = { aw: awAdd, base: 0, cp: 0, fp: 0, last: 0, dyn: 0, diff: 0, lastDyn: 0, firstDyn: 0, subDyn: 0, coinDyn: [], coinCp: [], coinFp: [], reuseAt: [], coinFlat: [], flatAll: [] };
       const forced = rows.some((r) => o[r.k] && r.parts.some(({ f, conds }) => f.k === "force" && dcaEff(f, conds, s)));  // "unconditionally activate all Reuse effects"
       for (const r of rows) if (o[r.k]) {
         if (r.seq) {  // stacks grow with every coin that inflicted them
@@ -1634,7 +1645,7 @@ function dcaModel(x, sk, up) {
         r.parts.forEach(({ f }, i) => {
           const v = vs[i];
           if (!v) return;
-          if (f.k === "take") return;  // this unit takes more
+          if (f.k === "take" || f.k === "aw") return;  // this unit takes more; Atk Weight above
           if (f.share && f.k === "dyn") {  // share of the final damage
             const put = (o2) => { if (typeof f.scope === "number") (o2.coinShare ||= [])[f.scope] = (o2.coinShare[f.scope] || 0) + v; else if (f.scope === "last") o2.lastShare = (o2.lastShare || 0) + v; else o2.share = (o2.share || 0) + v; };
             put(out); if (f.share === "all") put(out.shAll ||= {});
@@ -1818,7 +1829,7 @@ function dcModelOf(x, sk) {
 }
 // the state a skill is counted in: the sliders + the targets pick
 function dcS(u, base) {
-  const h = Math.max(1, Math.min(u.targets || 1, dc.hit || 1));
+  const h = Math.max(1, Math.min(9, dc.hit || 1));
   return { ...base, g_hit: h, allT: (dc.hit || 1) > 1 ? 1 : base.allT || 0 };
 }
 const dcEnv = (u) => { const t = dcTarget(); return { diff0: dc.lv + (u.level || 0) - t.def, R: t.R }; };
@@ -2465,7 +2476,7 @@ function dcbRefresh() {
   const xd = new Map(), xput = (k, v, n = 1) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0 }; e.v += v; e.n += n; xd.set(k, e); };
   C.forEach((c) => { xput(m.stk === "Burst" ? "Rupture" : m.stk || m.stn, c.sdmg); xput(c.fsin || m.flatSin, c.flat); xput("share", c.shd, c.shn); });
   const sd = [...xd.values()].reduce((a, e) => a + e.v, 0);
-  const ci = dc.coin >= 0 && dc.coin < C.length ? dc.coin : C.length - 1, sel = C[ci], w = u.targets || 1, h = now.x.targets || 1;
+  const ci = dc.coin >= 0 && dc.coin < C.length ? dc.coin : C.length - 1, sel = C[ci], w = (u.targets || 1) + (now.x.aw || 0), h = now.x.targets || 1;
   const xc = (c) => {  // what only this coin has
     const out = [], X = now.x;
     if (X.coinDyn[c.ci]) out.push(`${dcSign(+X.coinDyn[c.ci].toFixed(1))}% this coin`);
