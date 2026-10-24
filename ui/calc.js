@@ -578,6 +578,14 @@ function dcaTerm(t, side, ctx = {}) {
   if (/^(?:highest |\w+ )?A-Reson\.?$/i.test(t)) return { g: "ares" };
   if ((m = /^SP value below (-?\d+)$/i.exec(t))) return { ...(ctx.condTerm && ctx.condTerm.g ? ctx.condTerm : { g: "sp" }), abs: true, from: +m[1], dir: -1 };
   if (/types? of negative effects?/i.test(t)) return { g: "neg" };
+  if ((m = /^types? of (.+)$/i.exec(t))) {  // "2+ types of Mauled Color": statuses named "Mauled Color [Rouge]", "… [Bleu]"
+    const by = new Map(), nm = m[1].toLowerCase();
+    for (const [kw, g] of Object.entries(UNITS.glossary || {})) {
+      const n = String(g.name || "").toLowerCase();
+      if (g.st && n.startsWith(nm + " [") && (!by.has(n) || /Ally$/.test(kw))) by.set(n, kw);  // one kw per name, the IDs' "Ally" copy first
+    }
+    if (by.size > 1) return { types: [...by.values()].map((kw) => ({ kw, side: side || "target", part: "s" })), tname: m[1] };
+  }
   if (/^missing HP(?: percentage)?$/i.test(t)) return { g: side === "target" ? "mhpT" : "mhp" };
   if (/^(?:the )?target's missing HP$/i.test(t) || /^missing HP(?: percentage)? on (?:the )?(?:enemy|target)/i.test(t)) return { g: "mhpT" };
   if (/^Cracked Coins?$/i.test(t)) return { g: "crack" };
@@ -616,6 +624,7 @@ function dcaTerm(t, side, ctx = {}) {
 }
 function dcaVal(q, s) {
   if (q.sum) return q.sum.reduce((a, p) => a + dcaVal(p, s), 0);
+  if (q.types) return q.types.filter((p) => dcaVal(p, s) > 0).length;
   if (q.prod) return q.prod.reduce((a, p) => a * dcaVal(p, s), 1);
   if (q.g) return (q.abs ? Math.abs((s[`g_${q.g}`] || 0) - (q.from || 0)) : (q.neg ? -1 : 1) * (s[`g_${q.g}`] || 0)) - (q.sub || 0);
   if (q.res) return Math.round((DCA_R[q.res] ?? 1) * (q.scale || 1) * 100) / 100 - (q.sub || 0);
@@ -705,6 +714,13 @@ function dcaFocus() {
   const a = /On Tremor Burst, take (\w+) Damage equal to \((\d+) \+ sum of Charge Potency or Unique Charge on the attacker x (\d+)\)% of Tremor Potency.*?\(max (\d+)%\)/i.exec(dcaPlain(dcaEn("gl", "VibrationFocusing", dcaG("VibrationFocusing").desc) || ""));
   return (DCA_FZ = a ? { sin: a[1][0].toUpperCase() + a[1].slice(1).toLowerCase(), base: +a[2], per: +a[3], max: +a[4] } : null);
 }
+// Tremor - Scorch: "On Tremor Burst, take Wrath Damage equal to (sum of Tremor Potency and Burn Potency / 2), and lose 1 Burn Count"
+let DCA_SC;
+function dcaScorch() {
+  if (DCA_SC !== undefined) return DCA_SC;
+  const a = /On Tremor Burst, take (\w+) Damage equal to \(sum of Tremor Potency and Burn Potency \/ 2\)(?:, and lose (\d+) Burn Count)?/i.exec(dcaPlain(dcaEn("gl", "VibrationIgnition", dcaG("VibrationIgnition").desc) || ""));
+  return (DCA_SC = a ? { sin: a[1][0].toUpperCase() + a[1].slice(1).toLowerCase(), lose: a[2] ? +a[2] : 0 } : null);
+}
 // a passive's price on inflicting [X] ("When inflicting [X] using Skill effects: At 12+ [Y] Count, inflict +1 more [X] and consume 4 [Y] Count;
 // at fewer than 12 consume 2; at insufficient [Y] Count, does not inflict [X]") → { by, at, more, hi, lo }
 function dcaInfPay(kw) {
@@ -727,6 +743,7 @@ const dcaDeathOk = (d, s) => (!/10\+ Speed/i.test(d.by) || (s.g_speed || 0) >= 1
 function dcaLabel(q) {
   if (q.div) return [dcaLabel({ ...q, div: 0 }), q.div].join(" / ");
   if (q.sum) return q.sum.map(dcaLabel).join(" + ");
+  if (q.types) return `types of ${q.tname} on ${q.types[0].side}`;
   if (q.prod) return q.prod.map(dcaLabel).join(" × ");
   if (q.res) return q.scale ? `${q.res} resistance over 1 (tenths)` : `target's ${q.res} resistance`;
   if (q.pow) return "this Skill's Power";
@@ -881,7 +898,7 @@ function dcaLine(raw, ctx) {
   const named = /^(?:Skills?|Base Skills?)\s+((?:["“'][^"”']+["”'](?:,?\s*(?:and|or)?\s*)?)+)/i.exec(t);
   if (named && ctx.name) {
     const names = [...named[1].matchAll(/["“']([^"”']+)["”']/g)].map((q) => q[1].trim().toLowerCase());
-    if (!names.includes(ctx.name.toLowerCase())) return { none: t, why: "another Skill", quiet: 1 };
+    if (![ctx.name, dcaNames(ctx.name)].some((n) => names.includes(n.toLowerCase()))) return { none: t, why: "another Skill", quiet: 1 };  // status names inside the quotes are already [kw] ("High Noon")
   }
   // condition before the first top-level comma or colon
   // a sentence over several lines ("At 7~14 Charge Count" / "Consume all …," / "And …") keeps its condition
@@ -1223,6 +1240,7 @@ function dcaNeeds(f, conds, out) {
     if (q.div) { put({ ...q, div: 0 }, n * q.div); return; }
     if (q.sub) n += q.sub;
     if (q.sum) { q.sum.forEach((p) => put(p, Math.ceil(n / q.sum.length))); return; }
+    if (q.types) { q.types.slice(0, n).forEach((p) => put(p, 1)); return; }
     if (q.prod) { q.prod.forEach((p) => put(p, Math.ceil(Math.sqrt(n)))); return; }
     if (q.g) { const k = `g_${q.g}`; if (q.what) (out.__w ||= {})[q.g] = q.what; out[k] = q.abs ? 45 * (q.dir || 1) : q.g === "sp" || q.g === "spT" ? (q.neg ? Math.min(out[k] ?? 0, -n) : Math.max(out[k] ?? 0, n)) : Math.max(out[k] || 0, n); return; }
     const base = `${q.side[0]}_${q.kw}`, M = (k, v) => { out[k] = Math.max(out[k] || 0, v); };
@@ -1237,7 +1255,7 @@ function dcaNeeds(f, conds, out) {
   });
   if (f && f.tiers) put(f.per, f.tiers[f.tiers.length - 1][0]);
   if (f && f.per && f.v > 0) {
-    const mx = (q) => q.sum ? q.sum.reduce((t, z) => t + (mx(z) || 0), 0) : q.kw && dcaG(q.kw).max;
+    const mx = (q) => q.sum ? q.sum.reduce((t, z) => t + (mx(z) || 0), 0) : q.types ? q.types.length : q.kw && dcaG(q.kw).max;
     const n = f.k === "reuse" && f.cap == null ? (mx(f.per) || (f.every || 1) * 2) - (f.off || 0)  // uncapped Reuse count: 2
       : (f.cap != null && f.v ? (f.every ? f.every * Math.ceil(Math.abs(f.cap / f.v)) : Math.ceil(Math.abs(f.cap / f.v))) : mx(f.per) || (f.every || 1) * 5) - (f.off || 0);
     put(f.per, f.per.g === "sp" || f.per.g === "spT" ? 45 : f.per.g && f.cap == null ? DCA_G[f.per.g][2] : f.per.cap != null ? Math.min(f.per.cap, n) : n);
@@ -1496,7 +1514,7 @@ function dcaModel(x, sk, up) {
     if (g) chains.push({ from: cu[2], to: cu[2], side: "self", part: "p", v: +g[1], every: +g[2], at: +cu[1], q: { kw: cu[2], side: "self", part: "c", cap: +cu[3] }, name: `${dcaPlain(p.name)} (Count consumed)` });
   }
   // statuses the rows check also count by themselves
-  const walk = (q) => { if (!q) return; if (q.sum) q.sum.forEach(walk); else if (q.kw) tryStatus(q.side, q.kw, [], 0); };
+  const walk = (q) => { if (!q) return; if (q.sum || q.types) (q.sum || q.types).forEach(walk); else if (q.kw) tryStatus(q.side, q.kw, [], 0); };
   [...rows].forEach((r) => r.parts.forEach(({ f, conds }) => { walk(f.per); conds.forEach((c) => walk(c.q)); }));
   // a status only passives give sits in the Passives block; a passive that gives a counted status is not "nothing for damage"
   for (const r of stRows) {
@@ -1548,6 +1566,9 @@ function dcaModel(x, sk, up) {
   if (bursts.length) tKws.add("Vibration");
   // "Trigger [Switch_Vibration] into [VibrationFocusing]": from that coin on, every Burst also deals Focus's Sloth damage
   const focusAt = (u.coindescs || []).findIndex((cd) => cd.some((d) => /\[Switch_Vibration\] into \[VibrationFocusing\]/i.test(dcaPlain(d)))), fz = dcaFocus();
+  // "… into [VibrationIgnition]" (Tremor - Scorch): from that coin on (skill text: every hit) a Burst also deals (Tremor + Burn Potency) / 2
+  const ignRe = /\[Switch_Vibration\] into \[VibrationIgnition\]/i, sc = dcaScorch();
+  const ignAt = ignRe.test(dcaPlain(u.desc || "")) ? 0 : (u.coindescs || []).findIndex((cd) => cd.some((d) => ignRe.test(dcaPlain(d))));
   // one-number statuses the coins put on the target ("Inflict 1 [NoirNailDonQuixote]") and take off ("Consume all [X] on target")
   const inf1 = [], eat1 = [];
   (u.coindescs || []).forEach((cd, i) => cd.join("\n").split("\n").forEach((l) => {
@@ -1575,6 +1596,13 @@ function dcaModel(x, sk, up) {
     r.seq = inf1.filter(([, k]) => k === mm[1]).map(([i, , n]) => [i, n]);
     seqKws.push(mm[1]);
   }
+  // "+N% damage for every type of negative effect on target": a coin that inflicts a new type raises it for the next coins
+  const negInf = [];
+  (u.coindescs || []).forEach((cd, i) => cd.join("\n").split("\n").forEach((l) => {
+    const p = dcaNames(dcaPlain(l));
+    for (const q of p.matchAll(/\bInflict (?:\+?\d+ )?\[(\w+)\]/gi)) if (dcaG(q[1]).type === "neg" && !/^\s*next turn/i.test(p.slice(q.index + q[0].length))) negInf.push([i, q[1]]);
+  }));
+  if (negInf.length) for (const r of rows) if (r.parts.length === 1 && r.parts[0].f.k === "dyn" && r.parts[0].f.per && r.parts[0].f.per.g === "neg" && (r.parts[0].f.scope ?? "all") === "all") r.negSeq = negInf;
   const deaths = t1.filter((kw) => dcaDeath(kw));  // Deathrites on the target
   deaths.forEach((kw) => { const d = dcaDeath(kw); if (/10\+ Speed/i.test(d.by)) needs.g_speed = Math.max(needs.g_speed || 0, 10); if (/Critical Hit/i.test(d.by)) needs.g_crit = 1; });
   Object.keys(needs).forEach((k) => { const m = /^t_(\w+?)_(p|c)$/.exec(k); if (m) tKws.add(m[1]); });
@@ -1644,6 +1672,11 @@ function dcaModel(x, sk, up) {
           continue;
         }
         const vs = r.parts.map(({ f, conds }) => dcaEff(f, f.k === "reuse" && forced ? [] : conds, s));
+        if (r.negSeq) for (let ci = 1; ci < u.coins; ci++) {  // new negative types from the coins before
+          const add = new Set(r.negSeq.filter(([i, kw]) => i < ci && !dcaVal({ kw, side: "target", part: "s" }, s)).map(([, kw]) => dcaG(kw).name || kw)).size;
+          const v = add && dcaEff(r.parts[0].f, r.parts[0].conds, { ...s, g_neg: (s.g_neg || 0) + add }) - vs[0];
+          if (v) out.coinDyn[ci] = (out.coinDyn[ci] || 0) + v;
+        }
         r.parts.forEach((p, i) => { if (!p.inst || !vs[i]) return; for (let j = i - 1; j >= 0; j--) if (r.parts[j].f.k === p.f.k) { vs[j] = 0; break; } });  // "instead": the one before
         r.parts.forEach(({ f }, i) => {
           const v = vs[i];
@@ -1709,6 +1742,11 @@ function dcaModel(x, sk, up) {
             if (fz && (tk === "VibrationFocusing" || (focusAt >= 0 && ci >= focusAt))) {
               const d = Math.floor(v * Math.min(fz.max, fz.base + fz.per * dcaChargeP(s)) / 100 + 1e-9);
               if (d) { for (let k = 0; k < b.n; k++) (bflat[j] ||= []).push([d, fz.sin, "VibrationFocusing"]); blog.push({ lab: dcaG("VibrationFocusing").name || "VibrationFocusing", hit: d * b.n, sin: fz.sin, kw: "VibrationFocusing" }); }
+            }
+            if (sc && (tk === "VibrationIgnition" || (ignAt >= 0 && ci >= ignAt))) for (let k = 0; k < b.n; k++) {
+              const bp = f.t.Combustion ? f.t.Combustion.p : 0, d = Math.floor((v + bp) / 2);
+              if (d) { (bflat[j] ||= []).push([d, sc.sin, "VibrationIgnition"]); blog.push({ lab: dcaG("VibrationIgnition").name || "VibrationIgnition", hit: d, sin: sc.sin, kw: "VibrationIgnition" }); }
+              if (sc.lose && bp) f.dec("Combustion", sc.lose, dcaG("VibrationIgnition").name || "VibrationIgnition");
             }
             stag[j] = (stag[j] || 0) + v * b.n; blog.push({ lab: b.coin != null ? `Coin ${ROMAN[ci]}` : b.from, v: v * b.n, n: b.n, kw: tk });
             for (const kw of t1) {  // "Upon Tremor Burst, take 1 Sloth damage for every Stack (max 10; once per Skill)"
