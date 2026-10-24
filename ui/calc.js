@@ -1542,7 +1542,7 @@ function dcaModel(x, sk, up) {
       const b = `${c.side[0]}_${c.to}`, key = g2.st === 2 ? `${b}_${c.part === "c" ? "c" : "p"}` : b;
       s2[key] = Math.min(g2.max || 999, (s2[key] || 0) + n);
       if (g2.st === 2) { const o2 = `${b}_${c.part === "c" ? "p" : "c"}`; if (!s2[o2]) s2[o2] = 1; }  // new status: both numbers
-      notes[key] = `${notes[key] ? notes[key] + ", " : ""}+${n} from ${c.name ? esc(c.name) : dcbK(c.from)}`;
+      notes[key] = `${notes[key] ? notes[key] + ", " : ""}<span>+${n} from</span> ${c.name ? esc(c.name) : dcbK(c.from)}`;
     }
     return { s: s2, notes };
   };
@@ -2178,6 +2178,13 @@ function dcMax(x, i, F, form) {
 }
 // touch: hold, a copy follows the finger, drop on the card (or "+ turn") under it; mouse keeps HTML5 drag
 const dcDragged = () => Date.now() - (dc.touchEnd || 0) < 500;
+const DC_EDGE = 90, DC_SPEED = 16;  // edge strip (px) where a dragged copy scrolls the page, top speed (px a frame)
+// what scrolls here: the nearest scrolling parent (the desktop's #main), else the page
+function dcScroller(el) {
+  for (let a = el.parentElement; a && a !== document.body; a = a.parentElement)
+    if (/auto|scroll/.test(getComputedStyle(a).overflowY) && a.scrollHeight > a.clientHeight + 1) return a;
+  return document.scrollingElement;
+}
 function dcTouchDrag(el, start, drop) {
   el.addEventListener("pointerdown", (e) => {
     if (e.pointerType === "mouse" || e.button) return;
@@ -2190,19 +2197,40 @@ function dcTouchDrag(el, start, drop) {
       dx = x0 - b.left; dy = y0 - b.top;
       ghost = el.cloneNode(true); ghost.classList.add("dcghost"); ghost.classList.remove("on", "drag"); ghost.style.width = `${b.width}px`;
       document.body.appendChild(ghost); place(x0, y0); start();
+      raf = requestAnimationFrame(edge);
       if (navigator.vibrate) try { navigator.vibrate(15); } catch (_) { /* no vibration */ }
     }, 350);
+    let fx = x0, fy = y0, raf = 0, sc = null, up = false, down = false;
+    const hit = () => {
+      const t = document.elementFromPoint(fx, fy), to = t && t.closest(".dccard, .dcadd");
+      if (to !== over) { if (over) over.classList.remove("over"); if (to) to.classList.add("over"); over = to; }
+    };
+    // the page cannot scroll under the finger while dragging: it scrolls by itself near the top / bottom edge
+    const edge = () => {
+      raf = ghost ? requestAnimationFrame(edge) : 0;
+      if (!ghost) return;
+      sc = sc || dcScroller(el);
+      const root = sc === document.scrollingElement, r = root ? { top: 0, bottom: innerHeight } : sc.getBoundingClientRect();
+      const top = Math.max(0, r.top), bottom = Math.min(innerHeight, r.bottom), z = Math.min(DC_EDGE, (bottom - top) / 3);
+      // (an edge counts once the finger has been away from it: a skill picked up right at the edge does not run off)
+      if (fy >= top + z) up = true;
+      if (fy <= bottom - z) down = true;
+      const k = up && fy < top + z ? -(top + z - fy) / z : down && fy > bottom - z ? (fy - (bottom - z)) / z : 0;
+      if (!k) return;
+      const was = sc.scrollTop;
+      sc.scrollTop += Math.round(Math.sign(k) * Math.max(3, Math.min(1, Math.abs(k)) * DC_SPEED));
+      if (sc.scrollTop !== was) hit();
+    };
     const move = (ev) => {
       if (ev.pointerId !== id) return;
       if (!ghost) { if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 10) end(null); return; }
-      place(ev.clientX, ev.clientY);
-      const t = document.elementFromPoint(ev.clientX, ev.clientY), to = t && t.closest(".dccard, .dcadd");
-      if (to !== over) { if (over) over.classList.remove("over"); if (to) to.classList.add("over"); over = to; }
+      fx = ev.clientX; fy = ev.clientY;
+      place(fx, fy); hit();
     };
     const block = (ev) => { if (ghost && ev.cancelable) ev.preventDefault(); };  // no scroll while dragging
     const menu = (ev) => ev.preventDefault();
     const end = (ev) => {
-      clearTimeout(timer);
+      clearTimeout(timer); cancelAnimationFrame(raf);
       document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); document.removeEventListener("pointercancel", end);
       document.removeEventListener("touchmove", block); el.removeEventListener("contextmenu", menu);
       el.draggable = dr;
@@ -2388,7 +2416,7 @@ function dcbRefresh() {
   const nm = (k) => esc((UNITS.glossary[k] || {}).name || statusName(k));
   const img = (k) => dcImg(k).replace('class="dcsti" ', "") || esc(statusName(k));
   $("#dcbdum").innerHTML = `<div class="dcbsect2">After ${esc(label)} · ${esc(u.name)}</div>
-    ${card && card.i ? `<div class="dcbfrom">Turn ${card.i + 1}: before it the target had ${Object.keys(card.into).length ? Object.entries(card.into).map(([kw, v]) => `${dcImg(kw)}${v.n != null ? v.n : `${v.p}·${v.c}`}`).join(" ") : "nothing"} (carried; the controls below set turn 1)</div>` : ""}
+    ${card && card.i ? `<div class="dcbfrom"><span>Turn ${card.i + 1}: before it the target had</span> ${Object.keys(card.into).length ? Object.entries(card.into).map(([kw, v]) => `${dcImg(kw)}${v.n != null ? v.n : `${v.p}·${v.c}`}`).join(" ") : "<span>nothing</span>"} <span>(carried; the controls below set turn 1)</span></div>` : ""}
     ${card && card.i && Object.keys(card.mine).length ? `<div class="dcbfrom">Turn ${card.i + 1}, your statuses by the texts of the cards before: <span>${Object.entries(card.mine).map(([kw, v]) => `${kw === "sp" ? "SP " : dcImg(kw)}${v.n != null ? v.n : `${v.p}·${v.c}`}`).join(" ")}</span></div>` : ""}
     <div class="dcarena">${Array.from({ length: Math.min(h, 6) }, (_, i) => `<div class="dcfig${i ? " side" : ""}">${i ? fig.replace(/width="\d+" height="\d+"/, 'width="48" height="60"') : fig}<b>${i ? sideSum : mainSum}</b><small>${i ? "−50%" : h > 1 ? "main target" : "damage"}</small></div>`).join("")}</div>
     <div class="dcbbadges">${tg.st.map(([k, b0, a]) => {
