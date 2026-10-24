@@ -2517,11 +2517,11 @@ function dcbRefresh() {
   // the result: total = hits + status damage; Stagger from Tremor Burst beside it
   const C = now.coins, add = u.op !== "SUB", lo = calc(o, s, "tails").total, hi = calc(o, s, "heads").total;
   // extra damage (not the coin hit itself): status damage, flat sin damage, shares of the Coin's damage — summed per kind, instances counted
-  const xd = new Map(), xput = (k, v, n, o, row) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0, t: 1, rows: [], ...o }; e.v += v; e.n += n; e.rows.push(row); xd.set(k, e); };
+  const xd = new Map(), xput = (k, v, n, o, row) => { if (!v) return; const e = xd.get(k) || { t: 1, rows: [], ...o, v: 0, n: 0 }; e.v += v; e.n += n; e.rows.push(row); xd.set(k, e); };
   const cl = (c) => `<span class="dcxc">${c.reuse ? `coin ${ROMAN[c.ci] || c.ci + 1} Reuse` : `coin ${ROMAN[c.ci] || c.ci + 1}`}</span>`, n1 = (v) => +(+v).toFixed(2);
   C.forEach((c) => {
     xput("st", c.sdmg, 1, { st: m.stk || "Burst" }, `${cl(c)}<span>${c.srs !== 1 ? `Potency ${c.sraw} × ${m.stn} ×${n1(c.srs)} = ${c.sdmg}` : `Potency ${c.sraw} = ${c.sdmg}`}</span>`);
-    (c.fx || []).forEach((f) => xput(`fl ${f.sin} ${f.src}`, f.v, 1, f, `${cl(c)}<span>${f.rs !== 1 ? `${n1(f.raw)} × ${f.sin} ×${n1(f.rs)} = ${f.v}` : `${f.v}`}</span>`));
+    (c.fx || []).forEach((f) => xput(`fl ${f.sin} ${f.src}`, f.v, 1, f, `${cl(c)}<span>${f.rs !== 1 ? `${n1(f.raw)} × ${f.sin} ×${n1(f.rs)} = ${f.v}` : `+${f.v}`}</span>`));
     const nt = c.shn, one = dcFloor(c.shb * c.sh / 100);
     xput(`sh ${c.sh} ${c.shA ? 1 : 0}`, c.shd, c.shn, { pct: n1(c.sh), all: !!c.shA }, `${cl(c)}<span>${nt > 1 ? `${n1(c.sh)}% of ${c.shb} = ${one}, on ${nt} targets = ${c.shd}` : `${n1(c.sh)}% of ${c.shb} = ${c.shd}`}</span>`);
     const e = xd.get(`sh ${c.sh} ${c.shA ? 1 : 0}`); if (e && c.shd) e.t = Math.max(e.t, nt);

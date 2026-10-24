@@ -285,7 +285,8 @@
 .dcxw b { display: block; color: var(--xc); font-size: 13px; }
 .dcxf { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; } .dcxf > span { color: var(--text); } .dcxf .dcsti { width: 18px; height: 18px; }
 .dcxh { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; border-top: 1px solid var(--line, rgba(255,255,255,.12)); font-variant-numeric: tabular-nums; }
-.dcxh .dcxc { display: inline-block; min-width: 76px; color: var(--text); }
+@media (max-width: 600px) { .dcxcard { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-width: none; z-index: 9999; } }  /* phone: card at the bottom */
+.dcxh > span { display: flex; gap: 10px; } .dcxh .dcxc { min-width: 64px; color: var(--text); }
 .dcstg small { font: 12px "Segoe UI", sans-serif; margin-left: 4px; }
 .dcsum { font-size: 12.5px; color: var(--muted); margin-top: 6px; } .dcsum b { color: var(--text); }
 .dctbox { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding: 7px 9px; background: rgba(0, 0, 0, .3); border: 1px solid var(--line); }
