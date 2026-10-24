@@ -704,6 +704,13 @@ function dcaFocus() {
   const a = /On Tremor Burst, take (\w+) Damage equal to \((\d+) \+ sum of Charge Potency or Unique Charge on the attacker x (\d+)\)% of Tremor Potency.*?\(max (\d+)%\)/i.exec(dcaPlain(dcaEn("gl", "VibrationFocusing", dcaG("VibrationFocusing").desc) || ""));
   return (DCA_FZ = a ? { sin: a[1][0].toUpperCase() + a[1].slice(1).toLowerCase(), base: +a[2], per: +a[3], max: +a[4] } : null);
 }
+// a passive's price on inflicting [X] ("When inflicting [X] using Skill effects: At 12+ [Y] Count, inflict +1 more [X] and consume 4 [Y] Count;
+// at fewer than 12 consume 2; at insufficient [Y] Count, does not inflict [X]") → { by, at, more, hi, lo }
+function dcaInfPay(kw) {
+  const ps = dcaX ? (dcaX.passives || []).map((p) => dcaEn("ps", p.id, p.desc) || "").join("\n") : "", e = kw.replace(/\W/g, "");
+  const m = new RegExp(`When inflicting \\[${e}\\] using Skill effects:\\s*- At (\\d+)\\+ \\[(\\w+)\\] Count, inflict \\+(\\d+) more \\[${e}\\] and consume (\\d+) \\[\\2\\] Count\\s*- At fewer than \\1 \\[\\2\\] Count, consume (\\d+) \\[\\2\\] Count\\s*- At insufficient \\[\\2\\] Count, does not inflict \\[${e}\\]`, "i").exec(ps);
+  return m ? { by: m[2], at: +m[1], more: +m[3], hi: +m[4], lo: +m[5] } : null;
+}
 // Charge Potency + Unique Charge Potency on self ([ChargeNoirAlly] …)
 const dcaChargeP = (s) => Object.keys(s).filter((k) => /^s_Charge\w*_p$/.test(k)).reduce((a, k) => a + (s[k] || 0), 0);
 // Deathrite (a stack-count debuff of Rupture): every Rupture trigger lowers it under its condition (+Rupture Count), at 0 Stack it hits for Rupture Potency
@@ -1526,6 +1533,13 @@ function dcaModel(x, sk, up) {
   }));
   const t1 = [...new Set([...inf1.map(([, k]) => k), ...eat1.map(([, k]) => k), ...Object.keys(needs).map((k) => /^t_(\w+)$/.exec(k)).filter((q) => q && dcaG(q[1]).st === 1 && (dcaBurstHit(q[1]) || dcaDeath(q[1]))).map((q) => q[1])])];
   t1.forEach((kw) => { if (!(`t_${kw}` in needs)) needs[`t_${kw}`] = 0; });
+  // what inflicting them costs (a passive's Count price): the own Count becomes a slider, its max start pays the bonus every time
+  const pay1 = Object.fromEntries(inf1.map(([, kw]) => [kw, dcaInfPay(kw)]).filter(([, r]) => r));
+  Object.entries(pay1).forEach(([kw, r]) => {
+    const n = inf1.filter(([, k]) => k === kw).length, k = `s_${r.by}_c`;
+    needs[k] = Math.max(needs[k] || 0, r.at + (n - 1) * r.hi);
+    if (!(`s_${r.by}_p` in needs)) needs[`s_${r.by}_p`] = 0;
+  });
   // damage-taken debuffs this Skill puts on the target one coin after another ("Inflict 2 Fragile"): the next coins already feel them
   const seqKws = [];
   for (const r of rows) {
@@ -1632,7 +1646,7 @@ function dcaModel(x, sk, up) {
       const s = link(s0).s, x2 = m.mods(s0, o), seq = dcbSeq(u, x2), heads = face === "best" ? u.op !== "SUB" : face === "heads";
       const stag = [], blog = [], bflat = [], on = s.tb !== 0;
       // one-number statuses on the target (Promised Nail …): what coins inflict, what they consume, what they deal on a Tremor Burst
-      const one = Object.fromEntries(t1.map((kw) => [kw, s[`t_${kw}`] || 0])), one0 = { ...one }, used = new Set();
+      const one = Object.fromEntries(t1.map((kw) => [kw, s[`t_${kw}`] || 0])), one0 = { ...one }, used = new Set(), paid = {};
       const T = dcbSim([...tKws].map((kw) => [kw, s[`t_${kw}_p`] || 0, s[`t_${kw}_c`] || 0]), seq.map(([ci], j) => ({
         burst: (f, p) => {  // Rupture goes off: the Deathrites on the target react
           for (const kw of deaths) {
@@ -1645,7 +1659,15 @@ function dcaModel(x, sk, up) {
         },
         post: (f) => {
           inf.forEach(([i, kw, p, c, w]) => { if ((i === ci || i < 0) && (!w || (w === "H") === heads)) { f.add(kw, p, c, i < 0 ? label : `Coin ${ROMAN[ci]}`); } });
-          inf1.forEach(([i, kw, n, w]) => { if (i === ci && (!w || heads)) { one[kw] = dcaDeath(kw) ? one[kw] || n : Math.min(dcaCaps(kw).s ?? 99, one[kw] + n); /* a Deathrite does not stack on itself */ blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, add: n }); } });
+          inf1.forEach(([i, kw, n, w]) => { if (i === ci && (!w || heads)) {
+            const r = pay1[kw];
+            if (r) {  // the passive's price in own Count
+              const c = paid[r.by] ?? (s[`s_${r.by}_c`] || 0), cost = c >= r.at ? r.hi : r.lo;
+              if (c < cost) { blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, no: 1, by: r.by, c, pay: cost }); return; }
+              if (c >= r.at) n += r.more;
+              paid[r.by] = c - cost; blog.push({ lab: `Coin ${ROMAN[ci]}`, kw: r.by, own: -cost });
+            }
+            one[kw] =dcaDeath(kw) ? one[kw] || n : Math.min(dcaCaps(kw).s ?? 99, one[kw] + n); /* a Deathrite does not stack on itself */ blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, add: n }); } });
           if (on) for (const b of bursts) if (b.coin === ci || b.all || (b.last && j === seq.length - 1) || (b.first && j === 0)) {
             const tk = Object.keys(f.t).find((z) => /^Vibration/.test(z)), v = tk ? f.t[tk].p : 0;
             if (!v) continue;
@@ -2470,7 +2492,7 @@ function dcbRefresh() {
         ${dp ? `<i class="dp${dp < 0 ? " neg" : ""}">${sg(dp)}</i>` : ""}${dcn ? `<i class="dc${dcn < 0 ? " neg" : ""}">${sg(dcn)}</i>` : ""}</span>`;
     }).join("")}</div>${tg.st.length ? `<div class="dcblegend">on the main target · left Potency · right Count · green: from this skill</div>` : ""}
     <ul class="dcbadd">${[...tg.log.filter((e) => e.p || e.c).map((e) => `<li><b>${e.lab}</b> ${K(e.k)} ${[e.p ? `${sg(e.p)} Potency` : "", e.c ? `${sg(e.c)} Count` : ""].filter(Boolean).join(", ")}</li>`),
-      ...(tg.blog || []).map((e) => e.add ? `<li><b>${esc(e.lab)}</b> ${K(e.kw)} +${e.add}</li>` : e.eat ? `<li><b>${esc(e.lab)}</b> ${K(e.kw)} −${e.eat} (consumed)</li>` : e.hit ?`<li class="dcbsloth"><b>${K(e.kw)}</b> on ${K("VibrationExplosion")}: +${e.hit} ${esc(e.sin)} damage</li>` : `<li class="dcstgc"><b>${esc(e.lab)}</b> ${K("VibrationExplosion")}${e.n > 1 ? ` ×${e.n}` : ""}: +${e.v} Stagger</li>`), ...tg.extra.map((q) => `<li>${q}</li>`)].join("") || `<li>Nothing changes on the target.</li>`}</ul>`;
+      ...(tg.blog || []).map((e) => e.no ? `<li><b>${esc(e.lab)}</b> ${K(e.kw)} not inflicted: ${K(e.by)} Count ${e.c} &lt; ${e.pay}</li>` : e.own ? `<li><b>${esc(e.lab)}</b> ${K(e.kw)} Count ${e.own} on self</li>` : e.add ?`<li><b>${esc(e.lab)}</b> ${K(e.kw)} +${e.add}</li>` : e.eat ? `<li><b>${esc(e.lab)}</b> ${K(e.kw)} −${e.eat} (consumed)</li>` : e.hit ?`<li class="dcbsloth"><b>${K(e.kw)}</b> on ${K("VibrationExplosion")}: +${e.hit} ${esc(e.sin)} damage</li>` : `<li class="dcstgc"><b>${esc(e.lab)}</b> ${K("VibrationExplosion")}${e.n > 1 ? ` ×${e.n}` : ""}: +${e.v} Stagger</li>`), ...tg.extra.map((q) => `<li>${q}</li>`)].join("") || `<li>Nothing changes on the target.</li>`}</ul>`;
 
   // BaTyANl check: his max against ours with his settings (target at his level, no resistances, no status damage)
   const zero = Object.fromEntries(m.rows.map((r) => [r.k, false])), atBat = dcbCalc(m, u, { ...b.s, ...(m.auto ? id.start : m.bat.set), stdmg: 0, tb: 0 }, m.auto ? Object.fromEntries(m.rows.map((r) => [r.k, !r.off])) : allOn, { diff0: u.level || 0, R: {} }).total;
