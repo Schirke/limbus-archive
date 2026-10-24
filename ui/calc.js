@@ -541,12 +541,23 @@ const dcaG = (k) => { const g = UNITS.glossary[k]; if (g && k === "KnowledgeExpl
 // English texts (the page may show another language)
 const dcaEn = (kind, id, v) => (UNITS.en && UNITS.en[kind][id]) ?? v;
 const DCA = new Map();
+// "on Don Quixote" = on this unit when it is that Sinner (Sanctum: "Preservation Potency on Don Quixote")
+const DCA_SIN = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"];
+let dcaX = null, DCA_NM1 = null;
+// one-word status name before Potency / Count ("Preservation Potency"): the one this unit's texts name
+const dcaNm1 = (w) => {
+  if (!DCA_NM1) { DCA_NM1 = new Map(); for (const k of Object.keys(UNITS.glossary)) { const n = ((UNITS.en && UNITS.en.gn[k]) || UNITS.glossary[k].name || "").trim(); if (dcaG(k).st && /^\w+$/.test(n)) DCA_NM1.set(n, [...(DCA_NM1.get(n) || []), k]); } }
+  const ks = DCA_NM1.get(w) || [], all = dcaX ? JSON.stringify([dcaX.skills, dcaX.passives]) : "";
+  return DCA_NAMES[w] || ks.find((k) => all.includes(`[${k}]`)) || ks[0];
+};
 
 // "[Sinking] on target", "([Laceration] + [Sinking]) on the main target", "[X] Potency on self", "type of negative effect", "Stack consumed" → a term, or null
 function dcaTerm(t, side, ctx = {}) {
   t = t.trim().replace(/[.,;]$/, "").replace(/\s+instead$/i, "");
   if (/^\(.*\)$/.test(t) && !/\)\s*[+x]/.test(t.slice(1, -1))) t = t.slice(1, -1).trim();  // "(sum of … on all targets)"
   t = t.replace(/^(?:value of |the |total |sum of |remaining )+/i, "").replace(/^(?:the )?target['’]s\s+/i, () => { side = "target"; return ""; }).replace(/\band both\b/gi, "and").replace(/(\]) (?:stage|value)s?$/i, "$1").replace(/\[(\w+)\] Potency ([+x×]) Count\b/gi, "[$1] Potency $2 [$1] Count").replace(/(^|[\s(])(Burn|Bleed|Tremor|Rupture|Sinking|Poise|Charge)\b(?!\])/g, (_, a, b) => `${a}[${DCA_NAMES[b]}]`);
+  const sn = new RegExp(`^(.*?) on (${DCA_SIN.join("|")})$`).exec(t);
+  if (sn) { if (!dcaX || DCA_SIN[dcaX.sinner - 1] !== sn[2]) return null; t = sn[1].replace(/^(\w+)(?= (?:Potency|Count)$)/, (w) => dcaNm1(w) ? `[${dcaNm1(w)}]` : w); side = "self"; }
   const sm = /^(.*?)\s+(?:on|by) (?:the )?(?:main )?(target|self|this unit|Slot|all (?:attack )?(?:targets|enemies))$/i.exec(t);
   if (sm) { t = sm[1].trim(); side = /target|enem|slot/i.test(sm[2]) ? "target" : "self"; }
   if (/^\(.*\)$/.test(t) && !/\)\s*[+x]/.test(t.slice(1, -1))) t = t.slice(1, -1).trim();
@@ -1240,6 +1251,7 @@ function dcaEnU(sk, u) {
 function dcaModel(x, sk, up) {
   const key = `${x.id}.${sk.id}.${up}`;
   if (DCA.has(key)) return DCA.get(key);
+  dcaX = x;
   let u0 = cqAt(sk, up);
   if (!u0 || !u0.atk) return null;
   let u = dcaEnU(sk, u0);
