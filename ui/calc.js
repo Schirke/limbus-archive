@@ -534,6 +534,7 @@ const DCA_G = { neg: ["Negative effect types on target", 0, 10], spd: ["Speed ov
   mark: ["Skill is marked (1 yes)", 0, 1], nodmg: ["Took no damage last turn (1 yes)", 0, 1], tnd: ["Target took no damage this turn (1 yes)", 0, 1], tpd: ["Target already took damage this turn (1 yes)", 0, 1], shS: ["Shield HP on self", 0, 100], tgtd: ["Skills targeting this unit", 0, 6], panic: ["Stack of the target's Panic-type effects", 0, 10] };
 let DCA_HP = 1000;  // the target's HP: 1000 for the dummy, the game's for an enemy
 let DCA_R = {};  // the target's resistances of the calc in progress
+const DC_STAG = new Proxy({}, { get: () => 2 });  // resistances of a Staggered target
 // plain status names in texts
 const DCA_NAMES = { Burn: "Combustion", Bleed: "Laceration", Tremor: "Vibration", Rupture: "Burst", Sinking: "Sinking", Poise: "Breath", Charge: "Charge", Haste: "Agility", Fragile: "Vulnerable", Fanatic: "AssemblePersonality", Nails: "NailPersonality" };
 const DCA_TYPES = /\b(Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)\s+(?:damage|Skills?)\b/i;
@@ -546,9 +547,9 @@ const DCA = new Map();
 // "on Don Quixote" = on this unit when it is that Sinner (Sanctum: "Preservation Potency on Don Quixote")
 const DCA_SIN = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"];
 let dcaX = null, DCA_NM1 = null;
-// one-word status name before Potency / Count ("Preservation Potency"): the one this unit's texts name
+// status name before Potency / Count ("Preservation Potency", "Corpus Ingredient Potency"): the one this unit's texts name
 const dcaNm1 = (w) => {
-  if (!DCA_NM1) { DCA_NM1 = new Map(); for (const k of Object.keys(UNITS.glossary)) { const n = ((UNITS.en && UNITS.en.gn[k]) || UNITS.glossary[k].name || "").trim(); if (dcaG(k).st && /^\w+$/.test(n)) DCA_NM1.set(n, [...(DCA_NM1.get(n) || []), k]); } }
+  if (!DCA_NM1) { DCA_NM1 = new Map(); for (const k of Object.keys(UNITS.glossary)) { const n = ((UNITS.en && UNITS.en.gn[k]) || UNITS.glossary[k].name || "").trim(); if (dcaG(k).st && /^\w+(?: \w+)*$/.test(n)) DCA_NM1.set(n, [...(DCA_NM1.get(n) || []), k]); } }
   const ks = DCA_NM1.get(w) || [], all = dcaX ? JSON.stringify([dcaX.skills, dcaX.passives]) : "";
   return DCA_NAMES[w] || ks.find((k) => all.includes(`[${k}]`)) || ks[0];
 };
@@ -769,6 +770,8 @@ function dcaCond(c, ctx) {
     const q = dcaTerm(/target has/i.test(t) && !/ on /.test(m[2]) ? m[2] + " on target" : m[2], /target has/i.test(t) ? "target" : "self", ctx);
     if (q) return { q, n: +m[1], lt: true };
   }
+  // "If the enemy has Bleed or 'Unique Bleed'" (status texts): the target has that status
+  if ((m = /^if (?:the )?enemy has (\w+)(?: or '?Unique \1'?)?$/i.exec(t)) && DCA_NAMES[m[1]]) { const q = dcaTerm(`[${DCA_NAMES[m[1]]}] on target`, "target", ctx); if (q) return { q, n: 1 }; }
   if ((m = /^if (?:the )?(?:main )?target has (?:(\d+)\+ )?(.+)$/i.exec(t))) { const q = dcaTerm(/ on /.test(m[2]) ? m[2] : m[2] + " on target", "target", ctx); if (q) return { q, n: +(m[1] || 1) }; }
   if ((m = /^(?:if|when) (?:this unit|user) has (?:(\d+)\+? )?(.+)$/i.exec(t))) { const q = dcaTerm(m[2], "self", ctx); if (q) return { q, n: +(m[1] || 1) }; }
   if (/\bIdentit/i.test(t) && /target/i.test(t)) return { never: t };  // we hit enemies
@@ -939,6 +942,7 @@ function dcaLine(raw, ctx) {
   // clauses split by top-level ";", each with its own "for every" and "(max)"
   const cq = conds.find((c) => c.q);
   ctx.condTerm = cq ? cq.q : null; ctx.condN = cq ? cq.n : 0;
+  ctx.allT = /against all targets/i.test(t);  // a share of the Coin's damage that goes to every target
   const fx = [];
   for (let left = rest; left;) {
     const cut = dcaCut(left, /;/), part = cut < 0 ? left : left.slice(0, cut);
@@ -1180,7 +1184,7 @@ function dcaClause(rest, ctx) {
   if (cap2) fx.forEach((f) => { if (f.k !== "reuse") f.cap = f.k === "dyn" ? +cap2[2] : +cap2[1]; });
   else if (cap) fx.forEach((f) => { if (f.k !== "reuse") f.cap = +(cap[1] ?? cap[2] ?? cap[3]); });
   if (approx) fx.forEach((f) => { if (f.k === "dyn") f.approx = approx; });
-  if (share) fx.forEach((f) => { if (f.k === "dyn") f.share = true; });
+  if (share) fx.forEach((f) => { if (f.k === "dyn") f.share = ctx.allT ? "all" : true; });
   return fx.filter((f, i) => f.k !== "reuse" || fx.findIndex((g) => g.k === "reuse") === i);  // one Reuse per clause
 }
 
@@ -1289,6 +1293,7 @@ function dcaModel(x, sk, up) {
   const cand = x.skills.filter((q) => { const v = cqAt(q, up); return v && v.atk; }), nameOf = (q) => nm(dcaEnU(q, cqAt(q, up)).name);
   const into = turns.length && (turns.slice().reverse().map((t) => cand.find((q) => nameOf(q) === t)).find(Boolean) || turns.slice().reverse().map((t) => cand.find((q) => nameOf(q).startsWith(t))).find(Boolean));
   if (into) { u0 = cqAt(into, up); u = { ...dcaEnU(into, u0), into: dcaPlain(u0.name), from: u.desc }; }
+  const ramp = /^\s*\[WideAreaRampage\]\s*$/m.test(String(u.desc));  // every Coin flips against one random target
   const rows = [], nodmg = [], needs = {}, gains = new Map(), seen = new Set(), exprGains = [];
   const note = (pn, h, unk) => nodmg.push(`${pn ? `<span class="dcbpn">${esc(pn)}</span> ` : ""}${dcbText(h)}${unk ? ` <span class="dcbunk">not read yet</span>` : ""}`);
   const gainsOf = (t0, from) => {
@@ -1423,11 +1428,19 @@ function dcaModel(x, sk, up) {
     const covered = new Set(parts.map(({ f }) => f.k));
     if (dcaEn("gl", kw, g.desc) && (!(g.fx || []).length || own.length)) {
       const c = { ...kind, own: kw, ownSide: side };
-      String(dcaEn("gl", kw, g.desc)).split("\n").forEach((l) => { const r = dcaLine(l, c); if (!r || !r.fx || r.late) return;
+      // tiers: "… based on Corpus Ingredient Potency:" / "based on Stack:", then "- 2+ : …", "· At 10+ Stack: …", "· 11~20: …" need that many
+      let tq = null;
+      String(dcaEn("gl", kw, g.desc)).split("\n").forEach((l0) => {
+        const hd = /\bbased on (?:(.+?) (Potency|Count)|Stacks?):\s*$/i.exec(l0);
+        if (hd) { const k2 = hd[1] && ((/^\[(\w+)\]$/.exec(hd[1]) || [])[1] || dcaNm1(hd[1])); tq = !hd[1] ? q : k2 && dcaG(k2).st ? { kw: k2, side, part: dcaG(k2).st === 1 ? "s" : hd[2][0].toLowerCase() } : null; return; }
+        const tm = tq && /^\s*[-·]\s*(?:At\s+)?(\d+)(\+|~(\d+))?(?:\s+Stacks?)?\s*:\s*(.+)$/i.exec(l0);
+        if (!tm && !/^\s*·/.test(l0)) tq = null;
+        const tc = tm ? [{ q: tq, n: +tm[1], ...(tm[3] ? { max: +tm[3] } : {}) }] : [], l = tm ? tm[4] : l0;
+        const r = dcaLine(l, c); if (!r || !r.fx || r.late) return;
         const fx = r.fx.filter((f) => (side === "self" ? f.k !== "take" : f.k === "take") && !covered.has(f.k === "take" ? "dyn" : f.k));
         // a line not counting the status itself works only while it is there
         const has = (f) => (f.per && f.per.kw === kw) || r.conds.some((c) => c.q && c.q.kw === kw);
-        fx.forEach((f) => parts.push({ f: { ...f, k: f.k === "take" ? "dyn" : f.k, scope: "all" }, conds: has(f) ? r.conds : [...r.conds, { q, n: 1 }] })); });
+        fx.forEach((f) => parts.push({ f: { ...f, k: f.k === "take" ? "dyn" : f.k, scope: "all" }, conds: [...(has(f) ? r.conds : [...r.conds, { q, n: 1 }]), ...tc] })); });
     }
     // own status that makes enemies take more from Charge skills (Sanctum: "+10% … ("Le Noir" … +20% instead)")
     const cg = side === "self" && /Take \+(\d+)% damage from Skills that consume Charge Count(?: or Unique Charge)?(?: \(from "([^"]+)" allied Identities' Skills, take \+(\d+)% damage instead\))?/i.exec(dcaEn("gl", kw, g.desc) || "");
@@ -1497,6 +1510,7 @@ function dcaModel(x, sk, up) {
     needs.g_tm = 2;
   }
   if ("g_aw" in needs) needs.g_aw = Math.max(0, (u.targets || 1) - 1);
+  if ("g_stag" in needs) needs.g_stag = 0;  // "Target is Staggered" starts off (user): on = res ×2.0 + the texts' Staggered conditions
   // Critical Hits: a Poise Identity (the game's own tag) or this skill's text talks of Poise / crits
   if ((x.statuses || []).includes("Breath") || /Critical|\[Breath\]|\bPoise\b/i.test([u.desc, ...(u.coindescs || []).flat()].join("\n"))
     || rows.some((r) => r.parts.some(({ f }) => f.crit))) needs.g_crit = 1;
@@ -1621,7 +1635,11 @@ function dcaModel(x, sk, up) {
           const v = vs[i];
           if (!v) return;
           if (f.k === "take") return;  // this unit takes more
-          if (f.share && f.k === "dyn") { if (typeof f.scope === "number") (out.coinShare ||= [])[f.scope] = (out.coinShare[f.scope] || 0) + v; else if (f.scope === "last") out.lastShare = (out.lastShare || 0) + v; else out.share = (out.share || 0) + v; return; }  // share of the final damage
+          if (f.share && f.k === "dyn") {  // share of the final damage
+            const put = (o2) => { if (typeof f.scope === "number") (o2.coinShare ||= [])[f.scope] = (o2.coinShare[f.scope] || 0) + v; else if (f.scope === "last") o2.lastShare = (o2.lastShare || 0) + v; else o2.share = (o2.share || 0) + v; };
+            put(out); if (f.share === "all") put(out.shAll ||= {});
+            return;
+          }
           if (f.k === "sub") { out.subDyn += v; return; }
           if (f.k === "only") { (out.only ||= [])[f.scope] = v; return; }
           if (f.k === "force") return;
@@ -1641,6 +1659,7 @@ function dcaModel(x, sk, up) {
       out.clash = s.g_clash || 0;
       if (conv && o.conv !== false) { const net = out.cp; out.fp += conv.fp * net; out.dyn += conv.dyn * net; out.cp = 0; }  // "net Coin Power increase" becomes Final Power and damage
       if (s.g_hit > 1) out.targets = s.g_hit;  // side targets: -N% only where a line says so
+      out.ramp = ramp;
       return out;
     },
     target: (s0, o, face = "best") => {
@@ -1703,6 +1722,7 @@ const dcbOn = (bm) => Object.fromEntries(bm.m.rows.map((r) => { const v = bm.b.o
 
 // the formula of dcCalc on the model's numbers. face: "best" (heads on Plus Coins, tails on Minus Coins), "heads" or "tails"
 function dcbCalc(m, u, s, o, env, face = "best") {
+  if (s.g_stag) env = { ...env, R: DC_STAG };  // a Staggered target takes ×2.0 from every type and sin (game-checked)
   DCA_R = env.R || {};
   { const t = dcTarget(), hv = t.v; DCA_HP = hv && hv.hp ? Math.max(1, Math.floor(hv.hp + (hv.hpLevel || 0) * hv.level)) : 1000; }
   u = m.u || u;  // a Counter that turns into another Skill
@@ -1722,17 +1742,19 @@ function dcbCalc(m, u, s, o, env, face = "best") {
     const gdyn = gk.length ? (xg[gk.join()] ??= m.mods({ ...s, ...Object.fromEntries(gk.map((kw) => [`t_${kw}`, 0])) }, o)).dyn - x.dyn : 0;
     const fin = i === n - 1, r = roll + x.fp + (fin ? x.last : 0) + (x.coinFp[ci] || 0), d = gdyn + x.dyn + (fin ? x.lastDyn : 0) + (i === 0 ? x.firstDyn || 0 : 0) + (x.coinDyn[ci] || 0) + (x.powDyn || []).reduce((a, p) => a + Math.min(p.cap ?? 1e9, p.v * Math.max(0, r)), 0)
       + (i > 0 ? (x.hpDyn || []).reduce((a, p) => a + (typeof p.scope !== "number" || p.scope === ci ? Math.min(p.cap ?? 1e9, p.v * 100 * coins[0].main / DCA_HP) : 0), 0) : 0);
-    const sh = (x.share || 0) + (fin ? x.lastShare || 0 : 0) + ((x.coinShare || [])[ci] || 0);
+    const shOf = (z) => z ? (z.share || 0) + (fin ? z.lastShare || 0 : 0) + ((z.coinShare || [])[ci] || 0) : 0, sh = shOf(x), shA = shOf(x.shAll);
     // "N% of this Coin's final damage": its own hit on top of the coin's
-    const hit = (dd) => { const h = dcFloor(r <= 0 ? 1 : r * (1 + dd / 100) * mod); return h + (sh ? dcFloor(h * sh / 100) : 0); };
+    const h0 = (dd) => dcFloor(r <= 0 ? 1 : r * (1 + dd / 100) * mod), hit = (dd) => { const h = h0(dd); return h + (sh ? dcFloor(h * sh / 100) : 0); };
     // flat adders and status damage through their sin's resistance
     const fl2 = [...(x.coinFlat[ci] || []), ...x.flatAll, ...(again ? x.flatReuse || [] : []), ...((T && T.bflat && T.bflat[i]) || [])], fsin = fl2.length ? fl2[0][1] : m.flatSin;
     const flat = (fin && x.flatLast ? dcFloor(x.flatLast * res(m.flatSin)) : 0) + fl2.reduce((a, [v, k]) => a + dcFloor(v * res(k)), 0), sdmg = sd[i] ? dcFloor(sd[i] * (m.stn === "Gloom" ? res("Gloom") : 1)) : 0;
     const tmf = (v) => x.tm ? dcFloor(v * (1 + 0.15 * x.tm) * res("Sloth")) : v;  // Time Moratorium
     let main = tmf(hit(d) + flat + sdmg), side = x.targets > 1 ? tmf(hit(d + x.subDyn)) : 0, one = tmf(hit(d) + flat + (x.targets - 1) * hit(d + x.subDyn) + sdmg);
     const ov = x.only && x.only[ci];  // this coin hits only the main target (1) or only the others (2)
-    if (ov === 1) { side = 0; one = main; } else if (ov === 2) { one = (x.targets - 1) * side; main = 0; }
-    coins.push({ r, one, main, side, d, sh, heads, flat, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
+    let shd = sh ? dcFloor(h0(d) * sh / 100) : 0, shn = sh ? 1 : 0;  // "N% of this Coin's final damage": extra damage of its own
+    if (x.ramp && x.targets > 1) { side = 0; const e = shA ? tmf((x.targets - 1) * dcFloor(h0(d) * shA / 100)) : 0; one = main + e; if (e) { shd += e; shn += x.targets - 1; } }  // [WideAreaRampage]: one target per coin; "against all targets" shares hit every one
+    else if (ov === 1) { side = 0; one = main; } else if (ov === 2) { one = (x.targets - 1) * side; main = 0; }
+    coins.push({ r, one, main, side, d, sh, shA, shd, shn, heads, flat, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
     total += one;
   }
   return { total, coins, x, diff, mod, stag: stag.reduce((a, v) => a + (v || 0), 0) };
@@ -2438,7 +2460,11 @@ function dcbRefresh() {
   $("#dcbnd").innerHTML = m.nodmg.map((h) => `<li>${h}</li>`).join("");
 
   // the result: total = hits + status damage; Stagger from Tremor Burst beside it
-  const C = now.coins, add = u.op !== "SUB", sd = C.reduce((a, c) => a + c.sdmg, 0), lo = calc(o, s, "tails").total, hi = calc(o, s, "heads").total;
+  const C = now.coins, add = u.op !== "SUB", lo = calc(o, s, "tails").total, hi = calc(o, s, "heads").total;
+  // extra damage (not the coin hit itself): status damage, flat sin damage, shares of the Coin's damage — summed per kind, instances counted
+  const xd = new Map(), xput = (k, v, n = 1) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0 }; e.v += v; e.n += n; xd.set(k, e); };
+  C.forEach((c) => { xput(m.stk === "Burst" ? "Rupture" : m.stk || m.stn, c.sdmg); xput(c.fsin || m.flatSin, c.flat); xput("share", c.shd, c.shn); });
+  const sd = [...xd.values()].reduce((a, e) => a + e.v, 0);
   const ci = dc.coin >= 0 && dc.coin < C.length ? dc.coin : C.length - 1, sel = C[ci], w = u.targets || 1, h = now.x.targets || 1;
   const xc = (c) => {  // what only this coin has
     const out = [], X = now.x;
@@ -2458,10 +2484,10 @@ function dcbRefresh() {
   const st0 = now.mod, dy = 1 + sel.d / 100;
   $("#dcres").innerHTML = `<div class="dcrsk">${sinIcon(u.sin, "s22")}${atkIcon(u, "s20")}<span>${esc(F.info[dc.slot].kind)} · ${esc(u.name)}</span></div>
     ${card ? `<div class="dcturn">Turn ${card.i + 1} of the rotation${card.i ? `: the target carries what turns 1–${card.i} inflicted` : ""}<button class="toggle" id="dcback">Back to my fight state</button></div>` : ""}
-    <div class="dcbig"><b>${now.total}</b>${now.stag ? `<span class="dcstg">+${now.stag} Stagger<small>Tremor Burst</small></span>` : ""}</div>
-    <div class="dcsum">${sd ? `<b>${now.total - sd}</b> from hits + <b>${sd}</b> ${m.stk === "Burst" ? "Rupture" : m.stk} · ` : ""}<span>${add ? "all heads" : "all tails (Minus Coins)"}</span> · <span>${h > 1 ? `${h} targets` : "one target"}</span> · all tails <b>${lo}</b> · all heads <b>${hi}</b></div>
+    <div class="dcbig"><b>${now.total}</b>${xd.size ? `<span class="dcxd">${[...xd].map(([k, e]) => `<span><b>+${e.v}</b>${k === "share" ? "<i>share of Coin damage</i>" : `${/^(Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/.test(k) ? sinIcon(k, "s16") : dcImg(k === "Rupture" ? "Burst" : k)}<i>${esc(k)}</i>`}${e.n > 1 ? `<small>×${e.n}</small>` : ""}</span>`).join("")}</span>` : ""}${now.stag ? `<span class="dcstg">+${now.stag} Stagger<small>Tremor Burst</small></span>` : ""}</div>
+    <div class="dcsum">${sd ? `<b>${now.total - sd}</b> from hits + <b>${sd}</b> extra damage · ` : ""}<span>${add ? "all heads" : "all tails (Minus Coins)"}</span> · <span>${h > 1 ? `${h} targets` : "one target"}</span> · all tails <b>${lo}</b> · all heads <b>${hi}</b></div>
     ${m.auto && w > 1 ? `<div class="dctbox"><span class="dcaw">Atk Weight ${w}</span><span class="cqkind">${Array.from({ length: w }, (_, i) => `<button data-hit="${i + 1}" class="${i + 1 === h ? "on" : ""}">hitting ${i + 1}</button>`).join("")}</span>
-      <span class="dcbfrom">${w - h ? `${w - h} excess Atk Weight` : "no excess Atk Weight"}${h > 1 ? " · the other targets take −50%" : ""}</span></div>`
+      <span class="dcbfrom">${w - h ? `${w - h} excess Atk Weight` : "no excess Atk Weight"}${h > 1 ? now.x.ramp ? " · each Coin hits one random target" : " · the other targets take −50%" : ""}</span></div>`
       : !m.auto && m.multi ? `<div class="dctbox"><span class="cqkind"><button data-hit="1" class="${h > 1 ? "" : "on"}">One target</button><button data-hit="9" class="${h > 1 ? "on" : ""}">All targets</button></span><span class="dcbfrom">${h > 1 ? "main target + the rest at −50%" : "Atk Weight turns into +20% damage each"}</span></div>` : ""}
     ${m.stn || m.bursts ? `<div class="dcsws">${m.stn ? `<label class="dcbstsw"><span class="dcbsw"><input type="checkbox" id="dcbstdmg" ${s.stdmg ? "checked" : ""}><i></i></span><span>Status damage <small>${K(m.stk)} going off on hits</small></span></label>` : ""}
       ${m.bursts ? `<label class="dcbstsw"><span class="dcbsw"><input type="checkbox" id="dcbtb" ${b.s.tb !== 0 ? "checked" : ""}><i></i></span><span>Tremor Burst <small>moves the Stagger bar by Tremor Potency, no HP damage</small></span></label>` : ""}</div>` : ""}
@@ -2489,7 +2515,7 @@ function dcbRefresh() {
   $("#dcbdum").innerHTML = `<div class="dcbsect2">After ${esc(label)} · ${esc(u.name)}</div>
     ${card && card.i ? `<div class="dcbfrom"><span>Turn ${card.i + 1}: before it the target had</span> ${Object.keys(card.into).length ? Object.entries(card.into).map(([kw, v]) => `${dcImg(kw)}${v.n != null ? v.n : `${v.p}·${v.c}`}`).join(" ") : "<span>nothing</span>"} <span>(carried; the controls below set turn 1)</span></div>` : ""}
     ${card && card.i && Object.keys(card.mine).length ? `<div class="dcbfrom">Turn ${card.i + 1}, your statuses by the texts of the cards before: <span>${Object.entries(card.mine).map(([kw, v]) => `${kw === "sp" ? "SP " : dcImg(kw)}${v.n != null ? v.n : `${v.p}·${v.c}`}`).join(" ")}</span></div>` : ""}
-    <div class="dcarena">${Array.from({ length: Math.min(h, 6) }, (_, i) => `<div class="dcfig${i ? " side" : ""}">${i ? fig.replace(/width="\d+" height="\d+"/, 'width="48" height="60"') : fig}<b>${i ? sideSum : mainSum}</b><small>${i ? "−50%" : h > 1 ? "main target" : "damage"}</small></div>`).join("")}</div>
+    <div class="dcarena">${now.x.ramp && h > 1 ? `<div class="dcfig">${fig}<b>${C.reduce((a, c) => a + c.one, 0)}</b><small>${h} targets, one per Coin</small></div>` : Array.from({ length: Math.min(h, 6) }, (_, i) => `<div class="dcfig${i ? " side" : ""}">${i ? fig.replace(/width="\d+" height="\d+"/, 'width="48" height="60"') : fig}<b>${i ? sideSum : mainSum}</b><small>${i ? "−50%" : h > 1 ? "main target" : "damage"}</small></div>`).join("")}</div>
     <div class="dcbbadges">${tg.st.map(([k, b0, a]) => {
       if (typeof b0 === "number") return `<span class="dcbbadge" title="${nm(k)}">${img(k)}<b class="c">${a}</b>${a - b0 ? `<i class="dc">${sg(a - b0)}</i>` : ""}</span>`;
       const A = a || { p: 0, c: 0 }, dp = A.p - b0.p, dcn = A.c - b0.c;
@@ -2516,7 +2542,7 @@ function dcMult(now, ci, s, o, env) {
   const tr = (a, v, cls = "") => `<tr class="${cls}"><td>${a}</td><td>${v}</td></tr>`;
   const list = (f) => on.map((r) => [r, f(part.get(r))]).filter(([, v]) => v).map(([r, v]) => tr(nm(r), typeof v === "number" ? dcSign(+v.toFixed(1)) : v, "sub")).join("");
   const heads = seq.slice(0, ci + 1).filter((q) => q.heads).length;
-  const res = (k) => env.R[k] ?? 1, diff = now.diff;
+  const res = (k) => (s.g_stag ? DC_STAG : env.R)[k] ?? 1, diff = now.diff;
   const add = U.op !== "SUB";
   $("#dcmult").innerHTML = `<h2>Damage multipliers · ${c.reuse ? "Reuse" : "Coin"} ${ROMAN[c.ci]}</h2>
     <div class="cqkind dcmtabs">${seq.map((q, i) => `<button data-mc="${i}" class="${i === ci ? "on" : ""}">${q.reuse ? "Reuse" : "Coin"} ${ROMAN[q.ci]}</button>`).join("")}</div>
