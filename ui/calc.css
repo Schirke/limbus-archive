@@ -272,10 +272,20 @@
 .dcbig > b { font: 96px/.85 "LC Bebas", Impact, sans-serif; color: var(--gold); letter-spacing: .01em; }
 .dcstg { font: 32px/1 "LC Bebas", Impact, sans-serif; color: #7fb2e8; padding-bottom: 4px; }
 .dcxd { flex: 1 1 180px; display: flex; flex-wrap: wrap; align-content: flex-end; gap: 4px 6px; padding-bottom: 4px; }
-.dcxd > span { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: var(--panel2, rgba(255,255,255,.05)); border: 1px solid var(--line, rgba(255,255,255,.12)); font-size: 12px; color: var(--muted); }
-.dcxd b { font: 22px/1 "LC Bebas", Impact, sans-serif; color: var(--text); }
+.dcxd > span { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 7px; background: var(--panel2, rgba(255,255,255,.05)); border: 1px solid var(--line, rgba(255,255,255,.12)); border-left: 3px solid var(--xc, var(--line)); font-size: 12px; color: var(--muted); cursor: help; outline: none; }
+.dcx > b { font: 22px/1 "LC Bebas", Impact, sans-serif; color: var(--xc, var(--text)); }
 .dcxd i { font-style: normal; } .dcxd small { color: var(--muted); }
 .dcxd .dcsti { width: 16px; height: 16px; }
+.dcx > em { font: 600 11px/1 "Segoe UI", sans-serif; font-style: normal; color: #1a1406; background: var(--xc); padding: 2px 4px; border-radius: 3px; }
+.dcxn { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dcxcoin { position: relative; display: inline-flex; } .dcxcoin .ico { width: 16px; height: 16px; }
+.dcxcoin sup { position: absolute; right: -5px; top: -5px; font: 700 10px/10px "Segoe UI", sans-serif; width: 10px; height: 10px; text-align: center; color: #1a1406; background: var(--gold); border-radius: 50%; }
+.dcxcard { display: none; position: absolute; z-index: 30; left: -3px; top: calc(100% + 4px); width: max-content; max-width: min(320px, 86vw); flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--panel, #17130e); border: 1px solid var(--line, rgba(255,255,255,.18)); border-left: 3px solid var(--xc); box-shadow: 0 6px 18px rgba(0,0,0,.5); font-size: 12px; line-height: 1.35; color: var(--muted); cursor: default; }
+.dcx:hover .dcxcard, .dcx:focus .dcxcard, .dcx:focus-within .dcxcard { display: flex; }
+.dcxw b { display: block; color: var(--xc); font-size: 13px; }
+.dcxf { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; } .dcxf > span { color: var(--text); } .dcxf .dcsti { width: 18px; height: 18px; }
+.dcxh { display: flex; flex-direction: column; gap: 2px; padding-top: 5px; border-top: 1px solid var(--line, rgba(255,255,255,.12)); font-variant-numeric: tabular-nums; }
+.dcxh .dcxc { display: inline-block; min-width: 76px; color: var(--text); }
 .dcstg small { font: 12px "Segoe UI", sans-serif; margin-left: 4px; }
 .dcsum { font-size: 12.5px; color: var(--muted); margin-top: 6px; } .dcsum b { color: var(--text); }
 .dctbox { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; padding: 7px 9px; background: rgba(0, 0, 0, .3); border: 1px solid var(--line); }
