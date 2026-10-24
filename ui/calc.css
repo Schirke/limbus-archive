@@ -277,7 +277,7 @@
 .dcxd i { font-style: normal; } .dcxd small { color: var(--muted); }
 .dcxd .dcsti { width: 16px; height: 16px; }
 .dcx > em { font: 600 11px/1 "Segoe UI", sans-serif; font-style: normal; color: #1a1406; background: var(--xc); padding: 2px 4px; border-radius: 3px; }
-.dcxn { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dcxs { display: inline-flex; padding-left: 4px; border-left: 1px solid var(--line, rgba(255,255,255,.12)); } .dcxs .dcsti { width: 14px; height: 14px; opacity: .85; }  /* where it comes from */
 .dcxcoin { position: relative; display: inline-flex; } .dcxcoin .ico { width: 16px; height: 16px; }
 .dcxcoin sup { position: absolute; right: -5px; top: -5px; font: 700 10px/10px "Segoe UI", sans-serif; width: 10px; height: 10px; text-align: center; color: #1a1406; background: var(--gold); border-radius: 50%; }
 .dcxcard { display: none; position: absolute; z-index: 30; left: -3px; top: calc(100% + 4px); width: max-content; max-width: min(320px, 86vw); flex-direction: column; gap: 6px; padding: 8px 10px; background: var(--panel, #17130e); border: 1px solid var(--line, rgba(255,255,255,.18)); border-left: 3px solid var(--xc); box-shadow: 0 6px 18px rgba(0,0,0,.5); font-size: 12px; line-height: 1.35; color: var(--muted); cursor: default; }

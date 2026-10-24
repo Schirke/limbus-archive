@@ -2541,16 +2541,16 @@ function dcbRefresh() {
     } else if (k.startsWith("fl ")) {
       ic = SINS.test(e.sin) ? noT(sinIcon(e.sin, "s16")) : ""; col = SIN_COLORS[e.sin] || "var(--gold)"; lab = `${e.sin} damage`; from = srcOf(e.src);
       tip = e.src && !e.src.startsWith("p:") ? "A hit of its own when this status goes off, through the target's resistance to that sin" : "A hit of its own from the Skill or passive text, through the target's resistance to that sin";
-      sub = `<small>from</small>${from.ic || `<small class="notr dcxn">${esc(from.name)}</small>`}`;
+      sub = from.ic ? `<span class="dcxs">${from.ic}</span>` : "";  // source icon only; the card names it
     } else {
       ic = coinI; col = "var(--gold)"; lab = "extra hit"; from = now.x.shFrom ? srcOf(`p:${now.x.shFrom}`) : { ic: skImg, name: u.name, kind: "Skill" };
       tip = e.all ? "The Coin deals one more hit of its own to every target: a share of its final damage (after all multipliers)" : "The Coin deals one more hit of its own: a share of its final damage (after all multipliers)";
-      sub = `<small>${e.pct}% of Coin damage</small>${e.t > 1 ? `<em>×${e.t}</em>` : ""}`;
+      sub = e.t > 1 ? `<em>×${e.t}</em>` : "";
     }
     const card = `<span class="dcxcard"><span class="dcxw"><b>${lab}</b><span>${tip}</span></span>
       <span class="dcxf"><small>from</small>${from.ic}<span class="notr">${esc(from.name)}</span><small>${from.kind}</small></span>
       <span class="dcxh">${e.rows.map((r) => `<span>${r}</span>`).join("")}</span></span>`;
-    return `<span class="dcx" tabindex="0" style="--xc:${col}"><b>+${e.v}</b>${ic}<i>${lab}</i>${sub}${card}</span>`;
+    return `<span class="dcx" tabindex="0" style="--xc:${col}"><b>+${e.v}</b>${ic}${sub}${card}</span>`;  // icons only, words in the card
   };
   const sd = [...xd.values()].reduce((a, e) => a + e.v, 0);
   const ci = dc.coin >= 0 && dc.coin < C.length ? dc.coin : C.length - 1, sel = C[ci], w = (u.targets || 1) + (now.x.aw || 0), h = now.x.targets || 1;
