@@ -1685,6 +1685,7 @@ function dcaModel(x, sk, up) {
           if (f.share && f.k === "dyn") {  // share of the final damage
             const put = (o2) => { if (typeof f.scope === "number") (o2.coinShare ||= [])[f.scope] = (o2.coinShare[f.scope] || 0) + v; else if (f.scope === "last") o2.lastShare = (o2.lastShare || 0) + v; else o2.share = (o2.share || 0) + v; };
             put(out); if (f.share === "all") put(out.shAll ||= {});
+            if (r.stack === "pass") out.shFrom = r.title;  // the chip card names a passive
             return;
           }
           if (f.k === "sub") { out.subDyn += v; return; }
@@ -1693,7 +1694,7 @@ function dcaModel(x, sk, up) {
           if (f.per && f.per.pow) { (out.powDyn ||= []).push({ v, cap: f.cap }); return; }  // % of this Skill's Power
           if (f.per && f.per.hp1) { (out.hpDyn ||= []).push({ v, cap: f.cap, scope: f.scope }); return; }  // % of the HP the first Coin took  // "-50% damage against sub-targets"
           if (f.k === "tm") { out.tm = (out.tm || 0) + v; return; }
-          if (f.k === "flat") { if (f.scope === "reuse") (out.flatReuse ||= []).push([v, f.sin]); else if (typeof f.scope === "number") (out.coinFlat[f.scope] ||= []).push([v, f.sin]); else out.flatAll.push([v, f.sin]); return; }
+          if (f.k === "flat") { const fe = [v, f.sin, r.stack === "pass" ? `p:${r.title}` : ""]; if (f.scope === "reuse") (out.flatReuse ||= []).push(fe); else if (typeof f.scope === "number") (out.coinFlat[f.scope] ||= []).push(fe); else out.flatAll.push(fe); return; }
           if (f.k === "reuse") { const at = f.at ?? f.scope, c = typeof at === "number" ? at : u.coins - 1; for (let j = 0; j < v; j++) out.reuseAt.push(c); return; }
           if (typeof f.scope === "number") { const arr = { dyn: out.coinDyn, cp: out.coinCp, fp: out.coinFp }[f.k]; if (arr) arr[f.scope] = (arr[f.scope] || 0) + v; else out[order[f.k]] += v; }
           else if (f.scope === "last" && (f.k === "dyn" || f.k === "fp")) out[f.k === "dyn" ? "lastDyn" : "last"] += v;
@@ -1799,15 +1800,16 @@ function dcbCalc(m, u, s, o, env, face = "best") {
     const h0 = (dd) => dcFloor(r <= 0 ? 1 : r * (1 + dd / 100) * mod), hit = (dd) => { const h = h0(dd); return h + (sh ? dcFloor(h * sh / 100) : 0); };
     // flat adders and status damage through their sin's resistance
     const fl2 = [...(x.coinFlat[ci] || []), ...x.flatAll, ...(again ? x.flatReuse || [] : []), ...((T && T.bflat && T.bflat[i]) || [])], fsin = fl2.length ? fl2[0][1] : m.flatSin;
-    const fx = [...(fin && x.flatLast ? [[x.flatLast, m.flatSin]] : []), ...fl2].map(([v, k, src]) => ({ v: dcFloor(v * res(k)), sin: k, src: src || "" })).filter((f) => f.v);
+    const fx = [...(fin && x.flatLast ? [[x.flatLast, m.flatSin]] : []), ...fl2].map(([v, k, src]) => ({ v: dcFloor(v * res(k)), raw: v, rs: res(k), sin: k, src: src || "" })).filter((f) => f.v);
     const flat = fx.reduce((a, f) => a + f.v, 0), sdmg = sd[i] ? dcFloor(sd[i] * (m.stn === "Gloom" ? res("Gloom") : 1)) : 0;
     const tmf = (v) => x.tm ? dcFloor(v * (1 + 0.15 * x.tm) * res("Sloth")) : v;  // Time Moratorium
     let main = tmf(hit(d) + flat + sdmg), side = x.targets > 1 ? tmf(hit(d + x.subDyn)) : 0, one = tmf(hit(d) + flat + (x.targets - 1) * hit(d + x.subDyn) + sdmg);
     const ov = x.only && x.only[ci];  // this coin hits only the main target (1) or only the others (2)
     let shd = sh ? dcFloor(h0(d) * sh / 100) : 0, shn = sh ? 1 : 0;  // "N% of this Coin's final damage": extra damage of its own
     if (x.ramp && x.targets > 1) { side = 0; const e = shA ? tmf((x.targets - 1) * dcFloor(h0(d) * shA / 100)) : 0; one = main + e; if (e) { shd += e; shn += x.targets - 1; } }  // [WideAreaRampage]: one target per coin; "against all targets" shares hit every one
-    else if (ov === 1) { side = 0; one = main; } else if (ov === 2) { one = (x.targets - 1) * side; main = 0; }
-    coins.push({ r, one, main, side, d, sh, shA, shd, shn, heads, flat, fx, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
+    else if (ov === 1) { side = 0; one = main; } else if (ov === 2) { one = (x.targets - 1) * side; main = 0; if (sh) { shd = 0; shn = 0; } }
+    if (sh && side && !(x.ramp && x.targets > 1)) { shd += (x.targets - 1) * dcFloor(h0(d + x.subDyn) * sh / 100); shn += x.targets - 1; }  // the other targets' hits carry the share too
+    coins.push({ r, one, main, side, d, sh, shA, shd, shn, shb: h0(d), sraw: sd[i] || 0, srs: m.stn === "Gloom" ? res("Gloom") : 1, heads, flat, fx, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
     total += one;
   }
   return { total, coins, x, diff, mod, stag: stag.reduce((a, v) => a + (v || 0), 0) };
@@ -2515,23 +2517,40 @@ function dcbRefresh() {
   // the result: total = hits + status damage; Stagger from Tremor Burst beside it
   const C = now.coins, add = u.op !== "SUB", lo = calc(o, s, "tails").total, hi = calc(o, s, "heads").total;
   // extra damage (not the coin hit itself): status damage, flat sin damage, shares of the Coin's damage — summed per kind, instances counted
-  const xd = new Map(), xput = (k, v, n, o) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0, ...o }; e.v += v; e.n += n; xd.set(k, e); };
-  C.forEach((c) => { xput("st", c.sdmg, 1, { st: m.stk || "Burst" }); (c.fx || []).forEach((f) => xput(`fl ${f.sin} ${f.src}`, f.v, 1, f)); xput(`sh ${c.sh} ${c.shA ? 1 : 0}`, c.shd, c.shn, { pct: +(+c.sh).toFixed(1), all: !!c.shA }); });
-  const SINS = /^(Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/;
+  const xd = new Map(), xput = (k, v, n, o, row) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0, t: 1, rows: [], ...o }; e.v += v; e.n += n; e.rows.push(row); xd.set(k, e); };
+  const cl = (c) => `<span class="dcxc">${c.reuse ? `coin ${ROMAN[c.ci] || c.ci + 1} Reuse` : `coin ${ROMAN[c.ci] || c.ci + 1}`}</span>`, n1 = (v) => +(+v).toFixed(2);
+  C.forEach((c) => {
+    xput("st", c.sdmg, 1, { st: m.stk || "Burst" }, `${cl(c)}<span>${c.srs !== 1 ? `Potency ${c.sraw} × ${m.stn} ×${n1(c.srs)} = ${c.sdmg}` : `Potency ${c.sraw} = ${c.sdmg}`}</span>`);
+    (c.fx || []).forEach((f) => xput(`fl ${f.sin} ${f.src}`, f.v, 1, f, `${cl(c)}<span>${f.rs !== 1 ? `${n1(f.raw)} × ${f.sin} ×${n1(f.rs)} = ${f.v}` : `${f.v}`}</span>`));
+    const nt = c.shn, one = dcFloor(c.shb * c.sh / 100);
+    xput(`sh ${c.sh} ${c.shA ? 1 : 0}`, c.shd, c.shn, { pct: n1(c.sh), all: !!c.shA }, `${cl(c)}<span>${nt > 1 ? `${n1(c.sh)}% of ${c.shb} = ${one}, on ${nt} targets = ${c.shd}` : `${n1(c.sh)}% of ${c.shb} = ${c.shd}`}</span>`);
+    const e = xd.get(`sh ${c.sh} ${c.shA ? 1 : 0}`); if (e && c.shd) e.t = Math.max(e.t, nt);
+  });
+  // chip: sin / status colour stripe, icon, "from" + source icon; hover (or tap) = card: what / from where / per coin
+  const SINS = /^(Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/, ST_COL = { Burst: "#2ec4b6", Sinking: "#3f7fe0", Vibration: "#e3c43a", Combustion: "#e8862f", Bleeding: "#d94a3a" };
+  const noT = (h) => h.replace(/ title="[^"]*"/g, "");  // the card explains, no browser tooltip
+  const sk0 = slots[dc.slot] && slots[dc.slot][1], skImg = sk0 ? `<img class="dcsti" src="${sk0.iconUrl || imgThumb(sk0.iconPath || `Assets/Resources_moved/Sprite/SkillIcon/${sk0.icon || sk0.id}.png`)}" alt="" onerror="this.remove()">` : "";
+  const coinI = `<span class="dcxcoin">${noT(coinIcon(""))}<sup>+</sup></span>`;
+  const srcOf = (src) => src.startsWith("p:") ? { ic: "", name: src.slice(2), kind: "passive" } : src ? { ic: noT(dcImg(src)), name: dcaG(src).name || src, kind: "status" } : { ic: skImg, name: u.name, kind: "Skill" };
   const xdChip = ([k, e]) => {
-    let ic = "", lab, sub = "", tip;
+    let ic, col, lab, tip, from, sub = "";
     if (k === "st") {
-      ic = dcImg(e.st); lab = e.st === "Sinking" ? "Sinking damage" : "Rupture damage";
+      ic = noT(dcImg(e.st)); col = ST_COL[e.st] || "var(--gold)"; lab = e.st === "Sinking" ? "Sinking damage" : "Rupture damage";
       tip = e.st === "Sinking" ? "Each hit sets off Sinking on the target: Gloom damage = its Potency (no SP), then Count −1" : "Each hit sets off Rupture on the target: damage = its Potency, then Count −1";
+      from = { ic, name: dcaG(e.st).name || e.st, kind: "status on the target" };
     } else if (k.startsWith("fl ")) {
-      ic = SINS.test(e.sin) ? sinIcon(e.sin, "s16") : ""; lab = `${e.sin} damage`;
-      if (e.src) { sub = `<small>from</small> <small class="notr">${esc(dcaG(e.src).name || e.src)}</small>`; tip = "A hit of its own when this status goes off, through the target's resistance to that sin"; }
-      else tip = "A hit of its own from the Skill or passive text, through the target's resistance to that sin";
+      ic = SINS.test(e.sin) ? noT(sinIcon(e.sin, "s16")) : ""; col = SIN_COLORS[e.sin] || "var(--gold)"; lab = `${e.sin} damage`; from = srcOf(e.src);
+      tip = e.src && !e.src.startsWith("p:") ? "A hit of its own when this status goes off, through the target's resistance to that sin" : "A hit of its own from the Skill or passive text, through the target's resistance to that sin";
+      sub = `<small>from</small>${from.ic || `<small class="notr dcxn">${esc(from.name)}</small>`}`;
     } else {
-      lab = "extra hit"; sub = `<small>${e.all ? `${e.pct}% of Coin damage, every target` : `${e.pct}% of Coin damage`}</small>`;
+      ic = coinI; col = "var(--gold)"; lab = "extra hit"; from = now.x.shFrom ? srcOf(`p:${now.x.shFrom}`) : { ic: skImg, name: u.name, kind: "Skill" };
       tip = e.all ? "The Coin deals one more hit of its own to every target: a share of its final damage (after all multipliers)" : "The Coin deals one more hit of its own: a share of its final damage (after all multipliers)";
+      sub = `<small>${e.pct}% of Coin damage</small>${e.t > 1 ? `<em>×${e.t}</em>` : ""}`;
     }
-    return `<span title="${tip}"><b>+${e.v}</b>${ic}<i>${lab}</i>${sub}${e.n > 1 ? `<small>×${e.n}</small>` : ""}</span>`;
+    const card = `<span class="dcxcard"><span class="dcxw"><b>${lab}</b><span>${tip}</span></span>
+      <span class="dcxf"><small>from</small>${from.ic}<span class="notr">${esc(from.name)}</span><small>${from.kind}</small></span>
+      <span class="dcxh">${e.rows.map((r) => `<span>${r}</span>`).join("")}</span></span>`;
+    return `<span class="dcx" tabindex="0" style="--xc:${col}"><b>+${e.v}</b>${ic}<i>${lab}</i>${sub}${card}</span>`;
   };
   const sd = [...xd.values()].reduce((a, e) => a + e.v, 0);
   const ci = dc.coin >= 0 && dc.coin < C.length ? dc.coin : C.length - 1, sel = C[ci], w = (u.targets || 1) + (now.x.aw || 0), h = now.x.targets || 1;
