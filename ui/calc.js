@@ -1088,7 +1088,7 @@ function dcaClause(rest, ctx) {
   // bonus share of Coin damage
   const TYPE = /^(Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/i, own = (w) => !w || !TYPE.test(w) || [ctx.atk, ctx.sin].some((z) => z && z.toLowerCase() === w.toLowerCase());
   const bonus = /\((\d+(?:\.\d+)?)% of this Coin's final damage\) bonus/i.exec(rest);
-  if (bonus) return [{ k: "dyn", v: +bonus[1], share: true }];
+  if (bonus) return [{ k: "dyn", v: +bonus[1], share: ctx.allT ? "all" : true }];
   for (const [re, ni, ti] of [
     [/\bdeals?\s+(?:bonus\s+)?(?:(\w+)\s+)?(?:bonus\s+)?damage\s+(?:equal to|by)\s+\(?(\d+(?:\.\d+)?)%\s+of\s+(?:(?:this|each|the)\s+)?(?:Coin['’]s final damage|damage dealt)\)?/i, 2, 1],
     [/\bdeals?\s+\((\d+(?:\.\d+)?)%\s+of\s+this Coin['’]s final damage\)\s+(?:(\w+)\s+)?damage/i, 1, 2],
@@ -1445,6 +1445,9 @@ function dcaModel(x, sk, up) {
     // own status that makes enemies take more from Charge skills (Sanctum: "+10% … ("Le Noir" … +20% instead)")
     const cg = side === "self" && /Take \+(\d+)% damage from Skills that consume Charge Count(?: or Unique Charge)?(?: \(from "([^"]+)" allied Identities' Skills, take \+(\d+)% damage instead\))?/i.exec(dcaEn("gl", kw, g.desc) || "");
     if (cg && dcaUsesCharge(u)) parts.push({ f: { k: "dyn", v: +(cg[2] && dcaX && dcaX.title.includes(cg[2]) ? cg[3] : cg[1]), scope: "all" }, conds: [{ q, n: 1 }] });
+    // status on the target: "Take +(Stack x N)% damage from <A>-faction Identities" (· "If the attacker is in both <A> faction and <B> faction, … +(Stack x M)% … instead"): by the attacker's factions
+    const fa = side === "target" && /Take \+\(Stack x ([\d.]+)\)% damage from (?:the )?(.+?)-faction Identities(?:[^]*?If the attacker is in both (.+?) faction and (.+?) faction, take \+\(Stack x ([\d.]+)\)% damage instead)?/i.exec(dcaEn("gl", kw, g.desc) || "");
+    if (fa && dcaX) { const as = dcaX.assoc || [], v = fa[3] && as.includes(fa[3]) && as.includes(fa[4]) ? +fa[5] : as.includes(fa[2]) ? +fa[1] : 0; if (v) parts.push({ f: { k: "dyn", v, per: q, every: 1, scope: "all" }, conds: [] }); }
     // chain: gives other statuses
     let linked = 0;
     if (side === "self") for (const c of dcaChain(kw)) {
@@ -1685,7 +1688,7 @@ function dcaModel(x, sk, up) {
             if (!one[kw] || !dcaDeathOk(d, s)) continue;
             one[kw]--;
             if (d.cnt) f.addC("Burst", d.cnt, dcaG(kw).name || kw);
-            if (one[kw] <= 0) { (bflat[j] ||= []).push([p, d.sin[0].toUpperCase() + d.sin.slice(1).toLowerCase()]); blog.push({ lab: dcaG(kw).name || kw, hit: p, sin: d.sin, kw }); gone.push([kw, j]); }
+            if (one[kw] <= 0) { (bflat[j] ||= []).push([p, d.sin[0].toUpperCase() + d.sin.slice(1).toLowerCase(), kw]); blog.push({ lab: dcaG(kw).name || kw, hit: p, sin: d.sin, kw }); gone.push([kw, j]); }
           }
         },
         post: (f) => {
@@ -1702,17 +1705,17 @@ function dcaModel(x, sk, up) {
           if (on) for (const b of bursts) if (b.coin === ci || b.all || (b.last && j === seq.length - 1) || (b.first && j === 0)) {
             const tk = Object.keys(f.t).find((z) => /^Vibration/.test(z)), v = tk ? f.t[tk].p : 0;
             if (!v) continue;
-            if (bsin) (bflat[j] ||= []).push([v * b.n, bsin[1]]);
+            if (bsin) (bflat[j] ||= []).push([v * b.n, bsin[1], "VibrationExplosion"]);
             if (fz && (tk === "VibrationFocusing" || (focusAt >= 0 && ci >= focusAt))) {
               const d = Math.floor(v * Math.min(fz.max, fz.base + fz.per * dcaChargeP(s)) / 100 + 1e-9);
-              if (d) { for (let k = 0; k < b.n; k++) (bflat[j] ||= []).push([d, fz.sin]); blog.push({ lab: dcaG("VibrationFocusing").name || "VibrationFocusing", hit: d * b.n, sin: fz.sin, kw: "VibrationFocusing" }); }
+              if (d) { for (let k = 0; k < b.n; k++) (bflat[j] ||= []).push([d, fz.sin, "VibrationFocusing"]); blog.push({ lab: dcaG("VibrationFocusing").name || "VibrationFocusing", hit: d * b.n, sin: fz.sin, kw: "VibrationFocusing" }); }
             }
             stag[j] = (stag[j] || 0) + v * b.n; blog.push({ lab: b.coin != null ? `Coin ${ROMAN[ci]}` : b.from, v: v * b.n, n: b.n, kw: tk });
             for (const kw of t1) {  // "Upon Tremor Burst, take 1 Sloth damage for every Stack (max 10; once per Skill)"
               const h = dcaBurstHit(kw);
               if (!h || !one[kw] || (h.once && used.has(kw))) continue;
               const d = h.tremor ? v : Math.min(h.cap ?? 999, h.per * one[kw]);
-              (bflat[j] ||= []).push([d, h.sin]); used.add(kw); blog.push({ lab: dcaG(kw).name || kw, hit: d, sin: h.sin, kw });
+              (bflat[j] ||= []).push([d, h.sin, kw]); used.add(kw); blog.push({ lab: dcaG(kw).name || kw, hit: d, sin: h.sin, kw });
               if (h.lose) one[kw] = Math.max(0, one[kw] - h.lose);
             }
             if (b.cut) f.dec(tk, b.cut, `Coin ${ROMAN[ci]}`);  // "then, reduce … Count"
@@ -1758,14 +1761,15 @@ function dcbCalc(m, u, s, o, env, face = "best") {
     const h0 = (dd) => dcFloor(r <= 0 ? 1 : r * (1 + dd / 100) * mod), hit = (dd) => { const h = h0(dd); return h + (sh ? dcFloor(h * sh / 100) : 0); };
     // flat adders and status damage through their sin's resistance
     const fl2 = [...(x.coinFlat[ci] || []), ...x.flatAll, ...(again ? x.flatReuse || [] : []), ...((T && T.bflat && T.bflat[i]) || [])], fsin = fl2.length ? fl2[0][1] : m.flatSin;
-    const flat = (fin && x.flatLast ? dcFloor(x.flatLast * res(m.flatSin)) : 0) + fl2.reduce((a, [v, k]) => a + dcFloor(v * res(k)), 0), sdmg = sd[i] ? dcFloor(sd[i] * (m.stn === "Gloom" ? res("Gloom") : 1)) : 0;
+    const fx = [...(fin && x.flatLast ? [[x.flatLast, m.flatSin]] : []), ...fl2].map(([v, k, src]) => ({ v: dcFloor(v * res(k)), sin: k, src: src || "" })).filter((f) => f.v);
+    const flat = fx.reduce((a, f) => a + f.v, 0), sdmg = sd[i] ? dcFloor(sd[i] * (m.stn === "Gloom" ? res("Gloom") : 1)) : 0;
     const tmf = (v) => x.tm ? dcFloor(v * (1 + 0.15 * x.tm) * res("Sloth")) : v;  // Time Moratorium
     let main = tmf(hit(d) + flat + sdmg), side = x.targets > 1 ? tmf(hit(d + x.subDyn)) : 0, one = tmf(hit(d) + flat + (x.targets - 1) * hit(d + x.subDyn) + sdmg);
     const ov = x.only && x.only[ci];  // this coin hits only the main target (1) or only the others (2)
     let shd = sh ? dcFloor(h0(d) * sh / 100) : 0, shn = sh ? 1 : 0;  // "N% of this Coin's final damage": extra damage of its own
     if (x.ramp && x.targets > 1) { side = 0; const e = shA ? tmf((x.targets - 1) * dcFloor(h0(d) * shA / 100)) : 0; one = main + e; if (e) { shd += e; shn += x.targets - 1; } }  // [WideAreaRampage]: one target per coin; "against all targets" shares hit every one
     else if (ov === 1) { side = 0; one = main; } else if (ov === 2) { one = (x.targets - 1) * side; main = 0; }
-    coins.push({ r, one, main, side, d, sh, shA, shd, shn, heads, flat, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
+    coins.push({ r, one, main, side, d, sh, shA, shd, shn, heads, flat, fx, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
     total += one;
   }
   return { total, coins, x, diff, mod, stag: stag.reduce((a, v) => a + (v || 0), 0) };
@@ -2473,8 +2477,24 @@ function dcbRefresh() {
   // the result: total = hits + status damage; Stagger from Tremor Burst beside it
   const C = now.coins, add = u.op !== "SUB", lo = calc(o, s, "tails").total, hi = calc(o, s, "heads").total;
   // extra damage (not the coin hit itself): status damage, flat sin damage, shares of the Coin's damage — summed per kind, instances counted
-  const xd = new Map(), xput = (k, v, n = 1) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0 }; e.v += v; e.n += n; xd.set(k, e); };
-  C.forEach((c) => { xput(m.stk === "Burst" ? "Rupture" : m.stk || m.stn, c.sdmg); xput(c.fsin || m.flatSin, c.flat); xput("share", c.shd, c.shn); });
+  const xd = new Map(), xput = (k, v, n, o) => { if (!v) return; const e = xd.get(k) || { v: 0, n: 0, ...o }; e.v += v; e.n += n; xd.set(k, e); };
+  C.forEach((c) => { xput("st", c.sdmg, 1, { st: m.stk || "Burst" }); (c.fx || []).forEach((f) => xput(`fl ${f.sin} ${f.src}`, f.v, 1, f)); xput(`sh ${c.sh} ${c.shA ? 1 : 0}`, c.shd, c.shn, { pct: +(+c.sh).toFixed(1), all: !!c.shA }); });
+  const SINS = /^(Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/;
+  const xdChip = ([k, e]) => {
+    let ic = "", lab, sub = "", tip;
+    if (k === "st") {
+      ic = dcImg(e.st); lab = e.st === "Sinking" ? "Sinking damage" : "Rupture damage";
+      tip = e.st === "Sinking" ? "Each hit sets off Sinking on the target: Gloom damage = its Potency (no SP), then Count −1" : "Each hit sets off Rupture on the target: damage = its Potency, then Count −1";
+    } else if (k.startsWith("fl ")) {
+      ic = SINS.test(e.sin) ? sinIcon(e.sin, "s16") : ""; lab = `${e.sin} damage`;
+      if (e.src) { sub = `<small>from</small> <small class="notr">${esc(dcaG(e.src).name || e.src)}</small>`; tip = "A hit of its own when this status goes off, through the target's resistance to that sin"; }
+      else tip = "A hit of its own from the Skill or passive text, through the target's resistance to that sin";
+    } else {
+      lab = "extra hit"; sub = `<small>${e.all ? `${e.pct}% of Coin damage, every target` : `${e.pct}% of Coin damage`}</small>`;
+      tip = e.all ? "The Coin deals one more hit of its own to every target: a share of its final damage (after all multipliers)" : "The Coin deals one more hit of its own: a share of its final damage (after all multipliers)";
+    }
+    return `<span title="${tip}"><b>+${e.v}</b>${ic}<i>${lab}</i>${sub}${e.n > 1 ? `<small>×${e.n}</small>` : ""}</span>`;
+  };
   const sd = [...xd.values()].reduce((a, e) => a + e.v, 0);
   const ci = dc.coin >= 0 && dc.coin < C.length ? dc.coin : C.length - 1, sel = C[ci], w = (u.targets || 1) + (now.x.aw || 0), h = now.x.targets || 1;
   const xc = (c) => {  // what only this coin has
@@ -2495,7 +2515,7 @@ function dcbRefresh() {
   const st0 = now.mod, dy = 1 + sel.d / 100;
   $("#dcres").innerHTML = `<div class="dcrsk">${sinIcon(u.sin, "s22")}${atkIcon(u, "s20")}<span>${esc(F.info[dc.slot].kind)} · ${esc(u.name)}</span></div>
     ${card ? `<div class="dcturn">Turn ${card.i + 1} of the rotation${card.i ? `: the target carries what turns 1–${card.i} inflicted` : ""}<button class="toggle" id="dcback">Back to my fight state</button></div>` : ""}
-    <div class="dcbig"><b>${now.total}</b>${xd.size ? `<span class="dcxd">${[...xd].map(([k, e]) => `<span><b>+${e.v}</b>${k === "share" ? "<i>share of Coin damage</i>" : `${/^(Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/.test(k) ? sinIcon(k, "s16") : dcImg(k === "Rupture" ? "Burst" : k)}<i>${esc(k)}</i>`}${e.n > 1 ? `<small>×${e.n}</small>` : ""}</span>`).join("")}</span>` : ""}${now.stag ? `<span class="dcstg">+${now.stag} Stagger<small>Tremor Burst</small></span>` : ""}</div>
+    <div class="dcbig"><b>${now.total}</b>${xd.size ? `<span class="dcxd">${[...xd].map(xdChip).join("")}</span>` : ""}${now.stag ? `<span class="dcstg">+${now.stag} Stagger<small>Tremor Burst</small></span>` : ""}</div>
     <div class="dcsum">${sd ? `<b>${now.total - sd}</b> from hits + <b>${sd}</b> extra damage · ` : ""}<span>${add ? "all heads" : "all tails (Minus Coins)"}</span> · <span>${h > 1 ? `${h} targets` : "one target"}</span> · all tails <b>${lo}</b> · all heads <b>${hi}</b></div>
     ${m.auto && w > 1 ? `<div class="dctbox"><span class="dcaw">Atk Weight ${w}</span><span class="cqkind">${Array.from({ length: w }, (_, i) => `<button data-hit="${i + 1}" class="${i + 1 === h ? "on" : ""}">hitting ${i + 1}</button>`).join("")}</span>
       <span class="dcbfrom">${w - h ? `${w - h} excess Atk Weight` : "no excess Atk Weight"}${h > 1 ? now.x.ramp ? " · each Coin hits one random target" : " · the other targets take −50%" : ""}</span></div>`
