@@ -92,7 +92,9 @@ PAGES = {
                                    "gameodd", "gamemix", "gamebuff", "gamechain", "gamejig", "gamewhen", "gamediff", "gamehilo",
                                    "gamepassive", "gameego", "gamememory", "gamewho", "gamedare")},
     **{r: {"beta": True, "part": "biggames"} for r in ("biggames", "singingmachine", "slice", "survivors", "collection")},
-    **{r: {"app": True} for r in ("versus", "vsroom", "vsmirror", "sounds", "browse", "snapshots", "scan", "settings", "sprites")},
+    "sounds": {"title": "Sounds", "seo": "Every sound in Limbus Company's files: sound effects, the story's voiced lines, Identity and "
+               "E.G.O voice lines and the soundtrack, with who says them and their text.", "open": True, "part": "sounds"},
+    **{r: {"app": True} for r in ("versus", "vsroom", "vsmirror", "browse", "snapshots", "scan", "settings", "sprites")},
 }
 BASE_OPEN = [r for r, p in PAGES.items() if p.get("open")]
 CARD_DIRS = tuple(r for r, p in PAGES.items() if p.get("cards")) + ("og",)  # (og/: the cards' pictures)
@@ -113,6 +115,7 @@ SCENE_PACK = 384 << 10  # story backgrounds, ~350 KB each
 #   by      "verify": made by the check (verify), not by pages()
 #   always  made every time (from the internet, or one request); any other part is skipped while what it is made from
 #           (the app, the game version, the site settings, its "uses": INPUTS) is as when it was made last (Exporter.pages)
+SOUNDS_ELSEWHERE = ["story", "quiz", "music", "gacha", "announcers", "units", "newgames"]  # (parts made before "sounds")
 PARTS = {
     "quiz": {"cfg": "games", "taken": True, "crawl": {"stage": "Games (voice lines)", "start": ["/api/quiz"], "sort": True,
              "packs": [(r"/api/quiz$", PACK), (r"/api/quiz_audio\?", VOICE_PACK), (r"/api/asset_thumb\?", PACK)]}},
@@ -156,6 +159,10 @@ PARTS = {
                              (r"/api/bank\?", VOICE_PACK)]}},
     "abnologs": {"cfg": "story", "taken": True, "uses": ["enemy pictures", "abno authors"], "crawl": {"stage": "Abnormality logs", "start": ["/api/abno_logs"],
                  "packs": [(r"/api/abno_logs$", PACK), ((r"/api/asset_thumb\?", r"/api/enemy_thumb\?"), GAME_PACK)]}},
+    # the Sounds page: its folders, then each folder's sounds; a sound other parts have (the story's, the games', the
+    # soundtrack) stays theirs (elsewhere: not listed here, the site finds it in their manifests)
+    "sounds": {"cfg": "audio", "uses": ["shared sounds"], "crawl": {"stage": "Sounds", "start": ["/api/sounds"], "elsewhere": SOUNDS_ELSEWHERE,
+               "packs": [(r"/api/sounds\b", PACK), (r"/api/(asset_thumb|ui_icon)\?", GAME_PACK), (r"/api/((quiz|story|music)_audio|bank)\?", VOICE_PACK)]}},
     # the big games (ui/big, built): every request they make, found by running them in a hidden window; the lists are asked every time
     "biggames": {"taken": True, "uses": ["big games"], "crawl": {"stage": "Big games", "start": "biggames", "versions": "biggames", "ask": r"/api/(frames|sounds)\b",
                  "packs": [(r"/api/(frames|sounds)\b", PACK), (r"/api/(?!frames\b|sounds\b|bank\b)", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
@@ -803,6 +810,7 @@ INPUTS = {
     "enemy pictures": lambda ex: _files_sig(os.path.join(ex.svc.data_dir, "enemy_thumbs")),  # (drawn by the app's pages)
     "stage pictures": lambda ex: _files_sig(os.path.join(ex.svc.data_dir, "stage_thumbs")),  # (made by the player on demand)
     "abno authors": lambda ex: _file_sig(os.path.join(resource_dir(), "ui", "abno_authors.json")),
+    "shared sounds": lambda ex: [ex.manifest_hash(n) for n in SOUNDS_ELSEWHERE],  # (what they have, Sounds doesn't list)
 }
 MADE = "made.json"  # (d/, not uploaded) what each part was made from, what was sent last (Exporter.pages, _publish)
 EVERY_PAGE = ("langs", "extra")  # parts any page may read: a change opens all of them in the check
@@ -1131,6 +1139,8 @@ class Exporter:
         self.progress(stage, 0, 0)
         got, todo, srcs = {}, list(start), {}
         seen = set(todo)
+        # (requests other parts list: theirs, left out here)
+        elsewhere = {k for n in sec.get("elsewhere") or () for k in self.read_manifest(n).get("urls") or {}}
         while todo:
             level_have = have
             if sec.get("sources"):  # a file made from another request: kept while that request is the same
@@ -1142,7 +1152,7 @@ class Exporter:
             if sec.get("shape") and not got:  # (the lists as the site shows them)
                 SHAPES[sec["shape"]](self, level)
             got.update((k, level[k]) for k in todo if k in level)
-            todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen]
+            todo = [k for k in dict.fromkeys(k for t in todo if t in level for k in self._links(t, level[t])) if k not in seen and k not in elsewhere]
             seen.update(todo)
         for key in sec.get("prune", ()):
             if key in got:
@@ -1481,6 +1491,9 @@ const SITE = {json.dumps({"contact": self.cfg["contact"], "build": build_info(se
             who = {x.get("id"): f"{x.get('title')} {x.get('sinnerName')}" for x in u.get("ids") or []}
             who.update({x.get("id"): f"{x.get('name')} {x.get('sinnerName')}" for x in u.get("egos") or []})
             group("Banners", [("Until " + (b.get("end") or "")[:10] if b.get("end") else "", [who.get(i, str(i)) for i in b.get("pick") or []]) for b in d.get("archive") or []])
+        elif route == "sounds":
+            d = self._answer("/api/sounds") or {}
+            group("Folders", [(k.get("name"), [c.get("name") for c in k.get("kids") or []]) for k in d.get("kids") or []])
         return "".join(out)
 
     def _page(self, html: str, pages: dict, route: str, url: str) -> str:

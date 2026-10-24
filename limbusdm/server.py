@@ -695,9 +695,10 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 db = svc.sound_lib()
                 if q.get("q"):
                     return self._json(soundlib.search(db, q["q"], path=json.loads(q["path"]) if q.get("path") else None))
-                if q.get("path"):
-                    node = soundlib.find(db, json.loads(q["path"]))
-                    return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {}})
+                if q.get("path") or q.get("at"):
+                    node = soundlib.find_at(db, q["at"]) if q.get("at") else soundlib.find(db, json.loads(q["path"]))
+                    return self._json({"items": soundlib.items(db, node) if node else [], "pics": (node or {}).get("pics") or {},
+                                       **(soundlib.urls(db, node, _story_sounds(svc)) if node else {})})
                 return self._json({**soundlib.outline(db["tree"]), "note": "" if db["tree"].get("n") else getattr(svc, "_bank_note", "")})
             if p == "/api/story":  # Database → Story (story.py, private repo): chapters, episodes, Sinners' Identity stories
                 from . import story
@@ -1473,6 +1474,23 @@ def _story_ep_links(ep: dict) -> dict:
         if ln.get("vid"):
             L["v|" + ln["vid"]] = links.story_video(ln["vid"])
     return {**ep, "links": L}
+
+
+def _story_sounds(svc) -> dict:
+    """The story's own sounds and music by name (lowercase → as the story writes it): Sounds links them as the story does."""
+    sid = svc.latest_snapshot_id()
+    got = getattr(svc, "_story_sounds", None)
+    if got and got[0] == sid:
+        return got[1]
+    out = {}
+    try:
+        from . import story
+        kit = story.kit(svc)
+        out = {it["k"].lower(): it["k"] for k in ("bgm", "sfx") for it in kit.get(k) or [] if it.get("k")}
+    except Exception:
+        pass  # (by their samples' names)
+    svc._story_sounds = (sid, out)
+    return out
 
 
 def _story_kit_links(kit: dict) -> dict:

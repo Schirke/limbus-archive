@@ -125,6 +125,11 @@ def story_audio(sample: str) -> str:
     return f"/api/story_audio?s={_q(sample)}" if sample else ""
 
 
+def sounds(at: str) -> str:
+    """One folder of the Sounds page: its sounds (at: its place, soundlib.find_at)."""
+    return f"/api/sounds?at={_q(at)}"
+
+
 def story_video(name: str) -> str:
     """A story's video."""
     return f"/api/story_video?name={_q(name)}" if name else ""

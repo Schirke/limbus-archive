@@ -5,13 +5,20 @@ import json
 import os
 import re
 
+from . import links
 from .quiz import _rows, _text, _where
 
-VERSION = 8
+VERSION = 9
 SAVE_MAX = 500  # sounds one "Save folder" writes at most (Battle effects: ~9000)
 SEARCH_MAX = 3000  # (the page shows them 200 at a time)
 FX, STORY, VOICE, OST = "Sound Effects", "Story", "Voicefiles", "Soundtracks"
 TOP = [FX, STORY, VOICE, OST]  # (the folders' order)
+TOP_ART = {  # (their pictures: the game's own art)
+    FX: "Assets/Resources_moved/Story/Backgrounds/Ep10_1/story_b1_foodcourt.png",
+    STORY: "Assets/Resources_moved/Story/Backgrounds/Ep10_1/story_Ncourt.png",
+    VOICE: "Assets/Resources_moved/Sprite/Unit/CG/10201_normal.png",
+    OST: "Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_Rendezvous.png",
+}
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael", "Rodion",
            "Sinclair", "Outis", "Gregor"]
 
@@ -37,9 +44,10 @@ def _sinner_of(uid: int) -> str:
 
 def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], egos: list[dict], music: dict,
           portraits: dict | None = None, models: dict | None = None) -> dict:
-    """Build the sound tree {"v", "banks", "tree"} from the bank samples and texts."""
+    """Build the sound tree {"v", "banks", "tree", "src"} from the bank samples and texts. src: "<bank>:<i>" → "m<n>" (the
+    soundtrack's track n) or "s<sample>" (a story line, named as the story names it): what other answers have it as."""
     en = os.path.join(loc_root, "en")
-    banks, bank_n = [], {}
+    banks, bank_n, src = [], {}, {}
     tree = {"name": "", "kids": []}
 
     def folder(*path, order=None):
@@ -57,12 +65,14 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
     for name in TOP:
         folder(name)
 
-    def put(path, s, title="", sub="", text="", key=None, order=None, pic=None):
+    def put(path, s, title="", sub="", text="", key=None, order=None, pic=None, via=None):
         b = bank_n.setdefault(s[0], len(banks))
         if b == len(banks):
             banks.append(s[0])
         node = folder(*path, order=order)
         node.setdefault("items", []).append([b, s[1], s[2], s[3], title, sub, text, key, pic])
+        if via:
+            src[f"{b}:{s[1]}"] = via
 
     # who says what: the voice tables, the story's lines
     voice = {str(r["id"]).lower(): r for sub in ("PersonalityVoiceDlg", "EGOVoiceDig", "BattleAnnouncerDlg")
@@ -75,12 +85,13 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
     id_of = {x["id"]: x for x in ids}
     ego_of = {x["id"]: x for x in egos}
     codes = {str(r["id"]): r for r in _rows(en, r"EN_ScenarioModelCodes.*\.json$")}
-    line_of = {}  # sample → (stem, line id)
+    line_of, said = {}, {}  # sample → (stem, line id); its name as the story writes it
     for stem, rows in story.items():
         for r in rows:
-            v = str(r.get("voice") or "").lower()
+            v = str(r.get("voice") or "")
             if v and isinstance(r.get("id"), int):
-                line_of.setdefault(v, (stem, r["id"]))
+                line_of.setdefault(v.lower(), (stem, r["id"]))
+                said.setdefault(v.lower(), v)
     loc_cache: dict[str, dict] = {}
 
     def story_file(stem):
@@ -102,7 +113,8 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
         who = _text(t.get("teller") or (codes.get(str(t.get("model") or "")) or {}).get("name"))
         folder(STORY, label, order=order)
         pic = (models or {}).get(str(t.get("model") or "")) or (portraits or {}).get(who)  # (the line's own model first: two can share a name)
-        put([STORY, label, scene], s, who, _text(t.get("title")), _text(t.get("content")), line if line is not None else 1e9, pic=pic)
+        put([STORY, label, scene], s, who, _text(t.get("title")), _text(t.get("content")), line if line is not None else 1e9, pic=pic,
+            via=said.get(s[2].lower()) and "s" + said[s[2].lower()])
         if pic:  # (the folder's "who speaks": each face once, a second one of a name by its title)
             pics = folder(STORY, label, scene).setdefault("pics", {})
             if pic not in pics.values():
@@ -121,7 +133,8 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
             t = music.get((rel, low))
             group = "Battle themes" if t and t.get("battle") else "Story" if bank.startswith("BGM_Story") else "Lobby & other"
             put([OST, group], s, t["name"] if t else "", " · ".join(x for x in ((t or {}).get("where"), (t or {}).get("by")) if x),
-                key=(t["name"] if t else "~" + name).lower(), order={"Battle themes": 0, "Story": 1}.get(group, 2))
+                key=(t["name"] if t else "~" + name).lower(), order={"Battle themes": 0, "Story": 1}.get(group, 2),
+                via=t and "n" in t and f"m{t['n']}")
         elif bank.startswith(("SFX", "UI")) or bank.startswith("CP10-RPG"):
             if "_battleui_" in low:  # (the battle interface is split over the UI and SFX banks: one set, each name once)
                 if low in seen:
@@ -191,7 +204,7 @@ def build(samples: list[tuple], loc_root: str, story: dict, ids: list[dict], ego
         tidy(k)
     tree["kids"] = [top[n] for n in TOP]
     tree["n"] = sum(k["n"] for k in tree["kids"])
-    return {"v": VERSION, "banks": banks, "tree": tree}
+    return {"v": VERSION, "banks": banks, "tree": tree, "src": src}
 
 
 def find(db: dict, path: list[str]) -> dict | None:
@@ -203,15 +216,50 @@ def find(db: dict, path: list[str]) -> dict | None:
     return node
 
 
-def outline(node: dict) -> dict:
-    """A folder without its sounds (the page asks for those folder by folder)."""
+def outline(node: dict, at: tuple = ()) -> dict:
+    """A folder without its sounds (the page asks for those folder by folder: url, by the folders' places), with its
+    pictures' links."""
+    pic = TOP_ART.get(node["name"]) if len(at) == 1 else node.get("img")
     return {"name": node["name"], "n": node["n"], "items": len(node.get("items") or []),
             **{k: node[k] for k in ("sinner", "img") if node.get(k)},
-            **({"kids": [outline(k) for k in node["kids"]]} if node.get("kids") else {})}
+            **({"url": links.sounds(".".join(map(str, at)))} if node.get("items") else {}),
+            **({"thumb": links.thumb(pic)} if pic else {}),
+            **({"icon": links.ui_icon(f"sinner_{node['sinner']}")} if node.get("sinner") else {}),
+            **({"kids": [outline(k, at + (i,)) for i, k in enumerate(node["kids"])]} if node.get("kids") else {})}
+
+
+def find_at(db: dict, at: str) -> dict | None:
+    """The folder at "2.0.5" (its place among its parent's folders, level by level: outline's url)."""
+    node = db["tree"]
+    for i in at.split(".") if at else []:
+        kids = node.get("kids") or []
+        if not i.isdigit() or int(i) >= len(kids):
+            return None
+        node = kids[int(i)]
+    return node
 
 
 def items(db: dict, node: dict) -> list:
     return [[db["banks"][it[0]], *it[1:]] for it in node.get("items") or []]
+
+
+def urls(db: dict, node: dict, named: dict) -> dict:
+    """A folder's sounds as the site has them: {"urls": one per sound, "thumbs": {picture: link}}. Each by the answer other
+    pages have it in (a soundtrack's track; the story's line or sound, named = the story's names, lowercase → as written;
+    an announcer's line), else by its sample's name."""
+    out = []
+    for it in node.get("items") or []:
+        via = (db.get("src") or {}).get(f"{it[0]}:{it[1]}") or ""
+        if os.path.basename(db["banks"][it[0]]).startswith("Voice_Battle_Announcer"):  # (the Announcers page's)
+            out.append(links.bank(db["banks"][it[0]], it[1]))
+        elif via.startswith("m"):
+            out.append(links.music_audio(int(via[1:])))
+        elif via.startswith("s") or it[2].lower() in named:
+            out.append(links.story_audio(via[1:] if via else named[it[2].lower()]))
+        else:
+            out.append(links.quiz_audio(it[2].lower()))
+    pics = {p for p in [*(node.get("pics") or {}).values(), node.get("img")] + [it[7] for it in node.get("items") or [] if len(it) > 7] if p}
+    return {"urls": out, "thumbs": {p: links.thumb(p) for p in sorted(pics)}}
 
 
 def search(db: dict, q: str, limit: int = SEARCH_MAX, path: list[str] | None = None) -> list:

@@ -1,14 +1,9 @@
 // Database → Sounds: every bank sound in four folders with speaker and text; one plays at a time, folders save as WAVs.
 "use strict";
 
-const snd = { tree: null, path: [], rows: [], pics: {}, img: "", shown: 0, q: "", cur: -1, all: false, list: [], key: "" };
+const snd = { tree: null, path: [], rows: [], pics: {}, thumbs: {}, img: "", shown: 0, q: "", cur: -1, all: false, list: [], key: "", leaf: null };
 const SND_PAGE = 200;
-const SND_TOP = {  // (the four folders' pictures: the game's own art)
-  "Sound Effects": "Assets/Resources_moved/Story/Backgrounds/Ep10_1/story_b1_foodcourt.png",
-  "Story": "Assets/Resources_moved/Story/Backgrounds/Ep10_1/story_Ncourt.png",
-  "Voicefiles": "Assets/Resources_moved/Sprite/Unit/CG/10201_normal.png",
-  "Soundtracks": "Assets/Resources_moved/UIConfigs/LobbyBGM/Banner/bgmCover_Rendezvous.png",
-};
+const SND_SITE = typeof SITE !== "undefined";  // (the site: no saving, search inside the open folder)
 const SND_UNIT = { "Story": "voiced lines", "Voicefiles": "lines", "Soundtracks": "tracks" };
 const SND_PLAY = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 4l15 8-15 8z"/></svg>`;
 const SND_PAUSE = `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>`;
@@ -18,7 +13,7 @@ const sndHash = (path) => "#/sounds" + path.map((p) => "/" + encodeURIComponent(
 const sndNum = (n) => n.toLocaleString("en").replace(/,/g, " ");
 const sndT = (ms) => { const s = ms ? Math.max(1, Math.round(ms / 1000)) : 0; return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 const sndKey = (r) => r[1] + "#" + r[2];
-const sndSin = (n) => `/api/ui_icon?k=sinner_${n}`;
+const sndPic = (p) => (p && snd.thumbs[p]) || imgThumb(p);
 // short name inside its Sinner's folder
 const sndShort = (name, parent) => parent && parent.sinner && name.endsWith(" " + parent.name) ? name.slice(0, -parent.name.length - 1) : name;
 
@@ -63,6 +58,7 @@ routes.sounds = async (args) => {
 };
 
 function sndSearchBox(wide) {
+  if (SND_SITE && !(sndNode(snd.path) || {}).items) return "";
   const where = snd.path.length ? `Search in ${snd.path[snd.path.length - 1].split(" · ")[0]}` : "Search all sounds";
   return `<label class="sndq${wide ? " wide" : ""}"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
     <input type="search" id="sndq" placeholder="${esc(where)}: a name, a speaker, words of a line…" value="${esc(snd.q)}" aria-label="${esc(where)}"></label>`;
@@ -82,12 +78,12 @@ async function sndDraw() {
       <span class="sndslant"></span>${sndSearchBox()}</div>`;
   }
   let t;
-  $("#sndq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { snd.q = e.target.value.trim(); sndDraw().then(() => { const q = $("#sndq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }); }, 350); };
+  if ($("#sndq")) $("#sndq").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { snd.q = e.target.value.trim(); sndDraw().then(() => { const q = $("#sndq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); }); }, 350); };
   if (snd.q) return sndSearch();
   if (!path.length) {
     if (!node.n) { body.innerHTML = `<div class="empty">No sound files were found in the game's folder. Check the game's files (Steam: Properties, Installed Files, Verify integrity), then restart the app.${node.note ? `<div class="muted" style="margin-top:8px">${esc(node.note)}</div>` : ""}</div>`; return; }
     body.innerHTML = `<div class="sndtiles">${node.kids.map((k) => `<a class="sndtile" href="${sndHash([k.name])}">
-      <div class="sndart" style="background-image:url('${imgThumb(SND_TOP[k.name] || "")}')"><span class="sndtag">${(k.kids || []).length} folders</span></div>
+      <div class="sndart" style="background-image:url('${k.thumb || ""}')"><span class="sndtag">${(k.kids || []).length} folders</span></div>
       <div class="sndcap"><b>${esc(k.name)}</b><i>${sndNum(k.n)} ${SND_UNIT[k.name] || "sounds"}</i>
       <div class="sndchips">${(k.kids || []).slice(0, 5).map((c) => `<span>${esc(c.name)} ${sndNum(c.n)}</span>`).join("")}${(k.kids || []).length > 5 ? `<span>+${k.kids.length - 5}</span>` : ""}</div></div></a>`).join("")}</div>`;
     return;
@@ -97,10 +93,10 @@ async function sndDraw() {
     let h = "";
     if (node.sinner && parent) h += sndSinStrip(parent, path);
     if (node.kids.some((k) => k.sinner)) {
-      h += `<div class="sndsins">${node.kids.map((k) => `<a class="sndsin" href="${sndHash([...path, k.name])}">${k.sinner ? `<img src="${sndSin(k.sinner)}" alt="">` : ""}<b>${esc(k.name)}</b><i>${sndNum(k.n)} lines · ${k.kids ? k.kids.length : 0}</i></a>`).join("")}</div>`;
+      h += `<div class="sndsins">${node.kids.map((k) => `<a class="sndsin" href="${sndHash([...path, k.name])}">${k.icon ? `<img src="${k.icon}" alt="">` : ""}<b>${esc(k.name)}</b><i>${sndNum(k.n)} lines · ${k.kids ? k.kids.length : 0}</i></a>`).join("")}</div>`;
     } else if (node.kids.some((k) => k.img)) {
       const who = node.name.toUpperCase();
-      h += `<div class="sndids">${node.kids.map((k) => `<a class="sndid" href="${sndHash([...path, k.name])}"><div class="sndidart">${k.img ? `<img src="${imgThumb(k.img)}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
+      h += `<div class="sndids">${node.kids.map((k) => `<a class="sndid" href="${sndHash([...path, k.name])}"><div class="sndidart">${k.thumb ? `<img src="${k.thumb}" alt="" loading="lazy" onerror="this.remove()">` : ""}</div>
         <div class="sndidcap"><div><small>${esc(who)}</small><b>${esc(sndShort(k.name, node))}</b></div><i>${sndNum(k.n)} lines</i></div></a>`).join("")}</div>`;
     } else {
       h += `<div class="sndplates">${node.kids.map((k) => { const [code, place] = k.name.split(" · "); return `<a class="sndplate" href="${sndHash([...path, k.name])}"><b>${esc(code)}</b>${place ? `<span>${esc(place)}</span>` : ""}<i>${sndNum(k.n)}</i></a>`; }).join("")}</div>`;
@@ -113,7 +109,7 @@ async function sndDraw() {
 
 // a Sinner's folder: the twelve to switch between
 function sndSinStrip(parent, path) {
-  return `<div class="sndstrip">${parent.kids.filter((k) => k.sinner).map((k) => `<a class="${k.name === path[path.length - 1] ? "on" : ""}" href="${sndHash([...path.slice(0, -1), k.name])}"><img src="${sndSin(k.sinner)}" alt="">${esc(k.name)}</a>`).join("")}</div>`;
+  return `<div class="sndstrip">${parent.kids.filter((k) => k.sinner).map((k) => `<a class="${k.name === path[path.length - 1] ? "on" : ""}" href="${sndHash([...path.slice(0, -1), k.name])}"><img src="${k.icon}" alt="">${esc(k.name)}</a>`).join("")}</div>`;
 }
 
 async function sndLeaf(path, node) {
@@ -124,19 +120,21 @@ async function sndLeaf(path, node) {
     <section class="sndmain"><div class="sndleafhead"><div class="grow"><div class="sndtitle"><b>${esc(code)}</b>${place ? `<span>${esc(place)}</span>` : ""}</div>
       <div class="sndwho" id="sndwho"><span>${sndNum(node.items)} ${node.items === 1 ? "sound" : "sounds"}</span></div></div>
       <button class="primary" id="sndall">Play all</button>
-      <button id="sndsave" ${node.items > 500 ? "disabled title='Too many to save at once: save them one by one'" : ""}>Save folder · ${sndNum(node.items)} WAV</button></div>
+      ${SND_SITE ? "" : `<button id="sndsave" ${node.items > 500 ? "disabled title='Too many to save at once: save them one by one'" : ""}>Save folder · ${sndNum(node.items)} WAV</button>`}</div>
       <div id="sndrows" class="sndrows"><div class="muted">Loading…</div></div></section></div>`;
   const on = $(".sndsidelist .on");
   if (on) on.parentElement.scrollTop = on.offsetTop - on.parentElement.clientHeight / 2;
-  $("#sndsave").onclick = () => exportObj({ soundfolder: path });
+  if ($("#sndsave")) $("#sndsave").onclick = () => exportObj({ soundfolder: path });
   $("#sndall").onclick = () => { snd.all = true; sndPlay(0); };
-  const got = await api(`/api/sounds?path=${encodeURIComponent(JSON.stringify(path))}`).catch(() => ({ items: [], pics: {} }));
+  const got = await api(node.url || `/api/sounds?path=${encodeURIComponent(JSON.stringify(path))}`).catch(() => ({ items: [], pics: {} }));
   if (snd.path.join("/") !== path.join("/") || snd.q) return;
-  snd.rows = got.items.map((r) => [null, ...r]);
+  snd.rows = got.items.map((r, k) => Object.assign([null, ...r], { url: (got.urls || [])[k] }));
+  snd.leaf = { path: path.join("/"), rows: snd.rows, pics: got.pics || {} };
   snd.pics = got.pics || {};
+  snd.thumbs = got.thumbs || {};
   snd.img = node.img || "";
   const who = Object.keys(snd.pics).filter((w, i, all) => all.findLastIndex((v) => snd.pics[v] === snd.pics[w]) === i);  // (one face once: a translated name is the same picture)
-  if (who.length) $("#sndwho").insertAdjacentHTML("beforeend", `<span>· who speaks</span>${who.map((w) => `<img src="${imgThumb(snd.pics[w])}" alt="${esc(w)}" title="${esc(w)}" data-face="${esc(w)}">`).join("")}`);
+  if (who.length) $("#sndwho").insertAdjacentHTML("beforeend", `<span>· who speaks</span>${who.map((w) => `<img src="${sndPic(snd.pics[w])}" alt="${esc(w)}" title="${esc(w)}" data-face="${esc(w)}">`).join("")}`);
   // a face: that speaker's next line in the folder (first click: the first one)
   $("#sndwho").querySelectorAll("[data-face]").forEach((im) => im.onclick = () => {
     const face = snd.pics[im.dataset.face], from = snd.faceAt && snd.faceAt[0] === face ? snd.faceAt[1] + 1 : 0;
@@ -162,14 +160,24 @@ async function sndSearch() {
   const body = $("#sndbody");
   body.innerHTML = `<div class="muted">Searching…</div>`;
   const q = snd.q, path = snd.path.join("/");
-  const rows = await api(`/api/sounds?q=${encodeURIComponent(q)}${snd.path.length ? `&path=${encodeURIComponent(JSON.stringify(snd.path))}` : ""}`).catch(() => []);
+  const rows = SND_SITE ? sndFind(q) : await api(`/api/sounds?q=${encodeURIComponent(q)}${snd.path.length ? `&path=${encodeURIComponent(JSON.stringify(snd.path))}` : ""}`).catch(() => []);
   if (q !== snd.q || path !== snd.path.join("/")) return;
   snd.rows = rows;
-  snd.pics = {};
-  snd.img = "";
+  snd.pics = SND_SITE && snd.leaf ? snd.leaf.pics : {};
+  snd.img = SND_SITE ? snd.img : "";
   body.innerHTML = `<div class="sndmeta" style="margin-bottom:8px">${sndNum(rows.length)}${rows.length >= 3000 ? "+" : ""} found</div><div id="sndrows" class="sndrows"></div>`;
   snd.shown = 0;
   sndMore(true);
+}
+
+// the site's search: the open folder's sounds (as the app's: every word in the name, speaker or line; from: one speaker)
+function sndFind(q) {
+  if (!snd.leaf || snd.leaf.path !== snd.path.join("/")) return [];
+  const who = [...q.matchAll(/\bfrom:(?:"([^"]+)"|(\S+))/gi)].map((m) => (m[1] || m[2]).toLowerCase());
+  const words = q.replace(/\bfrom:(?:"[^"]+"|\S+)/gi, " ").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length && !who.length) return [];
+  return snd.leaf.rows.filter((r) => { const hay = `${r[3]} ${r[5]} ${r[6]} ${r[7]}`.toLowerCase(), t = String(r[5] || "").toLowerCase();
+    return words.every((w) => hay.includes(w)) && who.every((w) => t.includes(w)); });
 }
 
 function sndMore(first) {
@@ -182,12 +190,12 @@ function sndMore(first) {
     const [where, , , name, ms, title, sub, text, found] = r, n = snd.shown + k, pic = found || snd.pics[title] || snd.img;
     return `<div class="sndrow${sndKey(r) === playing ? " on" : ""}" data-key="${esc(sndKey(r))}">
       <button class="sndplay" data-play="${n}" aria-label="Play">${SND_PLAY}</button>
-      ${pic ? `<img class="sndpic" src="${imgThumb(pic)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
+      ${pic ? `<img class="sndpic" src="${sndPic(pic)}" alt="" loading="lazy" onerror="this.remove()">` : ""}
       <div class="sndtxt">${title ? `<b data-from="${esc(langEn(title))}" title="Only this speaker's lines">${esc(title)}</b>${sub ? ` <small>${esc(sub)}</small>` : ""}` : `<b class="mono">${esc(name)}</b>`}
         ${text ? `<div>${esc(text)}</div>` : ""}
         ${where ? `<a class="sndwhere" href="${sndHash(where)}">${esc(where.map((w) => w.split(" · ")[0]).join(" / "))}</a>` : ""}</div>
       ${title ? `<span class="sndname mono">${esc(name)}</span>` : ""}<span class="sndlen mono">${sndT(ms)}</span>
-      <button class="toggle" data-save="${n}" title="Save as WAV">WAV</button><i class="sndprog"></i></div>`;
+      ${SND_SITE ? "" : `<button class="toggle" data-save="${n}" title="Save as WAV">WAV</button>`}<i class="sndprog"></i></div>`;
   }).join("") || (first ? `<div class="empty">Nothing found.</div>` : ""));
   snd.shown += part.length;
   if (snd.shown < snd.rows.length) {
@@ -218,12 +226,12 @@ function sndPlay(n, fresh) {
   if (!a || !r) return;
   if (snd.key === sndKey(r) && a.src) { snd.cur = n; a.play().catch(() => {}); sndMark(); return; }
   snd.cur = n; snd.key = sndKey(r);
-  a.src = `/api/bank?path=${encodeURIComponent(r[1])}&i=${r[2]}`;
+  a.src = (SND_SITE && r.url) || `/api/bank?path=${encodeURIComponent(r[1])}&i=${r[2]}`;
   a.play().catch(() => {});
   const pic = r[8] || snd.pics[r[5]] || snd.img;
   $("#sndbar").hidden = false;
   $("#sndbarpic").hidden = !pic;
-  if (pic) $("#sndbarpic").src = imgThumb(pic);
+  if (pic) $("#sndbarpic").src = sndPic(pic);
   $("#sndnow").textContent = "♪ " + (r[5] || r[3]);
   $("#sndwhere").textContent = [r[0] ? r[0].map((w) => w.split(" · ")[0]).join(" / ") : snd.path.map((w) => w.split(" · ")[0]).join(" / "), `${n + 1} of ${snd.list.length}`].join(" · ");
   $("#sndlen").textContent = sndT(r[4]);

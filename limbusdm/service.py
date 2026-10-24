@@ -1223,10 +1223,10 @@ class Service:
                 except (OSError, ValueError, struct.error):
                     got = [tuple(x) for x in rec["sounds"]]
                 samples += [(path, i, name, ms) for i, (name, ms) in enumerate(got)]
-            for t in self.music().get("tracks") or []:
+            for n, t in enumerate(self.music().get("tracks") or []):
                 sounds = (snap["files"].get(t["bank"]) or {}).get("sounds") or []
                 if t["i"] < len(sounds):
-                    music[(t["bank"], sounds[t["i"]][0].lower())] = t
+                    music[(t["bank"], sounds[t["i"]][0].lower())] = {**t, "n": n}  # (n: its /api/music_audio)
             story, models, path = {}, {}, self.ensure_browse()  # the story's own files: which voice file a line plays
             if path:
                 con = sqlite3.connect(path)
