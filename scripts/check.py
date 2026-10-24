@@ -100,6 +100,56 @@ def check_code(rep):
         rep.warn("code", "ui/lang", f"not checked: {type(e).__name__}: {e}")
 
 
+KEYS = [  # a line ending in "keys-ok" is skipped
+    ("private key", r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    ("GitHub token", r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{60,})"),
+    ("Cloudflare token", r"(?i)(?:cloudflare|\bcf)[a-z_]*(?:token|key)['\"]?\s*[:=]\s*['\"]?[A-Za-z0-9_-]{32,}"),
+    ("Anthropic key", r"\bsk-ant-[A-Za-z0-9_-]{20,}"),
+    ("OpenAI key", r"\bsk-(?:proj-)?[A-Za-z0-9_-]{32,}"),
+    ("Google key", r"\bAIza[0-9A-Za-z_-]{35}"),
+    ("AWS key", r"\bAKIA[0-9A-Z]{16}\b"),
+    ("Slack token", r"\bxox[abprs]-[A-Za-z0-9-]{10,}"),
+    ("Apps Script url", r"script\.google\.com/macros/s/[A-Za-z0-9_-]{30,}"),
+    ("key value", r"(?i)(?:api[_-]?key|secret|token|passw(?:or)?d)['\"]?\s*[:=]\s*['\"][A-Za-z0-9_\-/+=.]{24,}['\"]"),
+]
+
+
+def check_keys(rep):
+    """Keys in what a push would send: commits not on the upstream yet, uncommitted edits, new files."""
+    import re
+    git = lambda *a: subprocess.run(["git", "-C", ROOT, *a], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    up = git("rev-parse", "--abbrev-ref", "@{u}").stdout.strip() or "origin/main"
+    base = git("merge-base", up, "HEAD").stdout.strip()
+    if not base:
+        rep.warn("keys", "git", f"no merge base with {up}: keys not checked")
+        return
+    pats = [(name, re.compile(p)) for name, p in KEYS]
+    lines, f, n = [], None, 0
+    for ln in git("diff", base, "--unified=0", "--no-color", "--no-ext-diff").stdout.splitlines():
+        if ln.startswith("+++ "):
+            f = ln[6:] if ln.startswith("+++ b/") else None
+        elif ln.startswith("@@"):
+            n = int(re.search(r"\+(\d+)", ln).group(1))
+        elif ln.startswith("+") and f:
+            lines.append((f, n, ln[1:])); n += 1
+    for f in git("ls-files", "--others", "--exclude-standard").stdout.splitlines():
+        p = os.path.join(ROOT, f)
+        if os.path.getsize(p) > 5_000_000:
+            continue
+        data = open(p, "rb").read()
+        if b"\0" not in data:
+            lines += [(f, i, x) for i, x in enumerate(data.decode("utf-8", "replace").splitlines(), 1)]
+    for f, n, text in lines:
+        if text.rstrip().endswith("keys-ok"):
+            continue
+        for name, rx in pats:
+            m = rx.search(text)
+            if m:
+                s = m.group(0)
+                rep.fail("keys", f"{f}:{n}", f"{name}: {s[:6]}...{s[-2:]} ({len(s)} chars): remove it, use an env var")
+                break
+
+
 class Report:
     def __init__(self):
         self.items, self.answers, self.tracebacks = [], {}, []
@@ -472,7 +522,7 @@ def visit(tab, base, route, n, settle=1.5, longest=15):
 
 def main():
     ap = argparse.ArgumentParser(description="Limbus Archive self-check: code, every /api route, every page.")
-    ap.add_argument("parts", nargs="*", default=["code", "api", "pages"], help="code / api / pages (default: all)")
+    ap.add_argument("parts", nargs="*", default=["code", "keys", "api", "pages"], help="code / keys / api / pages (default: all)")
     ap.add_argument("--url", help="check a running app (e.g. a test build) instead of the source")
     ap.add_argument("--save", action="store_true", help="keep this run's answers as the baseline")
     ap.add_argument("--page", action="append", help="only these pages (route names)")
@@ -484,6 +534,9 @@ def main():
     if "code" in a.parts:
         print("code...")
         check_code(rep)
+    if "keys" in a.parts:
+        print("keys...")
+        check_keys(rep)
     httpd, base = (None, a.url.rstrip("/")) if a.url else (None, None)
     if ("api" in a.parts or "pages" in a.parts) and not base:
         print("starting the server from the source (read only)...")
