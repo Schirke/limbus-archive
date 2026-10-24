@@ -150,5 +150,10 @@
 "{0}{1} vs {2}{3}",
 "· spine",
 "{0} {1} {2} sinnerling",
-"{0} {1} {2} spine"
+"{0} {1} {2} spine",
+"floor(",
+"floor(",
+"Vulnerable",
+"deal +($1)% damage",
+"gains Coin Power +$1"
 ]
