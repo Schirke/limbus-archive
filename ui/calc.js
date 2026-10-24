@@ -349,6 +349,9 @@ function dcbData() {
             "2nd: [OnSucceedAttack] If target has 3+ [NoirNailDonQuixote], trigger [VibrationExplosion]; then, reduce target's [Vibration] Count by 1"],
           need: (s) => !s.trem ? "needs Tremor on target" : !s.nail ? "needs Promised Nail" : "",
           text: "[NoirNailDonQuixote]:\n- Upon Tremor Burst due to Skill effects, take 1 Sloth damage for every Stack (max 10; once per Skill)" },
+        { k: "R7", stack: "skill", tint: "sloth", title: `${K("VibrationFocusing")} on coin III`, from: "S3 coin III turns Tremor into Focus",
+          fx: [`<span class="dcbsloth">each Burst: Sloth damage (60 + ${K("ChargeNoirAlly")} Potency × 8)% of Tremor Potency, max 120%</span>`], need: (s) => !s.trem ? "needs Tremor on target" : "",
+          text: "[VibrationFocusing]:\n- On Tremor Burst, take Sloth Damage equal to (60 + sum of Charge Potency or Unique Charge on the attacker x 8)% of Tremor Potency, and reduce the Count by 1 (max 120%)" },
         { k: "P4", stack: "pass", pn: "P4", title: "Obsidian Covenant", from: sinI("Pride", "Envy", "Sloth") + " owned", fx: [`damage +(${K("ChargeNoirAlly")} Potency × 6)%, max 30%`], need: (s) => s.pres ? "" : "needs Potency",
           text: "This unit's Base Attack Skills deal +([ChargeNoirAlly] Potency on self x 6)% damage against the main target (max 30%)" },
         { k: "P3", stack: "pass", pn: "P3", title: "The Lord's Will and Values Be With Us…", from: "always on", fx: [`final coin Final Power +(${K("ChargeNoirAlly")} Potency + ${K("NoirNailDonQuixote")} / 2), max +5`], need: (s) => s.pres || s.nail > 1 ? "" : "needs Potency or Nails",
@@ -358,7 +361,7 @@ function dcbData() {
         const p3 = s.pres >= 3 && o.R1;
         return { cp: (o.R2 ? min(2, fl((s.trem + s.nail) / 6)) : 0) + (p3 ? 1 : 0), last: (o.R5 ? min(4, s.res) : 0) + (o.P3 ? min(5, s.pres + fl(s.nail / 2)) : 0),
           dyn: (p3 ? 40 : 0) + (o.P4 ? min(30, s.pres * 6) : 0) + (o.R3 ? 20 : 0), diff: (o.R4 ? 2 : 0) + (o.R3 ? min(2, fl(s.pres / 3)) : 0),
-          flatLast: o.R6 && s.trem > 0 ? min(10, s.nail) : 0 };
+          flatLast: (o.R6 && s.trem > 0 ? min(10, s.nail) : 0) + (o.R7 && s.trem > 0 ? (s.nail + 1 >= 3 ? 2 : 1) * fl((s.trem + 4) * min(120, 60 + 8 * s.pres) / 100) : 0) };
       },
       target: (s) => {
         const TB = K("VibrationExplosion");
@@ -367,8 +370,7 @@ function dcbData() {
         return { log: T.log, st: [["Vibration", { p: s.trem, c: s.tc }, T.t.Vibration], ["NoirNailDonQuixote", s.nail, s.nail + 1]],
           extra: [`<b>Coin I</b> ${K("NoirNailDonQuixote")} +1`, `<b>Coin III</b> ${K("Vibration")} turns into ${K("VibrationFocusing")}`, `<b>${K("OathFieldDonQuixote")}</b> Speed −1`] };
       },
-      nodmg: [`Coin III: ${K("Switch_Vibration")} into ${K("VibrationFocusing")} — not counted yet (its Sloth damage on Burst)`,
-        `<span class="dcbpn">P1</span> <b>Malleus Promissionis</b>: gives ${K("ChargeNoirAlly")}, which feeds the rows above`,
+      nodmg: [`<span class="dcbpn">P1</span> <b>Malleus Promissionis</b>: gives ${K("ChargeNoirAlly")}, which feeds the rows above`,
         `<span class="dcbpn">P3</span> <b>The Lord's Will…</b> with ${K("OathFieldDonQuixote")}: Clash Power +3 (clash only)`,
         `<span class="dcbpn">P2</span> <b>Mission of Conservation</b>: ${K("NoirShieldUpDonQuixote")} (shield, Unbreakable Coins)`,
         `<span class="dcbpn">P4</span> <b>Obsidian Covenant</b>: 2 ${K("Agility")} next turn`,
@@ -695,6 +697,15 @@ function dcaBurstHit(kw) {
   DCA_BH.set(kw, out);
   return out;
 }
+// Tremor - Focus: "On Tremor Burst, take Sloth Damage equal to (60 + sum of Charge Potency or Unique Charge on the attacker x 8)% of Tremor Potency … (max 120%)"
+let DCA_FZ;
+function dcaFocus() {
+  if (DCA_FZ !== undefined) return DCA_FZ;
+  const a = /On Tremor Burst, take (\w+) Damage equal to \((\d+) \+ sum of Charge Potency or Unique Charge on the attacker x (\d+)\)% of Tremor Potency.*?\(max (\d+)%\)/i.exec(dcaPlain(dcaEn("gl", "VibrationFocusing", dcaG("VibrationFocusing").desc) || ""));
+  return (DCA_FZ = a ? { sin: a[1][0].toUpperCase() + a[1].slice(1).toLowerCase(), base: +a[2], per: +a[3], max: +a[4] } : null);
+}
+// Charge Potency + Unique Charge Potency on self ([ChargeNoirAlly] …)
+const dcaChargeP = (s) => Object.keys(s).filter((k) => /^s_Charge\w*_p$/.test(k)).reduce((a, k) => a + (s[k] || 0), 0);
 // Deathrite (a stack-count debuff of Rupture): every Rupture trigger lowers it under its condition (+Rupture Count), at 0 Stack it hits for Rupture Potency
 const DCA_DR = new Map();
 function dcaDeath(kw) {
@@ -1006,7 +1017,7 @@ function dcaClause(rest, ctx) {
   const fx = [];
   // # of Coins
   if (ctx.ncoins) rest = rest.replace(/\+\((\d+(?:\.\d+)?)\s*\/\s*# of Coins(?:,\s*minimum (\d+))?\)(%?)/gi, (all, a, mn, pct) => { const v = a / ctx.ncoins; return `+${pct ? +v.toFixed(2) : Math.max(+(mn || 0), Math.floor(v))}${pct}`; });
-  let approx = null;  // other-type bonus
+  let approx = null, share = false;  // other-type bonus; share = "N% of this Coin's final damage" (its own hit after all multipliers)
   rest = rest.replace(/^\+\(([^()%]+)\)%\s+Damage\b/i, "deal +($1)% damage");  // "+(X)% Damage on Critical Hit"
   rest = rest.replace(/\bgains Power \+(\d+)/i, "gains Coin Power +$1");  // "This Coin gains Power +1 and deals +40% damage for every X (max 3; max 120%)"
   if (/Coin Power does not change/i.test(rest)) return "none";  // read in dcaModel (conv)
@@ -1065,22 +1076,22 @@ function dcaClause(rest, ctx) {
   // bonus share of Coin damage
   const TYPE = /^(Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)$/i, own = (w) => !w || !TYPE.test(w) || [ctx.atk, ctx.sin].some((z) => z && z.toLowerCase() === w.toLowerCase());
   const bonus = /\((\d+(?:\.\d+)?)% of this Coin's final damage\) bonus/i.exec(rest);
-  if (bonus) return [{ k: "dyn", v: +bonus[1] }];
+  if (bonus) return [{ k: "dyn", v: +bonus[1], share: true }];
   for (const [re, ni, ti] of [
     [/\bdeals?\s+(?:bonus\s+)?(?:(\w+)\s+)?(?:bonus\s+)?damage\s+(?:equal to|by)\s+\(?(\d+(?:\.\d+)?)%\s+of\s+(?:(?:this|each|the)\s+)?(?:Coin['’]s final damage|damage dealt)\)?/i, 2, 1],
     [/\bdeals?\s+\((\d+(?:\.\d+)?)%\s+of\s+this Coin['’]s final damage\)\s+(?:(\w+)\s+)?damage/i, 1, 2],
     [/\bdeals?\s+(\d+(?:\.\d+)?)%\s+of\s+(?:the\s+)?damage dealt\s+as\s+(?:(\w+)\s+)?bonus damage/i, 1, 2],
     [/\bdeals?\s+(\d+(?:\.\d+)?)%\s+of\s+(?:(\w+)\s+)?damage dealt\s+as\s+(\w+)\s+damage/i, 1, 3]]) {  // "5% of Gluttony damage dealt as Wrath damage"
     const b = re.exec(rest);
-    if (b) { if (!own(b[ti])) approx = b[ti]; rest = `${rest.slice(0, b.index)}deal +${b[ni]}% damage${rest.slice(b.index + b[0].length)}`; break; }
+    if (b) { share = true; if (!own(b[ti])) approx = b[ti]; rest = `${rest.slice(0, b.index)}deal +${b[ni]}% damage${rest.slice(b.index + b[0].length)}`; break; }
   }
   const be = /\bdeals?\s+\(([^()%]+)\)%\s+of\s+this Coin['’]s final damage\s+as\s+(?:(\w+)\s+)?bonus damage/i.exec(rest), be2 = /\bdeals?\s+(?:(\w+)\s+)?damage equal to\s+\(([^()%]+)\)%\s+of\s+this Coin['’]s final damage/i.exec(rest);
   const bx = /\bdeals?\s+bonus\s+(?:(\w+)\s+)?damage by\s+\(([^()%]+)\)%\s+of\s+(?:the\s+)?damage dealt/i.exec(rest);  // "bonus Gloom damage by (X * 2.5)% of damage dealt"
-  if (bx) { if (!own(bx[1])) approx = bx[1]; rest = `${rest.slice(0, bx.index)}deal +(${bx[2]})% damage${rest.slice(bx.index + bx[0].length)}`; }
-  else if (be) { if (!own(be[2])) approx = be[2]; rest = `${rest.slice(0, be.index)}deal +(${be[1]})% damage${rest.slice(be.index + be[0].length)}`; }
-  else if (be2) { if (!own(be2[1])) approx = be2[1]; rest = `${rest.slice(0, be2.index)}deal +(${be2[2]})% damage${rest.slice(be2.index + be2[0].length)}`; }
+  if (bx) { share = true; if (!own(bx[1])) approx = bx[1]; rest = `${rest.slice(0, bx.index)}deal +(${bx[2]})% damage${rest.slice(bx.index + bx[0].length)}`; }
+  else if (be) { share = true; if (!own(be[2])) approx = be[2]; rest = `${rest.slice(0, be.index)}deal +(${be[1]})% damage${rest.slice(be.index + be[0].length)}`; }
+  else if (be2) { share = true; if (!own(be2[1])) approx = be2[1]; rest = `${rest.slice(0, be2.index)}deal +(${be2[2]})% damage${rest.slice(be2.index + be2[0].length)}`; }
   const be3 = /\bdeals?\s+\(\(([^()%]+)\)%\s+of\s+this Coin['’]s final damage\)\s+(?:(\w+)\s+)?damage/i.exec(rest);  // "Deal (([X] on self x 2)% of this Coin's final damage) Wrath damage"
-  if (!bx && !be && !be2 && be3) { if (!own(be3[2])) approx = be3[2]; rest = `${rest.slice(0, be3.index)}deal +(${be3[1]})% damage${rest.slice(be3.index + be3[0].length)}`; }
+  if (!bx && !be && !be2 && be3) { share = true; if (!own(be3[2])) approx = be3[2]; rest = `${rest.slice(0, be3.index)}deal +(${be3[1]})% damage${rest.slice(be3.index + be3[0].length)}`; }
   // "Deal ([X] Potency x [Y] Stack / 10) Wrath damage": a sin hit by two numbers
   const fm = /\bdeals?\s+\(([^()]+?)\s*\/\s*(\d+)\)\s+(Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy)\s+damage/i.exec(rest);
   if (fm) {
@@ -1161,6 +1172,7 @@ function dcaClause(rest, ctx) {
   if (cap2) fx.forEach((f) => { if (f.k !== "reuse") f.cap = f.k === "dyn" ? +cap2[2] : +cap2[1]; });
   else if (cap) fx.forEach((f) => { if (f.k !== "reuse") f.cap = +(cap[1] ?? cap[2] ?? cap[3]); });
   if (approx) fx.forEach((f) => { if (f.k === "dyn") f.approx = approx; });
+  if (share) fx.forEach((f) => { if (f.k === "dyn") f.share = true; });
   return fx.filter((f, i) => f.k !== "reuse" || fx.findIndex((g) => g.k === "reuse") === i);  // one Reuse per clause
 }
 
@@ -1247,6 +1259,13 @@ function dcaWhy(row, s) {
 function dcaEnU(sk, u) {
   const e = UNITS.en && UNITS.en.sk[sk.id], k = e && Object.keys(sk.up).find((n) => sk.up[n] === u);
   return k && e[k] ? { ...u, ...e[k] } : u;
+}
+// skill consumes Charge: its text says so, or it inflicts a status a passive counts as that ("Skills that inflict [X] … count as Skills that consume [Charge] Count")
+function dcaUsesCharge(u) {
+  const t = [u.desc, ...(u.coindescs || []).flat()].join("\n");
+  if (/Consume[^\n]*\[(?:Charge|ChargeNoirAlly)\]|\[Charge\] Count (?:is )?consumed/i.test(t)) return true;
+  const ps = dcaX ? (dcaX.passives || []).map((p) => dcaEn("ps", p.id, p.desc) || "").join("\n") : "";
+  return [...ps.matchAll(/Skills that inflict \[(\w+)\][^\n]*count as Skills that consume \[Charge\] Count/gi)].some((m) => new RegExp(`Inflict[^\\n]*\\[${m[1]}\\]`, "i").test(t));
 }
 function dcaModel(x, sk, up) {
   const key = `${x.id}.${sk.id}.${up}`;
@@ -1402,6 +1421,9 @@ function dcaModel(x, sk, up) {
         const has = (f) => (f.per && f.per.kw === kw) || r.conds.some((c) => c.q && c.q.kw === kw);
         fx.forEach((f) => parts.push({ f: { ...f, k: f.k === "take" ? "dyn" : f.k, scope: "all" }, conds: has(f) ? r.conds : [...r.conds, { q, n: 1 }] })); });
     }
+    // own status that makes enemies take more from Charge skills (Sanctum: "+10% … ("Le Noir" … +20% instead)")
+    const cg = side === "self" && /Take \+(\d+)% damage from Skills that consume Charge Count(?: or Unique Charge)?(?: \(from "([^"]+)" allied Identities' Skills, take \+(\d+)% damage instead\))?/i.exec(dcaEn("gl", kw, g.desc) || "");
+    if (cg && dcaUsesCharge(u)) parts.push({ f: { k: "dyn", v: +(cg[2] && dcaX && dcaX.title.includes(cg[2]) ? cg[3] : cg[1]), scope: "all" }, conds: [{ q, n: 1 }] });
     // chain: gives other statuses
     let linked = 0;
     if (side === "self") for (const c of dcaChain(kw)) {
@@ -1492,6 +1514,8 @@ function dcaModel(x, sk, up) {
   }
   const bsin = [u.desc, ...(u.coindescs || []).flat()].map((l) => /\bdeals? (Slash|Pierce|Blunt|Wrath|Lust|Sloth|Gluttony|Gloom|Pride|Envy) damage equal to (?:Tremor Burst|\[VibrationExplosion\]) damage/i.exec(dcaNames(dcaPlain(l)))).find(Boolean);  // "Deal Blunt damage equal to Tremor Burst damage"
   if (bursts.length) tKws.add("Vibration");
+  // "Trigger [Switch_Vibration] into [VibrationFocusing]": from that coin on, every Burst also deals Focus's Sloth damage
+  const focusAt = (u.coindescs || []).findIndex((cd) => cd.some((d) => /\[Switch_Vibration\] into \[VibrationFocusing\]/i.test(dcaPlain(d)))), fz = dcaFocus();
   // one-number statuses the coins put on the target ("Inflict 1 [NoirNailDonQuixote]") and take off ("Consume all [X] on target")
   const inf1 = [], eat1 = [];
   (u.coindescs || []).forEach((cd, i) => cd.join("\n").split("\n").forEach((l) => {
@@ -1582,6 +1606,7 @@ function dcaModel(x, sk, up) {
           const v = vs[i];
           if (!v) return;
           if (f.k === "take") return;  // this unit takes more
+          if (f.share && f.k === "dyn") { if (typeof f.scope === "number") (out.coinShare ||= [])[f.scope] = (out.coinShare[f.scope] || 0) + v; else if (f.scope === "last") out.lastShare = (out.lastShare || 0) + v; else out.share = (out.share || 0) + v; return; }  // share of the final damage
           if (f.k === "sub") { out.subDyn += v; return; }
           if (f.k === "only") { (out.only ||= [])[f.scope] = v; return; }
           if (f.k === "force") return;
@@ -1625,6 +1650,10 @@ function dcaModel(x, sk, up) {
             const tk = Object.keys(f.t).find((z) => /^Vibration/.test(z)), v = tk ? f.t[tk].p : 0;
             if (!v) continue;
             if (bsin) (bflat[j] ||= []).push([v * b.n, bsin[1]]);
+            if (fz && (tk === "VibrationFocusing" || (focusAt >= 0 && ci >= focusAt))) {
+              const d = Math.floor(v * Math.min(fz.max, fz.base + fz.per * dcaChargeP(s)) / 100 + 1e-9);
+              if (d) { for (let k = 0; k < b.n; k++) (bflat[j] ||= []).push([d, fz.sin]); blog.push({ lab: dcaG("VibrationFocusing").name || "VibrationFocusing", hit: d * b.n, sin: fz.sin, kw: "VibrationFocusing" }); }
+            }
             stag[j] = (stag[j] || 0) + v * b.n; blog.push({ lab: b.coin != null ? `Coin ${ROMAN[ci]}` : b.from, v: v * b.n, n: b.n, kw: tk });
             for (const kw of t1) {  // "Upon Tremor Burst, take 1 Sloth damage for every Stack (max 10; once per Skill)"
               const h = dcaBurstHit(kw);
@@ -1666,7 +1695,9 @@ function dcbCalc(m, u, s, o, env, face = "best") {
     if (heads) roll += add ? u.coin + x.cp + (x.coinCp[ci] || 0) : -u.coin;  // a Reuse tosses again
     const fin = i === n - 1, r = roll + x.fp + (fin ? x.last : 0) + (x.coinFp[ci] || 0), d = x.dyn + (fin ? x.lastDyn : 0) + (i === 0 ? x.firstDyn || 0 : 0) + (x.coinDyn[ci] || 0) + (x.powDyn || []).reduce((a, p) => a + Math.min(p.cap ?? 1e9, p.v * Math.max(0, r)), 0)
       + (i > 0 ? (x.hpDyn || []).reduce((a, p) => a + (typeof p.scope !== "number" || p.scope === ci ? Math.min(p.cap ?? 1e9, p.v * 100 * coins[0].main / DCA_HP) : 0), 0) : 0);
-    const hit = (dd) => dcFloor(r <= 0 ? 1 : r * (1 + dd / 100) * mod);
+    const sh = (x.share || 0) + (fin ? x.lastShare || 0 : 0) + ((x.coinShare || [])[ci] || 0);
+    // "N% of this Coin's final damage": its own hit on top of the coin's
+    const hit = (dd) => { const h = dcFloor(r <= 0 ? 1 : r * (1 + dd / 100) * mod); return h + (sh ? dcFloor(h * sh / 100) : 0); };
     // flat adders and status damage through their sin's resistance
     const fl2 = [...(x.coinFlat[ci] || []), ...x.flatAll, ...(again ? x.flatReuse || [] : []), ...((T && T.bflat && T.bflat[i]) || [])], fsin = fl2.length ? fl2[0][1] : m.flatSin;
     const flat = (fin && x.flatLast ? dcFloor(x.flatLast * res(m.flatSin)) : 0) + fl2.reduce((a, [v, k]) => a + dcFloor(v * res(k)), 0), sdmg = sd[i] ? dcFloor(sd[i] * (m.stn === "Gloom" ? res("Gloom") : 1)) : 0;
@@ -1674,7 +1705,7 @@ function dcbCalc(m, u, s, o, env, face = "best") {
     let main = tmf(hit(d) + flat + sdmg), side = x.targets > 1 ? tmf(hit(d + x.subDyn)) : 0, one = tmf(hit(d) + flat + (x.targets - 1) * hit(d + x.subDyn) + sdmg);
     const ov = x.only && x.only[ci];  // this coin hits only the main target (1) or only the others (2)
     if (ov === 1) { side = 0; one = main; } else if (ov === 2) { one = (x.targets - 1) * side; main = 0; }
-    coins.push({ r, one, main, side, d, heads, flat, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
+    coins.push({ r, one, main, side, d, sh, heads, flat, fsin, sdmg, stag: stag[i] || 0, reuse: again, ci, t: x.targets, fin, first: i === 0 });
     total += one;
   }
   return { total, coins, x, diff, mod, stag: stag.reduce((a, v) => a + (v || 0), 0) };
@@ -2385,6 +2416,7 @@ function dcbRefresh() {
   const xc = (c) => {  // what only this coin has
     const out = [], X = now.x;
     if (X.coinDyn[c.ci]) out.push(`${dcSign(+X.coinDyn[c.ci].toFixed(1))}% this coin`);
+    if (c.sh) out.push(`+${+c.sh.toFixed(1)}% of the final damage as its own hit`);
     if (X.coinCp[c.ci]) out.push(`Coin Power ${dcSign(X.coinCp[c.ci])} this coin`);
     if (X.coinFp[c.ci]) out.push(`Final Power ${dcSign(X.coinFp[c.ci])} this coin`);
     if (c.fin && X.last) out.push(`Final Power ${dcSign(X.last)} final coin`);
