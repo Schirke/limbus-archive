@@ -1482,12 +1482,27 @@ function dcaModel(x, sk, up) {
   if (bursts.length) tKws.add("Vibration");
   // one-number statuses the coins put on the target ("Inflict 1 [NoirNailDonQuixote]") and take off ("Consume all [X] on target")
   const inf1 = [], eat1 = [];
+  let ln = 0;  // (a coin's effects go in the order of its lines)
   (u.coindescs || []).forEach((cd, i) => cd.join("\n").split("\n").forEach((l) => {
-    const p = dcaNames(dcaPlain(l));
-    for (const q of p.matchAll(/\bInflict (?:\+?(\d+) )?\[(\w+)\]/gi)) if (dcaG(q[2]).st === 1 && (q[1] || dcaDeath(q[2])) && !/^\s*next turn/i.test(p.slice(q.index + q[0].length))) inf1.push([i, q[2], q[1] ? +q[1] : dcaDeath(q[2]).base, /\[OnSucceedAttackHead\]/.test(p) ? "H" : ""]);
-    const ea = /Consume all \[(\w+)\] on (?:the )?target/i.exec(p);
-    if (ea && dcaG(ea[1]).st === 1) eat1.push([i, ea[1]]);
+    const p = dcaNames(dcaPlain(l)), inst = /\binstead\b/i.test(p);
+    ln++;
+    // a leading condition ("When in [X] state, inflict 2 [Y] instead"): checked as the coin hits
+    const lead = /^((?:if|when|at)\b[^,]+),/i.exec(p.replace(/^-\s*/, "").replace(/^(?:\[\w+\]\s*)+/, "")), lc = lead && [].concat(dcaCond(lead[1], { coin: i })).filter((c) => c.q && c.max == null), cond = lc && lc.length === 1 ? lc[0] : null;
+    for (const q of p.matchAll(/\bInflict (?:\+?(\d+) )?\[(\w+)\]/gi)) if (dcaG(q[2]).st === 1 && (q[1] || dcaDeath(q[2])) && !/^\s*next turn/i.test(p.slice(q.index + q[0].length))) {
+      if (inst && !cond) continue;
+      let rep = [];
+      if (inst) {  // what it replaces (the same status, else the line before) only when this one's condition fails
+        rep = inf1.filter((e) => e[0] === i && e[1] === q[2] && !e[4]);
+        if (!rep.length) rep = inf1.filter((e) => e[0] === i && e[5] === ln - 1 && !e[4]);
+        rep.forEach((e) => { e[4] = { ...cond, lt: !cond.lt }; });
+      }
+      inf1.push([i, q[2], q[1] ? +q[1] : dcaDeath(q[2]).base, /\[OnSucceedAttackHead\]/.test(p) || rep.some((e) => e[3] === "H") ? "H" : "", inst ? cond : null, ln]);
+    }
+    const ea = /\b(?:Consume|Remove) (all|\d+) \[(\w+)\] on (?:the )?(?:main )?target/i.exec(p), rd = !ea && /\bReduce \[(\w+)\] on (?:the )?(?:main )?target by (\d+)/i.exec(p);
+    const ek = ea ? ea[2] : rd && rd[1], en = ea ? (/^all$/i.test(ea[1]) ? 0 : +ea[1]) : rd && +rd[2];
+    if (ek && dcaG(ek).st === 1) eat1.push([i, ek, en, /\[Critical\w*\]/.test(p), cond, ln]);  // n 0 = all
   }));
+  inf1.forEach((e) => { if (!e[4]) return; const nd = {}; dcaNeeds(null, [e[4]], nd); for (const k in nd) if (k !== "__w" && !(k in needs)) needs[k] = 0; });  // its slider
   const t1 = [...new Set([...inf1.map(([, k]) => k), ...eat1.map(([, k]) => k), ...Object.keys(needs).map((k) => /^t_(\w+)$/.exec(k)).filter((q) => q && dcaG(q[1]).st === 1 && (dcaBurstHit(q[1]) || dcaDeath(q[1]))).map((q) => q[1])])];
   t1.forEach((kw) => { if (!(`t_${kw}` in needs)) needs[`t_${kw}`] = 0; });
   // damage-taken debuffs this Skill puts on the target one coin after another ("Inflict 2 Fragile"): the next coins already feel them
@@ -1497,7 +1512,7 @@ function dcaModel(x, sk, up) {
     if (!mm || r.parts.length !== 1 || !inf1.some(([, k]) => k === mm[1])) continue;
     const { f } = r.parts[0];
     if (f.k !== "dyn" || !f.per || f.per.kw !== mm[1]) continue;
-    r.seq = inf1.filter(([, k]) => k === mm[1]).map(([i, , n]) => [i, n]);
+    r.seq = inf1.filter(([, k]) => k === mm[1]).map(([i, , n, , c]) => [i, n, c]);
     seqKws.push(mm[1]);
   }
   const deaths = t1.filter((kw) => dcaDeath(kw));  // Deathrites on the target
@@ -1557,7 +1572,7 @@ function dcaModel(x, sk, up) {
           const kw = r.k.slice(5), f = r.parts[0].f, mxs = dcaG(kw).max || 99;
           for (let ci = 0; ci < u.coins; ci++) {
             let n = s[`t_${kw}`] || 0;
-            for (const [i, k] of r.seq) if (i < ci) n += k;
+            for (const [i, k, c] of r.seq) if (i < ci && (!c || dcaOk(c, s))) n += k;
             let v = f.v * Math.min(mxs, n);
             if (f.cap != null) v = Math.min(f.cap, v);
             if (v) out.coinDyn[ci] = (out.coinDyn[ci] || 0) + v;
@@ -1608,7 +1623,16 @@ function dcaModel(x, sk, up) {
         },
         post: (f) => {
           inf.forEach(([i, kw, p, c, w]) => { if ((i === ci || i < 0) && (!w || (w === "H") === heads)) { f.add(kw, p, c, i < 0 ? label : `Coin ${ROMAN[ci]}`); } });
-          inf1.forEach(([i, kw, n, w]) => { if (i === ci && (!w || heads)) { one[kw] = dcaDeath(kw) ? one[kw] || n : Math.min(dcaCaps(kw).s ?? 99, one[kw] + n); /* a Deathrite does not stack on itself */ blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, add: n }); } });
+          const now = () => ({ ...s, ...Object.fromEntries(t1.map((kw) => [`t_${kw}`, one[kw]])) }), ate = new Set();
+          const eat = (e) => {  // "Remove all [X] on target", "Reduce [X] on target by 2"
+            const [i, kw, n, cr, c] = e;
+            if (i !== ci || ate.has(e)) return;
+            ate.add(e);
+            if (!one[kw] || (cr && !s.g_crit) || (c && !dcaOk(c, now()))) return;
+            const d = n ? Math.min(n, one[kw]) : one[kw];
+            blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, eat: d }); one[kw] -= d;
+          };
+          inf1.forEach(([i, kw, n, w, c, l]) => { if (i === ci) eat1.forEach((e) => { if (e[1] === kw && e[5] < l) eat(e); }); if (i === ci && (!w || heads) && (!c || dcaOk(c, now()))) { one[kw] = dcaDeath(kw) ? one[kw] || n : Math.min(dcaCaps(kw).s ?? 99, one[kw] + n); /* a Deathrite does not stack on itself */ blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, add: n }); } });
           if (on) for (const b of bursts) if (b.coin === ci || b.all || (b.last && j === seq.length - 1) || (b.first && j === 0)) {
             const tk = Object.keys(f.t).find((z) => /^Vibration/.test(z)), v = tk ? f.t[tk].p : 0;
             if (!v) continue;
@@ -1623,7 +1647,7 @@ function dcaModel(x, sk, up) {
             }
             if (b.cut) f.dec(tk, b.cut, `Coin ${ROMAN[ci]}`);  // "then, reduce … Count"
           }
-          eat1.forEach(([i, kw]) => { if (i === ci && one[kw]) { blog.push({ lab: `Coin ${ROMAN[ci]}`, kw, eat: one[kw] }); one[kw] = 0; } });  // "Consume all [X] on target"
+          eat1.forEach(eat);
         } })));
       return { dmg: T.dmg, log: T.log, stag, blog, bflat, end: T.t, st: [...[...tKws].map((kw) => [kw, { p: s[`t_${kw}_p`] || 0, c: s[`t_${kw}_c`] || 0 }, T.t[kw]]), ...t1.map((kw) => [kw, one0[kw], one[kw]])], extra: [] };
     },
