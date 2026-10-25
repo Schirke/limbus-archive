@@ -1,4 +1,4 @@
-__version__ = "0.12.3"
+__version__ = "0.12.4"
 APP_TITLE = "Limbus Archive"
 APP_EXE = "LimbusArchive.exe"
 OLD_EXE = "LimbusDatamine.exe"  # the app's name before 0.4.0
