@@ -6,28 +6,18 @@ import json
 import re
 import subprocess
 import time
-import urllib.request
 
-from . import REPO
+from . import REPO, ghraw
 
 URL = f"https://raw.githubusercontent.com/{REPO}/community-data/streams.json"
 # raw by branch is cached ~5 min; by commit it is fresh
-REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
 AT = f"https://raw.githubusercontent.com/{REPO}/%s/streams.json"
 KEEP = 50  # seconds a read list is served again
 _cache = [0.0, None]
 
 
 def _read(url: str) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "LimbusArchive"})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        return json.load(r)
-
-
-def _commit() -> str:
-    req = urllib.request.Request(REFS, headers={"User-Agent": "git/2.45"})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        return re.search(rb"([0-9a-f]{40}) refs/heads/community-data\n", r.read()).group(1).decode()
+    return json.loads(ghraw.get(url, 10))
 
 
 def streams() -> dict:
@@ -36,7 +26,7 @@ def streams() -> dict:
         return _cache[1]
     try:
         try:
-            doc = _read(AT % _commit())
+            doc = _read(AT % ghraw.head("community-data"))
         except Exception:
             doc = _read(URL)
         doc = {k: doc.get(k) for k in ("updated", "en", "ru", "ko", "recommended")}

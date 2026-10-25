@@ -25,7 +25,7 @@ routes.calc = async (args) => {
   if (location.hash.startsWith("#/calc") && $(".dcpage")) dcDraw();
 };
 function dcLoadEc() {
-  dc.ecBusy ||= sxBack().catch(() => {}).then(() => fetch(DC_EC)).then((r) => r.ok ? r.json() : []).catch(() => []).then(dcMatch).then((m) => { dc.ecMap = m; return m; });
+  dc.ecBusy ||= sxBack().catch(() => {}).then(() => ghGet(DC_EC, 15000)).catch(() => []).then(dcMatch).then((m) => { dc.ecMap = m; return m; });
   return dc.ecBusy;
 }
 

@@ -5,10 +5,13 @@
 // "ui" = interface languages on for everyone (i18n.js), "fu" = the owner's uses a turn of extra skills ("<id>.<skill>": n, team builder).
 "use strict";
 const BETA_URL = "https://raw.githubusercontent.com/Schirke/limbus-archive/community-config/beta.json";
-const BETA_SITE = "https://limbus-archive.com/cfg/beta.json";  // (the same file through the site: GitHub is out of reach in some countries)
-const betaGet = (u) => fetch(u, { cache: "no-cache", signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
-const betaReady = (typeof SITE !== "undefined" ? betaGet("/cfg/beta.json").catch(() => betaGet(BETA_URL)) : betaGet(BETA_URL).catch(() => betaGet(BETA_SITE)))
-  .catch(() => null);  // (i18n.js waits for its "ui")
+// a raw GitHub JSON file, or the site's copy of it (GitHub is out of reach in some countries); the site asks its copy first
+function ghGet(url, ms = 6000) {
+  const get = (u) => fetch(u, { cache: "no-cache", signal: AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+  const site = typeof SITE !== "undefined", copy = (site ? "/gh/" : "https://limbus-archive.com/gh/") + url.replace("https://raw.githubusercontent.com/", "");
+  return site ? get(copy).catch(() => get(url)) : get(url).catch(() => get(copy));
+}
+const betaReady = ghGet(BETA_URL).catch(() => null);  // (i18n.js waits for its "ui")
 const beta = { routes: new Set(), human: new Set(), edited: new Set(), fu: {}, raf: 0 };
 const langMark = (id) => beta.human.has(id) ? "human" : beta.edited.has(id) ? "edited" : "";
 document.head.insertAdjacentHTML("beforeend", `<style>

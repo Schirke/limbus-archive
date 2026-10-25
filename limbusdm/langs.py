@@ -10,14 +10,12 @@ import os
 import re
 import threading
 import time
-import urllib.request
 
-from . import REPO, links
+from . import REPO, ghraw, links
 
 VERSION = 4
 PUB_BRANCH = "lang-data"
-# branch commit via info/refs (no API limit), files by commit
-PUB_REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
+# files by the branch's commit
 PUB_RAW = f"https://raw.githubusercontent.com/{REPO}/%s/%s"
 PUB_KEEP = 600  # seconds the published list is used before it is asked again
 SAFE = re.compile(r"^[\w.-]+$")
@@ -76,21 +74,13 @@ def _listed(root: str, prefix: str = "", rel: str = "") -> dict[str, tuple]:
     return out
 
 
-def _get(url: str, timeout: int, ua: str = "LimbusArchive") -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": ua})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
-
-
 def _pub_read(svc):
     try:
-        refs = _get(PUB_REFS, 10, "git/2.45")
-        m = re.search(rb"([0-9a-f]{40}) refs/heads/" + PUB_BRANCH.encode() + rb"\n", refs)
-        if not m:  # nothing published yet
+        sha = ghraw.head(PUB_BRANCH)
+        if not sha:  # nothing published yet
             doc = {}
         else:
-            sha = m.group(1).decode()
-            doc = json.loads(_get(PUB_RAW % (sha, "index.json"), 15))
+            doc = json.loads(ghraw.get(PUB_RAW % (sha, "index.json"), 15))
             doc["sha"] = sha
         _pub["doc"] = doc
         os.makedirs(_cache_dir(svc), exist_ok=True)
@@ -297,7 +287,7 @@ def _fetch_pub(svc, e: dict) -> dict:
         raise ValueError("the published list is not readable")
     os.makedirs(_cache_dir(svc), exist_ok=True)
     for g, p in files.items():
-        data = _get(PUB_RAW % (sha, names[g]), 120)
+        data = ghraw.get(PUB_RAW % (sha, names[g]), 120)
         if data[:2] != b"\x1f\x8b":
             raise ValueError("not a table")
         with open(p + ".tmp", "wb") as f:
