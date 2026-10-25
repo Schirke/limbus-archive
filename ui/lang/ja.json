@@ -2255,6 +2255,7 @@
 "Sinners": "囚人",
 "Sinners not among the first {0} in order. Red: the sins of the {1} on the field can't switch it on. Click one to put that Identity in the team.": "順番で最初の {0} 人に入らない囚人。赤：フィールドの {1} の罪では発動しない。クリックでその人格をチームに入れます。",
 "Sins a turn ≈": "1ターンの罪リソース ≈",
+"With extra skills: {0}": "追加スキルあり：{0}",
 "Site files are ready (no upload is set up).": "サイトのファイルは準備完了（アップロードは未設定）。",
 "Site stats": "サイトの統計",
 "Sixteen Identities hide four groups of four: the same Sinner, archetype, season or faction. Pick four that belong together. {0} mistakes and it is over.": "16体の人格に4体ずつ4つのグループが隠れています：同じ囚人、キーワード、シーズン、所属。仲間になる4体を選んでください。ミス {0} 回で終わり。",
