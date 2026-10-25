@@ -1870,3 +1870,7 @@ button.sndnav:hover { color: var(--gold); }
 #snapgate .hint { color: var(--muted); font-size: 12.5px; margin: 4px 0 14px 26px; }
 #snapgate .sggame { border: 1px solid var(--red); border-radius: 6px; padding: 10px 12px; margin-top: 12px; }
 #snapgate .sgtips { color: var(--muted); font-size: 13px; padding-left: 20px; margin: 14px 0 0; } #snapgate .sgtips li { margin: 5px 0; }
+/* Thai: no tracking, room for marks above and below */
+:lang(th) :is(body, .hsay p) { line-height: 1.6; }
+:lang(th) *:not(.brand) { letter-spacing: 0 !important; }
+:lang(th) :is(h1, .hname, .utitle, .enname, .vsname b) { line-height: 1.3; }
