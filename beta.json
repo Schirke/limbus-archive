@@ -17,6 +17,7 @@
  "human": [
   "es-DreamsOffice",
   "hant-LTM",
+  "th-stlinx",
   "vn-Kazike",
   "zh-CN"
  ],
@@ -27,5 +28,6 @@
   "ru",
   "zh-Hans",
   "zh-Hant"
- ]
+ ],
+ "fu": {}
 }
