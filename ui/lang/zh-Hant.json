@@ -2255,6 +2255,7 @@
 "Sinners": "罪人",
 "Sinners not among the first {0} in order. Red: the sins of the {1} on the field can't switch it on. Click one to put that Identity in the team.": "不在出場順序前 {0} 位的罪人。紅色：場上 {1} 人的罪孽資源無法觸發它。點選可將該人格放入隊伍。",
 "Sins a turn ≈": "每回合罪孽 ≈",
+"With extra skills: {0}": "含額外技能：{0}",
 "Site files are ready (no upload is set up).": "網站檔案已準備好（未設定上傳）。",
 "Site stats": "網站統計",
 "Sixteen Identities hide four groups of four: the same Sinner, archetype, season or faction. Pick four that belong together. {0} mistakes and it is over.": "十六個人格中藏著四組，每組四個：相同的罪人、定位、賽季或陣營。選出屬於同一組的四個。失誤 {0} 次即結束。",

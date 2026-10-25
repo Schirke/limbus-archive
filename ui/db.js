@@ -510,7 +510,7 @@ function drawBuilder() {
       <span class="sep"></span>${Object.entries(atk).map(([k, n]) => `<span class="kwi small">${ico(`atk_${k}`, "s18", k, "")}<b>${n}</b> ${esc(k)}</span>`).join("")}
       <span class="grow"></span><button id="clearteam">Clear</button></div>
     <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${s} ${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>
-    ${sides.field.length ? `<div class="tbrate"><span class="muted small" title="Each used skill gives one of its sin; on average, from the ${sides.field.length} on the field">Sins a turn ≈</span>${UNITS.sins.filter((s) => S.rate[s]).map((s) => `<span class="tbcost">${sinIcon(s, "s16")}${S.rate[s].toFixed(1)}</span>`).join("")}
+    ${sides.field.length ? `<div class="tbrate"><span class="muted small" title="Each used skill gives one of its sin; on average, from the ${sides.field.length} on the field">Sins a turn ≈</span>${UNITS.sins.filter((s) => S.rate[s]).map((s) => `<span class="tbcost"${S.extra[s] ? ` title="${esc(`With extra skills: ${S.extra[s].map((f) => `${f.who} +${f.n.toFixed(1)}`).join(", ")}`)}"` : ""}>${sinIcon(s, "s16")}${S.rate[s].toFixed(1)}${S.extra[s] ? "*" : ""}</span>`).join("")}
       <span class="muted small">· E.G.O frame: <i class="tbkey slow"></i> slow to gather <i class="tbkey no"></i> no such sin on the field</span></div>` : ""}`;
   const P = tbPasList(sides, S);
   const panel = sides.field.length ? `<div class="card tbpanel"><div class="tbtabs">
@@ -588,19 +588,33 @@ function tbSides() {
   if (!field.length) field = all.filter(has);
   return { field, bench: all.filter((sid) => !field.includes(sid)) };
 }
-// rate: sins a turn on average; can: per Sinner, the chance a turn deals it a skill of that sin
+// rate: sins a turn on average (+ extra skills the kits use by name, x.fu); can: per Sinner, the chance a turn deals it a skill of that sin
 function tbSins(field) {
-  const rate = {}, can = {};
+  const rate = {}, can = {}, extra = {};
   for (const sid of field) {
-    const d = {};
-    unitById(MY.slots[sid]).skills.forEach((s) => { const n = s.copies ?? 1, sin = topUp(s).sin; if (n) d[sin] = (d[sin] || 0) + n; });
+    const d = {}, gives = {}, x = unitById(MY.slots[sid]);
+    x.skills.forEach((s) => { const n = s.copies ?? 1, sin = topUp(s).sin; if (n) { d[sin] = (d[sin] || 0) + n; if (!s.nores) gives[sin] = (gives[sin] || 0) + n; } });
     const tot = Object.values(d).reduce((a, b) => a + b, 0);
     for (const [sin, c] of Object.entries(d)) {
-      rate[sin] = (rate[sin] || 0) + c / tot;
+      if (gives[sin]) rate[sin] = (rate[sin] || 0) + gives[sin] / tot;
       (can[sin] = can[sin] || []).push(tot > 1 ? 1 - ((tot - c) * (tot - c - 1)) / (tot * (tot - 1)) : 1);
     }
+    for (const f of tbFollowUps(x, field.filter((o) => o !== sid).map((o) => unitById(MY.slots[o])))) {
+      rate[f.sin] = (rate[f.sin] || 0) + f.n;
+      (extra[f.sin] = extra[f.sin] || []).push(f);
+    }
   }
-  return { rate, can };
+  return { rate, can, extra };
+}
+// x's extra skills against its field mates: n = uses a turn (the owner's number from beta.json "fu" over the text's guess)
+function tbFollowUps(x, mates) {
+  return (x.fu || []).flatMap((f) => {
+    if (f.nores) return [];
+    const p = beta.fu[`${x.id}.${f.skill}`] ?? f.p, t = f.team;
+    const k = !t ? 1 : mates.filter((m) => t.kw ? (m.keywords || []).includes(t.kw) : mdFacs(m).includes(t.assoc)).length;
+    const n = p * (f.each ? k : Math.min(1, k)), sk = x.skills.find((s) => s.id === f.skill);
+    return n > 0 ? [{ sin: f.sin, n, who: `${x.sinnerName} · ${sk ? topUp(sk).name : f.skill}` }] : [];
+  });
 }
 function tbAtLeast(ps, n) {
   let dp = [1];

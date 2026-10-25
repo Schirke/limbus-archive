@@ -2255,6 +2255,7 @@
 "Sinners": "Грешники",
 "Sinners not among the first {0} in order. Red: the sins of the {1} on the field can't switch it on. Click one to put that Identity in the team.": "Грешники не среди первых {0} по порядку. Красным: грехи {1} на поле не могут её включить. Нажмите, чтобы поставить эту Идентичность в команду.",
 "Sins a turn ≈": "Грехов за ход ≈",
+"With extra skills: {0}": "С доп. навыками: {0}",
 "Site files are ready (no upload is set up).": "Файлы для сайта готовы (загрузка не настроена).",
 "Site stats": "Статистика сайта",
 "Sixteen Identities hide four groups of four: the same Sinner, archetype, season or faction. Pick four that belong together. {0} mistakes and it is over.": "Шестнадцать Идентичностей скрывают четыре группы по четыре: тот же грешник, архетип, сезон или фракция. Выберите четыре, которые подходят друг к другу. {0} {0|ошибка|ошибки|ошибок} — и конец.",
