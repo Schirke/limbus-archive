@@ -5,7 +5,7 @@ import re
 
 from .units import _load
 
-VERSION = 8
+VERSION = 9
 SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gluttony", "AZURE": "Gloom", "INDIGO": "Pride", "VIOLET": "Envy"}
 
 
@@ -34,6 +34,7 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
                           "hard": p.get("difficulty") == "DIFFICULT", "pic": pack_pics.get(str(ui.get("packSpriteId") or "")) or "",
                           # the boss the game draws over the card (the "WARNING" packs only), the bosses it names
                           "boss": pack_pics.get(str(ui.get("bossSpriteId") or "")) or "", "bossUnits": _boss_units(tables, p),
+                          "rare": bool(p.get("hiddenThemeRate")), "_fix": p.get("fixedRewardEgoGifts") or [],  # (a hidden pack, its clear reward)
                           "_gen": [p.get("mapGenOption"), p.get("mapGenSequence")]})
     packs.sort(key=lambda p: p["id"])
     _extra(tables, packs, set(gdata) - hid, how := {})
@@ -117,8 +118,9 @@ def _rewards(o) -> set:
 
 
 def _extra(tables: dict, packs: list, real: set, how: dict) -> None:
-    """Gifts outside the packs' pools: rewards of a pack's fights / events (pack-only when 3 packs or fewer, e.g. the
-    extreme bosses' gifts), the hidden fight of floors 11-15, events of many packs ({id: {how, min}} into `how`)."""
+    """Gifts outside the packs' pools: rewards of a pack's fights / events / clear (pack-only when 3 packs or fewer, e.g. the
+    extreme bosses' gifts; a hidden pack's: no route, a note), the hidden fight of floors 11-15, events of many packs
+    ({id: {how, min}} into `how`)."""
     src: dict[int, set] = {}
     for fold in ("battle-mirrordungeon", "abnormality-event"):
         for t in (tables.get(fold) or {}).values():
@@ -132,8 +134,13 @@ def _extra(tables: dict, packs: list, real: set, how: dict) -> None:
     owners: dict[int, list] = {}
     for p in packs:
         refs = {int(n) for n in re.findall(r"\d{5,7}", str([p.pop("_gen")]))}
-        for g in set().union(*(src.get(r, set()) for r in refs)) - known:
-            if g in real:
+        for g in set().union(set(p.pop("_fix")), *(src.get(r, set()) for r in refs)) - known:
+            if g not in real:
+                continue
+            if p["rare"]:
+                p["excl"].append(g)
+                how[g] = {"how": f"Reward for clearing the hidden pack {p['name']} (rare)"}
+            else:
                 owners.setdefault(g, []).append(p)
     for g, ps in owners.items():
         if len(ps) <= 3:

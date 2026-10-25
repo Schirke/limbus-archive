@@ -46,7 +46,8 @@ routes.mirror = async () => {
 
 // Route for the picked gifts: at most `cap` gifts per pack visit, packs added by gain while they all find floors.
 function mpPlan() {
-  const N = MP_MODES[mp.mode][1], floors = [...Array(N).keys()], packs = MIRROR.packs.filter((p) => floors.some((f) => mpAllowed(p, f)));
+  // (a hidden pack shows up too rarely to plan on)
+  const N = MP_MODES[mp.mode][1], floors = [...Array(N).keys()], packs = MIRROR.packs.filter((p) => !p.rare && floors.some((f) => mpAllowed(p, f)));
   const need = new Set(), fus = [];
   const add = (id) => { if (need.has(id) || mp.start.includes(id)) return; need.add(id); const r = MIRROR.fus[id]; if (r) { fus.push([id, r[0]]); r[0].forEach(add); } };
   mp.want.forEach(add);
@@ -127,7 +128,7 @@ function mpPacks(tabs) {
   const tg = (k, label) => `<button class="toggle ${mpPv.f === k ? "on" : ""}" data-pvf="${k}">${label}</button>`;
   return `<div class="card mpcard">${tabs}<input type="text" id="pvq" placeholder="Search a pack…" value="${esc(mpPv.q)}">
     <div class="mpchips">${tg("", "All packs")}${tg("own", "With their own gifts")}${tg("hard", "Hard")}<span class="grow"></span><span class="muted small">${list.length} of ${all.length} in this mode</span></div>
-    <div class="pvgrid">${list.map((p) => `<div class="pvc" data-pvp="${p.id}"><div class="pvb">${p.excl.length ? `<span>${p.excl.length} own</span>` : ""}${p.hard ? '<span class="h">Hard</span>' : ""}</div>
+    <div class="pvgrid">${list.map((p) => `<div class="pvc" data-pvp="${p.id}"><div class="pvb">${p.excl.length ? `<span>${p.excl.length} own</span>` : ""}${p.hard ? '<span class="h">Hard</span>' : ""}${p.rare ? '<span class="h">Rare</span>' : ""}</div>
       ${mpPackArt(p)}<div class="pvn">${esc(p.name)}</div></div>`).join("")}</div></div>`;
 }
 
@@ -147,7 +148,7 @@ async function mpPack(id) {
     f["2"] && ["Hard", "Floors 6–10"], f["3"] && ["Hard", "Floors 11–15"]].filter(Boolean);
   const tile = (g) => `<div class="mpgift ${mp.want.has(g) ? "on" : ""}" data-pvg="${g}" title="${esc(mpG(g).name)}">${mpG(g).tile ? `<img src="${mpG(g).tile}" loading="lazy">` : ""}${mpG(g).tier ? `<u>${ROMAN[mpG(g).tier - 1] || mpG(g).tier}</u>` : ""}${mpG(g).up ? `<em>${"+".repeat(mpG(g).up.length)}</em>` : ""}</div>`;
   modal(`<div class="pvx">${mpPackArt(p)}<div>
-    <h2>${esc(p.name)}</h2><div class="muted small">${p.hard ? "Hard pack · " : ""}${p.pool.length + p.excl.length} gifts can drop</div>
+    <h2>${esc(p.name)}</h2><div class="muted small">${p.rare ? "Hidden pack: shows up rarely · " : p.hard ? "Hard pack · " : ""}${p.pool.length + p.excl.length} gifts can drop</div>
     <h4>Boss</h4><div class="pvboss">${bossList()}</div>
     <h4>Gifts only in this pack${p.excl.length ? " · " + p.excl.length : ""}</h4>${p.excl.length ? `<div class="pvgs">${p.excl.map(tile).join("")}</div>` : '<div class="muted small">None: everything here drops in other packs too.</div>'}
     <h4>Floors</h4><div class="pvfl">${floors.map(([m, t]) => `<span>${m}<b>${esc(t)}</b></span>`).join("")}</div></div></div>`);
