@@ -98,6 +98,31 @@ def check_code(rep):
                 rep.warn("code", f"ui/lang/{lang}.json", f"{len(rows)} interface strings not translated (scripts/ui_langcheck.py lists them)")
     except Exception as e:
         rep.warn("code", "ui/lang", f"not checked: {type(e).__name__}: {e}")
+    check_github(rep)
+
+
+def check_github(rep):
+    """GitHub files are read through ghGet / ghraw (the site's copy where GitHub is out of reach), and the Worker copies them"""
+    import re
+    raw = "raw.githubusercontent" + ".com/"
+    m = re.search(r"const GH_FILE = /(.+)/;", open(os.path.join(ROOT, "ui", "site", "worker.js"), encoding="utf-8").read())
+    if not m:
+        rep.fail("code", "ui/site/worker.js", "GH_FILE not found")
+        return
+    copied, own = re.compile(m.group(1)), {"ghraw.py", "beta.js", "sw.js", "worker.js", "check.py"}
+    web = os.path.join(ROOT, "unity", "LimbusViewer", "Web")
+    games = [os.path.join(web, f) for f in sorted(os.listdir(web)) if f.endswith(".js")] if os.path.isdir(web) else []
+    for f in py_files() + [x for x in js_files() if os.sep + "big" + os.sep not in x] + games:
+        text = open(f, encoding="utf-8", errors="replace").read()
+        if raw not in text:
+            continue
+        where = os.path.relpath(f, ROOT)
+        if os.path.basename(f) not in own and "ghGet(" not in text and "ghraw." not in text:
+            rep.fail("code", where, "reads GitHub directly: use ghGet(url) / ghraw.get(url) (GitHub is out of reach in some countries)")
+        for u in re.findall(re.escape(raw) + r"[^\"'\s`)]+", text):
+            path = u[len(raw):].replace("{REPO}", "Schirke/limbus-archive").replace("%s/%s", "0" * 40 + "/x.json").replace("%s", "0" * 40)
+            if path and not copied.match(path):
+                rep.fail("code", where, f"{u}: the site has no copy of it, add it to GH_FILE in ui/site/worker.js")
 
 
 KEYS = [  # a line ending in "keys-ok" is skipped
