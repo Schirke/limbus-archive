@@ -29,20 +29,100 @@
       () => prompt("Link to this card:", url));
   });
   document.querySelector("#top .brand").setAttribute("href", "#/home");
-  const HOME_TILES = [
-    ["patches", "patches", "Patches", "What every update changed: new units, highlights, texts, pictures, sounds.", "BottomMenu_1_11"],
-    ["db", "db", "Identities & E.G.O", "Skills, coins, passives and the full art of every unit.", "BottomMenu_1_10"],
-    ["enemies", "enemies", "Enemies", "Enemies and Abnormalities with their skills and their battle look.", "BottomMenu_1_12"],
-    ["anim", "anim", "Animations", "Spine models and skills played with the game's own effects.", "BottomMenu_1_9"],
-    ["stages", "stages", "Story map", "Every Canto's stages: who stands there and what waits.", "BottomMenu_1_11"],
-    ["games", "games", "Games", "Guessers and live matches with friends. Lunacy for the Extraction.", "Settings_3_20"],
-    ["teams", "teams", "Team builder", "Put a team together and share it as a link.", "BottomMenu_1_14"],
-    ["community", "community", "Community", "Who streams Limbus right now, channels worth a look.", "BottomMenu_1_13"],
-  ];
+  // the Animations card's clips (ui/site/home/v/anim<i>.mp4, cut from the site's renders): [kind, id, tag]
+  const HOME_ANIM = [["ego", 20606, "Awakening"], ["ego", 20606, "Corrosion"], ["id", 10105, "Skill 3"], ["enemy", 1522, ""], ["ego", 20203, "Awakening"],
+    ["ego", 20203, "Corrosion"], ["id", 10607, "Skill 3"], ["ego", 20102, "Awakening"], ["ego", 20102, "Corrosion"], ["enemy", 1503, ""], ["ego", 20302, "Awakening"],
+    ["ego", 20302, "Corrosion"], ["id", 11008, "Skill 3"], ["ego", 21001, ""]];
+  const HOME_FOES = { 1522: "Jeanne Sartre, the Sartorial Tailor", 1503: "Blackthread of the Elden Sea" };
+  const HOME_BIG = [["survivors", "Limbus Survivors"], ["sing", "Singing Machine"], ["slice", "Muga Slice"]];
+  const HV = "/ui/site/home/v/";
+  const homeMotion = () => !matchMedia("(prefers-reduced-motion: reduce)").matches && !(navigator.connection && navigator.connection.saveData);
+  // the cards' videos play only while on screen (on a phone the first two of them), from a still frame until then
+  let homeSeen = null;
+  function homeVideos(root) {
+    if (homeSeen) homeSeen.disconnect();
+    if (!homeMotion() || !("IntersectionObserver" in window)) return;
+    const vis = new Set();
+    homeSeen = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) vis.add(e.target); else vis.delete(e.target);
+      const max = matchMedia("(max-width: 700px)").matches ? 2 : 8;
+      const on = [...root.querySelectorAll("video.hxbg")].filter((v) => vis.has(v)).slice(0, max);
+      for (const v of root.querySelectorAll("video.hxbg")) {
+        if (on.includes(v)) { if (!v.getAttribute("src")) v.src = v.dataset.src; if (v.paused) v.play().catch(() => { /* shown as its still frame */ }); }
+        else if (!v.paused) v.pause();
+      }
+    }, { threshold: 0.4 });
+    root.querySelectorAll("video.hxbg").forEach((v) => homeSeen.observe(v));
+  }
   let homeTimer = 0;
   // report counts without code / paths / other
   const homeChips = (sum) => `<div class="chips">${SUMMARY_LABELS.filter(([k]) => sum && sum[k] && !/^(code|catalog_added|other)$/.test(k)).map(([k, l]) =>
     `<span class="chip ${k === "leaks" || k === "foreign_only" ? "leak" : ""}"><b>${sum[k]}</b> ${l}</span>`).join("") || `<span class="chip">no content changes</span>`}</div>`;
+  const homeAnimLabel = ([kind, id, tag]) => {
+    const u = kind === "ego" ? UNITS && UNITS.egos.find((x) => x.id === id) : kind === "id" ? UNITS && UNITS.ids.find((x) => x.id === id) : null;
+    const name = u ? u.name || u.title : HOME_FOES[id] || "";
+    return `<span>${kind === "ego" ? "E.G.O" : kind === "id" ? "Identity" : "Enemy"}</span> <i>${esc(name)}</i>${tag ? ` · <span>${tag}</span>` : ""}`;
+  };
+  let homeAt = 0, homeBigAt = 0;
+  function homeCards(ids, games) {
+    const art = (i) => (ids[i] && ids[i].pics.art) || "";
+    const card = (r, title, text, inner) => (OPEN.has(r) ? `<a class="hxc" href="#/${r}">${inner}<div class="hxt"><b>${title}</b><span>${text}</span></div></a>` : "");
+    const img = (src) => (src ? `<img class="hxbg" src="${src}" alt="" loading="lazy">` : "");
+    const vid = (name, pos = "50% 50%", loop = true, id = "", poster = name) => `<video class="hxbg" ${id ? `id="${id}"` : ""} data-src="${HV}${name}.mp4" poster="${HV}${poster}.webp" style="object-position:${pos}" muted playsinline preload="none"${loop ? " loop" : ""}></video>`;
+    const num = (big, small) => `<span class="hxnum">${big}<small>${small}</small></span>`;
+    const grp = (title, sub, cards) => (cards.trim() ? `<div class="hsect hgrp"><h2>${title}</h2><span class="hsub">${sub}</span></div><div class="hxrow">${cards}</div>` : "");
+    homeAt %= HOME_ANIM.length;
+    return `<div class="hx"><div class="hxtop">
+        ${card("anim", "Animations", "Every skill and E.G.O with the game's own effects. Watch, slow down, save as a video.",
+          vid("anim" + homeAt, "50% 50%", false, "hxanim", "anim0") + `<span class="hxk" id="hxanimk">${homeAnimLabel(HOME_ANIM[homeAt])}</span>`)}
+        ${card("db", "Identities & E.G.O", "Skills, coins, passives and the art of every one — and what changed with each patch.", img(art(0)) + (ids[0] ? `<span class="hxk"><span>New</span> <i>${esc(ids[0].title)}</i></span>` : ""))}
+      </div>
+      ${grp("Look it up", "everything from the game's files",
+        card("enemies", "Enemies", "Bosses and Abnormalities: skills, resistances, battle look.", vid("enemies", "20% 30%"))
+        + card("stages", "Story map", "Every stage of every Canto: who stands there and what waits.", img(HV + "stages.webp"))
+        + card("sounds", "Sounds", "Voice lines, music and battle sounds — search and listen.", img(art(3)))
+        + card("buffs", "Effects", "Every buff and debuff with its icon and animation.", vid("buffs", "30% 35%")))}
+      ${grp("Plan", "build, count, prepare a run",
+        card("teams", "Team builder", "Sins a turn, passives that switch on, the gifts that fit.", vid("teams", "0% 20%"))
+        + card("mirror", "MD planner", "Pick the gifts you want — get the packs for every floor.", vid("mirror", "30% 40%"))
+        + card("calc", "Damage calc", "How hard a skill really hits, turn after turn.", img(art(4)) + num("2 480", "dmg"))
+        + card("growth", "Upgrade calc", "Threads, shards and runs to the Uptie and level you want.", img(art(1)) + num("UT4", "Lv 55")))}
+      ${grp("Games", "with friends or alone",
+        card("games", "Mini-games", "Guess the Identity, the voice, the E.G.O — daily rounds and live matches.", img(art(6)) + (games ? `<span class="hxnum">${games}</span>` : ""))
+        + card("biggames", "Big games", "Survivors, Singing Machine, Muga Slice.", vid(HOME_BIG[homeBigAt][0], "50% 50%", false, "hxbig") + `<span class="hxk notr" id="hxbigk"><i>${HOME_BIG[homeBigAt][1]}</i></span>`)
+        + card("workshop", "Story workshop", "Make your own scene with the story's characters and music.", vid("workshop", "40% 30%"))
+        + card("community", "Community", "Who streams Limbus right now.", '<img class="hxbg" id="hxlivei" src="/ui/site/home/community.webp" alt=""><span class="hxlive" id="hxlivet" hidden></span>'))}
+    </div>`;
+  }
+  // the next clip when one ends: the Animations card's list, the big games in turn
+  document.addEventListener("ended", (e) => {
+    const v = e.target, k = v.id === "hxanim" ? $("#hxanimk") : v.id === "hxbig" ? $("#hxbigk") : null;
+    if (!k) return;
+    if (v.id === "hxanim") { homeAt = (homeAt + 1) % HOME_ANIM.length; v.src = `${HV}anim${homeAt}.mp4`; k.innerHTML = homeAnimLabel(HOME_ANIM[homeAt]); }
+    else { homeBigAt = (homeBigAt + 1) % 3; v.src = `${HV}${HOME_BIG[homeBigAt][0]}.mp4`; k.innerHTML = `<i>${HOME_BIG[homeBigAt][1]}</i>`; }
+    v.play().catch(() => { /* stays on its last frame */ });
+  }, true);
+  // Community: who streams now, one after another
+  let homeLiveTimer = 0;
+  function homeLive() {
+    clearInterval(homeLiveTimer);
+    if (!$("#hxlivei")) return;
+    api("/api/community").then((c) => {
+      const all = Object.values(c.parts || {}).flatMap((p) => Object.values(p.streams || {}).flat()).filter((x) => x.thumb).sort((a, b) => b.viewers - a.viewers).slice(0, 8);
+      let at = -1;
+      const next = () => {
+        const im = $("#hxlivei"), t = $("#hxlivet");
+        if (!im) return clearInterval(homeLiveTimer);
+        if (document.hidden || !all.length) return;
+        at = (at + 1) % all.length;
+        const x = all[at], pic = new Image();
+        pic.onload = () => { im.src = x.thumb; t.hidden = false; t.innerHTML = `<i></i><b class="notr">${esc(x.name)}</b> <span>${x.viewers} watching</span>`; };
+        pic.src = x.thumb;
+      };
+      next();
+      if (all.length > 1 && homeMotion()) homeLiveTimer = setInterval(next, 4000);
+    }).catch(() => { /* the still picture then */ });
+  }
   routes.home = async () => {
     const main = $("#main"), here = () => !!main.querySelector(".home");
     clearInterval(homeTimer);
@@ -68,12 +148,12 @@
             ${prev ? `<a class="hprev" href="#/patches/${encodeURIComponent(prev.id)}"><span class="hkick dim">Before that · ${esc(b.d)}</span>${homeChips(prev.summary)}</a>` : ""}</div>` : ""}
           ${slides.length ? `<div class="hwho"><a id="hwho"></a>${slides.length > 1 ? `<span class="hdots">${slides.map((x, i) => `<button data-i="${i}" title="${esc(x.title)}"></button>`).join("")}</span>` : ""}</div>` : ""}
         </div>
-        <div class="hsect"><h2>What is inside</h2></div>
-        <div class="htiles">${HOME_TILES.filter(([name]) => OPEN.has(name)).map(([name, pic, title, text, icon]) => `<a class="htile" href="#/${name}">
-          <i class="hpic" style="background-image:url(/ui/site/home/${pic}.webp)"></i><span class="htx"><b><i style="background-image:url(/api/gacha_ui?n=MainUI_${icon})"></i>${esc(title)}</b><span>${esc(text)}</span></span></a>`).join("")}</div>
+        ${homeCards(byDate, games)}
         ${byDate.length ? `<div class="hsect"><h2>Newest Identities</h2><a href="#/db">All Identities ›</a></div>
         <div class="hids">${byDate.slice(0, 8).map((x) => dbCard(x, newest)).join("")}</div>` : ""}`;
       main.querySelectorAll(".hids [data-u]").forEach((c) => { c.onclick = () => openUnit(+c.dataset.u); });
+      homeVideos(main);
+      homeLive();
       if (!slides.length) return;
       // two layers, one fading into the other: a picture is shown when it has arrived
       const layers = main.querySelectorAll(".hart"), who = $("#hwho");
