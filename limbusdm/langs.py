@@ -369,6 +369,8 @@ FONT_DIRS = {"title": "Title", "text": "Context"}
 FONT_CHOICES = {"title": ("pack", "sofia"), "text": ("pack",)}
 SOFIA = "fonts/SofiaSansExtraCondensed-SemiBold.ttf"  # (in ui/: OFL, fonts/OFL-SofiaSans.txt)
 REF_TEXT = (0.700, 1.079, 0.251)  # Segoe UI: cap height, ascent, descent (em)
+NON_LATIN = {"ru", "uk", "be", "bg", "sr", "mk", "kk", "mn", "el", "zh", "ja", "ko", "th", "lo", "km", "my", "ar", "fa", "ur",
+             "he", "hi", "bn", "ta", "te", "ka", "hy"}
 _metric_cache: dict = {}
 
 
@@ -478,6 +480,8 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
     """{"title" / "text": {"url", "css"}}: the fonts a language's pages use (none: the app's own)"""
     from .paths import resource_dir
     out = {}
+    # a Latin-script language mixes its letters with ASCII inside a word: its font takes every letter ("all"), not only those past Latin-1
+    latin = str(src.get("lang") or "").split("-")[0] not in NON_LATIN
     for kind, choice in (mode or {}).items():
         if choice == "sofia":
             p, url = os.path.join(resource_dir(), "ui", SOFIA), "/ui/" + SOFIA
@@ -489,6 +493,8 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
             v = hashlib.sha1(f"{p}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
             url = f"/api/langfont?id={src['id']}&k={kind}&v={v}"  # (params sorted: the site's name)
         out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT)}
+        if latin:
+            out[kind]["all"] = True
     return out
 
 
