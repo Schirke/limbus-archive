@@ -1300,7 +1300,7 @@ class Service:
             try:
                 for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Sprite/EgoGiftIcon/%'"):
                     gifts.setdefault(name, c)
-                for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Everydungeon/card_pack/%'"):
+                for name, c in con.execute("select name, c from o where type = 'Texture2D' and (c like '%/Everydungeon/card_pack/%' or c like '%/Everydungeon/boss/%')"):
                     cards.setdefault(name, c)
             finally:
                 con.close()

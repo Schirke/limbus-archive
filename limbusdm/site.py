@@ -139,7 +139,7 @@ PARTS = {
     "small": {"always": True, "crawl": {"stage": "News", "start": ["/api/news", "/api/growth"], "packs": []}},  # (one-list pages asked every time)
     # the planner's gifts then theme packs with its list, the history with the rest
     "tools": {"taken": True, "uses": ["enemy pictures"], "crawl": {"stage": "Tools (planner, change history)", "start": ["/api/mirror", "/api/history"],
-              "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/card_pack/"), PACK)]}},
+              "packs": [((r"/api/mirror$", r"/api/asset_thumb\?path=.*/EgoGiftIcon/", r"/api/asset_thumb\?path=.*/Everydungeon/(card_pack|boss)/"), PACK)]}},
     # the list, its icons in its order (the grid), then who has them
     "buffs": {"uses": ["buff videos"], "crawl": {"stage": "Buff effects", "start": ["/api/buffs"], "final": "buffs",
               "packs": [(r"/api/buffs$", PACK), (r"/api/asset_thumb\?path=[^&]*/Buf/", WORD_PACK)]}},

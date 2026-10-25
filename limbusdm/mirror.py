@@ -5,7 +5,7 @@ import re
 
 from .units import _load
 
-VERSION = 7
+VERSION = 8
 SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gluttony", "AZURE": "Gloom", "INDIGO": "Pride", "VIOLET": "Envy"}
 
 
@@ -32,6 +32,8 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
             packs.append({"id": p["id"], "name": (pname.get(p["id"]) or {}).get("name") or str(p["id"]), "floors": floors,
                           "pool": p.get("egoGiftPool") or [], "excl": p.get("specificEgoGiftPool") or [],
                           "hard": p.get("difficulty") == "DIFFICULT", "pic": pack_pics.get(str(ui.get("packSpriteId") or "")) or "",
+                          # the boss the game draws over the card (the "WARNING" packs only), the bosses it names
+                          "boss": pack_pics.get(str(ui.get("bossSpriteId") or "")) or "", "bossUnits": _boss_units(tables, p),
                           "_gen": [p.get("mapGenOption"), p.get("mapGenSequence")]})
     packs.sort(key=lambda p: p["id"])
     _extra(tables, packs, set(gdata) - hid, how := {})
@@ -80,6 +82,16 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
             if d.get("typeIndex") is not None:
                 modes[str(d["typeIndex"])] = len(d.get("floors") or d.get("basicEnemyLevelPerFloor") or [])
     return {"packs": packs, "gifts": gifts, "fus": fus, "modes": modes, "start": _start(tables, loc_dir, gifts)}
+
+
+def _boss_units(tables: dict, p: dict) -> list[int]:
+    """A pack's bosses as unit ids: the ones its card shows, else the units of its boss fights."""
+    ids = list((p.get("uiConfigs") or {}).get("showBossIds") or [])
+    if not ids:
+        fights = {b.get("id"): b for t in (tables.get("battle-mirrordungeon") or {}).values() for b in (t.get("list") if isinstance(t, dict) else None) or []}
+        for bid in (p.get("mapGenOption") or {}).get("bossPool") or []:
+            ids += [u.get("unitID") for w in (fights.get(bid) or {}).get("waveList") or [] for u in w.get("unitList") or []]
+    return list(dict.fromkeys(i for i in ids if i))
 
 
 def _start(tables: dict, loc_dir: str, gifts: dict) -> dict:

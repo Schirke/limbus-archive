@@ -4,6 +4,7 @@ let MIRROR = null;
 const MP_KEEP = "mirror";
 const MP_MODES = [["Normal", 5, "0"], ["Hard", 5, "1"], ["Hard", 10, "2"], ["Hard", 15, "3"]];  // (name, floors, the game's typeIndex)
 const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g", start: [], picks: 1 };
+const mpPv = { on: false, q: "", f: "" };  // the picker's "Theme packs" tab: a handbook of the packs, to look at only
 // a keyword chip's picture: the status icon, or the damage type's for Hit / Penetrate / Slash (the name on hover)
 const MP_ATK = { Hit: "Blunt", Penetrate: "Pierce", Slash: "Slash" };
 const mpKwIco = (k) => (MP_ATK[k] ? ico(`atk_${MP_ATK[k]}`, "s22", mpKw(k), mpKw(k)) : ico(`st_${k}`, "s22", mpKw(k), mpKw(k)));
@@ -97,6 +98,8 @@ function mpPlan() {
 }
 
 function mpPicker() {
+  const tabs = `<div class="pvtabs seg"><button class="toggle ${mpPv.on ? "" : "on"}" data-pv="0">Gifts</button><button class="toggle ${mpPv.on ? "on" : ""}" data-pv="1">Theme packs</button></div>`;
+  if (mpPv.on) return mpPacks(tabs);
   const N = MP_MODES[mp.mode][1], avail = new Set(MIRROR.packs.filter((p) => [...Array(N).keys()].some((f) => mpAllowed(p, f))).flatMap((p) => [...p.pool, ...p.excl]).concat(Object.keys(MIRROR.fus).map(Number))
     .concat(Object.keys(MIRROR.gifts).filter((g) => MIRROR.gifts[g].how && (MIRROR.gifts[g].min || 0) < N).map(Number)));
   const all = Object.entries(MIRROR.gifts).filter(([id]) => avail.has(+id));
@@ -107,11 +110,57 @@ function mpPicker() {
   const key = { kw: (g) => String(9 - g.tier) + g.name, tier: (g) => String(9 - g.tier) + g.name, name: (g) => g.name }[mp.sort];
   list.sort((a, b) => (mp.sort === "kw" && mpKwCmp(a[1].kw, b[1].kw)) || key(a[1]).localeCompare(key(b[1])));
   const tg = (on, attr, label, cls = "") => `<button class="toggle ${cls} ${on ? "on" : ""}" ${attr}>${label}</button>`;
-  return `<div class="card mpcard"><input type="text" id="mpq" placeholder="Search a gift…" value="${esc(mp.q)}">
+  return `<div class="card mpcard">${tabs}<input type="text" id="mpq" placeholder="Search a gift…" value="${esc(mp.q)}">
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}${N > 10 ? tg(mp.only === "deep", 'data-o="deep" title="Gifts found on floors 11–15 only"', "Floors 11–15") : ""}</div>
     <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}" title="${esc(mpKw(k))}"`, mpKwIco(k), "kwi")).join("")}${tg(mp.kw === "-", 'data-k="-" title="Gifts without a keyword"', "No keyword")}</div>
     <div class="mpchips"><select id="mpsort">${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => `<option value="${k}" ${mp.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select><span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
     <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""} ${mp.start.includes(+id) ? "st" : ""}" data-g="${id}" data-pick>${g.tile ? `<img src="${g.tile}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${g.up ? `<em>${"+".repeat(g.up.length)}</em>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}${mp.start.includes(+id) ? "<i>START</i>" : ""}</div>`).join("")}</div></div>`;
+}
+
+// the pack as the game draws it: its card; on the "WARNING" packs the boss over it
+const mpPackArt = (p) => `<div class="pvart">${p.tile ? `<img src="${p.tile}" loading="lazy" alt="">` : ""}${p.bossTile ? `<img class="boss" src="${p.bossTile}" loading="lazy" alt="">` : ""}</div>`;
+
+function mpPacks(tabs) {
+  const N = MP_MODES[mp.mode][1], q = mpPv.q.trim().toLowerCase();
+  const all = MIRROR.packs.filter((p) => [...Array(N).keys()].some((f) => mpAllowed(p, f)));
+  const list = all.filter((p) => (!q || p.name.toLowerCase().includes(q)) && (mpPv.f !== "own" || p.excl.length) && (mpPv.f !== "hard" || p.hard));
+  const tg = (k, label) => `<button class="toggle ${mpPv.f === k ? "on" : ""}" data-pvf="${k}">${label}</button>`;
+  return `<div class="card mpcard">${tabs}<input type="text" id="pvq" placeholder="Search a pack…" value="${esc(mpPv.q)}">
+    <div class="mpchips">${tg("", "All packs")}${tg("own", "With their own gifts")}${tg("hard", "Hard")}<span class="grow"></span><span class="muted small">${list.length} of ${all.length} in this mode</span></div>
+    <div class="pvgrid">${list.map((p) => `<div class="pvc" data-pvp="${p.id}"><div class="pvb">${p.excl.length ? `<span>${p.excl.length} own</span>` : ""}${p.hard ? '<span class="h">Hard</span>' : ""}</div>
+      ${mpPackArt(p)}<div class="pvn">${esc(p.name)}</div></div>`).join("")}</div></div>`;
+}
+
+// a pack's card: its bosses (from the enemy handbook), the gifts found in it only, its floors
+async function mpPack(id) {
+  const p = MIRROR.packs.find((x) => x.id === id);
+  if (!p) return;
+  const bossList = () => {
+    const seen = new Set(), out = [];
+    for (const u of p.bossUnits || []) {
+      const e = ENEMIES && ENEMIES.list.find((x) => x.variants.some((v) => v.ids.includes(u)));
+      if (e && !seen.has(e.id) && !e.name.includes("::")) { seen.add(e.id); out.push(`<a href="#/enemies/${u}"><img src="${e.tile || e.face || ""}" alt=""><span><b>${esc(e.name)}</b><small>Enemy handbook ›</small></span></a>`); }
+    }
+    return out.join("") || `<span class="muted">${ENEMIES ? "—" : "Loading…"}</span>`;
+  };
+  const f = p.floors, floors = [f["0"] && ["Normal", "Floor " + f["0"].map((y) => y + 1).join(", ")], f["1"] && ["Hard", "Floor " + f["1"].map((y) => y + 1).join(", ")],
+    f["2"] && ["Hard", "Floors 6–10"], f["3"] && ["Hard", "Floors 11–15"]].filter(Boolean);
+  const tile = (g) => `<div class="mpgift ${mp.want.has(g) ? "on" : ""}" data-pvg="${g}" title="${esc(mpG(g).name)}">${mpG(g).tile ? `<img src="${mpG(g).tile}" loading="lazy">` : ""}${mpG(g).tier ? `<u>${ROMAN[mpG(g).tier - 1] || mpG(g).tier}</u>` : ""}${mpG(g).up ? `<em>${"+".repeat(mpG(g).up.length)}</em>` : ""}</div>`;
+  modal(`<div class="pvx">${mpPackArt(p)}<div>
+    <h2>${esc(p.name)}</h2><div class="muted small">${p.hard ? "Hard pack · " : ""}${p.pool.length + p.excl.length} gifts can drop</div>
+    <h4>Boss</h4><div class="pvboss">${bossList()}</div>
+    <h4>Gifts only in this pack${p.excl.length ? " · " + p.excl.length : ""}</h4>${p.excl.length ? `<div class="pvgs">${p.excl.map(tile).join("")}</div>` : '<div class="muted small">None: everything here drops in other packs too.</div>'}
+    <h4>Floors</h4><div class="pvfl">${floors.map(([m, t]) => `<span>${m}<b>${esc(t)}</b></span>`).join("")}</div></div></div>`);
+  $("#modal-body").onclick = (e) => {
+    const g = e.target.closest("[data-pvg]");
+    if (g) return mpCard(+g.dataset.pvg);
+    if (e.target.closest(".pvboss a")) closeModal();
+  };
+  if (!ENEMIES) {
+    try { ENEMIES = await api("/api/enemies"); } catch { /* the bosses stay unnamed */ }
+    const box = $("#modal-body .pvboss");
+    if (box) box.innerHTML = bossList();
+  }
 }
 
 function mpBuild(r) {
@@ -140,7 +189,7 @@ function mpRoute(r) {
       <div class="pn">${esc(p.name)}</div><div class="mpmini">${gs.slice(0, 10).map((g) => mpGi(g, r.only.has(g) ? "only" : "", false)).join("")}</div></div>`; }).join("")}</div>`;
   const arr = (x) => `<span class="arr">${mp.open === x.f ? "▴" : "▾"}</span>`;
   const row = (x, n, wide) => { const lk = luck(x), more = x.extra.length - lk.length; return `<div class="mprow ${x.take.some((g) => r.only.has(g)) ? "hit" : ""}" data-open="${x.f}"><div class="n ${wide ? "wide" : ""}">${n}</div>${pk(x.p, "pk")}
-      <div><span class="nm">${esc(x.p.name)}</span>${x.lock ? '<span class="pin">PINNED</span>' : ""}<small>${x.take.length} planned${more ? ` · ${more} more can drop` : ""}</small>
+      <div><span class="nm" data-pvp="${x.p.id}" title="About this pack">${esc(x.p.name)}</span>${x.lock ? '<span class="pin">PINNED</span>' : ""}<small>${x.take.length} planned${more ? ` · ${more} more can drop` : ""}</small>
         ${lk.length ? `<small class="lk"><b>!</b> ${lk.length} more pack-only gift${lk.length > 1 ? "s" : ""} over the limit of ${mp.cap} — needs luck</small>` : ""}</div>
       <div class="mpmini">${icons(x)}</div>${arr(x)}</div>${mp.open === x.f ? lane(x) : ""}`; };
   const free = (n, text) => `<div class="mprow free"><div class="n ${String(n).length > 2 ? "wide" : ""}">${n}</div><div>${text}</div></div>`;
@@ -169,15 +218,18 @@ function mpDraw() {
     <div class="mptabs">${[["g", "Gifts"], ["b", `Build${mp.want.size ? ` · ${mp.want.size}` : ""}`], ["f", "Floors"]].map(([k, t]) => `<button class="toggle ${mp.tab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
     <div class="mpcols" data-tab="${mp.tab}">${mpPicker()}${mpBuild(r)}<div>${mpRoute(r)}</div></div>
     ${mp.want.size && mp.tab !== "f" ? `<button class="mpstrip" data-tab="f"><b>${mp.want.size}</b> in the build <span>Route ›</span></button>` : ""}</div>`;
-  $(".mpgifts").scrollTop = top;
+  if ($(".mpgifts")) $(".mpgifts").scrollTop = top;
   const page = $("#mppage");
   page.onclick = (e) => {
-    const t = e.target.closest("[data-info],[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-start],button[data-tab]");
+    const t = e.target.closest("[data-pv],[data-pvf],[data-pvp],[data-info],[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-start],button[data-tab]");
     if (!t) return;
     const d = t.dataset;
     if ("info" in d || ("pick" in d && MP_TAP)) { mpTip(null); return mpCard(+d.g); }
     if ("start" in d) { mpTip(null); return mpStart(); }
-    if (d.m) { mp.mode = +d.m; mp.lock = {}; mp.open = -1; if (mp.only === "deep" && MP_MODES[mp.mode][1] < 11) mp.only = ""; }
+    if (d.pvp) { mpTip(null); return mpPack(+d.pvp); }
+    if (d.pv) mpPv.on = d.pv === "1";
+    else if ("pvf" in d) mpPv.f = d.pvf;
+    else if (d.m) { mp.mode = +d.m; mp.lock = {}; mp.open = -1; if (mp.only === "deep" && MP_MODES[mp.mode][1] < 11) mp.only = ""; }
     else if (d.c) mp.cap = +d.c;
     else if ("k" in d) mp.kw = d.k;
     else if ("o" in d) mp.only = d.o;
@@ -190,8 +242,10 @@ function mpDraw() {
     mpTip(null);
     mpDraw();
   };
-  $("#mpsort").onchange = (e) => { mp.sort = e.target.value; mpDraw(); };
-  $("#mpq").oninput = (e) => { mp.q = e.target.value; mpDraw(); const q = $("#mpq"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); };
+  if ($("#mpsort")) $("#mpsort").onchange = (e) => { mp.sort = e.target.value; mpDraw(); };
+  for (const [id, o] of [["#mpq", mp], ["#pvq", mpPv]]) {
+    if ($(id)) $(id).oninput = (e) => { o.q = e.target.value; mpDraw(); const q = $(id); q.focus(); q.setSelectionRange(q.value.length, q.value.length); };
+  }
   page.oncontextmenu = (e) => { const g = e.target.closest("[data-pick]"); if (g) { e.preventDefault(); mpTip(null); mpCard(+g.dataset.g); } };
   page.onmousemove = (e) => mpTip(e.target.closest("[data-g]"), e);
   page.onmouseleave = () => mpTip(null);

@@ -1494,6 +1494,31 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpstartb img { width: 26px; height: 26px; object-fit: contain; margin: -4px 0; }
 .mpgift.st { outline: 2px solid var(--gold); outline-offset: -2px; }
 .mpgift em { position: absolute; right: 4px; top: 0; font: 16px "LC Bebas", sans-serif; font-style: normal; color: #ffd36b; text-shadow: 0 0 3px #000, 0 0 3px #000; }  /* has upgrades */
+/* Theme packs: the picker's second tab, a pack's card */
+.pvtabs { display: flex; margin: -2px 0 10px; } .pvtabs .toggle { flex: 1; font-size: 16px; padding: 7px 8px 6px; }
+.pvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; max-height: calc(100vh - 330px); min-height: 240px; overflow: auto; margin-top: 10px; padding-right: 4px; }
+.pvc { position: relative; background: #0c0807; border: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; }
+.pvc:hover { border-color: var(--gold); }
+.pvart { position: relative; aspect-ratio: 211 / 384; overflow: hidden; }
+.pvart > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pvart > img.boss { inset: auto; left: 50%; top: 47%; width: 150%; height: auto; transform: translate(-50%, -50%); object-fit: contain; }  /* wider than the card, on the octagon */
+.pvc .pvn { font-size: 12.5px; line-height: 1.25; padding: 5px 6px 6px; }
+.pvc .pvb { position: absolute; top: 4px; left: 4px; display: flex; gap: 3px; flex-wrap: wrap; z-index: 1; }
+.pvc .pvb span { font: 11px/1 "LC Bebas", sans-serif; letter-spacing: .06em; padding: 3px 4px 2px; background: #120d0bcc; border: 1px solid var(--line); color: var(--cream); }
+.pvc .pvb span.h { color: #ff8a7a; border-color: #7a2b22; }
+.mprow .nm[data-pvp] { cursor: pointer; } .mprow .nm[data-pvp]:hover { color: var(--gold); text-decoration: underline; }
+.pvx { width: min(760px, 88vw); max-width: 100%; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; }
+.pvx .pvart { border: 1px solid var(--line); align-self: start; }
+.pvx h2 { margin: 0 30px 2px 0; color: var(--gold); }
+.pvx h4 { margin: 14px 0 6px; }
+.pvfl { display: flex; flex-wrap: wrap; gap: 6px; } .pvfl span { padding: 3px 8px; border: 1px solid var(--line); background: #0c0807; font-size: 12.5px; }
+.pvfl span b { color: var(--gold); font-weight: normal; margin-left: 4px; }
+.pvboss { display: flex; flex-wrap: wrap; gap: 8px; }
+.pvboss a { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border: 1px solid #7a2b22; background: linear-gradient(90deg, rgba(122, 43, 34, .35), #0c0807); text-decoration: none; color: var(--text); }
+.pvboss a:hover { border-color: #ff8a7a; } .pvboss img { width: 64px; height: 64px; object-fit: contain; background: #0c0807; }
+.pvboss b { display: block; color: #ffb3a8; } .pvboss small { color: var(--muted); }
+.pvgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 5px; } .pvgs .mpgift { cursor: pointer; }
+@media (max-width: 700px) { .pvx { grid-template-columns: minmax(0, 1fr); } .pvx .pvart { width: 150px; } .pvgrid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); max-height: none; } }
 .mpgift i { position: absolute; left: 2px; bottom: 2px; font: 11px "LC Bebas", sans-serif; font-style: normal; background: var(--gold); color: #120d0b; padding: 0 4px; letter-spacing: .06em; }
 .mpck.mpstart { border-left: 3px solid var(--gold); padding-left: 8px; }
 .mptag { display: inline-block; font: 12px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .08em; color: #120d0b; background: var(--gold); padding: 3px 5px 2px; margin-left: 6px; vertical-align: 2px; }
