@@ -1489,6 +1489,30 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .uph.flash { animation: uphflash 1s ease-out; }
 @keyframes uphflash { from { background: rgba(255, 138, 0, .55); box-shadow: 0 0 0 3px rgba(255, 138, 0, .55); } }
 .mpcardx h4 { margin: 14px 0 6px; } .mpcardx .mdteam { margin-top: 6px; }
+/* MD planner: starting gift (button, picker mark, build rows, the choice) */
+.mpstartb { display: flex; align-items: center; gap: 8px; } .mpstartb .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
+.mpstartb img { width: 26px; height: 26px; object-fit: contain; margin: -4px 0; }
+.mpgift.st { outline: 2px solid var(--gold); outline-offset: -2px; }
+.mpgift i { position: absolute; left: 2px; bottom: 2px; font: 11px "LC Bebas", sans-serif; font-style: normal; background: var(--gold); color: #120d0b; padding: 0 4px; letter-spacing: .06em; }
+.mpck.mpstart { border-left: 3px solid var(--gold); padding-left: 8px; }
+.mptag { display: inline-block; font: 12px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .08em; color: #120d0b; background: var(--gold); padding: 3px 5px 2px; margin-left: 6px; vertical-align: 2px; }
+.mpsx { width: min(760px, 88vw); max-width: 100%; }
+.mpsx h2 { margin: 0 30px 4px 0; color: var(--gold); }
+.mpskws { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0; }
+.mpskws .toggle { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 6px 6px; font-size: 15px; min-width: 0; }
+.mpskws .toggle .ico { margin: 0; flex: none; }
+.mpsgifts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mpsgift { position: relative; background: #0c0807; border: 1px solid var(--line); padding: 10px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.mpsgift:hover { border-color: #6b4a2c; }
+.mpsgift.on { border-color: var(--gold); box-shadow: inset 0 0 18px rgba(255, 138, 0, .35), 0 0 0 1px var(--gold); }
+.mpsgift.off { opacity: .45; }
+.mpsgift > i { position: absolute; top: 6px; right: 8px; color: var(--gold); font-style: normal; font-weight: 700; }
+.mpsh { display: flex; gap: 10px; align-items: center; } .mpsh img { width: 64px; height: 64px; object-fit: contain; flex: none; }
+.mpsh b { color: var(--gold); font: 17px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.mpsd { font-size: 12.5px; line-height: 1.45; max-height: 11em; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
+.mpspicks { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 4px; } .mpspicks small span + span::before { content: " · "; }
+.mpsfoot { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; } .mpsfoot .grow { flex: 1; }
+@media (max-width: 700px) { .mpskws { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mpsgifts { grid-template-columns: minmax(0, 1fr); } .mpsd { max-height: none; } }
 .mpcrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; } .mpcrow > b { color: var(--muted); }
 .mpcchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); background: #0c0807; cursor: pointer; font-size: 13px; }
 .mpcchip:hover { border-color: var(--gold); } .mpcchip img { width: 26px; height: 26px; object-fit: contain; }

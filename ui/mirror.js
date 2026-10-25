@@ -3,7 +3,7 @@
 let MIRROR = null;
 const MP_KEEP = "mirror";
 const MP_MODES = [["Normal", 5, "0"], ["Hard", 5, "1"], ["Hard", 10, "2"], ["Hard", 15, "3"]];  // (name, floors, the game's typeIndex)
-const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g" };
+const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g", start: [], picks: 1 };
 // a keyword chip's picture: the status icon, or the damage type's for Hit / Penetrate / Slash (the name on hover)
 const MP_ATK = { Hit: "Blunt", Penetrate: "Pierce", Slash: "Slash" };
 const mpKwIco = (k) => (MP_ATK[k] ? ico(`atk_${MP_ATK[k]}`, "s22", mpKw(k), mpKw(k)) : ico(`st_${k}`, "s22", mpKw(k), mpKw(k)));
@@ -11,8 +11,8 @@ const mpKwIco = (k) => (MP_ATK[k] ? ico(`atk_${MP_ATK[k]}`, "s22", mpKw(k), mpKw
 const MP_KW_ORDER = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath", "Charge", "Slash", "Penetrate", "Hit"];
 const mpKwRank = (k) => { const i = MP_KW_ORDER.indexOf(k); return i < 0 ? 50 : i; };
 const mpKwCmp = (a, b) => (!a - !b) || mpKwRank(a) - mpKwRank(b) || mpKw(a).localeCompare(mpKw(b));
-(() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {} }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
-const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want] })); } catch { /* not kept */ } };
+(() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {}, start: s.start || [], picks: s.picks || 1 }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
+const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want], start: mp.start, picks: mp.picks })); } catch { /* not kept */ } };
 const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, tile: "", kw: "", tier: 0, desc: "" };
 const mpGi = (id, cls = "", info = true) => (mpG(id).tile ? `<img class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""} src="${mpG(id).tile}" loading="lazy">` : `<i class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""}></i>`);
 const MP_TAP = matchMedia("(hover: none)").matches;  // phones: a tap on a picker tile opens the gift's card
@@ -30,6 +30,7 @@ async function mpLoad() {
   const deep = (p) => Object.keys(p.floors).every((d) => d === "3");
   m.deep = new Set(Object.keys(m.gifts).map(Number).filter((g) => (m.gifts[g].min || 0) >= 10 || (m.excl.has(g) && m.packs.filter((p) => p.excl.includes(g)).every(deep))));
   for (const g of [...mp.want]) if (!m.gifts[g]) mp.want.delete(g);
+  mp.start = mp.start.filter((g) => m.gifts[g]);
   return (MIRROR = m);
 }
 routes.mirror = async () => {
@@ -46,7 +47,7 @@ routes.mirror = async () => {
 function mpPlan() {
   const N = MP_MODES[mp.mode][1], floors = [...Array(N).keys()], packs = MIRROR.packs.filter((p) => floors.some((f) => mpAllowed(p, f)));
   const need = new Set(), fus = [];
-  const add = (id) => { if (need.has(id)) return; need.add(id); const r = MIRROR.fus[id]; if (r) { fus.push([id, r[0]]); r[0].forEach(add); } };
+  const add = (id) => { if (need.has(id) || mp.start.includes(id)) return; need.add(id); const r = MIRROR.fus[id]; if (r) { fus.push([id, r[0]]); r[0].forEach(add); } };
   mp.want.forEach(add);
   const raw = [...need].filter((g) => !MIRROR.fus[g] && !mpG(g).how);
   const only = new Set(raw.filter((g) => packs.some((p) => p.excl.includes(g))));
@@ -110,12 +111,13 @@ function mpPicker() {
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}${N > 10 ? tg(mp.only === "deep", 'data-o="deep" title="Gifts found on floors 11–15 only"', "Floors 11–15") : ""}</div>
     <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}" title="${esc(mpKw(k))}"`, mpKwIco(k), "kwi")).join("")}${tg(mp.kw === "-", 'data-k="-" title="Gifts without a keyword"', "No keyword")}</div>
     <div class="mpchips"><select id="mpsort">${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => `<option value="${k}" ${mp.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select><span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
-    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""}" data-g="${id}" data-pick>${g.tile ? `<img src="${g.tile}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}</div>`).join("")}</div></div>`;
+    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""} ${mp.start.includes(+id) ? "st" : ""}" data-g="${id}" data-pick>${g.tile ? `<img src="${g.tile}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}${mp.start.includes(+id) ? "<i>START</i>" : ""}</div>`).join("")}</div></div>`;
 }
 
 function mpBuild(r) {
   const line = (g) => {
     const s = r.src[g];
+    if (mp.start.includes(g)) return '<small class="ok">Starting gift — owned from the start, no floor needed</small>';
     if (mpG(g).how) return `<small class="luck">${esc(mpG(g).how)}</small>`;
     if (s && s.luck) return `<small class="luck">${mpFloor(s.f)} · ${esc(s.p.name)} — over ${mp.cap} from one pack, needs luck</small>`;
     if (s) return `<small class="${s.only ? "gold" : "ok"}">${mpFloor(s.f)} · ${esc(s.p.name)}${s.only ? " — only there" : ""}</small>`;
@@ -125,8 +127,9 @@ function mpBuild(r) {
   const item = (g) => { const f = r.fus.find(([res]) => res === g); return `<div class="mpck">${mpGi(g)}<div><b data-g="${g}" data-info>${esc(mpG(g).name)}</b>${f ? `<small class="fz">Fusion of ${f[1].length} gifts</small>` : line(g)}${mdTeamLine(g)}</div>
       ${f ? `<div class="parts">${f[1].map((p) => `<div>${mpGi(p)}<span><a data-g="${p}" data-info>${esc(mpG(p).name)}</a><br>${MIRROR.fus[p] ? '<small class="fz">a fusion itself — below</small>' : line(p)}</span></div>`).join("")}</div>` : ""}</div>`; };
   const extra = r.fus.map(([res]) => res).filter((g) => !mp.want.has(g));
+  const start = mp.start.map((g) => `<div class="mpck mpstart">${mpGi(g)}<div><b data-g="${g}" data-info>${esc(mpG(g).name)}</b><span class="mptag">START</span>${line(g)}</div></div>`).join("");
   return `<div class="card mpcard"><div class="row"><span class="mpcap">Your build<small>${mp.want.size} gifts</small></span><span class="grow"></span>${mp.want.size ? "<button data-clear>Clear all</button>" : ""}</div>
-    ${[...mp.want, ...extra].map(item).join("") || '<div class="muted" style="margin:12px 0 4px">Pick gifts on the left — click one again to drop it.</div>'}</div>`;
+    ${start}${[...mp.want, ...extra].filter((g) => !mp.start.includes(g)).map(item).join("") || (start ? "" : '<div class="muted" style="margin:12px 0 4px">Pick gifts on the left — click one again to drop it.</div>')}</div>`;
 }
 
 function mpRoute(r) {
@@ -160,17 +163,20 @@ function mpDraw() {
   mpSave();
   main.innerHTML = `<div id="mppage"><h1>Mirror Dungeon planner</h1><div class="sub">Pick the E.G.O gifts you want — the planner says which theme packs to take and on which floors. Gold frame: a gift found in certain packs only.</div>
     <div class="mpbar"><div class="seg">${MP_MODES.map(([n, f, t], i) => (MIRROR.modes[t] ? `<button data-m="${i}" class="toggle ${mp.mode === i ? "on" : ""}">${n} · ${f} floors</button>` : "")).join("")}</div>
-      <span><label>Gifts counted from one pack</label><span class="seg">${[2, 3, 4, 0].map((c) => `<button data-c="${c}" class="toggle ${mp.cap === c ? "on" : ""}">${c || "All"}</button>`).join("")}</span></span></div>
+      <span><label>Gifts counted from one pack</label><span class="seg">${[2, 3, 4, 0].map((c) => `<button data-c="${c}" class="toggle ${mp.cap === c ? "on" : ""}">${c || "All"}</button>`).join("")}</span></span>
+      ${(MIRROR.start || {}).pools && MIRROR.start.pools.length ? `<span class="mpstartb"><label>Starting gift</label><button class="toggle ${mp.start.length ? "on" : ""}" data-start>${mp.start.length
+        ? mp.start.map((g) => (mpG(g).tile ? `<img src="${mpG(g).tile}" alt="">` : "")).join("") + (mp.start.length === 1 ? `<span>${esc(mpG(mp.start[0]).name)}</span>` : "") : "Choose…"}</button></span>` : ""}</div>
     <div class="mptabs">${[["g", "Gifts"], ["b", `Build${mp.want.size ? ` · ${mp.want.size}` : ""}`], ["f", "Floors"]].map(([k, t]) => `<button class="toggle ${mp.tab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
     <div class="mpcols" data-tab="${mp.tab}">${mpPicker()}${mpBuild(r)}<div>${mpRoute(r)}</div></div>
     ${mp.want.size && mp.tab !== "f" ? `<button class="mpstrip" data-tab="f"><b>${mp.want.size}</b> in the build <span>Route ›</span></button>` : ""}</div>`;
   $(".mpgifts").scrollTop = top;
   const page = $("#mppage");
   page.onclick = (e) => {
-    const t = e.target.closest("[data-info],[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],button[data-tab]");
+    const t = e.target.closest("[data-info],[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-start],button[data-tab]");
     if (!t) return;
     const d = t.dataset;
     if ("info" in d || ("pick" in d && MP_TAP)) { mpTip(null); return mpCard(+d.g); }
+    if ("start" in d) { mpTip(null); return mpStart(); }
     if (d.m) { mp.mode = +d.m; mp.lock = {}; mp.open = -1; if (mp.only === "deep" && MP_MODES[mp.mode][1] < 11) mp.only = ""; }
     else if (d.c) mp.cap = +d.c;
     else if ("k" in d) mp.kw = d.k;
@@ -189,6 +195,36 @@ function mpDraw() {
   page.oncontextmenu = (e) => { const g = e.target.closest("[data-pick]"); if (g) { e.preventDefault(); mpTip(null); mpCard(+g.dataset.g); } };
   page.onmousemove = (e) => mpTip(e.target.closest("[data-g]"), e);
   page.onmouseleave = () => mpTip(null);
+}
+
+// the game's "Starting E.G.O Gift Choice": a category, then 1 of its gifts (+1 for each Starlight bonus)
+function mpStart() {
+  const S = MIRROR.start, max = 1 + S.bonus.length;
+  let kw = (S.pools.find(([, p]) => p.includes(mp.start[0])) || S.pools[0])[0], sel = [...mp.start], picks = Math.min(mp.picks, max);
+  const draw = () => {
+    const pool = S.pools.find(([k]) => k === kw)[1];
+    modal(`<div class="mpsx"><h2>Starting E.G.O Gift</h2><div class="muted small">As in the game: a category, then gifts of it. The planner counts them as owned: no floor is spent on them.</div>
+      <div class="mpskws">${S.pools.map(([k]) => `<button class="toggle ${k === kw ? "on" : ""}" data-skw="${esc(k)}">${mpKwIco(k)}${esc(mpKw(k))}</button>`).join("")}</div>
+      <div class="mpsgifts">${pool.map((g) => { const on = sel.includes(g); return `<div class="mpsgift ${on ? "on" : ""} ${!on && picks > 1 && sel.length >= picks ? "off" : ""}" data-sg="${g}">${on ? "<i>✓</i>" : ""}
+        <div class="mpsh">${mpG(g).tile ? `<img src="${mpG(g).tile}" alt="">` : ""}<div><b>${esc(mpG(g).name)}</b><div class="muted small">${mpG(g).tier ? "Tier " + mpG(g).tier : ""}</div></div></div><div class="mpsd">${fmtDesc(mpG(g).desc)}</div></div>`; }).join("")}</div>
+      ${max > 1 ? `<div class="mpspicks"><label>Gifts to choose</label><span class="seg">${[...Array(max).keys()].map((i) => `<button class="toggle ${picks === i + 1 ? "on" : ""}" data-spk="${i + 1}">${i + 1}</button>`).join("")}</span>
+        <small class="muted">${S.bonus.map((b) => `<span>+1 · ${esc(b.name)}</span>`).join("")}</small></div>` : ""}
+      <div class="mpsfoot"><button data-snone>No starting gift</button><span class="grow"></span><span class="muted small">${sel.length} / ${picks}</span><button class="primary" data-sok>Done</button></div></div>`);
+  };
+  closeModal.then = () => ($("#modal-body").onclick = null);
+  $("#modal-body").onclick = (e) => {
+    const k = e.target.closest("[data-skw]"), g = e.target.closest("[data-sg]"), pk = e.target.closest("[data-spk]");
+    if (k) { if (k.dataset.skw !== kw) { kw = k.dataset.skw; sel = []; } return draw(); }
+    if (pk) { picks = +pk.dataset.spk; sel = sel.slice(0, picks); return draw(); }
+    if (g && !e.target.closest(".kw[data-kw]")) {
+      const id = +g.dataset.sg;
+      sel = sel.includes(id) ? sel.filter((x) => x !== id) : picks === 1 ? [id] : sel.length < picks ? [...sel, id] : sel;
+      return draw();
+    }
+    const done = e.target.closest("[data-sok]") ? sel : e.target.closest("[data-snone]") ? [] : null;
+    if (done) { mp.start = done; mp.picks = picks; closeModal(); if (location.hash.startsWith("#/mirror")) mpDraw(); }
+  };
+  draw();
 }
 
 // gift tooltip

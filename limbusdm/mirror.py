@@ -5,7 +5,7 @@ import re
 
 from .units import _load
 
-VERSION = 6
+VERSION = 7
 SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gluttony", "AZURE": "Gloom", "INDIGO": "Pride", "VIOLET": "Envy"}
 
 
@@ -79,7 +79,21 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
         for d in (t.get("list") if isinstance(t, dict) else None) or []:
             if d.get("typeIndex") is not None:
                 modes[str(d["typeIndex"])] = len(d.get("floors") or d.get("basicEnemyLevelPerFloor") or [])
-    return {"packs": packs, "gifts": gifts, "fus": fus, "modes": modes}
+    return {"packs": packs, "gifts": gifts, "fus": fus, "modes": modes, "start": _start(tables, loc_dir, gifts)}
+
+
+def _start(tables: dict, loc_dir: str, gifts: dict) -> dict:
+    """The game's "Starting E.G.O Gift Choice": {pools: [[keyword, [ids]]], bonus: [{name}]} (each bonus = one more pick)."""
+    common = [t for _, t in sorted((tables.get("mirror-dungeon-common-data") or {}).items()) if isinstance(t, dict) and t.get("startEgoGiftPools")]
+    pools = [[p["keyword"], [g for g in p.get("normalpool") or [] if g in gifts]] for p in (common[-1]["startEgoGiftPools"] if common else []) if p.get("keyword")]
+    ui = _load(loc_dir, r"EN_MirrorDungeonUI.*\.json$")
+    bonus = {}
+    for _, t in sorted((tables.get("mirrordungeon-start-buffs") or {}).items()):
+        for d in (t.get("list") if isinstance(t, dict) else None) or []:
+            for b in d.get("buffs") or []:
+                if any(e.get("type") == "ADDITIONAL_START_EGO_GIFT_SELECT" for e in b.get("effects") or []) and b.get("baseId") not in bonus:
+                    bonus[b.get("baseId")] = (ui.get(b.get("localizeId")) or {}).get("content") or str(b.get("baseId"))
+    return {"pools": [p for p in pools if p[1]], "bonus": [{"name": n} for _, n in sorted(bonus.items())]}
 
 
 def _rewards(o) -> set:
