@@ -155,5 +155,6 @@
 "floor(",
 "Vulnerable",
 "deal +($1)% damage",
-"gains Coin Power +$1"
+"gains Coin Power +$1",
+"Discord ↗"
 ]

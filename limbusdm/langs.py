@@ -134,7 +134,7 @@ def sources(svc) -> list[dict]:
     for code, prefix, lang in OFFICIAL:
         d = os.path.join(loc, code)
         if os.path.isdir(d):
-            out.append({"id": code, "name": "Official", "lang": lang, "dir": d, "prefix": prefix, "version": "", "authors": [], "link": "", "license": {}})
+            out.append({"id": code, "name": "Official", "lang": lang, "dir": d, "prefix": prefix, "version": "", "authors": [], "link": "", "license": {}, "discord": ""})
             seen.add(code)
     for root in [os.path.join(svc.data_dir, "lang")]:
         if not os.path.isdir(root):
@@ -154,17 +154,19 @@ def sources(svc) -> list[dict]:
             seen.add(name)
             out.append({"id": name, "name": meta.get("name") or name, "lang": meta.get("lang") or _lang_of(name), "dir": d,
                         "prefix": "", "version": str(meta.get("version") or ""), "authors": meta.get("authors") or [],
-                        "link": meta.get("link") or "", "license": meta.get("license") or {}})
+                        "link": meta.get("link") or "", "license": meta.get("license") or {},
+                        "discord": meta.get("discord") or ""})
     for e in published(svc).get("langs") or []:
         if not isinstance(e, dict) or not SAFE.match(str(e.get("id", ""))) or not SAFE.match(str(e.get("sig", ""))):
             continue
         mine = next((s for s in out if s["id"] == e["id"]), None)
         if mine:
             mine["pub"] = e
+            mine["discord"] = mine["discord"] or e.get("discord") or ""
         else:
             out.append({"id": e["id"], "name": e.get("name") or e["id"], "lang": e.get("lang") or _lang_of(e["id"]), "dir": None,
                         "prefix": None, "version": str(e.get("version") or ""), "authors": e.get("authors") or [],
-                        "link": e.get("link") or "", "license": e.get("license") or {}, "pub": e})
+                        "link": e.get("link") or "", "license": e.get("license") or {}, "discord": e.get("discord") or "", "pub": e})
     for s in out:
         s["label"] = NATIVE.get(s["lang"], s["lang"])
     return out
@@ -517,7 +519,7 @@ def listing(svc) -> dict:
                 pass
         if cover is None and s.get("pub"):
             cover = s["pub"].get("cover")
-        out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link", "license")}
+        out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link", "license", "discord")}
                    | {"cover": cover, "fonts": _fonts(svc, s, modes.get(s["id"])), "tables": {g: links.lang_table(s["id"], g) for g in GROUPS}})
     return {"langs": out}
 
