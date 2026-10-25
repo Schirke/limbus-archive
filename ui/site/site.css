@@ -188,31 +188,42 @@ body.site #fxnote { flex-basis: 100%; }
 .hsect h2 { margin: 0; font-size: 30px; line-height: 1; }
 .hsect::after { content: ""; flex: 1; height: 12px; background: var(--k-slant) left / 268px 100% no-repeat; opacity: .22; }
 .hsect a { order: 2; font: 15px "LC Bebas", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
-/* the cards: a recording of the page, an art or a clip on each; groups "Look it up / Plan / Play" */
-.hgrp { margin: 30px 0 12px; } .hgrp h2 { font-size: 26px; }
-.hgrp .hsub { order: 1; color: var(--muted); font-size: 13px; white-space: nowrap; }
-.hgrp::after { order: 2; }
-.hx { margin-top: 26px; }
-.hxtop { display: grid; grid-template-columns: 1.35fr 1fr; gap: 12px; }
-.hxrow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.hxc { position: relative; overflow: hidden; display: block; min-height: 190px; border: 1px solid var(--line); background: #0c0807; color: var(--text); text-decoration: none; }
-.hxtop .hxc { min-height: 330px; }
-.hxc:hover { border-color: var(--gold); } .hxc:hover .hxbg { transform: scale(1.04); }
-.hxc .hxbg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; transition: transform .5s; }
-.hxc video.hxbg { background: #000; }
-.hxc::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 5, 4, .05) 30%, rgba(8, 5, 4, .92) 82%); pointer-events: none; }
-.hxt { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 2; }
-.hxt b { display: block; font: 24px/1.05 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; font-weight: normal; color: var(--gold); }
-.hxtop .hxt b { font-size: 36px; }
-.hxt span { display: block; margin-top: 4px; font-size: 13.5px; line-height: 1.4; color: #eadfcd; max-width: 46ch; }
-.hxk { position: absolute; top: 12px; left: 14px; z-index: 2; font: 13px "LC Bebas", sans-serif; letter-spacing: .1em; color: #fff3d0; background: rgba(18, 13, 11, .75); border: 1px solid var(--line); padding: 4px 8px 3px; max-width: calc(100% - 28px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hxk i { font-style: normal; color: var(--gold); }
-.hxnum { position: absolute; top: 16px; right: 18px; z-index: 2; font: 50px/1 "LC Bebas", sans-serif; color: #fff3d0; text-shadow: 0 0 16px var(--hot); }
-.hxnum small { font-size: 18px; color: var(--gold); margin-left: 4px; }
-.hxlive { position: absolute; left: 14px; top: 12px; z-index: 2; display: flex; align-items: center; gap: 7px; max-width: calc(100% - 28px); font-size: 12.5px; color: #fff; background: rgba(10, 6, 5, .75); border: 1px solid var(--line); padding: 3px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hxlive i { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #ff3b30; animation: hxpulse 1.2s infinite; }
-@keyframes hxpulse { 50% { opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { .hxlive i { animation: none; } .hxc:hover .hxbg { transform: none; } }
+/* the cards: 4 big ones (game art and footage), the rest as compact tiles */
+.h2 { margin-top: 26px; }
+.h2grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 200px; gap: 12px; }
+.h2c { position: relative; overflow: hidden; display: block; border: 1px solid var(--line); background: #0c0807; color: var(--text); text-decoration: none; }
+.h2c:hover { border-color: var(--gold); }
+.h2c > .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform .6s; }
+.h2c:hover > .bg { transform: scale(1.03); }
+.h2c video.bg { background: #000; }
+.h2c::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 55%; background: linear-gradient(180deg, transparent, rgba(8, 5, 4, .88)); pointer-events: none; }
+.h2c .t { position: absolute; left: 18px; right: 18px; bottom: 14px; z-index: 2; }
+.h2c .t b { display: block; font: 30px/1 "LC Bebas", sans-serif; letter-spacing: .06em; text-transform: uppercase; font-weight: normal; color: #fff3d0; text-shadow: 0 2px 10px #000; }
+.h2c .t span { display: block; margin-top: 5px; font-size: 13.5px; line-height: 1.4; color: #e6d9c4; max-width: 44ch; text-shadow: 0 1px 6px #000; }
+.h2c .k { position: absolute; top: 12px; left: 14px; z-index: 2; max-width: calc(100% - 28px); font: 13px "LC Bebas", sans-serif; letter-spacing: .1em; color: #fff3d0; background: rgba(18, 13, 11, .7); border: 1px solid var(--line); padding: 4px 8px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h2c .k i { font-style: normal; color: var(--gold); }
+.h2anim { grid-column: span 2; grid-row: span 2; } .h2anim .t b { font-size: 44px; }
+.h2db { grid-row: span 2; } .h2db > .bg { object-position: 50% 15%; }
+.h2md { background: radial-gradient(circle at 50% 35%, #3a2412, #0c0807 70%); }
+.h2md .fan { position: absolute; left: 0; right: 0; top: 8px; height: 82%; display: flex; justify-content: center; align-items: flex-start; }
+.h2md .fan img { height: 100%; width: auto; margin: 0 -14px; filter: drop-shadow(0 6px 10px #000); transition: transform .3s; }
+.h2md .fan img:nth-child(1) { transform: rotate(-14deg) translateY(14px); } .h2md .fan img:nth-child(2) { transform: rotate(-5deg); }
+.h2md .fan img:nth-child(3) { transform: rotate(5deg); } .h2md .fan img:nth-child(4) { transform: rotate(14deg) translateY(14px); }
+.h2md:hover .fan img:nth-child(1) { transform: rotate(-18deg) translate(-8px, 14px); } .h2md:hover .fan img:nth-child(4) { transform: rotate(18deg) translate(8px, 14px); }
+.h2more { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 8px; margin-top: 12px; }
+.h2t { display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 10px 14px 10px 10px; border: 1px solid var(--line); background: #120d0b; color: var(--text); text-decoration: none; }
+.h2t:hover { border-color: var(--gold); background: #1a120e; }
+.h2t .p { position: relative; width: 64px; height: 64px; flex: none; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); background: radial-gradient(circle at 50% 40%, #2c1c12, #0c0807); }
+.h2t .p > img.cov { width: 100%; height: 100%; object-fit: cover; }
+.h2t .p > img.fit { width: 100%; height: 100%; object-fit: contain; transform: scale(1.7) translateY(4%); }
+.h2t .p svg { width: 34px; height: 34px; stroke: var(--gold); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.h2t .p .ics { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; } .h2t .p .ics img { width: 26px; height: 26px; }
+.h2t .p .stack { display: flex; } .h2t .p .stack img { width: 30px; height: 44px; object-fit: cover; object-position: 50% 10%; margin: 0 -4px; border: 1px solid #0c0807; }
+.h2t .p .live { position: absolute; top: 4px; left: 4px; width: 9px; height: 9px; border-radius: 50%; background: #ff3b30; box-shadow: 0 0 0 2px #0c0807; }
+.h2t .p .n { position: absolute; right: 3px; bottom: 1px; font: 16px "LC Bebas", sans-serif; color: #fff3d0; text-shadow: 0 0 4px #000; }
+.h2t b { display: block; font: 20px/1.05 "LC Bebas", sans-serif; letter-spacing: .06em; text-transform: uppercase; font-weight: normal; color: var(--gold); }
+.h2t span { display: block; margin-top: 3px; font-size: 13px; line-height: 1.35; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .h2c:hover > .bg, .h2md .fan img { transition: none; } }
 .hids { display: grid; grid-template-columns: repeat(8, 1fr); gap: 16px; }
 @media (max-width: 1500px) { .hids { grid-template-columns: repeat(4, 1fr); } .hname { font-size: 76px; } }
 @media (max-width: 1100px) {
@@ -220,7 +231,7 @@ body.site #fxnote { flex-basis: 100%; }
   .hhero::before { background: linear-gradient(rgba(13, 10, 9, .8), rgba(13, 10, 9, .9)); }
   .hlast { width: auto; margin: 0; }
   .hwho { right: 28px; }
-  .hxrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .h2grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .hhero { margin: -22px -28px 0; padding: 22px 18px 84px; }
@@ -230,9 +241,9 @@ body.site #fxnote { flex-basis: 100%; }
   /* a shorter banner: the name, one button, the latest patch */
   .hhero { padding-bottom: 18px; } .hsay p, .hgo .hbtn, .hsay .hkick, .hprev, .hwho { display: none; }
   .hname { font-size: 46px; line-height: .95; } .hlast { margin-top: 4px; }
-  .hxtop { grid-template-columns: minmax(0, 1fr); } .hxtop .hxc { min-height: 230px; } .hxtop .hxt b { font-size: 28px; }
-  .hxrow { gap: 8px; } .hxc { min-height: 150px; } .hxt { left: 10px; right: 10px; bottom: 10px; } .hxt b { font-size: 19px; } .hxt span { display: none; }
-  .hxnum { font-size: 34px; } .hgrp .hsub { display: none; }
+  .h2grid { grid-auto-rows: 150px; gap: 8px; } .h2anim .t b { font-size: 32px; } .h2c .t b { font-size: 22px; } .h2c .t span { display: none; }
+  .h2anim .t span { display: block; font-size: 12.5px; } .h2c .t { left: 12px; right: 12px; bottom: 10px; } .h2md .fan img { margin: 0 -18px; }
+  .h2more { grid-template-columns: minmax(0, 1fr); } .h2t { min-height: 70px; } .h2t .p { width: 52px; height: 52px; }
 }
 /* section text for search engines */
 .seo { max-width: 1100px; margin: 0 auto; line-height: 1.5; }

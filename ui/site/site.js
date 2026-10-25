@@ -29,30 +29,27 @@
       () => prompt("Link to this card:", url));
   });
   document.querySelector("#top .brand").setAttribute("href", "#/home");
-  // the Animations card's clips (ui/site/home/v/anim<i>.mp4, cut from the site's renders): [kind, id, tag]
-  const HOME_ANIM = [["ego", 20606, "Awakening"], ["ego", 20606, "Corrosion"], ["id", 10105, "Skill 3"], ["enemy", 1522, ""], ["ego", 20203, "Awakening"],
-    ["ego", 20203, "Corrosion"], ["id", 10607, "Skill 3"], ["ego", 20102, "Awakening"], ["ego", 20102, "Corrosion"], ["enemy", 1503, ""], ["ego", 20302, "Awakening"],
-    ["ego", 20302, "Corrosion"], ["id", 11008, "Skill 3"], ["ego", 21001, ""]];
-  const HOME_FOES = { 1522: "Jeanne Sartre, the Sartorial Tailor", 1503: "Blackthread of the Elden Sea" };
-  const HOME_BIG = [["survivors", "Limbus Survivors"], ["sing", "Singing Machine"], ["slice", "Muga Slice"]];
+  // the Animations card's clips (ui/site/home/v/anim<i>.mp4, bright ones cut from the site's renders): [kind, id, tag]
+  const HOME_ANIM = [["ego", 20905, "Awakening"], ["ego", 20905, "Corrosion"], ["id", 11009, "Skill 3"], ["ego", 21008, "Awakening"], ["ego", 21008, "Corrosion"],
+    ["enemy", 8999, ""], ["ego", 20503, "Awakening"], ["ego", 20503, "Corrosion"], ["id", 10611, "Skill 3"], ["ego", 20909, "Awakening"], ["ego", 20909, "Corrosion"],
+    ["enemy", 8174, ""], ["ego", 20608, "Awakening"], ["ego", 20608, "Corrosion"]];
+  const HOME_FOES = { 8999: "Vergilius", 8174: "Cathy" };
+  const HOME_BIG = [["survivors", "Limbus Survivors"], ["slice", "Muga Slice"], ["sing", "Singing Machine"]];
+  const HOME_PACKS = [1402, 1202, 1406, 1317];  // v/pack<id>.webp: theme pack cards as the game draws them
   const HV = "/ui/site/home/v/";
   const homeMotion = () => !matchMedia("(prefers-reduced-motion: reduce)").matches && !(navigator.connection && navigator.connection.saveData);
-  // the cards' videos play only while on screen (on a phone the first two of them), from a still frame until then
+  // the big cards' videos play only while on screen, from a still frame until then
   let homeSeen = null;
   function homeVideos(root) {
     if (homeSeen) homeSeen.disconnect();
     if (!homeMotion() || !("IntersectionObserver" in window)) return;
-    const vis = new Set();
     homeSeen = new IntersectionObserver((es) => {
-      for (const e of es) if (e.isIntersecting) vis.add(e.target); else vis.delete(e.target);
-      const max = matchMedia("(max-width: 700px)").matches ? 2 : 8;
-      const on = [...root.querySelectorAll("video.hxbg")].filter((v) => vis.has(v)).slice(0, max);
-      for (const v of root.querySelectorAll("video.hxbg")) {
-        if (on.includes(v)) { if (!v.getAttribute("src")) v.src = v.dataset.src; if (v.paused) v.play().catch(() => { /* shown as its still frame */ }); }
+      for (const { target: v, isIntersecting: on } of es) {
+        if (on) { if (!v.getAttribute("src")) v.src = v.dataset.src; v.play().catch(() => { /* shown as its still frame */ }); }
         else if (!v.paused) v.pause();
       }
     }, { threshold: 0.4 });
-    root.querySelectorAll("video.hxbg").forEach((v) => homeSeen.observe(v));
+    root.querySelectorAll(".h2 video").forEach((v) => homeSeen.observe(v));
   }
   let homeTimer = 0;
   // report counts without code / paths / other
@@ -63,36 +60,42 @@
     const name = u ? u.name || u.title : HOME_FOES[id] || "";
     return `<span>${kind === "ego" ? "E.G.O" : kind === "id" ? "Identity" : "Enemy"}</span> <i>${esc(name)}</i>${tag ? ` · <span>${tag}</span>` : ""}`;
   };
+  const HOME_SVG = {
+    sounds: '<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/>',
+    games: '<rect x="3" y="7" width="18" height="11" rx="3"/><path d="M8 11v4M6 13h4"/><circle cx="15.5" cy="12" r=".8"/><circle cx="17.5" cy="14.5" r=".8"/>',
+    calc: '<path d="M14.5 3.5l6 6-11 11h-6v-6z"/><path d="M12 6l6 6"/>',
+    growth: '<path d="M4 20h16"/><path d="M6 16l4-4 3 3 6-7"/><path d="M15 8h4v4"/>',
+  };
   let homeAt = 0, homeBigAt = 0;
+  // 4 big cards (game art and footage, no picture twice on the page), the rest as compact tiles
   function homeCards(ids, games) {
-    const art = (i) => (ids[i] && ids[i].pics.art) || "";
-    const card = (r, title, text, inner) => (OPEN.has(r) ? `<a class="hxc" href="#/${r}">${inner}<div class="hxt"><b>${title}</b><span>${text}</span></div></a>` : "");
-    const img = (src) => (src ? `<img class="hxbg" src="${src}" alt="" loading="lazy">` : "");
-    const vid = (name, pos = "50% 50%", loop = true, id = "", poster = name) => `<video class="hxbg" ${id ? `id="${id}"` : ""} data-src="${HV}${name}.mp4" poster="${HV}${poster}.webp" style="object-position:${pos}" muted playsinline preload="none"${loop ? " loop" : ""}></video>`;
-    const num = (big, small) => `<span class="hxnum">${big}<small>${small}</small></span>`;
-    const grp = (title, sub, cards) => (cards.trim() ? `<div class="hsect hgrp"><h2>${title}</h2><span class="hsub">${sub}</span></div><div class="hxrow">${cards}</div>` : "");
+    const older = ids.slice(8).filter((x) => x.pics && x.pics.art);  // (the 8 newest are in the banner and the row below)
+    const pick = older.find((x) => x.pics.art2) || older[0], team = older.slice(6, 9);
+    const big = (r, cls, inner, title, text = "") => (OPEN.has(r) ? `<a class="h2c ${cls}" href="#/${r}">${inner}<div class="t"><b>${title}</b>${text ? `<span>${text}</span>` : ""}</div></a>` : "");
+    const tile = (r, pic, title, text) => (OPEN.has(r) ? `<a class="h2t" href="#/${r}"><div class="p">${pic}</div><div><b>${title}</b><span>${text}</span></div></a>` : "");
+    const vid = (id, name, poster = name) => `<video class="bg" id="${id}" data-src="${HV}${name}.mp4" poster="${HV}${poster}.webp" muted playsinline preload="none"></video>`;
+    const svg = (k) => `<svg viewBox="0 0 24 24">${HOME_SVG[k]}</svg>`;
     homeAt %= HOME_ANIM.length;
-    return `<div class="hx"><div class="hxtop">
-        ${card("anim", "Animations", "Every skill and E.G.O with the game's own effects. Watch, slow down, save as a video.",
-          vid("anim" + homeAt, "50% 50%", false, "hxanim", "anim0") + `<span class="hxk" id="hxanimk">${homeAnimLabel(HOME_ANIM[homeAt])}</span>`)}
-        ${card("db", "Identities & E.G.O", "Skills, coins, passives and the art of every one — and what changed with each patch.", img(art(0)) + (ids[0] ? `<span class="hxk"><span>New</span> <i>${esc(ids[0].title)}</i></span>` : ""))}
+    return `<div class="h2"><div class="h2grid">
+        ${big("anim", "h2anim", vid("hxanim", "anim" + homeAt, "anim0") + `<span class="k" id="hxanimk">${homeAnimLabel(HOME_ANIM[homeAt])}</span>`,
+          "Animations", "Every skill and E.G.O with the game's own effects. Watch, slow down, save as a video.")}
+        ${big("db", "h2db", pick ? `<img class="bg" src="${pick.pics.art2 || pick.pics.art}" alt="" loading="lazy"><span class="k"><span>Identity</span> <i>${esc(pick.title)}</i></span>` : "",
+          "Identities & E.G.O", "Skills, coins, passives and art of every one.")}
+        ${big("biggames", "h2big", vid("hxbig", HOME_BIG[homeBigAt][0]) + `<span class="k notr" id="hxbigk"><i>${HOME_BIG[homeBigAt][1]}</i></span>`, "Big games")}
+        ${big("mirror", "h2md", `<div class="fan">${HOME_PACKS.map((id) => `<img src="${HV}pack${id}.webp" alt="" loading="lazy">`).join("")}</div>`, "MD planner")}
       </div>
-      ${grp("Look it up", "everything from the game's files",
-        card("enemies", "Enemies", "Bosses and Abnormalities: skills, resistances, battle look.", vid("enemies", "20% 30%"))
-        + card("stages", "Story map", "Every stage of every Canto: who stands there and what waits.", img(HV + "stages.webp"))
-        + card("sounds", "Sounds", "Voice lines, music and battle sounds — search and listen.", img(art(3)))
-        + card("buffs", "Effects", "Every buff and debuff with its icon and animation.", vid("buffs", "30% 35%")))}
-      ${grp("Plan", "build, count, prepare a run",
-        card("teams", "Team builder", "Sins a turn, passives that switch on, the gifts that fit.", vid("teams", "0% 20%"))
-        + card("mirror", "MD planner", "Pick the gifts you want — get the packs for every floor.", vid("mirror", "30% 40%"))
-        + card("calc", "Damage calc", "How hard a skill really hits, turn after turn.", img(art(4)) + num("2 480", "dmg"))
-        + card("growth", "Upgrade calc", "Threads, shards and runs to the Uptie and level you want.", img(art(1)) + num("UT4", "Lv 55")))}
-      ${grp("Games", "with friends or alone",
-        card("games", "Mini-games", "Guess the Identity, the voice, the E.G.O — daily rounds and live matches.", img(art(6)) + (games ? `<span class="hxnum">${games}</span>` : ""))
-        + card("biggames", "Big games", "Survivors, Singing Machine, Muga Slice.", vid(HOME_BIG[homeBigAt][0], "50% 50%", false, "hxbig") + `<span class="hxk notr" id="hxbigk"><i>${HOME_BIG[homeBigAt][1]}</i></span>`)
-        + card("workshop", "Story workshop", "Make your own scene with the story's characters and music.", vid("workshop", "40% 30%"))
-        + card("community", "Community", "Who streams Limbus right now.", '<img class="hxbg" id="hxlivei" src="/ui/site/home/community.webp" alt=""><span class="hxlive" id="hxlivet" hidden></span>'))}
-    </div>`;
+      <div class="h2more">
+        ${tile("enemies", `<img class="fit" src="${HV}foe.webp" alt="" loading="lazy">`, "Enemies", "Bosses and Abnormalities: skills, resistances, battle look.")}
+        ${tile("buffs", `<div class="ics">${["Combustion", "Laceration", "Vibration", "Burst"].map((k) => ico(`st_${k}`)).join("")}</div>`, "Effects", "Every buff and debuff with its icon and animation.")}
+        ${tile("teams", `<div class="stack">${team.map((x) => `<img src="${x.pics.thumb}" alt="" loading="lazy">`).join("")}</div>`, "Team builder", "Sins a turn, passives that switch on, the gifts that fit.")}
+        ${tile("stages", `<img class="cov" src="${HV}stages.webp" alt="" loading="lazy">`, "Story map", "Every stage of every Canto: who stands there and what waits.")}
+        ${tile("workshop", `<img class="cov" src="${HV}workshop.webp" alt="" loading="lazy">`, "Story workshop", "Make your own scene with the story's characters and music.")}
+        ${tile("sounds", svg("sounds"), "Sounds", "Voice lines, music and battle sounds.")}
+        ${tile("games", svg("games") + (games ? `<span class="n">${games}</span>` : ""), "Mini-games", "Guessers, daily rounds and live matches with friends.")}
+        ${tile("calc", svg("calc"), "Damage calc", "How hard a skill really hits, turn after turn.")}
+        ${tile("growth", svg("growth"), "Upgrade calc", "Threads, shards and runs to the Uptie and level you want.")}
+        ${tile("community", '<img class="cov" id="hxlivei" src="/ui/site/home/community.webp" alt=""><i class="live"></i>', "Community", "Who streams Limbus right now.")}
+      </div></div>`;
   }
   // the next clip when one ends: the Animations card's list, the big games in turn
   document.addEventListener("ended", (e) => {
@@ -102,7 +105,7 @@
     else { homeBigAt = (homeBigAt + 1) % 3; v.src = `${HV}${HOME_BIG[homeBigAt][0]}.mp4`; k.innerHTML = `<i>${HOME_BIG[homeBigAt][1]}</i>`; }
     v.play().catch(() => { /* stays on its last frame */ });
   }, true);
-  // Community: who streams now, one after another
+  // Community: who streams now, one picture after another
   let homeLiveTimer = 0;
   function homeLive() {
     clearInterval(homeLiveTimer);
@@ -111,13 +114,13 @@
       const all = Object.values(c.parts || {}).flatMap((p) => Object.values(p.streams || {}).flat()).filter((x) => x.thumb).sort((a, b) => b.viewers - a.viewers).slice(0, 8);
       let at = -1;
       const next = () => {
-        const im = $("#hxlivei"), t = $("#hxlivet");
+        const im = $("#hxlivei");
         if (!im) return clearInterval(homeLiveTimer);
         if (document.hidden || !all.length) return;
         at = (at + 1) % all.length;
-        const x = all[at], pic = new Image();
-        pic.onload = () => { im.src = x.thumb; t.hidden = false; t.innerHTML = `<i></i><b class="notr">${esc(x.name)}</b> <span>${x.viewers} watching</span>`; };
-        pic.src = x.thumb;
+        const url = all[at].thumb, pic = new Image();
+        pic.onload = () => { im.src = url; };
+        pic.src = url;
       };
       next();
       if (all.length > 1 && homeMotion()) homeLiveTimer = setInterval(next, 4000);
