@@ -509,7 +509,7 @@ function drawBuilder() {
       ${UNITS.statuses.filter((k) => st[k]).map((k) => `<span class="kwi small">${statusIcon(k, "s22")}<b>${st[k]}</b> ${esc(statusName(k))}</span>`).join("") || `<span class="muted small">no statuses yet</span>`}
       <span class="sep"></span>${Object.entries(atk).map(([k, n]) => `<span class="kwi small">${ico(`atk_${k}`, "s18", k, "")}<b>${n}</b> ${esc(k)}</span>`).join("")}
       <span class="grow"></span><button id="clearteam">Clear</button></div>
-    <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${s} ${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>
+    <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${100 * sins[s] / total < 8 ? "" : s + " "}${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>
     ${sides.field.length ? `<div class="tbrate"><span class="muted small" title="Each used skill gives one of its sin; on average, from the ${sides.field.length} on the field">Sins a turn ≈</span>${UNITS.sins.filter((s) => S.rate[s]).map((s) => `<span class="tbcost"${S.extra[s] ? ` title="${esc(`With extra skills: ${S.extra[s].map((f) => `${f.who} +${f.n.toFixed(1)}`).join(", ")}`)}"` : ""}>${sinIcon(s, "s16")}${S.rate[s].toFixed(1)}${S.extra[s] ? "*" : ""}</span>`).join("")}
       <span class="muted small">· E.G.O frame: <i class="tbkey slow"></i> slow to gather <i class="tbkey no"></i> no such sin on the field</span></div>` : ""}`;
   const P = tbPasList(sides, S);

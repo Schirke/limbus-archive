@@ -1874,3 +1874,4 @@ button.sndnav:hover { color: var(--gold); }
 :is(:lang(th), :lang(vi)) :is(body, .hsay p) { line-height: 1.6; }
 :lang(th) *:not(.brand) { letter-spacing: 0 !important; }
 :is(:lang(th), :lang(vi)) :is(h1, .hname, .utitle, .enname, .vsname b) { line-height: 1.3; }
+:lang(vi) .ud .panel h4 { letter-spacing: .04em; padding-right: 24px; }
