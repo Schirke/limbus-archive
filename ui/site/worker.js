@@ -1,7 +1,9 @@
 // The site's Worker: static files, /room/<code> live-match rooms (a Durable Object relaying messages in one order with
-// its clock), /stat/* visitor counts (daily sums, salted daily hashes), and /save: the games' progress under a code (D1).
+// its clock), /stat/* visitor counts (daily sums, salted daily hashes), /save: the games' progress under a code (D1), and
+// /cfg/beta.json: the owner's page switches from GitHub, for visitors who can't reach GitHub.
 import { DurableObject } from "cloudflare:workers";
 
+const BETA_RAW = "https://raw.githubusercontent.com/Schirke/limbus-archive/community-config/beta.json";
 const MOST = 8, ROOM_KEEP = 12 * 3600e3;
 const RATE_MS = 10e3, RATE_MOST = 80, RATE = new WeakMap();
 const what = (state) => [state.kind, state.game, state.mode].filter(Boolean).join(" ").slice(0, 40);
@@ -331,6 +333,11 @@ export default {
         if (closed) return new Response("closed", { status: 503 });
         G.d += 3;  // (the connection, and its messages: twenty of them count as a request)
         return await env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(req);
+      }
+      if (u.pathname === "/cfg/beta.json" && req.method === "GET") {
+        if (closed) return new Response(null, { status: 503 });
+        const r = await fetch(BETA_RAW, { cf: { cacheTtl: 60, cacheEverything: true } });
+        return new Response(r.ok ? await r.text() : null, { status: r.ok ? 200 : 502, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "max-age=60", "Access-Control-Allow-Origin": "*" } });
       }
       if (u.pathname === "/save") {
         if (closed) return new Response(JSON.stringify({ error: "off" }), { status: 503, headers: saveCors(req, u) || {} });
