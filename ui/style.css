@@ -1493,6 +1493,7 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpstartb { display: flex; align-items: center; gap: 8px; } .mpstartb .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
 .mpstartb img { width: 26px; height: 26px; object-fit: contain; margin: -4px 0; }
 .mpgift.st { outline: 2px solid var(--gold); outline-offset: -2px; }
+.mpgift em { position: absolute; right: 4px; top: 0; font: 16px "LC Bebas", sans-serif; font-style: normal; color: #ffd36b; text-shadow: 0 0 3px #000, 0 0 3px #000; }  /* has upgrades */
 .mpgift i { position: absolute; left: 2px; bottom: 2px; font: 11px "LC Bebas", sans-serif; font-style: normal; background: var(--gold); color: #120d0b; padding: 0 4px; letter-spacing: .06em; }
 .mpck.mpstart { border-left: 3px solid var(--gold); padding-left: 8px; }
 .mptag { display: inline-block; font: 12px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .08em; color: #120d0b; background: var(--gold); padding: 3px 5px 2px; margin-left: 6px; vertical-align: 2px; }
