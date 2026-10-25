@@ -1907,3 +1907,19 @@ button.sndnav:hover { color: var(--gold); }
 :lang(th) *:not(.brand) { letter-spacing: 0 !important; }
 :is(:lang(th), :lang(vi)) :is(h1, .hname, .utitle, .enname, .vsname b) { line-height: 1.3; }
 :lang(vi) .ud .panel h4 { letter-spacing: .04em; padding-right: 24px; }
+/* "? Guide" by a page's title and its tour (guide.js) */
+.gdbtn { display: inline-flex; align-items: center; gap: 7px; vertical-align: middle; margin-left: 16px; position: relative; top: -4px; font: 15px/1 "LC Bebas", "Segoe UI", sans-serif;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--cream); background: #120d0b; border: 1px solid var(--line); padding: 6px 12px 5px; cursor: pointer; }
+.gdbtn b { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--gold); color: #120d0b; font-size: 14px; }
+.gdbtn:hover { color: var(--text); border-color: var(--gold); }
+.gdbtn.new { color: #fff3d0; border-color: var(--gold); background: linear-gradient(#6a4a1d, #3b2710); animation: gdpulse 1.6s ease-in-out infinite; }
+.gdbtn.new::after { content: "NEW"; position: absolute; top: -9px; right: -10px; font-size: 11px; background: #c0392b; color: #fff; padding: 2px 4px 1px; }
+@keyframes gdpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(248, 180, 0, .55), inset 0 0 8px rgba(255, 138, 0, .4); } 50% { box-shadow: 0 0 0 7px rgba(248, 180, 0, 0), inset 0 0 14px rgba(255, 138, 0, .7); } }
+.sttabs .gdbtn, .an-rhead .gdbtn { top: 0; margin: 0 0 0 8px; }
+#gdcatch { position: fixed; inset: 0; z-index: 89; }
+#gdhole { position: fixed; z-index: 90; border: 2px solid var(--gold); box-shadow: 0 0 0 9999px rgba(5, 3, 2, .78), 0 0 22px rgba(255, 138, 0, .6); pointer-events: none; transition: all .25s ease; }
+#gdbox { position: fixed; z-index: 91; width: min(340px, calc(100vw - 24px)); background: #17110e; border: 1px solid var(--gold); padding: 14px 16px 12px; box-shadow: 0 8px 30px #000; transition: top .25s ease, left .25s ease; }
+#gdbox .gdn { font: 13px "LC Bebas", sans-serif; letter-spacing: .1em; color: var(--gold); margin-bottom: 6px; }
+#gdbox p { margin: 0 0 12px; line-height: 1.5; }
+#gdbox .gdrow { display: flex; gap: 8px; align-items: center; } #gdbox .grow { flex: 1; }
+@media (max-width: 700px) { .gdbtn { margin-left: 10px; top: -2px; font-size: 13px; padding: 5px 9px 4px; } }
