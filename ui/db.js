@@ -201,7 +201,7 @@ function fmtDesc(text, plain = false) {
     .replace(/<style="highlight">/g, "\u0006").replace(/<\/style>/g, "\u0007")
     .replace(/<(color|mark)[= ](?:color=)?"?(#[0-9a-fA-F]{6,8})"?>/g, (_, t, c) => mark(`<span style="${t === "mark" ? "background" : "color"}:${c}">`))
     .replace(/<b>/g, () => mark(`<span style="font-weight:700">`)).replace(/<\/(color|mark|b)>/g, () => mark("</span>"))
-    .replace(/<[^>]+>/g, "");
+    .replace(/<\/?[A-Za-z][\w-]*(?:[= ][^>]*)?>/g, "");  // only tags: a translation's own "<Bloodfiend>" stays text, as in the game
   const pk = plain && UNITS && kwPlainOf();
   if (pk && pk.rx) s = s.split(/("[^"\n]*"|“[^”\n]*”|(?<![A-Za-z])'[^'\n]*'(?![A-Za-z]))/)
     .map((part, i) => i % 2 ? part : part.replace(pk.rx, (n) => kwSpan(pk.key[n], n))).join("");
