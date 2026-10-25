@@ -5,7 +5,7 @@ import re
 
 from .units import _load
 
-VERSION = 5
+VERSION = 6
 SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gluttony", "AZURE": "Gloom", "INDIGO": "Pride", "VIOLET": "Envy"}
 
 
@@ -68,6 +68,10 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
         gifts[g] = {"name": n.get("name") or f"Gift {g}", "kw": kw if kw and kw != "None" else "", "tier": int(tier) if tier.isdigit() else 0,
                     "sin": SINS.get(d.get("attributeType"), ""), "desc": re.sub(r"\[TabExplain\]", "", n.get("desc") or ""),
                     "pic": gift_pics.get(str(d.get("iconId") or g)) or gift_pics.get(str(g)) or "", "team": team_conds(n.get("desc") or "")}
+        # "+" / "++": the game's texts of each upgrade level, changed parts in <style="upgradeHighlight">
+        up = [gname.get(u.get("localizeID")) or {} for u in sorted(d.get("upgradeDataList") or [], key=lambda u: u.get("upgradeLevel") or 0) if u.get("upgradeLevel")]
+        if up and all(u.get("desc") for u in up):
+            gifts[g]["up"] = [{"name": u.get("name") or "", "desc": re.sub(r"\[TabExplain\]", "", u["desc"])} for u in up]
         if g in how:
             gifts[g].update(how[g])
     modes = {}

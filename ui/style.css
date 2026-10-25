@@ -1481,6 +1481,13 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpchead { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; } .mpchead img { width: 72px; height: 72px; object-fit: contain; }
 .mpchead h2 { margin: 0 28px 2px 0; color: var(--gold); }
 .mpcdesc { line-height: 1.55; } .mpcdesc .kw[data-kw] { cursor: pointer; }
+.mpup { display: inline-flex; gap: 4px; margin-left: 10px; vertical-align: 3px; }
+.mpup .toggle { font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; min-width: 34px; padding: 4px 9px 3px; }
+.mpuphint { font-size: 12.5px; color: var(--muted); margin: -4px 0 8px; }
+/* a gift upgrade's changed parts (the game's upgradeHighlight) */
+.uph { color: #ffd36b; background: rgba(248, 180, 0, .13); box-shadow: 0 0 0 2px rgba(248, 180, 0, .13); border-radius: 2px; }
+.uph.flash { animation: uphflash 1s ease-out; }
+@keyframes uphflash { from { background: rgba(255, 138, 0, .55); box-shadow: 0 0 0 3px rgba(255, 138, 0, .55); } }
 .mpcardx h4 { margin: 14px 0 6px; } .mpcardx .mdteam { margin-top: 6px; }
 .mpcrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; } .mpcrow > b { color: var(--muted); }
 .mpcchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); background: #0c0807; cursor: pointer; font-size: 13px; }

@@ -210,14 +210,33 @@ function mpTip(el, e) {
 }
 window.addEventListener("hashchange", () => mpTip(null));
 
+// an upgrade level the game marks nothing on (9427): the words that differ from the level before
+function mpUpMark(a, b) {
+  if (b.includes("upgradeHighlight")) return b;
+  const A = a.replace(/<\/?style[^>]*>/g, "").toLowerCase().split(/(\s+)/), B = b.split(/(\s+)/), Bl = B.map((w) => w.toLowerCase()), n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Int16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = A[i] === Bl[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const keep = new Set();
+  for (let i = 0, j = 0; i < n && j < m;) { if (A[i] === Bl[j]) { keep.add(j); i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; }
+  let out = "", on = false;
+  B.forEach((w, j) => {
+    const ch = !keep.has(j) && w.trim();
+    if (ch && !on) { out += `<style="upgradeHighlight">`; on = true; } else if (!ch && on && w.trim()) { out += "</style>"; on = false; }
+    out += w;
+  });
+  return (out + (on ? "</style>" : "")).replace(/(\s+)<\/style>/g, "</style>$1");
+}
+
 // gift card: the whole text with clickable statuses, recipe, where it comes from
-function mpCard(id) {
+function mpCard(id, lv = 0) {
   const g = mpG(id), packs = [...new Set(MIRROR.packs.filter((p) => p.excl.includes(id)).map((p) => p.name))];
   const into = Object.keys(MIRROR.fus).filter((r) => MIRROR.fus[r].some((rs) => rs.includes(id))).map(Number);
   const chip = (x) => `<a class="mpcchip" data-card="${x}">${mpG(x).tile ? `<img src="${mpG(x).tile}">` : ""}${esc(mpG(x).name)}</a>`;
-  modal(`<div class="mpcardx"><div class="mpchead">${g.tile ? `<img src="${g.tile}">` : ""}<div><h2>${esc(g.name)}</h2>
+  const ups = g.up || [], t = (lv && ups[lv - 1]) || g;
+  modal(`<div class="mpcardx"><div class="mpchead">${g.tile ? `<img src="${g.tile}">` : ""}<div><h2>${esc(t.name)}${ups.length ? `<span class="mpup">${ups.map((u, i) => `<button data-up="${i + 1}" class="toggle ${lv === i + 1 ? "on" : ""}" title="Upgrade ${i + 1}">${"+".repeat(i + 1)}</button>`).join("")}</span>` : ""}</h2>
       <div class="muted small">${[g.tier && "Tier " + g.tier, g.kw && esc(mpKw(g.kw)), g.sin].filter(Boolean).join(" · ")}</div></div></div>
-    <div class="mpcdesc">${fmtDesc(g.desc)}</div>${mdTeamLine(id)}
+    ${lv ? `<div class="mpuphint">${lv === 1 ? "Highlighted: what changed from the base gift" : "Highlighted: what changed from +"}</div>` : ""}
+    <div class="mpcdesc">${fmtDesc(lv ? mpUpMark(lv > 1 ? ups[lv - 2].desc : g.desc, t.desc) : t.desc)}</div>${mdTeamLine(id)}
     ${MIRROR.fus[id] ? `<h4>Fusion of</h4>${MIRROR.fus[id].map((rs) => `<div class="mpcrow">${rs.map(chip).join("<b>+</b>")}</div>`).join("")}` : ""}
     ${into.length ? `<h4>Fuses into</h4><div class="mpcrow">${into.map(chip).join("")}</div>` : ""}
     ${packs.length ? `<h4>Only in</h4><div class="gold">${esc(packs.join(", "))}</div>` : ""}${g.how ? `<h4>Where</h4><div class="gold">${esc(g.how)}</div>` : ""}
@@ -226,6 +245,8 @@ function mpCard(id) {
   $("#modal-body").onclick = (e) => {
     const c = e.target.closest("[data-card]");
     if (c) return mpCard(+c.dataset.card);
+    const u = e.target.closest("[data-up]");
+    if (u) { mpCard(id, lv === +u.dataset.up ? 0 : +u.dataset.up); document.querySelectorAll("#modal-body .uph").forEach((x) => x.classList.add("flash")); return; }
     if (e.target.closest("[data-want]")) { if (mp.want.has(id)) mp.want.delete(id); else mp.want.add(id); closeModal(); if (location.hash.startsWith("#/mirror")) mpDraw(); }
   };
 }

@@ -198,7 +198,7 @@ function fmtDesc(text, plain = false) {
   // [TabExplain] is a wrap mark, not a keyword
   let s = String(text).replace(/\[TabExplain\]/g, "").replace(/<sprite[^>]*>/g, "")
     .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t.replace(/<[^>]+>/g, "")))
-    .replace(/<style="highlight">/g, "\u0006").replace(/<\/style>/g, "\u0007")
+    .replace(/<style="highlight">/g, "\u0006").replace(/<style="upgradeHighlight">/g, "\u0005").replace(/<\/style>/g, "\u0007")
     .replace(/<(color|mark)[= ](?:color=)?"?(#[0-9a-fA-F]{6,8})"?>/g, (_, t, c) => mark(`<span style="${t === "mark" ? "background" : "color"}:${c}">`))
     .replace(/<b>/g, () => mark(`<span style="font-weight:700">`)).replace(/<\/(color|mark|b)>/g, () => mark("</span>"))
     .replace(/<\/?[A-Za-z][\w-]*(?:[= ][^>]*)?>/g, "");  // only tags: a translation's own "<Bloodfiend>" stays text, as in the game
@@ -209,9 +209,9 @@ function fmtDesc(text, plain = false) {
     ? mark(`<span class="tg" style="color:${TAG_COLOR[k] || "#93f13e"}">${esc(tags[k].replace(/<[^>]*>/g, ""))}</span>`) : kwSpan(k));
   // unbalanced spans dropped / closed
   let open = 0;
-  s = s.replace(/\u0001(\d+)\u0002|[\u0006\u0007]/g, (m, i) => {
-    const h = m === "\u0006" ? `<span class="hl">` : m === "\u0007" ? "</span>" : marks[i];
-    if (h === "</span>") { if (!open) return ""; open--; } else if (h.startsWith("<span style=") || h === `<span class="hl">`) open++;
+  s = s.replace(/\u0001(\d+)\u0002|[\u0005\u0006\u0007]/g, (m, i) => {
+    const h = m === "\u0005" ? `<span class="uph">` : m === "\u0006" ? `<span class="hl">` : m === "\u0007" ? "</span>" : marks[i];
+    if (h === "</span>") { if (!open) return ""; open--; } else if (h.startsWith("<span style=") || h === `<span class="hl">` || h === `<span class="uph">`) open++;
     return h;
   });
   return s.replace(/\n/g, "<br>") + "</span>".repeat(open);
