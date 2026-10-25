@@ -373,6 +373,7 @@ SOFIA = "fonts/SofiaSansExtraCondensed-SemiBold.ttf"  # (in ui/: OFL, fonts/OFL-
 REF_TEXT = (0.700, 1.079, 0.251)  # Segoe UI: cap height, ascent, descent (em)
 NON_LATIN = {"ru", "uk", "be", "bg", "sr", "mk", "kk", "mn", "el", "zh", "ja", "ko", "th", "lo", "km", "my", "ar", "fa", "ur",
              "he", "hi", "bn", "ta", "te", "ka", "hy"}
+STACKED = {"th", "lo", "km", "my", "hi", "bn", "ta", "te"}  # marks above and below: own line metrics, a little larger
 _metric_cache: dict = {}
 
 
@@ -470,11 +471,13 @@ def _ref_title(svc) -> tuple:
     return _metric_cache["bebas"]
 
 
-def _fit(m: tuple | None, ref: tuple) -> str:
+def _fit(m: tuple | None, ref: tuple, stacked: bool = False) -> str:
     """descriptors: the same cap height and line as the font it stands next to"""
     if not m:
         return ""
     k = ref[0] / m[0]
+    if stacked:
+        return f"size-adjust: {100 * min(k, 1.15):.1f}%;"
     return f"size-adjust: {100 * k:.1f}%; ascent-override: {100 * ref[1] / k:.1f}%; descent-override: {100 * ref[2] / k:.1f}%; line-gap-override: 0%;"
 
 
@@ -483,7 +486,8 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
     from .paths import resource_dir
     out = {}
     # a Latin-script language mixes its letters with ASCII inside a word: its font takes every letter ("all"), not only those past Latin-1
-    latin = str(src.get("lang") or "").split("-")[0] not in NON_LATIN
+    script = str(src.get("lang") or "").split("-")[0]
+    latin = script not in NON_LATIN
     for kind, choice in (mode or {}).items():
         if choice == "sofia":
             p, url = os.path.join(resource_dir(), "ui", SOFIA), "/ui/" + SOFIA
@@ -494,7 +498,7 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
             st = os.stat(p)
             v = hashlib.sha1(f"{p}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
             url = f"/api/langfont?id={src['id']}&k={kind}&v={v}"  # (params sorted: the site's name)
-        out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT)}
+        out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT, script in STACKED)}
         if latin:
             out[kind]["all"] = True
     return out
