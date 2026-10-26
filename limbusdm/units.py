@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 20  # bump when the database layout changes (cached per snapshot)
+VERSION = 21  # bump when the database layout changes (cached per snapshot)
 NO_RES = re.compile(r"cannot gain E\.G\.O resources?", re.I)
 
 
@@ -282,13 +282,17 @@ def build(tables: dict, loc_dir: str) -> dict:
         sinner = int(str(eid)[1:3])
         # extra E.G.O skills from additionalList, each once
         sets = [r] + [a for g in r.get("additionalList") or [] for a in g.get("additionalList") or []]
-        sk = []
+        sk, views = [], {}
         for key, label in (("awakeningSkillId", "Awakening"), ("corrosionSkillId", "Corrosion")):
             for i, sid in enumerate(dict.fromkeys(a[key] for a in sets if a.get(key))):
                 s = skill_info(sid, skills, loc_skills)
                 if s:
                     s["label"] = label if not i else f"{label} {i + 1}"
                     sk.append(s)
+                # its cut-in: SkillViewEGO_<actionScript>, else <id>11 / <id>21 (early E.G.O use 21 / 22)
+                act = next((lv["actionScript"] for lv in (skills.get(sid) or {}).get("skillData") or [] if lv.get("actionScript")), None)
+                act = act or f"{eid}{1 if label == 'Awakening' else 2}1"
+                views.setdefault(f"SkillViewEGO_{act}", s["label"] if s else label)
         # one passive per name, earlier versions in "prev"
         got = {}
         for p in r.get("awakeningPassiveList") or []:
@@ -307,7 +311,7 @@ def build(tables: dict, loc_dir: str) -> dict:
             "cost": [{"sin": SINS.get(c.get("attributeType"), c.get("attributeType")), "n": c.get("num")}
                      for c in r.get("requirementList") or []],
             "resist": {SINS.get(x.get("type"), x.get("type")): x.get("value") for x in r.get("attributeResistList") or []},
-            "skills": sk, "passives": pas, "maxUp": r.get("maxEgoSyncLevel") or 4,
+            "skills": sk, "views": views, "passives": pas, "maxUp": r.get("maxEgoSyncLevel") or 4,
             "img": {"thumb": f"{ASSET}Unit/Profile/Ego/{eid}_awaken_profile.png", "art": f"{ASSET}Unit/EgoCG/{eid}_cg.png"},
         })
 

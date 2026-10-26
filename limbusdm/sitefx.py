@@ -32,7 +32,7 @@ def _read(ex) -> dict:
     """The site's videos; after a patch they stay and "old" lists the sets to render again."""
     m, made = ex.read_manifest("fx"), _made(ex.svc)
     out = {"kind": "fx", "id": made, "urls": m.get("urls") or {}, "src": m.get("src") or {}, "have": m.get("have") or {},
-           "none": m.get("none") or [], "old": m.get("old") or {}, "dropped": m.get("dropped") or [], "was": m.get("was")}
+           "none": m.get("none") or [], "old": m.get("old") or {}, "dropped": m.get("dropped") or [], "was": m.get("was"), "units": m.get("units")}
     if m.get("id") and m.get("id") != made:
         out["old"] = {c: sorted(v for v, names in vs.items() if names) for c, vs in out["have"].items()}
         out["none"] = []  # (what gave nothing may give something now)
@@ -97,9 +97,13 @@ def _take(ex, m: dict, cid: int, v: str) -> int:
 
 def _lists(ex, m: dict, before: dict):
     """What the tab asks before a video: video lists, skill names, buffs, and /api/site_fx."""
-    from . import links
+    from . import links, units
     cids = sorted(m["have"], key=lambda c: (not c.isdigit(), int(c) if c.isdigit() else 0, c))
     want = []
+    if m.get("units") != units.VERSION:  # (skill names come from the unit database: ask again)
+        for c in cids:
+            m["urls"].pop(_key("/api/skill_slots", c), None)
+        m["units"] = units.VERSION
     for c in cids:
         for v in VARIANTS:
             names = m["have"][c].get(v) or []

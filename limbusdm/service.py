@@ -1011,9 +1011,12 @@ class Service:
         """An Identity's skill videos as the game names them: {n: {slot, name}} (n is not the tier)."""
         own = self.form_skills(cid)
         owner = self.form_owner(cid) or cid
+        db = self.unit_db()
+        if isinstance(owner, int) and str(owner).startswith("2"):  # an E.G.O: its cut-ins {clip: {slot: Awakening / Corrosion}}
+            e = next((x for x in db.get("egos", []) if x.get("id") == owner), None) or {}
+            return {k: {"slot": v, "name": ""} for k, v in (e.get("views") or {}).items()}
         if not isinstance(owner, int) or not str(owner).startswith(("1", "4")):
             return {}
-        db = self.unit_db()
         u = next((x for x in db.get("ids", []) + db.get("events", []) if x.get("id") == owner), None)
         if not u:
             return {}

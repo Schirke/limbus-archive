@@ -1428,9 +1428,9 @@ const slotOrder = (n, slots = anim.slots) => {
 };
 function fxLabel(name, slots = anim.slots) {
   if (!name) return "";
-  // an E.G.O's cut-in: SkillViewEGO_<id>11 its use, …21 corroded
+  // an E.G.O's cut-in: which one the game's data says (/api/skill_slots), else <id>11 awakening, …21 corrosion
   const view = /^SkillViewEGO_\d{5}(\d)(\d)$/.exec(name);
-  if (view) return view[1] === "1" ? "E.G.O" : view[1] === "2" ? "E.G.O · Corrosion" : `E.G.O · ${view[1]}${view[2]}`;
+  if (view) return slots && slots[name] ? `E.G.O · ${slots[name].slot}` : view[1] === "1" ? "E.G.O · Awakening" : view[1] === "2" ? "E.G.O · Corrosion" : `E.G.O · ${view[1]}${view[2]}`;
   const sk = (n) => (slots && slots[n] ? slots[n].slot : `Skill ${n}`);
   // (a joint skill: "…_S<n>_<the other Identity's id>")
   const whole = /(?:^|_)S(\d+)(?:_(\d{5}))?$/.exec(name);
