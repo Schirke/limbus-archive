@@ -141,7 +141,7 @@ const DR_KIT = {
   // Skills by SP's sign: counted at 45 and at -40 SP
   10913: { sp: [45, -40], st: (t, on, sp) => ({ s_BlessingAlly: +(sp >= 0), s_DespairAlly: +(sp < 0), g_cwhenindespairallystate: +(sp < 0) }), deck: (t, sp) => (sp < 0 ? { 1: "Skill 1.1", 2: "Skill 2.1", 3: "Skill 3.1" } : {}) },
   10312: { sp: [45, -40], st: (t, on, sp) => ({ s_MagicalGirlAppear: +(sp >= 0), s_NoVillain: +(sp < 0) }), deck: (t, sp) => (sp < 0 ? { 1: "Skill 1.1", 2: "Skill 2.1", 3: "Skill 3.1" } : {}) },
-  // enhanced Skills (Vlad, 26.10): every S3, from a turn, or on the turns its counter fills
+  // enhanced Skills (Vlad, 26.10): the S3 of the round (turns 6, 12, 18) once its counter is full; a turn of its own only where the kit says so
   10114: { deck: () => ({ 3: "Skill 3.1" }) },  // Heishou Wu Yi Sang: 5 Breakthrough by every S3
   10116: { deck: () => ({ 3: "Skill 3.1" }), st: (t) => (drS3(t) ? { s_Charge_c: 15 } : {}) },  // Dimension Rip Yi Sang: 15 Charge Count
   10412: { deck: () => ({ 3: "Skill 3.1" }), st: (t) => (drS3(t) ? { t_ContemptRyoshu: 1 } : {}) },  // Contempt, Awe Ryōshū: 7 Gaze in 2 turns
@@ -149,19 +149,22 @@ const DR_KIT = {
   11213: { deck: () => ({ 3: "Skill 3.1" }) },  // Night Awls Gregor
   10716: { on: (t) => t >= 3, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { t_DuelEdgeAlly: 5 } : {}) },  // Big Apprentice Heathcliff: 5 Duel Edge by turn 3
   11215: { on: (t) => t >= 4, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { s_Charge_p: 3 } : {}) },  // RAND Gregor: 3 Charge Potency by turn 4, kept
-  10115: { cyc: 1, card: (t) => (drAt(t, 5, 4) ? "Skill 3.1" : null) },  // Index Nursefather Yi Sang: Furioso-Replica on turn 5, then every 4
+  // Index Nursefather Yi Sang: Furioso-Replica on turn 5, then every 4. With one Slot its Skill is always marked; every Prescript done: +3 Blessing (max 9),
+  // Unlock stage at 3/6/9; SP 45 over the dummy's 0; Black Nightmare after the first Furioso
+  10115: { cyc: 1, card: (t) => (drAt(t, 5, 4) ? "Skill 3.1" : null),
+    st: (t) => { const b = Math.min(9, 3 * (t - 1)); return { g_mark: 1, g_cifthisunitsspishigherthanthetargets: 1, g_fspdifference: 45, s_BlessingOfIndexPrescriptAlly: b, s_UnlockBuff_Base: Math.floor(b / 3), ...(t > 5 ? { s_BlackNightmareYisang: 1 } : {}) }; } },
   // Crimson Moth Faust: A.B.S Max Attunement kills her, so S3 is held (S2 instead) and the enhanced one goes on the last turn
   10211: { note: 1, deck: () => ({ 3: "Skill 2" }), card: (t) => (t === DR_TURNS ? "Skill 3.1" : null), st: (t) => (t === DR_TURNS ? { s_Combustion_p: 30, g_mhp: 90 } : {}) },  // (her own Burn: 90% HP lost by then)
   // Heishou Mao Faust: alone every other S3; with the team from turn 3 S3 every turn, the enhanced one every other turn
   // (with the Heishou team she is at 10 Speed: its Haste, her own S2 isn't played)
   10212: { cyc: 1, card: (t, m) => (m ? (t >= 3 ? (drAt(t, 3, 2) ? "Skill 3.1" : "Skill 3") : null) : t === 12 ? "Skill 3.1" : null), st: (t, on, sp, m) => (m ? { g_speed: 10, g_spd: 10 - DR_FOE_SPEED } : {}), drop: (m) => (m ? ["Burst"] : []) },  // (Rupture stacks fall in a team fight: only what each turn's Skill inflicts)
-  10310: { cyc: 1, card: (t, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? "Skill 3.1" : null), st: (t, on, sp, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? { s_BloodArmorPersonalityFirst: 10 } : {}) },  // La Manchaland Manager Don: alone every 5 turns, with the team every 3
-  10410: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RedEyeFirst: 15, s_PenanceFirst: 15 } : {}) },  // Red Eyes & Penance Ryōshū: 15 + 15 by turn 4, again every 4
-  10416: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RealisationAlly: 60 } : {}) },  // Le Noir Ryōshū: 60 Realisation by turn 4, again every 4
-  10513: { cyc: 1, card: (t, m) => (drAt(t, m ? 3 : 4, 3) ? "Skill 3.1" : null) },  // La Manchaland Prince Meursault: 5 Blood Armor on turn 4 (3 with the team), every 3
-  10714: { cyc: 1, card: (t) => (drAt(t, 3, 3) ? "Skill 3.1" : null), st: (t) => (drAt(t, 3, 3) ? { s_ChickenFightlust: 20 } : {}) },  // Heishou You Heathcliff: 20 Fightlust on turn 3, every 3
-  10911: { cyc: 1, card: (t, m) => (m ? drAt(t, 3, 3) : t === 5) ? "Skill 3.1" : null },  // La Manchaland Princess Rodion: with the team every 3 from turn 3, alone once on turn 5
-  11216: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null) },  // Dawn Gregor: 30 Stigma on turn 4, again every 4
+  10310: { cyc: 1, deck: () => ({ 3: "Skill 3.1" }), st: (t) => (drS3(t) ? { s_BloodArmorPersonalityFirst: 10 } : {}) },  // La Manchaland Manager Don: every 5 turns alone, 3 with the team: every S3
+  10410: { cyc: 1, on: (t) => t >= 4, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on && drS3(t) ? { s_RedEyeFirst: 15, s_PenanceFirst: 15 } : {}) },  // Red Eyes & Penance Ryōshū: 15 + 15 by turn 4, refilled in 4
+  10416: { cyc: 1, on: (t) => t >= 4, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on && drS3(t) ? { s_RealisationAlly: 60 } : {}) },  // Le Noir Ryōshū: 60 Realisation by turn 4, refilled in 4
+  10513: { cyc: 1, on: (t, m) => t >= (m ? 3 : 4), deck: () => ({ 3: "Skill 3.1" }) },  // La Manchaland Prince Meursault: 5 Blood Armor by turn 4 (3 with the team), refilled in 3
+  10714: { cyc: 1, on: (t) => t >= 3, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on && drS3(t) ? { s_ChickenFightlust: 20 } : {}) },  // Heishou You Heathcliff: 20 Fightlust by turn 3, refilled in 3
+  10911: { cyc: 1, on: (t, m) => (m ? t >= 3 : t >= 5 && t <= 6), deck: () => ({ 3: "Skill 3.1" }) },  // La Manchaland Princess Rodion: with the team refilled in 3; alone once, from turn 5
+  11216: { cyc: 1, on: (t) => t >= 4, deck: () => ({ 3: "Skill 3.1" }) },  // Dawn Gregor: 30 Stigma by turn 4, refilled in 4
   10711: { card: (t) => (t === 6 ? "Skill 3.1" : null) },  // Full-Stop Heathcliff: its one AL-HV round on the first S3
   10815: { fu: { "Skill 3.1": [3, 6, 9, 12, 15, 18] }, st: (t) => (drAt(t, 3, 3) ? { s_WindBladeIshmael: 15 } : {}) },  // LCCB-Hound Ishmael: Even the Balance every 3 turns
   // Thumb Capo Meursault: 12 rounds (S1 1, S2 2, S3 3), then 12 special ones: Super Coins and the enhanced S3
