@@ -389,8 +389,8 @@ BIG_ASKS = {"/api/frames", "/api/frame_png", "/api/sounds", "/api/bank", "/api/s
             "/api/char_icon", "/api/ui_icon", "/api/scene_sprite", "/api/object", "/api/owner_videos", "/api/collection_refs"}
 
 
-def _big_needs(base: str, progress=None) -> list[str]:
-    """Every request the big games make, from the app at `base`, run in a hidden window."""
+def _big_needs(base: str, progress=None) -> dict:
+    """Every request the big games make, from the app at `base`, run in a hidden window: {urls, bad: {game: why}}."""
     from .sitecheck import _Tab, _free_port, close_browser, find_browser, new_profile
     exe = find_browser()
     if not exe:
@@ -427,7 +427,7 @@ def _big_needs(base: str, progress=None) -> list[str]:
         end, t0 = time.time() + 1800, time.time()
         while True:
             got = tab.js("'__need' in window ? window.__need : 'the page reloaded'")
-            if isinstance(got, list):
+            if isinstance(got, dict):
                 return got
             if isinstance(got, str) or time.time() > end:
                 raise RuntimeError(f"the big games' data: {got or 'too slow'}")
@@ -560,7 +560,7 @@ def _anim_shape(ex, got: dict):
 SHAPES = {"anim": _anim_shape}
 
 def _big_made(ex) -> dict:
-    """What the big games' requests depend on: the game data and the built scripts (one dict per send: a failed run clears it)."""
+    """What the big games' requests depend on: the built scripts only, old sprites never change (one dict per send: a failed run clears it)."""
     if hasattr(ex, "_big"):
         return ex._big
     big = os.path.join(resource_dir(), "ui", "big")
@@ -569,21 +569,25 @@ def _big_made(ex) -> dict:
     for fn in names:
         with open(os.path.join(big, fn), "rb") as f:
             h.update(f.read())
-    ex._big = {"made": f"{ex.svc.latest_snapshot_id()}|{h.hexdigest()[:12]}"} if names else {}
+    ex._big = {"made": h.hexdigest()[:12]} if names else {}
     return ex._big
 
 
 def _big_start(ex, old: dict) -> list[str]:
     """The requests the big games make, as found by running them in a hidden window (bigNeeds); the old manifest's when
-    nothing they depend on changed or they can't run."""
+    nothing they depend on changed or they can't run, plus the old ones when a game failed in the run."""
     made = _big_made(ex)
-    if made and old.get("made") != made["made"]:
+    if made and (old.get("made") or "").rpartition("|")[2] != made["made"]:  # (older manifests: "<snapshot>|<scripts>")
         try:
-            keys = []
-            for u in _big_needs(ex.base, ex.progress):
+            keys, need = [], _big_needs(ex.base, ex.progress)
+            for u in need.get("urls") or []:
                 path, _, qs = u.partition("?")
                 if path in BIG_ASKS:
                     keys.append(url_key(path, **dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))))
+            for game, why in (need.get("bad") or {}).items():
+                ex.failed.append(("big games", f"{game}: {why}"))
+            if need.get("bad"):
+                keys += list(old.get("urls") or {})
             return list(dict.fromkeys(keys))
         except Exception as e:
             ex.failed.append(("big games", str(e)))

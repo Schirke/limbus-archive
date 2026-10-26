@@ -64,10 +64,13 @@ function bigSync() {
 async function bigNeeds() {
   performance.setResourceTimingBufferSize(1e6);
   performance.clearResourceTimings();
-  for (const g of BIG) if (g.need) try { await g.need(); } catch (e) { console.warn(g.key, e); }
+  const own = location.origin + "/api/", asked = () => performance.getEntriesByType("resource").filter((e) => e.name.startsWith(own)).length, bad = {};
+  for (const g of BIG) if (g.need) {
+    const n = asked();
+    try { await g.need(); if (asked() === n) bad[g.key] = "asked nothing"; } catch (e) { bad[g.key] = String(e); }
+  }
   for (const f of BIG_ASK) try { await f(); } catch (e) { console.warn(e); }
-  const own = location.origin + "/api/";
-  return [...new Set(performance.getEntriesByType("resource").map((e) => e.name).filter((u) => u.startsWith(own)).map((u) => u.slice(location.origin.length)))];
+  return { urls: [...new Set(performance.getEntriesByType("resource").map((e) => e.name).filter((u) => u.startsWith(own)).map((u) => u.slice(location.origin.length)))], bad };
 }
 
 routes.biggames = () => {
