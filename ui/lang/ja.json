@@ -3559,6 +3559,7 @@
 "Turn {0} · {1}: {2}": "{0}ターン目 · {1}：{2}",
 "Open in the calculator →": "計算機で開く →",
 "Allies fall": "味方が倒れる",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "チームと一緒：同じグループの味方が与える効果（黎明事務所、蜘蛛の巣…）、味方に関する条件は満たしたものとします。味方が倒れる：10ターン目から1ターンに1人ずつ（自分で味方を倒す人格はもっと早く）。計算式：計算機のもの、"
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "チームと一緒：同じグループの味方が与える効果（黎明事務所、蜘蛛の巣…）、味方に関する条件は満たしたものとします。味方が倒れる：10ターン目から1ターンに1人ずつ（自分で味方を倒す人格はもっと早く）。計算式：計算機のもの、",
+"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "SPでスキルが変わる人格は、SP 45とSP -40の2回表示します。実際の戦闘はプレイ次第です。"
 }
 }

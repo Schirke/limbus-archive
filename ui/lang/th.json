@@ -3559,6 +3559,7 @@
 "Turn {0} · {1}: {2}": "เทิร์น {0} · {1}: {2}",
 "Open in the calculator →": "เปิดในเครื่องคิดเลข →",
 "Allies fall": "พันธมิตรล้ม",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "กับทีม: สิ่งที่พันธมิตรกลุ่มเดียวกันมอบให้ (สำนักงานรุ่งอรุณ บ้านแมงมุม…) และถือว่าเงื่อนไขเกี่ยวกับพันธมิตรครบ พันธมิตรล้ม: ตั้งแต่เทิร์น 10 ล้มเทิร์นละหนึ่งตัว (บางไอเดนทิตี้จัดการพันธมิตรเองเร็วกว่านั้น) สูตร: ของเครื่องคิดเลข"
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "กับทีม: สิ่งที่พันธมิตรกลุ่มเดียวกันมอบให้ (สำนักงานรุ่งอรุณ บ้านแมงมุม…) และถือว่าเงื่อนไขเกี่ยวกับพันธมิตรครบ พันธมิตรล้ม: ตั้งแต่เทิร์น 10 ล้มเทิร์นละหนึ่งตัว (บางไอเดนทิตี้จัดการพันธมิตรเองเร็วกว่านั้น) สูตร: ของเครื่องคิดเลข",
+"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "ไอเดนทิตี้ที่สกิลเปลี่ยนตาม SP จะแสดงสองครั้ง ที่ 45 และ -40 SP: การต่อสู้จริงขึ้นอยู่กับวิธีเล่น"
 }
 }

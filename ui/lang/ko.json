@@ -3559,6 +3559,7 @@
 "Turn {0} · {1}: {2}": "{0}턴 · {1}: {2}",
 "Open in the calculator →": "계산기에서 열기 →",
 "Allies fall": "아군 사망",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "팀과 함께: 같은 그룹의 아군이 주는 효과(여명 사무소, 거미집…), 아군 조건은 충족된 것으로 계산. 아군 사망: 10턴부터 턴마다 아군 1명이 쓰러짐(일부 인격은 더 일찍 직접 아군을 처치). 공식: 계산기의 것,"
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "팀과 함께: 같은 그룹의 아군이 주는 효과(여명 사무소, 거미집…), 아군 조건은 충족된 것으로 계산. 아군 사망: 10턴부터 턴마다 아군 1명이 쓰러짐(일부 인격은 더 일찍 직접 아군을 처치). 공식: 계산기의 것,",
+"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "정신력에 따라 스킬이 바뀌는 인격은 정신력 45와 -40, 두 번 표시됩니다. 실제 전투는 플레이 방식에 따라 달라집니다."
 }
 }
