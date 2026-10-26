@@ -3561,6 +3561,8 @@
 "Open in the calculator →": "Mở trong máy tính →",
 "Allies fall": "Đồng minh ngã xuống",
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "Cùng đội: những gì đồng minh cùng nhóm cho nó (Văn phòng Bình Minh, Nhà Nhện…), các điều kiện về đồng minh được coi là đạt. Đồng minh ngã xuống: từ lượt 10 mỗi lượt một đồng minh (một số bộ kỹ năng tự hạ đồng minh sớm hơn). Công thức: của máy tính,",
-"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "Các bộ kỹ năng thay đổi theo SP được hiển thị hai lần, ở 45 và -40 SP: trận đấu thực tế phụ thuộc vào cách chơi."
+"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "Các bộ kỹ năng thay đổi theo SP được hiển thị hai lần, ở 45 và -40 SP: trận đấu thực tế phụ thuộc vào cách chơi.",
+"S3 held to the last turn": "Giữ S3 đến lượt cuối",
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "S3 cường hóa sẽ giết cô ấy, nên S3 không được dùng cho đến lượt cuối."
 }
 }

@@ -150,9 +150,11 @@ const DR_KIT = {
   10716: { on: (t) => t >= 3, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { t_DuelEdgeAlly: 5 } : {}) },  // Big Apprentice Heathcliff: 5 Duel Edge by turn 3
   11215: { on: (t) => t >= 4, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { s_Charge_p: 3 } : {}) },  // RAND Gregor: 3 Charge Potency by turn 4, kept
   10115: { cyc: 1, card: (t) => (drAt(t, 5, 4) ? "Skill 3.1" : null) },  // Index Nursefather Yi Sang: Furioso-Replica on turn 5, then every 4
-  10211: { card: (t) => (t === 3 ? "Skill 3.1" : null), st: (t) => (t === 3 ? { s_Combustion_p: 30 } : {}), dies: 3 },  // Crimson Moth Faust: A.B.S Max Attunement on turn 3 kills her
+  // Crimson Moth Faust: A.B.S Max Attunement kills her, so S3 is held (S2 instead) and the enhanced one goes on the last turn
+  10211: { note: 1, deck: () => ({ 3: "Skill 2" }), card: (t) => (t === DR_TURNS ? "Skill 3.1" : null), st: (t) => (t === DR_TURNS ? { s_Combustion_p: 30, g_mhp: 90 } : {}) },  // (her own Burn: 90% HP lost by then)
   // Heishou Mao Faust: alone every other S3; with the team from turn 3 S3 every turn, the enhanced one every other turn
-  10212: { cyc: 1, card: (t, m) => (m ? (t >= 3 ? (drAt(t, 3, 2) ? "Skill 3.1" : "Skill 3") : null) : t === 12 ? "Skill 3.1" : null) },
+  // (with the Heishou team she is at 10 Speed: its Haste, her own S2 isn't played)
+  10212: { cyc: 1, card: (t, m) => (m ? (t >= 3 ? (drAt(t, 3, 2) ? "Skill 3.1" : "Skill 3") : null) : t === 12 ? "Skill 3.1" : null), st: (t, on, sp, m) => (m ? { g_speed: 10, g_spd: 10 - DR_FOE_SPEED } : {}) },
   10310: { cyc: 1, card: (t, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? "Skill 3.1" : null), st: (t, on, sp, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? { s_BloodArmorPersonalityFirst: 10 } : {}) },  // La Manchaland Manager Don: alone every 5 turns, with the team every 3
   10410: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RedEyeFirst: 15, s_PenanceFirst: 15 } : {}) },  // Red Eyes & Penance Ryōshū: 15 + 15 by turn 4, again every 4
   10416: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RealisationAlly: 60 } : {}) },  // Le Noir Ryōshū: 60 Realisation by turn 4, again every 4
@@ -331,7 +333,7 @@ function drSim(x0, hit, mode, sp = null) {
           if ((m = /^t_(\w+)_(p|c)$/.exec(k))) s[k] = !real && DR_ELEM.has(m[1]) ? 99 : carry[m[1]] ? carry[m[1]][m[2]] || 0 : 0;
           else if ((m = /^t_(\w+)$/.exec(k))) s[k] = carry[m[1]] ? carry[m[1]].n ?? carry[m[1]].p ?? 0 : 0;
           else if (/^s_/.test(k)) s[k] = me[k] || 0;
-          else if ((m = /^g_(\w+)$/.exec(k))) s[k] = drG(m[1], k, bm, { speed, team, carry, real, dead });
+          else if ((m = /^g_(\w+)$/.exec(k))) s[k] = drG(m[1], k, bm, { speed: speed + (me.s_Agility || 0) + (me.s_Agility_p || 0), team, carry, real, dead });  // (Haste adds Speed)
           else if ((m = /data-kw="(\w+)"[^]*?(Potency|Count)?(?: on (self|target))?$/.exec((bm.id.sliders.find(([q]) => q === k) || [])[1] || ""))) {
             // a hand model's slider on a status: the fight's own number
             const [, kw, pc, side] = m, part = pc ? pc[0].toLowerCase() : "", c = carry[kw];
@@ -359,7 +361,7 @@ function drSim(x0, hit, mode, sp = null) {
       const b99 = calc(m2, s99, 0), bR = calc(m2, sR, 0), cR = calc(bm.m, sR, 1);
       dmg += b99.total + (cR.total - bR.total);
       if (bm.m.auto) for (const [kw, b0, a] of bm.m.target(sR, o).st) {
-        if (typeof b0 === "number") { if (a > 0) carry[kw] = { n: a }; else delete carry[kw]; } else if (a && a.p > 0 && a.c > 0) carry[kw] = { p: a.p, c: a.c }; else delete carry[kw];
+        if (typeof b0 === "number") { if (a > 0) carry[kw] = { n: a }; else delete carry[kw]; } else if (a && a.p > 0 && a.c > 0) carry[kw] = { p: Math.min(99, a.p), c: Math.min(99, a.c) }; else delete carry[kw];  // (the game caps both at 99)
       }
       dcOwnAfter(me, [...evs, ...pas.filter((e) => e.at === "hit" || e.at === "post" || e.at === "use")], { s: s99, c: b99.c, name }, all, pend);
       // follow-ups by their text's condition (a kit script's turns instead)
@@ -482,6 +484,7 @@ async function drPage() {
   $("#drlist").onclick = (e) => { const r = e.target.closest(".drrow"); if (!r || e.target.closest("a")) return; dr.open = dr.open === r.dataset.key ? "" : r.dataset.key; drDraw(dr.rows); };
   await re();
 }
+const DR_HELD = ["S3 held to the last turn", "Her enhanced S3 kills her, so S3 is not used until the last turn."];
 const DR_SPT = "Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.";
 const DR_WHY = { "follow-up": "a follow-up's condition", "form not reached": "how it reaches its other form", "hand model": "this Skill's state (set by hand)" };
 function drDraw(rows) {
@@ -497,7 +500,7 @@ function drDraw(rows) {
     const mates = r.team.length ? `<span class="drmates" title="${esc(r.team.map((id) => (unitById(id) || {}).title || id).join(", "))}">${r.team.map((id) => { const y = unitById(id); return y ? `<img src="${imgThumb(y.img.thumb)}" alt="">` : ""; }).join("")}</span>` : "";
     return `<div class="drrow${p <= 3 ? " top3" : ""}${dr.open === r.key ? " open" : ""}" data-key="${r.key}">
       <div class="drpos">#${p}</div><img class="drpic" src="${imgThumb(x.img.thumb)}" alt="" onerror="this.style.visibility='hidden'">
-      <div class="drnm"><div class="drt">${esc(x.title)}</div><div class="drs"><span>${esc(x.sinnerName)}</span><span class="drrk">${"0".repeat(x.rank)}</span>${seasonTag(x.season)}${ap}${r.sp != null ? `<span class="drtag" title="${esc(DR_SPT)}">SP ${r.sp}</span>` : ""}${r.formAt ? `<span class="drtag">Form from turn ${r.formAt}</span>` : ""}${mates}</div></div>
+      <div class="drnm"><div class="drt">${esc(x.title)}</div><div class="drs"><span>${esc(x.sinnerName)}</span><span class="drrk">${"0".repeat(x.rank)}</span>${seasonTag(x.season)}${ap}${r.sp != null ? `<span class="drtag" title="${esc(DR_SPT)}">SP ${r.sp}</span>` : ""}${(DR_KIT[r.id] || {}).note ? `<span class="drtag" title="${esc(DR_HELD[1])}">${esc(DR_HELD[0])}</span>` : ""}${r.formAt ? `<span class="drtag">Form from turn ${r.formAt}</span>` : ""}${mates}</div></div>
       <div class="drbars">${bars}</div>
       <div class="drtot"><b>${r.approx.length ? "≈" : ""}${r.tot}</b><small><span>${r.avg}</span> a turn</small><small>Full power by turn <span>${r.full}</span></small><div class="drfull"><u style="width:${(100 * r.tot / top).toFixed(1)}%"></u></div></div>
       ${dr.open === r.key ? `<div class="drmore"><div class="drturns">${r.turns.map((t) => `<span><i>${t.t}</i>${esc(t.kind)}<b>${t.dmg}</b></span>`).join("")}</div>

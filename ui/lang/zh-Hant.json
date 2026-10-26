@@ -3600,6 +3600,8 @@
 "Open in the calculator →": "在計算器中開啟 →",
 "Allies fall": "隊友倒下",
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "帶隊伍：同組隊友給予它的效果（黎明事務所、蛛巢…），對隊友的條件視為滿足。隊友倒下：從第 10 回合起每回合倒下一名隊友（有些人格會更早親手擊殺隊友）。公式：計算器的，",
-"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "技能隨理智值變化的人格顯示兩次：理智值 45 和 -40。實際戰鬥取決於具體打法。"
+"Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "技能隨理智值變化的人格顯示兩次：理智值 45 和 -40。實際戰鬥取決於具體打法。",
+"S3 held to the last turn": "S3 留到最後一回合",
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "她的強化 S3 會讓她死亡，所以 S3 留到最後一回合再用。"
 }
 }
