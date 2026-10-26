@@ -3602,6 +3602,12 @@
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "С командой: что ей дают союзники из её группы (офис «Рассвета», Дом Пауков…), условия на союзников выполнены. Союзники падают: с 10-го хода по одному союзнику за ход (некоторые киты убивают своих раньше). Формула — калькулятора,",
 "Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "Киты, у которых скиллы меняются от SP, показаны дважды — при 45 и при -40 SP: в реальном бою всё зависит от того, как играть.",
 "S3 held to the last turn": "S3 до последнего хода",
-"Her enhanced S3 kills her, so S3 is not used until the last turn.": "Её усиленный S3 убивает её, поэтому S3 не жмётся до последнего хода."
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "Её усиленный S3 убивает её, поэтому S3 не жмётся до последнего хода.",
+"How we count": "Как считаем",
+"Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.": "Каждая ID одна бьёт один манекен 20 ходов, один навык за ход в порядке S1 S1 S2 S1 S2 S3. Каждый удар — по формуле калькулятора.",
+"Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "Статусы на манекене считаются как 99 только для условий; их урон — то, что ID накладывает сама (не больше 99 Потенциала и Счётчика).",
+"Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "Свои баффы начинаются с 0 и растут по текстам кита. Спешка прибавляется к скорости.",
+"Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "Вторые формы и усиленные навыки включаются с хода, когда кит до них доходит; усиленный навык заменяет S3 своего круга. Где тексты не говорят (стаки от получаемых ударов, комбо с командой), ходы поставлены вручную.",
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Всего = 20 ходов. За ход = среднее. Полная сила = первый отрезок из 6 ходов, где урон не ниже 95% лучшего."
 }
 }

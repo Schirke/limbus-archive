@@ -3563,6 +3563,12 @@
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "チームと一緒：同じグループの味方が与える効果（黎明事務所、蜘蛛の巣…）、味方に関する条件は満たしたものとします。味方が倒れる：10ターン目から1ターンに1人ずつ（自分で味方を倒す人格はもっと早く）。計算式：計算機のもの、",
 "Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "SPでスキルが変わる人格は、SP 45とSP -40の2回表示します。実際の戦闘はプレイ次第です。",
 "S3 held to the last turn": "S3は最終ターンまで温存",
-"Her enhanced S3 kills her, so S3 is not used until the last turn.": "強化S3で彼女は倒れるため、S3は最終ターンまで使いません。"
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "強化S3で彼女は倒れるため、S3は最終ターンまで使いません。",
+"How we count": "計算方法",
+"Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.": "各人格は1人で木人1体を20ターン攻撃し、1ターンに1スキルをS1 S1 S2 S1 S2 S3の順で使います。各攻撃は計算機の計算式です。",
+"Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "木人の状態異常は条件判定でのみ99として扱い、そのダメージは人格自身が付与した分だけです（威力・回数は最大99）。",
+"Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "自分のバフは0から始まり、スキルテキストどおりに増えます。迅速は速度に加算されます。",
+"Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "第2形態と強化スキルは条件を満たしたターンから始まり、強化スキルはそのサイクルのS3と入れ替わります。テキストで判断できない場合（被弾で得るスタック、チーム連携）はターンを手動で設定しています。",
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "合計 = 20ターン。1ターン = 平均。最大火力 = 最高値の95%以上になる最初の6ターン区間。"
 }
 }

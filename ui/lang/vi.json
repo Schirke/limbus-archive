@@ -3563,6 +3563,12 @@
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "Cùng đội: những gì đồng minh cùng nhóm cho nó (Văn phòng Bình Minh, Nhà Nhện…), các điều kiện về đồng minh được coi là đạt. Đồng minh ngã xuống: từ lượt 10 mỗi lượt một đồng minh (một số bộ kỹ năng tự hạ đồng minh sớm hơn). Công thức: của máy tính,",
 "Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "Các bộ kỹ năng thay đổi theo SP được hiển thị hai lần, ở 45 và -40 SP: trận đấu thực tế phụ thuộc vào cách chơi.",
 "S3 held to the last turn": "Giữ S3 đến lượt cuối",
-"Her enhanced S3 kills her, so S3 is not used until the last turn.": "S3 cường hóa sẽ giết cô ấy, nên S3 không được dùng cho đến lượt cuối."
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "S3 cường hóa sẽ giết cô ấy, nên S3 không được dùng cho đến lượt cuối.",
+"How we count": "Cách tính",
+"Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.": "Mỗi Nhân cách tự đánh một hình nộm trong 20 lượt, mỗi lượt một kỹ năng theo thứ tự S1 S1 S2 S1 S2 S3. Mỗi đòn dùng công thức của máy tính.",
+"Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "Trạng thái trên hình nộm chỉ được tính là 99 cho điều kiện; sát thương của chúng là phần Nhân cách tự gây ra (tối đa 99 Tiềm năng và Số đếm).",
+"Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "Buff của bản thân bắt đầu từ 0 và tăng theo mô tả bộ kỹ năng. Tốc hành được cộng vào Tốc độ.",
+"Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "Dạng thứ hai và kỹ năng cường hóa bắt đầu từ lượt bộ kỹ năng đạt điều kiện; kỹ năng cường hóa thay cho S3 của vòng đó. Khi mô tả không nói rõ (cộng dồn khi bị đánh, combo đội), lượt được đặt thủ công.",
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Tổng = 20 lượt. Mỗi lượt = trung bình. Toàn lực = đoạn 6 lượt đầu tiên đạt ít nhất 95% đoạn tốt nhất."
 }
 }

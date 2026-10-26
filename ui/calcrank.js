@@ -462,10 +462,18 @@ async function drPage() {
   if (!UNITS.ids.length) { $("#main").innerHTML = `<div class="empty">Take a snapshot first — the database is read from it.</div>`; return; }
   $("#main").innerHTML = `<div class="dcpage drpage">
     <div class="dctop"><h1>Damage calculator</h1>${drTabs("rank")}</div>
+    <details class="drhow"><summary>How we count</summary>
     <div class="drcond"><span class="drlbl">Same for everyone</span>
       <span class="drchip">Uptie 4 · Lv ${MAX_LEVEL}</span><span class="drchip">${DR_TURNS} turns, one Skill a turn: S1 S1 S2 S1 S2 S3</span>
       <span class="drchip">Dummy of the same level, all resistances ×1.0</span><span class="drchip">Burn, Bleed, Tremor, Rupture, Sinking on the target count as 99 for conditions</span>
       <span class="drchip">Own buffs start at 0</span><span class="drchip">Coins all Heads, Clashes won, SP at max</span></div>
+      <ul class="drhowl">
+        <li>Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.</li>
+        <li>Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).</li>
+        <li>Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.</li>
+        <li>Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.</li>
+        <li>Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.</li>
+      </ul></details>
     <div class="drbar">
       <span class="cqkind" id="drhit">${[1, 3, 5].map((n) => `<button data-hit="${n}" class="${dr.hit === n ? "on" : ""}">${n === 1 ? "1 enemy" : `${n} enemies`}</button>`).join("")}</span>
       <span class="cqkind" id="drteam">${[[0, "Alone"], [1, "With its team"], [2, "Allies fall"]].map(([n, l]) => `<button data-team="${n}" class="${dr.team === n ? "on" : ""}">${l}</button>`).join("")}</span>

@@ -3563,6 +3563,12 @@
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "Con su equipo: lo que le dan los aliados de su grupo (Oficina Amanecer, Casa de las Arañas…) y las condiciones sobre aliados cumplidas. Caen aliados: desde el turno 10, un aliado por turno (algunos kits matan a sus aliados antes). Fórmula: la de la calculadora,",
 "Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "Los kits cuyas habilidades cambian con la SP aparecen dos veces, con 45 y con -40 SP: el combate real depende de cómo se juegue.",
 "S3 held to the last turn": "S3 reservada al último turno",
-"Her enhanced S3 kills her, so S3 is not used until the last turn.": "Su S3 mejorada la mata, así que la S3 no se usa hasta el último turno."
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "Su S3 mejorada la mata, así que la S3 no se usa hasta el último turno.",
+"How we count": "Cómo calculamos",
+"Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.": "Cada Identidad pelea sola contra un muñeco durante 20 turnos, una habilidad por turno en el orden S1 S1 S2 S1 S2 S3. Cada golpe usa la fórmula de la calculadora.",
+"Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "Los estados del muñeco cuentan como 99 solo para las condiciones; su daño es el que la Identidad aplica por sí misma (como máximo 99 de Potencia y Cantidad).",
+"Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "Los beneficios propios empiezan en 0 y crecen según los textos del kit. La Prisa se suma a la Velocidad.",
+"Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "Las segundas formas y las habilidades mejoradas empiezan en el turno en que el kit las alcanza; la habilidad mejorada ocupa el lugar de la S3 de la ronda. Donde los textos no lo dicen (cargas ganadas al recibir golpes, combos de equipo), los turnos se fijan a mano.",
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Total = 20 turnos. Por turno = la media. Plena potencia = el primer tramo de 6 turnos con al menos el 95% del mejor."
 }
 }

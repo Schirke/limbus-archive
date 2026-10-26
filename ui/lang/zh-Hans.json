@@ -3602,6 +3602,12 @@
 "With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "带队伍：同组队友给予它的效果（黎明事务所、蛛巢…），对队友的条件视为满足。队友倒下：从第 10 回合起每回合倒下一名队友（有些人格会更早亲手击杀队友）。公式：计算器的，",
 "Kits whose Skills change with SP are shown twice, at 45 and at -40 SP: the real fight depends on how it is played.": "技能随理智值变化的人格显示两次：理智值 45 和 -40。实际战斗取决于具体打法。",
 "S3 held to the last turn": "S3 留到最后一回合",
-"Her enhanced S3 kills her, so S3 is not used until the last turn.": "她的强化 S3 会让她死亡，所以 S3 留到最后一回合再用。"
+"Her enhanced S3 kills her, so S3 is not used until the last turn.": "她的强化 S3 会让她死亡，所以 S3 留到最后一回合再用。",
+"How we count": "计算方式",
+"Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.": "每个人格单独攻击一个木桩 20 回合，每回合一个技能，顺序为 S1 S1 S2 S1 S2 S3。每次攻击都用计算器的公式。",
+"Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "木桩上的状态只在判断条件时视为 99；状态伤害只算人格自己施加的部分（强度和层数最多 99）。",
+"Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "自身增益从 0 开始，按技能文本增长。迅捷计入速度。",
+"Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "第二形态和强化技能从人格达到条件的回合开始；强化技能替换该轮的 S3。文本无法判断的情况（受击获得的层数、队伍连携），回合为手动设定。",
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "总计 = 20 回合。每回合 = 平均值。全力 = 第一个达到最佳值 95% 的连续 6 回合。"
 }
 }
