@@ -154,7 +154,7 @@ const DR_KIT = {
   10211: { note: 1, deck: () => ({ 3: "Skill 2" }), card: (t) => (t === DR_TURNS ? "Skill 3.1" : null), st: (t) => (t === DR_TURNS ? { s_Combustion_p: 30, g_mhp: 90 } : {}) },  // (her own Burn: 90% HP lost by then)
   // Heishou Mao Faust: alone every other S3; with the team from turn 3 S3 every turn, the enhanced one every other turn
   // (with the Heishou team she is at 10 Speed: its Haste, her own S2 isn't played)
-  10212: { cyc: 1, card: (t, m) => (m ? (t >= 3 ? (drAt(t, 3, 2) ? "Skill 3.1" : "Skill 3") : null) : t === 12 ? "Skill 3.1" : null), st: (t, on, sp, m) => (m ? { g_speed: 10, g_spd: 10 - DR_FOE_SPEED } : {}) },
+  10212: { cyc: 1, card: (t, m) => (m ? (t >= 3 ? (drAt(t, 3, 2) ? "Skill 3.1" : "Skill 3") : null) : t === 12 ? "Skill 3.1" : null), st: (t, on, sp, m) => (m ? { g_speed: 10, g_spd: 10 - DR_FOE_SPEED } : {}), drop: (m) => (m ? ["Burst"] : []) },  // (Rupture stacks fall in a team fight: only what each turn's Skill inflicts)
   10310: { cyc: 1, card: (t, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? "Skill 3.1" : null), st: (t, on, sp, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? { s_BloodArmorPersonalityFirst: 10 } : {}) },  // La Manchaland Manager Don: alone every 5 turns, with the team every 3
   10410: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RedEyeFirst: 15, s_PenanceFirst: 15 } : {}) },  // Red Eyes & Penance Ryōshū: 15 + 15 by turn 4, again every 4
   10416: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RealisationAlly: 60 } : {}) },  // Le Noir Ryōshū: 60 Realisation by turn 4, again every 4
@@ -381,6 +381,7 @@ function drSim(x0, hit, mode, sp = null) {
     dmg += fu;
     // turn end: the target's statuses tick (Burn hits), yours lose Counts, Turn End lines, then what was gained for next turn
     let burn = 0;
+    if (kit.drop) kit.drop(mode).forEach((k) => delete carry[k]);
     carry = Object.fromEntries(Object.entries(carry).flatMap(([k, v]) => {
       const e = dcaTurnEnd(k);
       if (e.dmg && v.p) burn += v.p;
