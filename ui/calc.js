@@ -10,6 +10,7 @@ const dcNum = (v) => { const n = parseFloat(String(v).replace(",", ".")); return
 const dcSign = (n) => n > 0 ? `+${n}` : `${n}`;
 
 routes.calc = async (args) => {
+  if (args[0] === "rank") return drPage();
   $("#main").innerHTML = `<div class="muted">Loading…</div>`;
   try { await Promise.all([units(), ENEMIES || api("/api/enemies").then((j) => { ENEMIES = j; })]); } catch (e) { $("#main").innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
   if (!UNITS.ids.length) { $("#main").innerHTML = `<div class="empty">Take a snapshot first — the database is read from it.</div>`; return; }
@@ -156,7 +157,7 @@ function dcDraw() {
     return;
   }
   dcUrl();
-  $("#main").innerHTML = `<div class="dcpage"><h1>Damage calculator</h1>
+  $("#main").innerHTML = `<div class="dcpage"><h1>Damage calculator</h1>${drTabs("calc")}
     <p class="muted small dccredit">Formula and presets: <a href="https://github.com/BaTyANl/ElderCalc" target="_blank" rel="noopener">BaTyANl calc ↗</a></p>
     <div class="cqpicks">${dcPickA(x)}<div class="cqvs">VS</div>${dcPickB(t)}</div>
     <div class="cqctl">${dcKind()}${dcUp()}${dcLvIn()}
@@ -2243,7 +2244,7 @@ function dcMoveCard(from, to) {
 function dcbHtml(x, t) {
   const fig = dcFig(t, 76);
   return `<div class="dcpage dcnew">
-    <div class="dctop"><h1>Damage calculator</h1><p class="muted small dccredit">Formula: the game's (see "All multipliers"). Presets to compare: <a href="https://github.com/BaTyANl/ElderCalc" target="_blank" rel="noopener">BaTyANl calc ↗</a></p></div>
+    <div class="dctop"><h1>Damage calculator</h1>${drTabs("calc")}<p class="muted small dccredit">Formula: the game's (see "All multipliers"). Presets to compare: <a href="https://github.com/BaTyANl/ElderCalc" target="_blank" rel="noopener">BaTyANl calc ↗</a></p></div>
     <div class="dcb dcskwrap"><div class="dcskbar" id="dcskbar"></div><div class="dcrot" id="dcrot"></div></div>
     <div class="dcfight">
       <div class="dcb dcyou">${dcPickA(x)}<div class="dcctl2">${dcKind()}</div><div class="dcctl2">${dcUp()}</div><div class="dcctl2">${dcLvIn()}</div><div class="dcctl2"><button class="toggle" id="dcmax" title="Every status at what this skill needs for its most damage (the game's caps)">Max for this skill</button></div><div id="dcbself"></div></div>

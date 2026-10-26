@@ -356,3 +356,57 @@ button.cqname.dcunit:hover { color: var(--gold); } img.dcunit { cursor: pointer;
 .dcnew .dcst:has(.dcrange) .dcstc { flex-basis: 100%; }
 .dcnew .dcrange { width: 100%; } .dcnew .dcrange input[type=range] { flex: 1; width: auto; min-width: 0; }
 .dcnew .dcrange .dcnumin { width: 3.4em; flex: none; }
+/* Ranking (calcrank.js) */
+.drtabs { display: flex; gap: 0; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
+.drtabs a { padding: 8px 16px; font: 16px "LC Bebas", sans-serif; letter-spacing: .1em; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.drtabs a.on { color: var(--gold); border-color: var(--gold); }
+.drcond { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 12px; }
+.drlbl { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-right: 4px; }
+.drchip { padding: 3px 9px; background: rgba(255, 255, 255, .04); border: 1px solid var(--line); font-size: 12.5px; color: var(--cream); }
+.drbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 12px; background: rgba(0, 0, 0, .3); border: 1px solid var(--line); margin-bottom: 14px; }
+.drq { width: 180px; }
+.drload { padding: 18px 4px; }
+.drprogw { height: 4px; background: #2a1d15; margin-top: 8px; max-width: 420px; }
+#drprog { height: 100%; width: 0; background: var(--gold); }
+.drlist { display: flex; flex-direction: column; gap: 6px; }
+.drrow { display: grid; grid-template-columns: 46px 60px minmax(0, 1fr) minmax(200px, 340px) 130px; gap: 12px; align-items: center; padding: 6px 12px 6px 8px; background: linear-gradient(90deg, #1f1612, #150f0c); border: 1px solid var(--line); cursor: pointer; }
+.drrow:hover { border-color: #6b4a2c; }
+.drrow.top3 { border-color: #7a5a1c; }
+.drpos { font: 24px "LC Bebas", sans-serif; text-align: center; color: var(--muted); }
+.top3 .drpos { color: var(--gold); }
+.drpic { width: 60px; height: 60px; object-fit: cover; object-position: top; border: 1px solid #000; background: #000; }
+.drnm { min-width: 0; }
+.drt { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drs { color: var(--muted); font-size: 12.5px; margin-top: 3px; display: flex; gap: 6px 8px; flex-wrap: wrap; align-items: center; }
+.drrk { color: #f0c64b; letter-spacing: -1px; }
+.drap { color: #e8862f; border: 1px solid #6b3f1a; padding: 0 5px; font-size: 11.5px; cursor: help; }
+.drtag { border: 1px solid #3e62d6; color: #9fb4f0; padding: 0 5px; font-size: 11.5px; }
+.drmates { display: inline-flex; gap: 2px; }
+.drmates img { width: 20px; height: 20px; object-fit: cover; object-position: top; border: 1px solid #000; }
+.drbars { display: grid; grid-template-columns: repeat(20, 1fr); gap: 2px; align-items: end; height: 44px; }
+.drbars i { display: block; background: linear-gradient(#f8b400, #a86a00); }
+.drbars i.t2 { background: linear-gradient(#ff8a00, #a3470b); }
+.drbars i.t3 { background: linear-gradient(#ff5a3a, #8f1610); }
+.drbars i.f { outline: 1px solid #9fb4f0; }
+.drtot { text-align: right; }
+.drtot b { font: 28px/1 "LC Bebas", sans-serif; color: var(--gold); letter-spacing: .03em; }
+.drtot small { display: block; color: var(--muted); font-size: 11px; }
+.drfull { height: 3px; background: #2a1d15; margin-top: 3px; }
+.drfull u { display: block; height: 100%; background: var(--gold); }
+.drmore { grid-column: 1 / -1; padding: 6px 4px 4px 58px; font-size: 12.5px; }
+.drturns { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.drturns span { display: inline-flex; flex-direction: column; align-items: center; min-width: 42px; padding: 3px 4px; background: rgba(255, 255, 255, .04); border: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.drturns i { font-style: normal; color: var(--muted); font-size: 10px; }
+.drturns b { color: var(--cream); font-size: 13px; }
+.drmore a { color: var(--gold); }
+.drfoot { margin-top: 14px; line-height: 1.6; }
+@media (max-width: 760px) {
+  .drq { width: 100%; }
+  .drbar > * { flex: 1 1 auto; }
+  .drbar .cqkind button { flex: 1; }
+  .drrow { grid-template-columns: 30px 48px minmax(0, 1fr) 96px; grid-template-areas: "p i n t" "c c c c" "m m m m"; gap: 6px 8px; padding: 6px 8px 8px 4px; }
+  .drpos { grid-area: p; font-size: 19px; } .drpic { grid-area: i; width: 48px; height: 48px; } .drnm { grid-area: n; } .drtot { grid-area: t; } .drbars { grid-area: c; height: 30px; } .drmore { grid-area: m; padding-left: 4px; }
+  .drtot b { font-size: 22px; } .drtot small { font-size: 10.5px; line-height: 1.25; }
+  .drcond { gap: 4px 6px; } .drchip { font-size: 11.5px; padding: 2px 7px; }
+  .drtabs a { padding: 8px 12px; }
+}
