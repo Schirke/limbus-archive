@@ -2,7 +2,7 @@
 // The web copy's stand-in for the app's server: /api/… answered from the files site.py wrote.
 const DATA = "/d/";
 const TYPES = { ogg: "audio/ogg", wav: "audio/wav", mp4: "video/mp4", webm: "video/webm", json: "application/json; charset=utf-8", txt: "text/plain; charset=utf-8", png: "image/png", webp: "image/webp",
-  jpg: "image/jpeg", gif: "image/gif", otf: "font/otf", ttf: "font/ttf" };
+  jpg: "image/jpeg", gif: "image/gif", otf: "font/otf", ttf: "font/ttf", woff2: "font/woff2" };
 const MEDIA = /\.(mp4|webm|ogg|wav|mp3)$/;
 const ONLY_APP = "Only in the desktop app";
 let site = null, loading = null, loaded = 0, tr = null;

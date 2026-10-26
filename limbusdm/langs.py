@@ -471,8 +471,111 @@ def _fit(m: tuple | None, ref: tuple, stacked: bool = False) -> str:
     return f"size-adjust: {100 * k:.1f}%; ascent-override: {100 * ref[1] / k:.1f}%; descent-override: {100 * ref[2] / k:.1f}%; line-gap-override: 0%;"
 
 
+CUT_SCRIPTS = {"zh", "ja", "ko"}  # big CJK fonts: pages get the letters the texts use, the whole font only for a letter outside them
+CUT_FROM = 2 << 20
+_cut_lock = threading.Lock()
+
+
+def _ui_lang_file(src: dict) -> str:
+    from .paths import resource_dir
+    return os.path.join(resource_dir(), "ui", "lang", f"{src.get('lang')}.json")
+
+
+def _cut_sig(svc, src: dict, p: str) -> str | None:
+    """the cut font's name: its font, the tables made here, the interface's words, the app's version; None = not cut"""
+    if str(src.get("lang") or "").split("-")[0] not in CUT_SCRIPTS:
+        return None
+    try:
+        st = os.stat(p)
+        if st.st_size < CUT_FROM:
+            return None
+        import fontTools  # noqa: F401
+    except (OSError, ImportError):
+        return None
+    from . import __version__
+    try:
+        tables = sorted(n for n in os.listdir(_cache_dir(svc)) if n.startswith(src["id"] + ".") and n.endswith(".json.gz"))
+    except OSError:
+        tables = []
+    try:
+        ui = os.stat(_ui_lang_file(src))
+        ui_sig = f"{ui.st_size}|{int(ui.st_mtime)}"
+    except OSError:
+        ui_sig = ""
+    return hashlib.sha1(f"{p}|{st.st_size}|{int(st.st_mtime)}|{tables}|{ui_sig}|{__version__}".encode()).hexdigest()[:8]
+
+
+def _text_chars(svc, src: dict) -> set:
+    """every letter the language's tables, its interface words and the pages' scripts show"""
+    out = set(map(chr, range(0x20, 0x7F)))
+
+    def walk(o):
+        if isinstance(o, str):
+            out.update(o)
+        elif isinstance(o, dict):
+            for k, v in o.items():
+                out.update(k)
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    for g in GROUPS:
+        f = table_file(svc, src["id"], g)
+        if f:
+            with gzip.open(f, "rt", encoding="utf-8") as fh:
+                walk(json.load(fh))
+    try:
+        with open(_ui_lang_file(src), encoding="utf-8") as fh:
+            walk(json.load(fh))
+    except (OSError, ValueError):
+        pass
+    from .paths import resource_dir
+    for root, _, names in os.walk(os.path.join(resource_dir(), "ui")):
+        for n in names:
+            if n.endswith(".js"):
+                try:
+                    with open(os.path.join(root, n), encoding="utf-8", errors="ignore") as fh:
+                        out.update(c for c in fh.read() if ord(c) >= 0x2E80)
+                except OSError:
+                    pass
+    return out
+
+
+def font_cut(svc, lid: str, kind: str) -> str | None:
+    """the pack's font cut to the letters its pages show (woff2, kept in lang_cache/fonts); None = not cut"""
+    src = next((s for s in sources(svc) if s["id"] == lid), {})
+    p = _font_path(src, kind)
+    sig = p and _cut_sig(svc, src, p)
+    if not sig:
+        return None
+    d = os.path.join(_cache_dir(svc), "fonts")
+    out = os.path.join(d, f"{lid}.{kind}.{sig}.woff2")
+    with _cut_lock:
+        if os.path.exists(out):
+            return out
+        from fontTools import subset
+        from fontTools.ttLib import TTFont
+        opt = subset.Options()
+        opt.flavor, opt.layout_features, opt.notdef_outline = "woff2", ["*"], True
+        font = TTFont(p, fontNumber=0)
+        cut = subset.Subsetter(opt)
+        cut.populate(text="".join(_text_chars(svc, src)))
+        cut.subset(font)
+        os.makedirs(d, exist_ok=True)
+        for old in os.listdir(d):
+            if old.startswith(f"{lid}.{kind}."):
+                try:
+                    os.remove(os.path.join(d, old))
+                except OSError:
+                    pass
+        font.flavor = "woff2"
+        font.save(out + ".tmp")
+        os.replace(out + ".tmp", out)
+        return out
+
+
 def _fonts(svc, src: dict, mode: dict | None) -> dict:
-    """{"title" / "text": {"url", "css"}}: the fonts a language's pages use (none: the app's own)"""
+    """{"title" / "text": {"url", "css", "full"?}}: the fonts a language's pages use (none: the app's own)"""
     from .paths import resource_dir
     out = {}
     # a Latin-script language mixes its letters with ASCII inside a word: its font takes every letter ("all"), not only those past Latin-1
@@ -489,6 +592,9 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
             v = hashlib.sha1(f"{p}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
             url = f"/api/langfont?id={src['id']}&k={kind}&v={v}"  # (params sorted: the site's name)
         out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT, script in STACKED)}
+        cut = choice != "sofia" and _cut_sig(svc, src, p)
+        if cut:
+            out[kind] |= {"url": f"/api/langfont?cut={cut}&id={src['id']}&k={kind}", "full": url}
         if latin:
             out[kind]["all"] = True
     return out

@@ -25,7 +25,7 @@ from .paths import resource_dir
 VERSION = 1
 EXT = {"image/png": "png", "image/webp": "webp", "image/jpeg": "jpg", "image/gif": "gif", "audio/wav": "wav",
        "audio/ogg": "ogg", "video/mp4": "mp4", "video/webm": "webm", "application/json": "json", "text/plain": "txt",
-       "font/otf": "otf", "font/ttf": "ttf"}
+       "font/otf": "otf", "font/ttf": "ttf", "font/woff2": "woff2"}
 DEFAULTS = {"contact": "", "audio": True, "video": True, "full_images": True, "enemies": True, "music": True, "spine": True, "clips": True,
             "games": True, "story": True,
             "project": "", "url": ""}

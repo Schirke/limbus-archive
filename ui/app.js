@@ -57,7 +57,8 @@ function langFonts(f) {
   let st = document.getElementById("langfonts");
   if (!st) { st = document.createElement("style"); st.id = "langfonts"; document.head.appendChild(st); }
   f = f || {};
-  const face = (fam, x) => `@font-face { font-family: "${fam}"; src: url(${x.url || x}); font-display: swap; ${x.all ? "" : LANG_RANGE} ${x.css || ""} }`;
+  // a cut font comes after its whole one: the browser fetches the whole font only for a letter the cut one lacks
+  const face = (fam, x) => (x.full ? face(fam, { ...x, url: x.full, full: "" }) : "") + `@font-face { font-family: "${fam}"; src: url(${x.url || x}); font-display: swap; ${x.all ? "" : LANG_RANGE} ${x.css || ""} }`;
   st.textContent = (f.title ? face("LC Bebas", f.title) : "")
     + (f.text ? `${face("LC Lang", f.text)}
       html, body { font-family: "LC Lang", "Segoe UI", system-ui, sans-serif; }` : "");

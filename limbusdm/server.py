@@ -384,6 +384,11 @@ def make_handler(svc: Service, ui_dir: str, on_show=None):
                 return self._gz_json_file(f, f'"{os.path.basename(f)}"') if f else self._json({"error": "no such language"}, 404)
             if p == "/api/langfont":  # a language pack's own font (k: title / text)
                 from . import langs
+                if q.get("cut"):  # (cut to the letters its pages show)
+                    f = langs.font_cut(svc, q.get("id", ""), q.get("k", ""))
+                    if f:
+                        with open(f, "rb") as fh:
+                            return self._send(200, fh.read(), "font/woff2", {"Cache-Control": "max-age=31536000"})
                 f = langs.font_file(svc, q.get("id", ""), q.get("k", ""))
                 if not f:
                     return self._send(404, b"no font", "text/plain")

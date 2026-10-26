@@ -9,7 +9,7 @@ import time
 import urllib.request
 
 DATA = "https://limbus-archive.com/d/"
-TYPES = {"png": "image/png", "webp": "image/webp", "jpg": "image/jpeg", "otf": "font/otf", "ttf": "font/ttf"}
+TYPES = {"png": "image/png", "webp": "image/webp", "jpg": "image/jpeg", "otf": "font/otf", "ttf": "font/ttf", "woff2": "font/woff2"}
 KEEP = 600  # seconds the index is used, and a failed site is left alone
 _lock = threading.Lock()
 _state = {"idx": None, "at": 0.0, "down": 0.0}

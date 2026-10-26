@@ -31,7 +31,7 @@ try {
     --add-data "ui;ui" --add-data "limbusdm\code_sig.txt;limbusdm" `
     --collect-all UnityPy --collect-all fmod_toolkit --collect-all pyfmodex `
     --collect-all texture2ddecoder --collect-all etcpak --collect-all astc_encoder --collect-all archspec `
-    --collect-all webview --collect-all clr_loader --collect-all pythonnet --collect-all imageio_ffmpeg `
+    --collect-all webview --collect-all clr_loader --collect-all pythonnet --collect-all imageio_ffmpeg --collect-submodules fontTools `
     run.py
 } finally {
   $pyd | Remove-Item -ErrorAction SilentlyContinue
