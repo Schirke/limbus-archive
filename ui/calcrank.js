@@ -141,7 +141,40 @@ const DR_KIT = {
   // Skills by SP's sign: counted at 45 and at -40 SP
   10913: { sp: [45, -40], st: (t, on, sp) => ({ s_BlessingAlly: +(sp >= 0), s_DespairAlly: +(sp < 0), g_cwhenindespairallystate: +(sp < 0) }), deck: (t, sp) => (sp < 0 ? { 1: "Skill 1.1", 2: "Skill 2.1", 3: "Skill 3.1" } : {}) },
   10312: { sp: [45, -40], st: (t, on, sp) => ({ s_MagicalGirlAppear: +(sp >= 0), s_NoVillain: +(sp < 0) }), deck: (t, sp) => (sp < 0 ? { 1: "Skill 1.1", 2: "Skill 2.1", 3: "Skill 3.1" } : {}) },
+  // enhanced Skills (Vlad, 26.10): every S3, from a turn, or on the turns its counter fills
+  10114: { deck: () => ({ 3: "Skill 3.1" }) },  // Heishou Wu Yi Sang: 5 Breakthrough by every S3
+  10116: { deck: () => ({ 3: "Skill 3.1" }), st: (t) => (drS3(t) ? { s_Charge_c: 15 } : {}) },  // Dimension Rip Yi Sang: 15 Charge Count
+  10412: { deck: () => ({ 3: "Skill 3.1" }), st: (t) => (drS3(t) ? { t_ContemptRyoshu: 1 } : {}) },  // Contempt, Awe Ryōshū: 7 Gaze in 2 turns
+  10915: { deck: () => ({ 3: "Skill 3.1" }), st: (t, on, sp, m) => (drS3(t) || (m && t >= 2) ? { g_neg: 6 } : {}) },  // Fauvism Hong Lu: 6 negative types after S2
+  11213: { deck: () => ({ 3: "Skill 3.1" }) },  // Night Awls Gregor
+  10716: { on: (t) => t >= 3, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { t_DuelEdgeAlly: 5 } : {}) },  // Big Apprentice Heathcliff: 5 Duel Edge by turn 3
+  11215: { on: (t) => t >= 4, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { s_Charge_p: 3 } : {}) },  // RAND Gregor: 3 Charge Potency by turn 4, kept
+  10115: { cyc: 1, card: (t) => (drAt(t, 5, 4) ? "Skill 3.1" : null) },  // Index Nursefather Yi Sang: Furioso-Replica on turn 5, then every 4
+  10211: { card: (t) => (t === 3 ? "Skill 3.1" : null), st: (t) => (t === 3 ? { s_Combustion_p: 30 } : {}), dies: 3 },  // Crimson Moth Faust: A.B.S Max Attunement on turn 3 kills her
+  // Heishou Mao Faust: alone every other S3; with the team from turn 3 S3 every turn, the enhanced one every other turn
+  10212: { cyc: 1, card: (t, m) => (m ? (t >= 3 ? (drAt(t, 3, 2) ? "Skill 3.1" : "Skill 3") : null) : t === 12 ? "Skill 3.1" : null) },
+  10310: { cyc: 1, card: (t, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? "Skill 3.1" : null), st: (t, on, sp, m) => (drAt(t, m ? 3 : 5, m ? 3 : 5) ? { s_BloodArmorPersonalityFirst: 10 } : {}) },  // La Manchaland Manager Don: alone every 5 turns, with the team every 3
+  10410: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RedEyeFirst: 15, s_PenanceFirst: 15 } : {}) },  // Red Eyes & Penance Ryōshū: 15 + 15 by turn 4, again every 4
+  10416: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null), st: (t) => (drAt(t, 4, 4) ? { s_RealisationAlly: 60 } : {}) },  // Le Noir Ryōshū: 60 Realisation by turn 4, again every 4
+  10513: { cyc: 1, card: (t, m) => (drAt(t, m ? 3 : 4, 3) ? "Skill 3.1" : null) },  // La Manchaland Prince Meursault: 5 Blood Armor on turn 4 (3 with the team), every 3
+  10714: { cyc: 1, card: (t) => (drAt(t, 3, 3) ? "Skill 3.1" : null), st: (t) => (drAt(t, 3, 3) ? { s_ChickenFightlust: 20 } : {}) },  // Heishou You Heathcliff: 20 Fightlust on turn 3, every 3
+  10911: { cyc: 1, card: (t, m) => (m ? drAt(t, 3, 3) : t === 5) ? "Skill 3.1" : null },  // La Manchaland Princess Rodion: with the team every 3 from turn 3, alone once on turn 5
+  11216: { cyc: 1, card: (t) => (drAt(t, 4, 4) ? "Skill 3.1" : null) },  // Dawn Gregor: 30 Stigma on turn 4, again every 4
+  10711: { card: (t) => (t === 6 ? "Skill 3.1" : null) },  // Full-Stop Heathcliff: its one AL-HV round on the first S3
+  10815: { fu: { "Skill 3.1": [3, 6, 9, 12, 15, 18] }, st: (t) => (drAt(t, 3, 3) ? { s_WindBladeIshmael: 15 } : {}) },  // LCCB-Hound Ishmael: Even the Balance every 3 turns
+  // Thumb Capo Meursault: 12 rounds (S1 1, S2 2, S3 3), then 12 special ones: Super Coins and the enhanced S3
+  10512: { cyc: 1, on: (t) => DR_CAPO[t - 1], st: (t, on) => (on ? { s_BulletPropellantSpecialAlly: 12 } : {}), deck: () => ({ 3: "Skill 3.1" }) },
+  10614: { card: (t, m) => (m && t === 5 ? "Skill 3.1" : null) },  // Ring Nursefather Hong Lu: Closing Time once, turn 5 with 5 Ring allies (alone too late)
+  10710: { cyc: 1, idle: (t) => t % 2 === 1, on: (t) => t % 2 === 0, st: (t, on) => (on ? { s_NightPathfinding: 1 } : {}), card: (t) => (t % 2 === 0 ? "Skill 3.1" : null) },  // Wild Hunt: Counter → mount → Lament, Mourn, and Despair
+  10613: { on: (t, m) => m > 0 && t >= 3, deck: () => ({ 3: "Skill 3.1" }), st: (t, on) => (on ? { g_cifthisunitactivatedcombowithaheishou: 1 } : {}) },  // Lord of Hongyuan: with the Heishou team every S3 from turn 3
+  10611: { on: (t, m) => m > 0 && t <= 4, deck: () => ({ 1: "Skill 1.1", 2: "Skill 2.1", 3: "Skill 3.1" }) },  // Full-Stop Rep Hong Lu: combos while Full-Stop Heathcliff is there
+  10712: { fu: (m) => (m ? { "Skill 1.1": [2, 3, 4, 5, 6] } : {}) },  // Kurokumo Wakashu Heathcliff: Rules of the Backstreets once per ally, from turn 2
+  10917: { fu: (m) => (m ? { "Skill 2.1": Array.from({ length: DR_TURNS - 1 }, (_, i) => i + 2) } : {}) },  // Le Noir Rodion: Patterning as Cutout after a Le Noir ally, from turn 2
+  10315: { card: (t) => (t === 4 ? "Skill 3.1" : null), fu: (m) => (m ? { "Skill 1.1": Array.from({ length: DR_TURNS - 1 }, (_, i) => i + 2) } : {}) },  // Le Noir Don: With Each Smite on turn 4; Judgment! with Le Noir allies
 };
+const drAt = (t, a, k) => t >= a && (t - a) % k === 0, drS3 = (t) => DR_DECK[(t - 1) % 6] === 3;
+// Thumb Capo: which turns shoot the special rounds (12 a magazine, S1 1, S2 2, S3 3)
+const DR_CAPO = (() => { const out = []; let n = 12, sp = false; for (let t = 1; t <= DR_TURNS; t++) { out.push(sp); n -= DR_DECK[(t - 1) % 6]; if (n <= 0) { sp = !sp; n = 12; } } return out; })();
 // "[BeforeUse] At 30 [X], activate "Y" instead", "If target has 5 [X], activate "Y" instead": the stronger Skill once its status is there
 const DR_ALT = new Map();
 function drAlt(sk, up) {
@@ -231,8 +264,8 @@ function drSim(x0, hit, mode, sp = null) {
   let carry = {};
   const added = [], all = { has: (k) => k !== "sp" };
   let pas = [...drEvPas(x, up, T ? T.tc : null)];
-  const nameOf = (z) => dcaBare(dcaEnU(slots[z][1], cqAt(slots[z][1], up)).name);
-  const drSlot = (n) => slots.findIndex(([l], z) => l === n || nameOf(z) === n);
+  const nameOf = (z) => dcaBare(dcaEnU(slots[z][1], cqAt(slots[z][1], up)).name), kfu = typeof kit.fu === "function" ? kit.fu(mode) : kit.fu;
+  const drSlot = (n) => slots.findIndex(([l], z) => l === n || nameOf(z) === dcaBare(n));
   const killsAt = (t) => !D ? 0 : kit.kills ? kit.kills[t - 1] || 0 : t >= 10 ? 1 : 0;
   let dead = 0;
   const die = (s) => {
@@ -261,20 +294,22 @@ function drSim(x0, hit, mode, sp = null) {
     const fi = F.forms.findIndex((f, i) => i && f.kw && dcOwnKeys(f.kw).some((k) => me[k] > 0)), form = fi > 0 ? F.forms[fi] : base;
     if ((fi > 0 || (on && !kit.cyc)) && !formAt) formAt = t;
     lastForm = fi > 0 ? fi : on ? 1 : 0;
-    const ov = { ...(kit.st ? kit.st(t, on, sp) : {}), ...(sp != null ? { g_sp: sp, sp } : {}) };
+    const ov = { ...(kit.st ? kit.st(t, on, sp, mode) : {}), ...(sp != null ? { g_sp: sp, sp } : {}) };
     const deck = { ...byLabel, ...base.deck, ...form.deck };
-    if (kit.deck && (on || !kit.on)) for (const [tier, n] of Object.entries(kit.deck(t, sp))) { const z = drSlot(n); if (z >= 0) deck[tier] = z; }
+    if (kit.deck && (on || !kit.on)) for (const [tier, n] of Object.entries(kit.deck(t, sp, mode))) { const z = drSlot(n); if (z >= 0) deck[tier] = z; }
     // her kills take one of her Skill Slots
     let cards = 1 + (D && D.slot ? Math.min(D.slot.max, Math.floor((kit.selfKill ? before : dead) / D.slot.every)) : 0);
     if (kit.selfKill && dead > before) cards -= 1;
-    const n = kit.idle && kit.idle(t) ? 0 : cards;
+    const gone = kit.dies && t > kit.dies, n = gone || (kit.idle && kit.idle(t, mode)) ? 0 : cards;
     let dmg = 0, fu = 0, s99 = {}, firstSlot = null;
     const kinds = [];
     for (let ci = 0; ci < Math.max(1, n); ci++) {
       const none = ci >= n;  // no attack this turn (Defense, a kill): its turn-start lines still happen
       const tier = DR_DECK[cardN % 6];
       if (!none) cardN++;
-      let slot = ci === 0 && kit.card && kit.card(t) ? drSlot(kit.card(t)) : deck[tier];
+      let slot = deck[tier];
+      const cn = ci === 0 && !none && kit.card && kit.card(t, mode);
+      if (cn) { const z = drSlot(cn); if (z >= 0) slot = z; else approx.add("kit"); }
       if (slot == null || slot < 0) return null;
       // a stronger Skill its own status calls in ("At 30 [X], activate "Y" instead")
       if (!none) for (const a of drAlt(slots[slot][1], up)) {
@@ -287,7 +322,7 @@ function drSim(x0, hit, mode, sp = null) {
       if (!bm) return null;
       if (!bm.m.auto && !none) approx.add("hand model");
       const u = cqAt(sk, up), o = dcbOn(bm), name = dcaBare(dcaEnU(sk, u).name);
-      kinds.push(none ? "Defense" : F.info[slot].kind);
+      kinds.push(none ? (gone ? "Dead" : "Defense") : F.info[slot].kind);
       // the card's two states: conditions (status-effects at 99) and the real target (status damage)
       const st = (real) => {
         const s = {};
@@ -329,7 +364,7 @@ function drSim(x0, hit, mode, sp = null) {
       dcOwnAfter(me, [...evs, ...pas.filter((e) => e.at === "hit" || e.at === "post" || e.at === "use")], { s: s99, c: b99.c, name }, all, pend);
       // follow-ups by their text's condition (a kit script's turns instead)
       for (const z of form.fu || []) {
-        if (deckSlots.has(z) || (kit.fu && kit.fu[nameOf(z)])) continue;
+        if (deckSlots.has(z) || (kfu && kfu[nameOf(z)])) continue;
         const c = dcaFuCond(x, nameOf(z), up);
         if (!c.length) { approx.add("follow-up"); continue; }
         // "at 0 [X]" of a status the texts never give: not known
@@ -340,7 +375,7 @@ function drSim(x0, hit, mode, sp = null) {
         fu += drFu(x, slots, z, s99);
       }
     }
-    if (kit.fu) slots.forEach((_, z) => { const at = kit.fu[nameOf(z)]; if (at && at.includes(t)) fu += drFu(x, slots, z, s99); });
+    if (kfu) Object.entries(kfu).forEach(([nm, at]) => { const z = drSlot(nm); if (z >= 0 && at.includes(t)) fu += drFu(x, slots, z, s99); });
     dmg += fu;
     // turn end: the target's statuses tick (Burn hits), yours lose Counts, Turn End lines, then what was gained for next turn
     let burn = 0;
