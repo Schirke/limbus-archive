@@ -3549,7 +3549,6 @@
 "Search…": "검색…",
 "Counting every Identity…": "모든 인격을 계산하는 중…",
 "≈ = part of this kit is not read yet (hover it), the real number can be higher or lower. Not a tier list: damage on one dummy only, no allies' attacks, no E.G.O.": "≈ = 이 인격의 일부 효과를 아직 읽지 못함(마우스를 올려 확인), 실제 수치는 더 높거나 낮을 수 있음. 티어표가 아님: 허수아비 하나에 대한 피해만, 아군 공격과 E.G.O 제외.",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Formula: the calculator's,": "팀과 함께: 같은 그룹의 아군이 주는 효과(여명 사무소, 거미집…), 아군 조건은 충족된 것으로 계산. 공식: 계산기의 것,",
 "Not read yet: {0}": "아직 읽지 못함: {0}",
 "a follow-up's condition": "추가 스킬의 조건",
 "how it reaches its other form": "다른 형태로 바뀌는 방법",
@@ -3558,6 +3557,8 @@
 "a turn": "턴당",
 "Full power by turn": "최대 화력 도달 턴",
 "Turn {0} · {1}: {2}": "{0}턴 · {1}: {2}",
-"Open in the calculator →": "계산기에서 열기 →"
+"Open in the calculator →": "계산기에서 열기 →",
+"Allies fall": "아군 사망",
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "팀과 함께: 같은 그룹의 아군이 주는 효과(여명 사무소, 거미집…), 아군 조건은 충족된 것으로 계산. 아군 사망: 10턴부터 턴마다 아군 1명이 쓰러짐(일부 인격은 더 일찍 직접 아군을 처치). 공식: 계산기의 것,"
 }
 }

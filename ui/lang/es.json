@@ -3549,7 +3549,6 @@
 "Search…": "Buscar…",
 "Counting every Identity…": "Calculando todas las Identidades…",
 "≈ = part of this kit is not read yet (hover it), the real number can be higher or lower. Not a tier list: damage on one dummy only, no allies' attacks, no E.G.O.": "≈ = parte de este kit aún no se lee (pasa el cursor), el número real puede ser mayor o menor. No es una tier list: solo daño a un muñeco, sin ataques de aliados ni E.G.O.",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Formula: the calculator's,": "Con su equipo: lo que le dan los aliados de su grupo (Oficina Amanecer, Casa de las Arañas…) y las condiciones sobre aliados cumplidas. Fórmula: la de la calculadora,",
 "Not read yet: {0}": "Aún no se lee: {0}",
 "a follow-up's condition": "la condición de una habilidad adicional",
 "how it reaches its other form": "cómo llega a su otra forma",
@@ -3558,6 +3557,8 @@
 "a turn": "por turno",
 "Full power by turn": "Plena potencia en el turno",
 "Turn {0} · {1}: {2}": "Turno {0} · {1}: {2}",
-"Open in the calculator →": "Abrir en la calculadora →"
+"Open in the calculator →": "Abrir en la calculadora →",
+"Allies fall": "Caen aliados",
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "Con su equipo: lo que le dan los aliados de su grupo (Oficina Amanecer, Casa de las Arañas…) y las condiciones sobre aliados cumplidas. Caen aliados: desde el turno 10, un aliado por turno (algunos kits matan a sus aliados antes). Fórmula: la de la calculadora,"
 }
 }

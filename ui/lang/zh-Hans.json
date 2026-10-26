@@ -3588,7 +3588,6 @@
 "Search…": "搜索…",
 "Counting every Identity…": "正在计算所有人格…",
 "≈ = part of this kit is not read yet (hover it), the real number can be higher or lower. Not a tier list: damage on one dummy only, no allies' attacks, no E.G.O.": "≈ = 这个人格的部分效果暂未读取（悬停查看），实际数值可能更高或更低。这不是强度榜：只计算对一个木桩的伤害，不含队友攻击和 E.G.O。",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Formula: the calculator's,": "带队伍：同组队友给予它的效果（黎明事务所、蛛巢…），对队友的条件视为满足。公式：计算器的，",
 "Not read yet: {0}": "暂未读取：{0}",
 "a follow-up's condition": "追加技能的条件",
 "how it reaches its other form": "如何进入另一形态",
@@ -3597,6 +3596,8 @@
 "a turn": "每回合",
 "Full power by turn": "达到全力的回合",
 "Turn {0} · {1}: {2}": "第 {0} 回合 · {1}：{2}",
-"Open in the calculator →": "在计算器中打开 →"
+"Open in the calculator →": "在计算器中打开 →",
+"Allies fall": "队友倒下",
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "带队伍：同组队友给予它的效果（黎明事务所、蛛巢…），对队友的条件视为满足。队友倒下：从第 10 回合起每回合倒下一名队友（有些人格会更早亲手击杀队友）。公式：计算器的，"
 }
 }

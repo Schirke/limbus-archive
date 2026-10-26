@@ -3588,7 +3588,6 @@
 "Search…": "Поиск…",
 "Counting every Identity…": "Считаем все Идентичности…",
 "≈ = part of this kit is not read yet (hover it), the real number can be higher or lower. Not a tier list: damage on one dummy only, no allies' attacks, no E.G.O.": "≈ = часть кита пока не читается (наведите курсор), настоящая цифра может быть выше или ниже. Это не тир-лист: только урон по одному манекену, без атак союзников и без E.G.O.",
-"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Formula: the calculator's,": "С командой: что ей дают союзники из её группы (офис «Рассвета», Дом Пауков…), условия на союзников выполнены. Формула — калькулятора,",
 "Not read yet: {0}": "Пока не читается: {0}",
 "a follow-up's condition": "условие доп. навыка",
 "how it reaches its other form": "как она переходит в другую форму",
@@ -3597,6 +3596,8 @@
 "a turn": "за ход",
 "Full power by turn": "Полная сила к ходу",
 "Turn {0} · {1}: {2}": "Ход {0} · {1}: {2}",
-"Open in the calculator →": "Открыть в калькуляторе →"
+"Open in the calculator →": "Открыть в калькуляторе →",
+"Allies fall": "Союзники падают",
+"With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's,": "С командой: что ей дают союзники из её группы (офис «Рассвета», Дом Пауков…), условия на союзников выполнены. Союзники падают: с 10-го хода по одному союзнику за ход (некоторые киты убивают своих раньше). Формула — калькулятора,"
 }
 }
