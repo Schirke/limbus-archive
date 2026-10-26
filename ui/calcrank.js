@@ -125,7 +125,8 @@ function drTeamOf(x) {
 // a kit the texts can't tell (Vlad's numbers): turns a follow-up plays, the turn the form starts ([alone, team, falling]), allies falling a turn,
 // on(t) = its other state this turn, st = states set then, deck = Skills (name or label) by tier, card = the turn's one Skill, idle = no attack, sp = counted at each SP
 const DR_KIT = {
-  11115: { fu: { "time to unpack!": [1, 3, 5] }, form: 6 },  // Outis: the sword's seals at turns 1, 3, 5 → Lævateinn
+  // Outis: the sword's seals at turns 1, 3, 5 → Lævateinn with 10 Vengeance Tattoos (from Resentment she gains when hit; the calculator's preset)
+  11115: { fu: { "time to unpack!": [1, 3, 5] }, form: 6, st: (t) => (t >= 6 ? { s_ReinforcedTattooSpiderOutis: 10, s_MiddleFatherSwordOneOutis: 0 } : {}) },
   10415: { kills: [1, 2, 2, 2, 2, 2], selfKill: 1 },  // Ryōshū kills her House of Spiders allies herself with a Defense Skill: 1 on turn 1, then 2 a turn
   10215: { form: [7, 2, 2] },  // Faust: Corpus Ingredient spent by S3 → Flow State (with The Ring allies, S3 on turn 1)
   11016: { form: 4 },  // Le Rouge Sinclair: Noble Dignity
