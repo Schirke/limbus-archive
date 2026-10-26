@@ -3569,6 +3569,7 @@
 "Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "สถานะบนหุ่นนับเป็น 99 เฉพาะตอนเช็กเงื่อนไข ความเสียหายของมันคือส่วนที่ไอเดนทิตี้ใส่เอง (Potency และ Count ไม่เกิน 99)",
 "Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "บัฟของตัวเองเริ่มที่ 0 และเพิ่มตามคำอธิบายสกิล Haste บวกเข้ากับ Speed",
 "Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "ร่างที่สองและสกิลเสริมพลังเริ่มในเทิร์นที่ชุดสกิลไปถึง สกิลเสริมพลังแทนที่ S3 ของรอบนั้น ส่วนที่คำอธิบายไม่ได้บอก (สแตกที่ได้จากการโดนโจมตี คอมโบกับทีม) กำหนดเทิร์นเอง",
-"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "รวม = 20 เทิร์น ต่อเทิร์น = ค่าเฉลี่ย พลังเต็มที่ = ช่วง 6 เทิร์นแรกที่ได้อย่างน้อย 95% ของช่วงที่ดีที่สุด"
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "รวม = 20 เทิร์น ต่อเทิร์น = ค่าเฉลี่ย พลังเต็มที่ = ช่วง 6 เทิร์นแรกที่ได้อย่างน้อย 95% ของช่วงที่ดีที่สุด",
+"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "การจัดอันดับยังอยู่ระหว่างพัฒนา ตอนนี้ตัวเลขจึงเป็นค่าประมาณ เรากำลังปรับปรุงและจะทำให้แม่นยำขึ้นในอนาคต"
 }
 }

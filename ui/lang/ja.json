@@ -3569,6 +3569,7 @@
 "Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "木人の状態異常は条件判定でのみ99として扱い、そのダメージは人格自身が付与した分だけです（威力・回数は最大99）。",
 "Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "自分のバフは0から始まり、スキルテキストどおりに増えます。迅速は速度に加算されます。",
 "Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "第2形態と強化スキルは条件を満たしたターンから始まり、強化スキルはそのサイクルのS3と入れ替わります。テキストで判断できない場合（被弾で得るスタック、チーム連携）はターンを手動で設定しています。",
-"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "合計 = 20ターン。1ターン = 平均。最大火力 = 最高値の95%以上になる最初の6ターン区間。"
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "合計 = 20ターン。1ターン = 平均。最大火力 = 最高値の95%以上になる最初の6ターン区間。",
+"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "ランキングはまだ開発中のため、現在の数値はおおよそです。作業を進めており、今後より正確にしていきます。"
 }
 }

@@ -3608,6 +3608,7 @@
 "Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "Статусы на манекене считаются как 99 только для условий; их урон — то, что ID накладывает сама (не больше 99 Потенциала и Счётчика).",
 "Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "Свои баффы начинаются с 0 и растут по текстам кита. Спешка прибавляется к скорости.",
 "Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "Вторые формы и усиленные навыки включаются с хода, когда кит до них доходит; усиленный навык заменяет S3 своего круга. Где тексты не говорят (стаки от получаемых ударов, комбо с командой), ходы поставлены вручную.",
-"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Всего = 20 ходов. За ход = среднее. Полная сила = первый отрезок из 6 ходов, где урон не ниже 95% лучшего."
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Всего = 20 ходов. За ход = среднее. Полная сила = первый отрезок из 6 ходов, где урон не ниже 95% лучшего.",
+"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "Рейтинг пока в разработке, поэтому цифры сейчас примерные. Работа идёт — в будущем сделаем их точнее."
 }
 }

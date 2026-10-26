@@ -3569,6 +3569,7 @@
 "Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "허수아비의 상태이상은 조건 판정에서만 99로 계산하고, 그 피해는 인격이 직접 부여한 만큼만 셉니다(위력·횟수 최대 99).",
 "Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "자신의 버프는 0에서 시작해 스킬 텍스트대로 쌓입니다. 신속은 속도에 더해집니다.",
 "Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "두 번째 형태와 강화 스킬은 조건을 채운 턴부터 적용되며, 강화 스킬은 해당 순환의 S3를 대신합니다. 텍스트로 알 수 없는 경우(피격으로 얻는 스택, 팀 연계)는 턴을 직접 정했습니다.",
-"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "합계 = 20턴. 턴당 = 평균. 최대 화력 = 최고치의 95% 이상인 첫 6턴 구간."
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "합계 = 20턴. 턴당 = 평균. 최대 화력 = 최고치의 95% 이상인 첫 6턴 구간.",
+"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "랭킹은 아직 개발 중이라 지금 수치는 대략적인 값입니다. 작업 중이며 앞으로 더 정확하게 만들겠습니다."
 }
 }

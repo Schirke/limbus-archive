@@ -462,6 +462,7 @@ async function drPage() {
   if (!UNITS.ids.length) { $("#main").innerHTML = `<div class="empty">Take a snapshot first — the database is read from it.</div>`; return; }
   $("#main").innerHTML = `<div class="dcpage drpage">
     <div class="dctop"><h1>Damage calculator</h1>${drTabs("rank")}</div>
+    <div class="drwip">The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.</div>
     <details class="drhow"><summary>How we count</summary>
     <div class="drcond"><span class="drlbl">Same for everyone</span>
       <span class="drchip">Uptie 4 · Lv ${MAX_LEVEL}</span><span class="drchip">${DR_TURNS} turns, one Skill a turn: S1 S1 S2 S1 S2 S3</span>

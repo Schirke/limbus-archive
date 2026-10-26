@@ -3569,6 +3569,7 @@
 "Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "Los estados del muñeco cuentan como 99 solo para las condiciones; su daño es el que la Identidad aplica por sí misma (como máximo 99 de Potencia y Cantidad).",
 "Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "Los beneficios propios empiezan en 0 y crecen según los textos del kit. La Prisa se suma a la Velocidad.",
 "Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "Las segundas formas y las habilidades mejoradas empiezan en el turno en que el kit las alcanza; la habilidad mejorada ocupa el lugar de la S3 de la ronda. Donde los textos no lo dicen (cargas ganadas al recibir golpes, combos de equipo), los turnos se fijan a mano.",
-"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Total = 20 turnos. Por turno = la media. Plena potencia = el primer tramo de 6 turnos con al menos el 95% del mejor."
+"Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "Total = 20 turnos. Por turno = la media. Plena potencia = el primer tramo de 6 turnos con al menos el 95% del mejor.",
+"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "La clasificación aún está en desarrollo, así que por ahora las cifras son aproximadas. Estamos trabajando en ello y las haremos más precisas."
 }
 }
