@@ -27,34 +27,40 @@ def find_browser() -> str | None:
     return shutil.which("msedge") or shutil.which("chrome")
 
 
-_job = None
+def _kernel32():
+    import ctypes
+    from ctypes import wintypes
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateJobObjectW.restype = k.OpenProcess.restype = wintypes.HANDLE
+    k.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+    k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    k.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    return k
 
 
 def start_browser(args: list, **kw) -> subprocess.Popen:
-    """A headless browser that dies with this process, however it ends (a Windows job: kill on close)."""
-    global _job
+    """A headless browser that dies with this process, however it ends (a Windows job per browser: kill on close)."""
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), **kw)
     if os.name == "nt":
         try:
             import ctypes
             from ctypes import wintypes
-            k = ctypes.WinDLL("kernel32", use_last_error=True)
-            k.CreateJobObjectW.restype = k.OpenProcess.restype = wintypes.HANDLE
-            k.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
-            k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
-            k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-            if not _job:
-                class Limits(ctypes.Structure):  # JOBOBJECT_EXTENDED_LIMIT_INFORMATION
-                    _fields_ = [("a", ctypes.c_int64 * 2), ("flags", wintypes.DWORD), ("b", ctypes.c_size_t * 2), ("c", wintypes.DWORD),
-                                ("d", ctypes.c_size_t), ("e", wintypes.DWORD), ("f", wintypes.DWORD), ("io", ctypes.c_uint64 * 6), ("g", ctypes.c_size_t * 4)]
-                job, lim = k.CreateJobObjectW(None, None), Limits()
-                lim.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
-                if job and k.SetInformationJobObject(job, 9, ctypes.byref(lim), ctypes.sizeof(lim)):
-                    _job = job
+            k = _kernel32()
+
+            class Limits(ctypes.Structure):  # JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+                _fields_ = [("a", ctypes.c_int64 * 2), ("flags", wintypes.DWORD), ("b", ctypes.c_size_t * 2), ("c", wintypes.DWORD),
+                            ("d", ctypes.c_size_t), ("e", wintypes.DWORD), ("f", wintypes.DWORD), ("io", ctypes.c_uint64 * 6), ("g", ctypes.c_size_t * 4)]
+            job, lim = k.CreateJobObjectW(None, None), Limits()
+            lim.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
             h = k.OpenProcess(0x0101, False, proc.pid)  # PROCESS_SET_QUOTA | PROCESS_TERMINATE
-            if _job and h:
-                k.AssignProcessToJobObject(_job, h)
-            h and k.CloseHandle(h)
+            if job and h and k.SetInformationJobObject(job, 9, ctypes.byref(lim), ctypes.sizeof(lim)) and k.AssignProcessToJobObject(job, h):
+                proc.job = job  # type: ignore[attr-defined]
+            elif job:
+                k.CloseHandle(job)
+            if h:
+                k.CloseHandle(h)
         except Exception:
             pass
     return proc
@@ -83,6 +89,15 @@ def close_browser(proc, prof: str) -> None:
     except Exception:
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True,
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    job = getattr(proc, "job", None)
+    if job:  # Edge relaunches itself at start, so the launcher's exit says nothing: the job holds the real browser
+        try:
+            k = _kernel32()
+            k.TerminateJobObject(job, 1)
+            k.CloseHandle(job)
+        except Exception:
+            pass
+        proc.job = None
     for _ in range(20):
         shutil.rmtree(prof, ignore_errors=True)
         if not os.path.exists(prof):
