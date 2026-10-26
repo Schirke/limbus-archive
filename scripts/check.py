@@ -434,17 +434,16 @@ class Cdp:
 
 
 def check_pages(rep, base, only=None, shots=False):
-    from limbusdm.sitecheck import _free_port, close_browser, find_browser, new_profile
+    from limbusdm.sitecheck import _free_port, close_browser, find_browser, new_profile, start_browser
     exe = find_browser()
     if not exe:
         rep.warn("pages", "browser", "no Edge or Chrome: pages not opened")
         return
     port, prof = _free_port(), new_profile("limbus-check-")
-    proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
+    proc = start_browser([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
                              "--window-size=1600,1000", "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-extensions", "--disable-sync",
                              "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE 127.0.0.1, EXCLUDE cdn.jsdelivr.net",
-                             "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "about:blank"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                             "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "about:blank"])
     tab = None
     try:
         tabs = None

@@ -27,6 +27,39 @@ def find_browser() -> str | None:
     return shutil.which("msedge") or shutil.which("chrome")
 
 
+_job = None
+
+
+def start_browser(args: list, **kw) -> subprocess.Popen:
+    """A headless browser that dies with this process, however it ends (a Windows job: kill on close)."""
+    global _job
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), **kw)
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            k = ctypes.WinDLL("kernel32", use_last_error=True)
+            k.CreateJobObjectW.restype = k.OpenProcess.restype = wintypes.HANDLE
+            k.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+            k.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+            k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            if not _job:
+                class Limits(ctypes.Structure):  # JOBOBJECT_EXTENDED_LIMIT_INFORMATION
+                    _fields_ = [("a", ctypes.c_int64 * 2), ("flags", wintypes.DWORD), ("b", ctypes.c_size_t * 2), ("c", wintypes.DWORD),
+                                ("d", ctypes.c_size_t), ("e", wintypes.DWORD), ("f", wintypes.DWORD), ("io", ctypes.c_uint64 * 6), ("g", ctypes.c_size_t * 4)]
+                job, lim = k.CreateJobObjectW(None, None), Limits()
+                lim.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                if job and k.SetInformationJobObject(job, 9, ctypes.byref(lim), ctypes.sizeof(lim)):
+                    _job = job
+            h = k.OpenProcess(0x0101, False, proc.pid)  # PROCESS_SET_QUOTA | PROCESS_TERMINATE
+            if _job and h:
+                k.AssignProcessToJobObject(_job, h)
+            h and k.CloseHandle(h)
+        except Exception:
+            pass
+    return proc
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
@@ -91,10 +124,9 @@ def check(root: str, routes: list[str] | None = None, progress=None, settle: flo
     httpd = serve_dir(root)
     base = f"http://127.0.0.1:{httpd.server_address[1]}"
     port, prof = _free_port(), new_profile("limbus-sitecheck-")
-    proc = subprocess.Popen([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
+    proc = start_browser([exe, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}", "--window-size=1400,1000",
                              "--remote-allow-origins=*", "--mute-audio", "--no-first-run", "--disable-extensions", "--disable-sync", "--disable-background-timer-throttling",
-                             "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "about:blank"],
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                             "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows", "about:blank"])
     tab, more = None, []
     try:
         tabs = None
