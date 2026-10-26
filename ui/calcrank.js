@@ -2,7 +2,7 @@
 // Target: Burn / Bleed / Tremor / Rupture / Sinking count as 99 / 99 for conditions; their damage comes from what the Identity inflicts itself.
 // Own statuses start at 0 and grow by the kit's texts (clashes won, coins all Heads, SP at max, no kills, full HP).
 const DR_TURNS = 20, DR_ELEM = new Set(["Combustion", "Laceration", "Vibration", "Burst", "Sinking"]), DR_DECK = [1, 1, 2, 1, 2, 3], DR_FOE_SPEED = 4;
-const dr = { hit: 1, team: 0, rows: null, busy: null, sort: "tot", sin: "", rk: "", q: "" };
+const dr = { hit: 1, team: 0, crit: 0, rows: null, busy: null, sort: "tot", sin: "", rk: "", q: "" };
 
 // ---- texts as a dummy fight reads them: clashes are won, "first time in the Encounter" lines happen on turn 1
 // with a team (tc = its groups' sizes): conditions on allies of its group are met, "# of [group] allies" become numbers
@@ -230,7 +230,9 @@ function drMateDeaths(x, up, mates) {
 }
 // ---- one Identity: 20 turns, one card a turn (S1 S1 S2 S1 S2 S3 round; more with extra Skill Slots), the form its own status says
 // mode: 0 alone, 1 with its team, 2 with its team and allies falling
-function drSim(x0, hit, mode, sp = null) {
+// own Poise (99/99) and Charge Count (20) at their max for conditions, like the dummy's 99; Charge Potency grows too slowly (1 a 10 Count spent): its own
+const DR_SELFMAX = { Breath: { p: 99, c: 99 }, Charge: { c: 20 } };
+function drSim(x0, hit, mode, sp = null, crit = 0) {
   const team = mode > 0, kit = DR_KIT[x0.id] || {};
   // with a team: what the mates' statuses do is read as one more passive of this Identity (its own copy, its own caches)
   const tm = team ? drTeamOf(x0) : null, T = team ? drTeam(x0) : null, up0 = x0.maxUp || 4;
@@ -283,7 +285,7 @@ function drSim(x0, hit, mode, sp = null) {
     if (y && mateDeath.has(y.id)) mateDeath.get(y.id).forEach(add);
   };
   const turns = [];
-  let formAt = 0, lastForm = 0, cardN = 0;
+  let formAt = 0, lastForm = 0, cardN = 0, critAcc = 0;
   for (let t = 1; t <= DR_TURNS; t++) {
     // turn start: statuses' own losses, what a mate fallen last turn gave turns into its other status, allies that fall, the passives' Combat Start lines (Encounter ones on turn 1)
     for (const kw of new Set(Object.keys(me).map((k) => k.replace(/^s_/, "").replace(/_[pc]$/, "")))) { const te = dcaTurnEnd(kw); if (te.start) dcOwnDo(me, { conds: [], kw, part: dcaG(kw).st === 2 ? "c" : "s", op: "eat", n: te.start, upTo: true }, {}); }
@@ -340,11 +342,13 @@ function drSim(x0, hit, mode, sp = null) {
           else if ((m = /data-kw="(\w+)"[^]*?(Potency|Count)?(?: on (self|target))?$/.exec((bm.id.sliders.find(([q]) => q === k) || [])[1] || ""))) {
             // a hand model's slider on a status: the fight's own number
             const [, kw, pc, side] = m, part = pc ? pc[0].toLowerCase() : "", c = carry[kw];
-            s[k] = side === "target" ? (!real && DR_ELEM.has(kw) ? 99 : c ? (part ? c[part] : c.n ?? c.p) || 0 : 0) : me[part ? `s_${kw}_${part}` : `s_${kw}`] || 0;
+            s[k] = side === "target" ? (!real && DR_ELEM.has(kw) ? 99 : c ? (part ? c[part] : c.n ?? c.p) || 0 : 0) : !real && DR_SELFMAX[kw] && DR_SELFMAX[kw][part || "p"] != null ? DR_SELFMAX[kw][part || "p"] : me[part ? `s_${kw}_${part}` : `s_${kw}`] || 0;
           } else s[k] = bm.s[k];
         }
         if (fi > 0) F.forms.forEach((f) => { if (f.kw) s[`s_${f.kw}`] = f === form ? 1 : 0; });
         for (const k in me) if (!(k in s)) s[k] = me[k];
+        // "Guaranteed crit": Poise 99/99 for everything
+        for (const [kw, v] of Object.entries(DR_SELFMAX)) if (!real || (crit && kw === "Breath")) for (const q of ["p", "c"]) if (v[q] != null) s[`s_${kw}_${q}`] = v[q];
         Object.assign(s, ov);
         s.__name = name;
         return dcS(u, s);
@@ -356,8 +360,8 @@ function drSim(x0, hit, mode, sp = null) {
       evs.forEach((e) => { if (e.op === "add" && e.at === "pre") dcOwnDo(me, e, st(false)); });
       s99 = st(false);
       const sR = st(true), env = dcEnv(u), m2 = { ...bm.m, bursts: null };
-      // Poise: crit chance 5% a Potency
-      const pc = Math.min(1, (ov.s_Breath_p ?? me.s_Breath_p ?? 0) * 0.05), calc = (m, s, sd) => {
+      // Poise: crit chance 5% a Potency it has really gained
+      const pc = crit ? 1 : Math.min(1, (ov.s_Breath_p ?? me.s_Breath_p ?? 0) * 0.05), calc = (m, s, sd) => {
         const a = dcbCalc(m, u, { ...s, g_crit: 0, stdmg: sd }, o, env), b = pc > 0 ? dcbCalc(m, u, { ...s, g_crit: 1, stdmg: sd }, o, env) : a;
         return { total: a.total * (1 - pc) + b.total * pc, c: pc >= 0.5 ? b : a };
       };
@@ -365,6 +369,13 @@ function drSim(x0, hit, mode, sp = null) {
       dmg += b99.total + (cR.total - bR.total);
       if (bm.m.auto) for (const [kw, b0, a] of bm.m.target(sR, o).st) {
         if (typeof b0 === "number") { if (a > 0) carry[kw] = { n: a }; else delete carry[kw]; } else if (a && a.p > 0 && a.c > 0) carry[kw] = { p: Math.min(99, a.p), c: Math.min(99, a.c) }; else delete carry[kw];  // (the game caps both at 99)
+      }
+      // each crit spends 1 Poise Count (the expected ones, coin by coin); at 0 Count Poise is gone
+      if (!crit && pc > 0 && ov.s_Breath_p == null) {
+        critAcc += pc * (u.coins || 1);
+        const k = Math.floor(critAcc + 1e-9);
+        critAcc -= k;
+        if (k) { const c = (me.s_Breath_c || 1) - k; if (c > 0) me.s_Breath_c = c; else { me.s_Breath_c = 0; me.s_Breath_p = 0; } }
       }
       dcOwnAfter(me, [...evs, ...pas.filter((e) => e.at === "hit" || e.at === "post" || e.at === "use")], { s: s99, c: b99.c, name }, all, pend);
       // follow-ups by their text's condition (a kit script's turns instead)
@@ -438,12 +449,12 @@ function drG(g, key, bm, c) {
 const drTabs = (on) => `<div class="drtabs"><a href="#/calc"${on === "calc" ? ' class="on"' : ""}>Calculator</a><a href="#/calc/rank"${on === "rank" ? ' class="on"' : ""}>Ranking</a></div>`;
 const DR_DONE = new Map();  // "hit.team" → rows
 async function drRows() {
-  const key = `${dr.hit}.${dr.team}`;
+  const key = `${dr.hit}.${dr.team}.${dr.crit}`;
   if (DR_DONE.has(key)) return DR_DONE.get(key);
   // the calculator's own state is put back after the run
   const keep = { ...dc }, rows = [], ids = UNITS.ids.filter((x) => x.title);
   for (let i = 0; i < ids.length; i++) {
-    for (const sp of (DR_KIT[ids[i].id] || {}).sp || [null]) try { const r = drSim(ids[i], dr.hit, dr.team, sp); if (r) rows.push(r); } catch (e) { console.warn("ranking", ids[i].id, e); }
+    for (const sp of (DR_KIT[ids[i].id] || {}).sp || [null]) try { const r = drSim(ids[i], dr.hit, dr.team, sp, dr.crit); if (r) rows.push(r); } catch (e) { console.warn("ranking", ids[i].id, e); }
     if (i % 8 === 7) {
       Object.assign(dc, keep);
       const bar = $("#drprog");
@@ -471,12 +482,14 @@ async function drPage() {
       <ul class="drhowl">
         <li>Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.</li>
         <li>Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).</li>
-        <li>Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.</li>
+        <li>Own buffs start at 0 and grow by the kit's texts; Haste from its own Skills adds to Speed. Conditions on its own Poise and Charge Count count them at their max (Poise 99, Charge Count 20), like the statuses on the dummy; Charge Potency is its own.</li>
+        <li>Crits: 5% a Poise Potency it has really gained, each crit spends 1 Poise Count, at 0 Count Poise is gone. &quot;Guaranteed crit&quot;: Poise 99/99, every coin crits.</li>
         <li>Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.</li>
         <li>Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.</li>
       </ul></details>
     <div class="drbar">
       <span class="cqkind" id="drhit">${[1, 3, 5].map((n) => `<button data-hit="${n}" class="${dr.hit === n ? "on" : ""}">${n === 1 ? "1 enemy" : `${n} enemies`}</button>`).join("")}</span>
+      <span class="cqkind" id="drcrit"><button class="drcritb${dr.crit ? " on" : ""}">${(/<img[^>]*>/.exec(dcbK("Breath")) || [""])[0]}Guaranteed crit</button></span>
       <span class="cqkind" id="drteam">${[[0, "Alone"], [1, "With its team"], [2, "Allies fall"]].map(([n, l]) => `<button data-team="${n}" class="${dr.team === n ? "on" : ""}">${l}</button>`).join("")}</span>
       <span class="cqkind" id="drsort"><button data-sort="tot" class="${dr.sort === "tot" ? "on" : ""}">Most damage</button><button data-sort="full" class="${dr.sort === "full" ? "on" : ""}">Fastest to full power</button></span>
       <select id="drsin"><option value="">All Sinners</option>${DCA_SIN.map((n, i) => `<option value="${i + 1}"${+dr.sin === i + 1 ? " selected" : ""}>${esc(n)}</option>`).join("")}</select>
@@ -488,6 +501,7 @@ async function drPage() {
       With its team: what allies of its group give it (Dawn Office, House of Spiders…) and conditions on allies met. Allies fall: from turn 10 one ally a turn (some kits kill their own allies sooner). Formula: the calculator's, <a href="https://github.com/BaTyANl/ElderCalc" target="_blank" rel="noopener">BaTyANl calc ↗</a><br>
       ${esc(DR_SPT)}</p></div>`;
   const re = async () => { $("#drlist").innerHTML = `<div class="drload"><span class="muted">Counting every Identity…</span><div class="drprogw"><div id="drprog"></div></div></div>`; const r = await drRows(); if (r) drDraw(r); };
+  $("#drcrit").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; dr.crit = dr.crit ? 0 : 1; b.classList.toggle("on", !!dr.crit); re(); };
   $("#drhit").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; dr.hit = +b.dataset.hit; document.querySelectorAll("#drhit button").forEach((q) => q.classList.toggle("on", q === b)); re(); };
   $("#drteam").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; dr.team = +b.dataset.team; document.querySelectorAll("#drteam button").forEach((q) => q.classList.toggle("on", q === b)); re(); };
   $("#drsort").onclick = (e) => { const b = e.target.closest("button"); if (!b) return; dr.sort = b.dataset.sort; document.querySelectorAll("#drsort button").forEach((q) => q.classList.toggle("on", q === b)); if (dr.rows) drDraw(dr.rows); };

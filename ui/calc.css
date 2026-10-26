@@ -361,6 +361,7 @@ button.cqname.dcunit:hover { color: var(--gold); } img.dcunit { cursor: pointer;
 .drtabs a { padding: 8px 16px; font: 16px "LC Bebas", sans-serif; letter-spacing: .1em; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .drtabs a.on { color: var(--gold); border-color: var(--gold); }
 .drwip { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--red); border-radius: 6px; background: rgba(192, 57, 43, .14); color: #ff8a7a; font-size: 13.5px; line-height: 1.5; }
+.drcritb { display: inline-flex; align-items: center; gap: 5px; } .drcritb .kwico { width: 16px; height: 16px; }
 .drhow { margin-bottom: 12px; } .drhow summary { cursor: pointer; width: max-content; color: var(--gold); font-size: 13px; }
 .drhow[open] summary { margin-bottom: 8px; } .drhowl { margin: 8px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .drcond { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-bottom: 0; }

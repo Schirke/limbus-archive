@@ -3606,9 +3606,11 @@
 "How we count": "計算方式",
 "Every Identity fights one dummy alone for 20 turns, one Skill a turn in the order S1 S1 S2 S1 S2 S3. Each hit is the calculator's own formula.": "每個人格單獨攻擊一個木樁 20 回合，每回合一個技能，順序為 S1 S1 S2 S1 S2 S3。每次攻擊都用計算器的公式。",
 "Statuses on the dummy count as 99 only for conditions; their damage is what the Identity inflicts itself (at most 99 Potency and Count).": "木樁上的狀態只在判斷條件時視為 99；狀態傷害只算人格自己施加的部分（強度和層數最多 99）。",
-"Own buffs start at 0 and grow by the kit's texts. Haste adds to Speed.": "自身增益從 0 開始，依技能文本增長。迅捷計入速度。",
 "Second forms and enhanced Skills start on the turn the kit reaches them; an enhanced Skill takes the place of the S3 of the round. Where the texts can't tell (stacks gained when hit, team combos), the turns are set by hand.": "第二形態和強化技能從人格達到條件的回合開始；強化技能取代該輪的 S3。文本無法判斷的情況（受擊獲得的層數、隊伍連攜），回合為手動設定。",
 "Total = 20 turns. A turn = the average. Full power = the first 6-turn stretch within 95% of the best one.": "總計 = 20 回合。每回合 = 平均值。全力 = 第一個達到最佳值 95% 的連續 6 回合。",
-"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "排行仍在開發中，目前數值僅供參考。我們正在努力，之後會讓它更準確。"
+"The ranking is still in development, so for now the numbers are approximate. We are working on it and will make them more accurate.": "排行仍在開發中，目前數值僅供參考。我們正在努力，之後會讓它更準確。",
+"Crits: 5% a Poise Potency it has really gained, each crit spends 1 Poise Count, at 0 Count Poise is gone. \"Guaranteed crit\": Poise 99/99, every coin crits.": "暴擊：每 1 點實際獲得的呼吸法強度 5% 機率；每次暴擊消耗 1 層呼吸法，層數為 0 時呼吸法消失。「必定暴擊」：呼吸法 99/99，每枚硬幣都暴擊。",
+"Guaranteed crit": "必定暴擊",
+"Own buffs start at 0 and grow by the kit's texts; Haste from its own Skills adds to Speed. Conditions on its own Poise and Charge Count count them at their max (Poise 99, Charge Count 20), like the statuses on the dummy; Charge Potency is its own.": "自身增益從 0 開始，依技能文本增長；自身技能給的迅捷計入速度。對自身呼吸法和充能層數的條件按最大值計算（呼吸法 99，充能層數 20），與木樁上的狀態相同；充能強度按自身實際值。"
 }
 }
