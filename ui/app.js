@@ -50,13 +50,14 @@ try {
 } catch {}
 if (LANG.id === "en") LANG.id = "";
 // a pack's own fonts: titles in place of the game's Bebas, texts too when set; kept for the next load.
-// Only for letters past Latin-1 (English keeps Bebas / Segoe UI; punctuation and arrows too); css: sized to stand next to them
+// Only for letters past Latin-1 (English keeps Bebas / Segoe UI; punctuation and arrows too), every letter for a Latin-script language
+// ("all": its words mix both); css: sized to stand next to them
 const LANG_RANGE = "unicode-range: U+0100-1FFF, U+2C00-FFFF;";
 function langFonts(f) {
   let st = document.getElementById("langfonts");
   if (!st) { st = document.createElement("style"); st.id = "langfonts"; document.head.appendChild(st); }
   f = f || {};
-  const face = (fam, x) => `@font-face { font-family: "${fam}"; src: url(${x.url || x}); font-display: swap; ${LANG_RANGE} ${x.css || ""} }`;
+  const face = (fam, x) => `@font-face { font-family: "${fam}"; src: url(${x.url || x}); font-display: swap; ${x.all ? "" : LANG_RANGE} ${x.css || ""} }`;
   st.textContent = (f.title ? face("LC Bebas", f.title) : "")
     + (f.text ? `${face("LC Lang", f.text)}
       html, body { font-family: "LC Lang", "Segoe UI", system-ui, sans-serif; }` : "");

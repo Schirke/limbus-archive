@@ -103,6 +103,10 @@ def install(data_dir: str, progress=None, info: dict | None = None) -> str:
     # delete the pre-rename exe
     cleanup = f'Remove-Item -LiteralPath "{os.path.join(app, OLD_EXE)}" -Force -ErrorAction SilentlyContinue\n' \
         if exe != OLD_EXE else ""
+    # the old Mono player's folders (robocopy adds, never removes): gone once the IL2CPP player is in
+    if os.path.isfile(os.path.join(src, "LimbusViewer", "GameAssembly.dll")):
+        for old in (os.path.join("LimbusViewer", "MonoBleedingEdge"), os.path.join("LimbusViewer", "LimbusViewer_Data", "Managed")):
+            cleanup += f'Remove-Item -LiteralPath "{os.path.join(app, old)}" -Recurse -Force -ErrorAction SilentlyContinue\n'
     script = os.path.join(work, "apply.ps1")
     log = os.path.join(work, "update.log")
     with open(script, "w", encoding="utf-8-sig") as f:

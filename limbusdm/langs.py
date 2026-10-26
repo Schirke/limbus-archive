@@ -10,14 +10,12 @@ import os
 import re
 import threading
 import time
-import urllib.request
 
-from . import REPO, links
+from . import REPO, ghraw, links
 
 VERSION = 4
 PUB_BRANCH = "lang-data"
-# branch commit via info/refs (no API limit), files by commit
-PUB_REFS = f"https://github.com/{REPO}.git/info/refs?service=git-upload-pack"
+# files by the branch's commit
 PUB_RAW = f"https://raw.githubusercontent.com/{REPO}/%s/%s"
 PUB_KEEP = 600  # seconds the published list is used before it is asked again
 SAFE = re.compile(r"^[\w.-]+$")
@@ -76,21 +74,13 @@ def _listed(root: str, prefix: str = "", rel: str = "") -> dict[str, tuple]:
     return out
 
 
-def _get(url: str, timeout: int, ua: str = "LimbusArchive") -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": ua})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read()
-
-
 def _pub_read(svc):
     try:
-        refs = _get(PUB_REFS, 10, "git/2.45")
-        m = re.search(rb"([0-9a-f]{40}) refs/heads/" + PUB_BRANCH.encode() + rb"\n", refs)
-        if not m:  # nothing published yet
+        sha = ghraw.head(PUB_BRANCH)
+        if not sha:  # nothing published yet
             doc = {}
         else:
-            sha = m.group(1).decode()
-            doc = json.loads(_get(PUB_RAW % (sha, "index.json"), 15))
+            doc = json.loads(ghraw.get(PUB_RAW % (sha, "index.json"), 15))
             doc["sha"] = sha
         _pub["doc"] = doc
         os.makedirs(_cache_dir(svc), exist_ok=True)
@@ -134,7 +124,7 @@ def sources(svc) -> list[dict]:
     for code, prefix, lang in OFFICIAL:
         d = os.path.join(loc, code)
         if os.path.isdir(d):
-            out.append({"id": code, "name": "Official", "lang": lang, "dir": d, "prefix": prefix, "version": "", "authors": [], "link": "", "license": {}})
+            out.append({"id": code, "name": "Official", "lang": lang, "dir": d, "prefix": prefix, "version": "", "authors": [], "link": "", "license": {}, "discord": ""})
             seen.add(code)
     for root in [os.path.join(svc.data_dir, "lang")]:
         if not os.path.isdir(root):
@@ -154,17 +144,19 @@ def sources(svc) -> list[dict]:
             seen.add(name)
             out.append({"id": name, "name": meta.get("name") or name, "lang": meta.get("lang") or _lang_of(name), "dir": d,
                         "prefix": "", "version": str(meta.get("version") or ""), "authors": meta.get("authors") or [],
-                        "link": meta.get("link") or "", "license": meta.get("license") or {}})
+                        "link": meta.get("link") or "", "license": meta.get("license") or {},
+                        "discord": meta.get("discord") or ""})
     for e in published(svc).get("langs") or []:
         if not isinstance(e, dict) or not SAFE.match(str(e.get("id", ""))) or not SAFE.match(str(e.get("sig", ""))):
             continue
         mine = next((s for s in out if s["id"] == e["id"]), None)
         if mine:
             mine["pub"] = e
+            mine["discord"] = mine["discord"] or e.get("discord") or ""
         else:
             out.append({"id": e["id"], "name": e.get("name") or e["id"], "lang": e.get("lang") or _lang_of(e["id"]), "dir": None,
                         "prefix": None, "version": str(e.get("version") or ""), "authors": e.get("authors") or [],
-                        "link": e.get("link") or "", "license": e.get("license") or {}, "pub": e})
+                        "link": e.get("link") or "", "license": e.get("license") or {}, "discord": e.get("discord") or "", "pub": e})
     for s in out:
         s["label"] = NATIVE.get(s["lang"], s["lang"])
     return out
@@ -295,7 +287,7 @@ def _fetch_pub(svc, e: dict) -> dict:
         raise ValueError("the published list is not readable")
     os.makedirs(_cache_dir(svc), exist_ok=True)
     for g, p in files.items():
-        data = _get(PUB_RAW % (sha, names[g]), 120)
+        data = ghraw.get(PUB_RAW % (sha, names[g]), 120)
         if data[:2] != b"\x1f\x8b":
             raise ValueError("not a table")
         with open(p + ".tmp", "wb") as f:
@@ -369,6 +361,9 @@ FONT_DIRS = {"title": "Title", "text": "Context"}
 FONT_CHOICES = {"title": ("pack", "sofia"), "text": ("pack",)}
 SOFIA = "fonts/SofiaSansExtraCondensed-SemiBold.ttf"  # (in ui/: OFL, fonts/OFL-SofiaSans.txt)
 REF_TEXT = (0.700, 1.079, 0.251)  # Segoe UI: cap height, ascent, descent (em)
+NON_LATIN = {"ru", "uk", "be", "bg", "sr", "mk", "kk", "mn", "el", "zh", "ja", "ko", "th", "lo", "km", "my", "ar", "fa", "ur",
+             "he", "hi", "bn", "ta", "te", "ka", "hy"}
+STACKED = {"th", "lo", "km", "my", "hi", "bn", "ta", "te"}  # marks above and below: own line metrics, a little larger
 _metric_cache: dict = {}
 
 
@@ -466,11 +461,13 @@ def _ref_title(svc) -> tuple:
     return _metric_cache["bebas"]
 
 
-def _fit(m: tuple | None, ref: tuple) -> str:
+def _fit(m: tuple | None, ref: tuple, stacked: bool = False) -> str:
     """descriptors: the same cap height and line as the font it stands next to"""
     if not m:
         return ""
     k = ref[0] / m[0]
+    if stacked:
+        return f"size-adjust: {100 * min(k, 1.15):.1f}%;"
     return f"size-adjust: {100 * k:.1f}%; ascent-override: {100 * ref[1] / k:.1f}%; descent-override: {100 * ref[2] / k:.1f}%; line-gap-override: 0%;"
 
 
@@ -478,6 +475,9 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
     """{"title" / "text": {"url", "css"}}: the fonts a language's pages use (none: the app's own)"""
     from .paths import resource_dir
     out = {}
+    # a Latin-script language mixes its letters with ASCII inside a word: its font takes every letter ("all"), not only those past Latin-1
+    script = str(src.get("lang") or "").split("-")[0]
+    latin = script not in NON_LATIN
     for kind, choice in (mode or {}).items():
         if choice == "sofia":
             p, url = os.path.join(resource_dir(), "ui", SOFIA), "/ui/" + SOFIA
@@ -488,7 +488,9 @@ def _fonts(svc, src: dict, mode: dict | None) -> dict:
             st = os.stat(p)
             v = hashlib.sha1(f"{p}|{st.st_size}|{int(st.st_mtime)}".encode()).hexdigest()[:8]
             url = f"/api/langfont?id={src['id']}&k={kind}&v={v}"  # (params sorted: the site's name)
-        out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT)}
+        out[kind] = {"url": url, "css": _fit(_metrics_of(p), _ref_title(svc) if kind == "title" else REF_TEXT, script in STACKED)}
+        if latin:
+            out[kind]["all"] = True
     return out
 
 
@@ -511,7 +513,7 @@ def listing(svc) -> dict:
                 pass
         if cover is None and s.get("pub"):
             cover = s["pub"].get("cover")
-        out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link", "license")}
+        out.append({k: s[k] for k in ("id", "name", "lang", "label", "version", "authors", "link", "license", "discord")}
                    | {"cover": cover, "fonts": _fonts(svc, s, modes.get(s["id"])), "tables": {g: links.lang_table(s["id"], g) for g in GROUPS}})
     return {"langs": out}
 

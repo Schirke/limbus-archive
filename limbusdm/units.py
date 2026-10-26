@@ -14,7 +14,8 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 19  # bump when the database layout changes (cached per snapshot)
+VERSION = 20  # bump when the database layout changes (cached per snapshot)
+NO_RES = re.compile(r"cannot gain E\.G\.O resources?", re.I)
 
 
 def _load(base: str, pattern: str) -> dict:
@@ -157,6 +158,8 @@ def skill_info(sid: int, skills: dict, loc_skills: dict, copies: int | None = No
         out["icon"] = icon
     if copies is not None:
         out["copies"] = copies
+    if ups and NO_RES.search(ups[max(ups)]["desc"]):
+        out["nores"] = True
     return out
 
 
@@ -308,6 +311,11 @@ def build(tables: dict, loc_dir: str) -> dict:
             "img": {"thumb": f"{ASSET}Unit/Profile/Ego/{eid}_awaken_profile.png", "art": f"{ASSET}Unit/EgoCG/{eid}_cg.png"},
         })
 
+    factions = {t for x in ids for t in x["assoc"] + [k["name"] for k in x["traitKw"]] if len(t) > 3}
+    for x in ids:
+        if fu := follow_ups(x, factions):
+            x["fu"] = fu
+
     used = {k for x in ids + events for k in x["keywords"]} | set(STATUSES)
     kw = {k: _one_line((keywords.get(k) or {}).get("name")) or k for k in used}
     tag_names = {k: _one_line(v.get("name")) for k, v in tags.items() if v.get("name")}
@@ -331,3 +339,74 @@ def build(tables: dict, loc_dir: str) -> dict:
     return {"ids": ids, "egos": egos, "events": events, "keywords": kw, "statuses": STATUSES, "tags": tag_names,
             "glossary": glossary, "sins": [v for k, v in SINS.items() if k not in ("WHITE", "BLACK", "NEUTRAL")],
             "sinners": SINNERS}
+
+
+# ---- extra uses of a skill the kit makes by name ("use 'X'"): each gives one of its sin like a dealt skill (team builder)
+_USE = re.compile(r"(?<!not )\buse\s+(?:the\s+)?(?:[\"“‘](.+?)[\"”’]|'(.+?)'(?=[\s,.)]|$))(?!\s+(?:Skill\s+)?as (?:a )?Counter)", re.I)
+# how often a line's condition holds in a turn: first match wins (the owner corrects them in Admin → Pages)
+_ODDS = [(r"once per Encounter", .15), (r"Substituted in|Returned to the field", .1), (r"Staggered", .3),
+         (r"less than \d+% HP|\d+%- HP", .2), (r"types of negative effects", .3),
+         (r"\b(?:at|has|with) \d+\+? \[|\bat 0 \[", .5),
+         (r"following Skills", .6), (r"\ball(?:y|ies|ied)\b.*\b(?:Attack|Skill|hits?)\b|attacked", .8)]
+
+
+def _plain(s: str) -> str:
+    return re.sub(r"\[TabExplain\]|<[^>]*>", "", s or "")
+
+
+def _skill_key(n: str) -> str:
+    return re.sub(r"\s*[\[【(].*$", "", _plain(n)).strip().lower()
+
+
+def _team(text: str, factions: set) -> dict | None:
+    """The allies a line needs: a faction ("Dawn Office" Identities, "Le Rouge" ally) or a status kind ([PersonalityCharge])."""
+    if m := re.search(r"\ballied \[Personality(\w+)\]", text):
+        return {"kw": m.group(1)}
+    for f in sorted(factions, key=len, reverse=True):
+        q = re.escape(f)
+        if re.search(rf"(?<!non-)[\"“]?{q}[\"”]?(?:-faction)? (?:all(?:y|ies|ied)|Identit(?:y|ies))(?! including this unit)", text):
+            return {"assoc": f}
+    return None
+
+
+def follow_ups(x: dict, factions: set) -> list:
+    own = {}
+    for s in x["skills"]:
+        u = s["up"][max(s["up"])]
+        own.setdefault(_skill_key(u["name"]), (s, u["sin"]))
+    texts = [p["desc"] for p in x["passives"] if p["kind"] == "battle"]
+    for s in x["skills"]:
+        u = s["up"][max(s["up"])]
+        texts += [u["desc"]] + [c for cl in u.get("coindescs") or [] for c in cl]
+    got: dict[int, dict] = {}
+    for t in texts:
+        head = ""
+        for line in _plain(t).split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            bullet = line[0] in "-·※•"
+            if not bullet:
+                head = line
+            ctx = f"{head}\n{line}" if bullet else line
+            for m in _USE.finditer(line):
+                hit = own.get(_skill_key(m.group(1) or m.group(2)))
+                if not hit:
+                    continue
+                s, sin = hit
+                cond = re.sub(r"\(prioritiz[^)]*\)", "", line)
+                p = next((v for pat, v in _ODDS if re.search(pat, cond)), .5)
+                if re.search(r"If this unit has \[\w+\]", head) and bullet:
+                    p *= .5  # (only in another form)
+                fu = got.setdefault(s["id"], {"skill": s["id"], "sin": sin, "p": 0, "why": []})
+                if line[:240] in fu["why"]:
+                    continue
+                fu["p"] = max(fu["p"], round(p, 2))  # (lines of one skill are mostly fallbacks of each other)
+                if s.get("nores"):
+                    fu["nores"] = True
+                if "team" not in fu and (team := _team(ctx, factions)):
+                    fu["team"] = team
+                if re.search(r"per turn per Identity", ctx):
+                    fu["each"] = True
+                fu["why"].append(line[:240])
+    return list(got.values())

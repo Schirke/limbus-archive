@@ -5,7 +5,7 @@ import re
 
 from .units import _load
 
-VERSION = 5
+VERSION = 9
 SINS = {"CRIMSON": "Wrath", "SCARLET": "Lust", "AMBER": "Sloth", "SHAMROCK": "Gluttony", "AZURE": "Gloom", "INDIGO": "Pride", "VIOLET": "Envy"}
 
 
@@ -32,6 +32,9 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
             packs.append({"id": p["id"], "name": (pname.get(p["id"]) or {}).get("name") or str(p["id"]), "floors": floors,
                           "pool": p.get("egoGiftPool") or [], "excl": p.get("specificEgoGiftPool") or [],
                           "hard": p.get("difficulty") == "DIFFICULT", "pic": pack_pics.get(str(ui.get("packSpriteId") or "")) or "",
+                          # the boss the game draws over the card (the "WARNING" packs only), the bosses it names
+                          "boss": pack_pics.get(str(ui.get("bossSpriteId") or "")) or "", "bossUnits": _boss_units(tables, p),
+                          "rare": bool(p.get("hiddenThemeRate")), "_fix": p.get("fixedRewardEgoGifts") or [],  # (a hidden pack, its clear reward)
                           "_gen": [p.get("mapGenOption"), p.get("mapGenSequence")]})
     packs.sort(key=lambda p: p["id"])
     _extra(tables, packs, set(gdata) - hid, how := {})
@@ -68,6 +71,10 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
         gifts[g] = {"name": n.get("name") or f"Gift {g}", "kw": kw if kw and kw != "None" else "", "tier": int(tier) if tier.isdigit() else 0,
                     "sin": SINS.get(d.get("attributeType"), ""), "desc": re.sub(r"\[TabExplain\]", "", n.get("desc") or ""),
                     "pic": gift_pics.get(str(d.get("iconId") or g)) or gift_pics.get(str(g)) or "", "team": team_conds(n.get("desc") or "")}
+        # "+" / "++": the game's texts of each upgrade level, changed parts in <style="upgradeHighlight">
+        up = [gname.get(u.get("localizeID")) or {} for u in sorted(d.get("upgradeDataList") or [], key=lambda u: u.get("upgradeLevel") or 0) if u.get("upgradeLevel")]
+        if up and all(u.get("desc") for u in up):
+            gifts[g]["up"] = [{"name": u.get("name") or "", "desc": re.sub(r"\[TabExplain\]", "", u["desc"])} for u in up]
         if g in how:
             gifts[g].update(how[g])
     modes = {}
@@ -75,7 +82,31 @@ def build(tables: dict, loc_dir: str, gift_pics: dict, pack_pics: dict) -> dict:
         for d in (t.get("list") if isinstance(t, dict) else None) or []:
             if d.get("typeIndex") is not None:
                 modes[str(d["typeIndex"])] = len(d.get("floors") or d.get("basicEnemyLevelPerFloor") or [])
-    return {"packs": packs, "gifts": gifts, "fus": fus, "modes": modes}
+    return {"packs": packs, "gifts": gifts, "fus": fus, "modes": modes, "start": _start(tables, loc_dir, gifts)}
+
+
+def _boss_units(tables: dict, p: dict) -> list[int]:
+    """A pack's bosses as unit ids: the ones its card shows, else the units of its boss fights."""
+    ids = list((p.get("uiConfigs") or {}).get("showBossIds") or [])
+    if not ids:
+        fights = {b.get("id"): b for t in (tables.get("battle-mirrordungeon") or {}).values() for b in (t.get("list") if isinstance(t, dict) else None) or []}
+        for bid in (p.get("mapGenOption") or {}).get("bossPool") or []:
+            ids += [u.get("unitID") for w in (fights.get(bid) or {}).get("waveList") or [] for u in w.get("unitList") or []]
+    return list(dict.fromkeys(i for i in ids if i))
+
+
+def _start(tables: dict, loc_dir: str, gifts: dict) -> dict:
+    """The game's "Starting E.G.O Gift Choice": {pools: [[keyword, [ids]]], bonus: [{name}]} (each bonus = one more pick)."""
+    common = [t for _, t in sorted((tables.get("mirror-dungeon-common-data") or {}).items()) if isinstance(t, dict) and t.get("startEgoGiftPools")]
+    pools = [[p["keyword"], [g for g in p.get("normalpool") or [] if g in gifts]] for p in (common[-1]["startEgoGiftPools"] if common else []) if p.get("keyword")]
+    ui = _load(loc_dir, r"EN_MirrorDungeonUI.*\.json$")
+    bonus = {}
+    for _, t in sorted((tables.get("mirrordungeon-start-buffs") or {}).items()):
+        for d in (t.get("list") if isinstance(t, dict) else None) or []:
+            for b in d.get("buffs") or []:
+                if any(e.get("type") == "ADDITIONAL_START_EGO_GIFT_SELECT" for e in b.get("effects") or []) and b.get("baseId") not in bonus:
+                    bonus[b.get("baseId")] = (ui.get(b.get("localizeId")) or {}).get("content") or str(b.get("baseId"))
+    return {"pools": [p for p in pools if p[1]], "bonus": [{"name": n} for _, n in sorted(bonus.items())]}
 
 
 def _rewards(o) -> set:
@@ -87,8 +118,9 @@ def _rewards(o) -> set:
 
 
 def _extra(tables: dict, packs: list, real: set, how: dict) -> None:
-    """Gifts outside the packs' pools: rewards of a pack's fights / events (pack-only when 3 packs or fewer, e.g. the
-    extreme bosses' gifts), the hidden fight of floors 11-15, events of many packs ({id: {how, min}} into `how`)."""
+    """Gifts outside the packs' pools: rewards of a pack's fights / events / clear (pack-only when 3 packs or fewer, e.g. the
+    extreme bosses' gifts; a hidden pack's: no route, a note), the hidden fight of floors 11-15, events of many packs
+    ({id: {how, min}} into `how`)."""
     src: dict[int, set] = {}
     for fold in ("battle-mirrordungeon", "abnormality-event"):
         for t in (tables.get(fold) or {}).values():
@@ -102,8 +134,13 @@ def _extra(tables: dict, packs: list, real: set, how: dict) -> None:
     owners: dict[int, list] = {}
     for p in packs:
         refs = {int(n) for n in re.findall(r"\d{5,7}", str([p.pop("_gen")]))}
-        for g in set().union(*(src.get(r, set()) for r in refs)) - known:
-            if g in real:
+        for g in set().union(set(p.pop("_fix")), *(src.get(r, set()) for r in refs)) - known:
+            if g not in real:
+                continue
+            if p["rare"]:
+                p["excl"].append(g)
+                how[g] = {"how": f"Reward for clearing the hidden pack {p['name']} (rare)"}
+            else:
                 owners.setdefault(g, []).append(p)
     for g, ps in owners.items():
         if len(ps) <= 3:

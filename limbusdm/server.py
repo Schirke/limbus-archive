@@ -1440,7 +1440,7 @@ def _skill_links(svc, s: dict | None, sid, pic: str):
 def _mirror_links(db: dict) -> dict:
     """The planner's gifts and theme packs with their picture's link."""
     return {**db, "gifts": {k: {**g, "tile": links.thumb(g.get("pic"))} for k, g in (db.get("gifts") or {}).items()},
-            "packs": [{**p, "tile": links.thumb(p.get("pic"))} for p in db.get("packs") or []]}
+            "packs": [{**p, "tile": links.thumb(p.get("pic")), "bossTile": links.thumb(p.get("boss"))} for p in db.get("packs") or []]}
 
 
 STORY_OFF = re.compile(r"(?i)off|none|stop")  # (a line's bgm that stops the music)

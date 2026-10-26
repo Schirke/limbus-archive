@@ -1300,14 +1300,14 @@ class Service:
             try:
                 for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Sprite/EgoGiftIcon/%'"):
                     gifts.setdefault(name, c)
-                for name, c in con.execute("select name, c from o where type = 'Texture2D' and c like '%/Everydungeon/card_pack/%'"):
+                for name, c in con.execute("select name, c from o where type = 'Texture2D' and (c like '%/Everydungeon/card_pack/%' or c like '%/Everydungeon/boss/%')"):
                     cards.setdefault(name, c)
             finally:
                 con.close()
             loc = os.path.join(self.game.data or "", "Assets", "Resources_moved", "Localize", "en")
             db = mirror.build(self.static_tables(["mirrordungeon-theme-floor", "mirror-dungeon-common-data", "ego-gift", "ego-gift-mirrordungeon",
                                                   "mirrordungeon", "battle-mirrordungeon", "abnormality-event", "acquirable-egogifts-in-event",
-                                                  "mirrordungeon-egogift-droppool"]), loc, gifts, cards)
+                                                  "mirrordungeon-egogift-droppool", "mirrordungeon-start-buffs"]), loc, gifts, cards)
             db["users"] = mirror.users(db, self.unit_db())
             db["v"] = mirror.VERSION
             self.store.write_json(rel, db)

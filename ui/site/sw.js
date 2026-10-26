@@ -134,7 +134,8 @@ async function answer(req, u, e) {
   if (k in s.inline) return json(s.inline[k]);
   if (k === "/api/_misses") return json(misses.get(e.clientId) || []);
   if (s.live[k]) {  // read from where the app reads it, now
-    try { return json(await (await fetch(s.live[k], { cache: "no-cache" })).json()); } catch (err) { return json({}); }
+    const get = (u) => fetch(u, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));  // (the Worker's copy first: GitHub is out of reach in some countries)
+    try { return json(await get("/gh/" + s.live[k].replace("https://raw.githubusercontent.com/", "")).catch(() => get(s.live[k]))); } catch (err) { return json({}); }
   }
   let file;
   try { file = await lookup(s, k); } catch (err) { return json({ error: "The site's data didn't load: " + err.message }, 503); }

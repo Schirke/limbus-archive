@@ -12,9 +12,10 @@ const UI_PH = /\{(\d+)\}/g;
 const uiForeign = /(?![\p{Script=Latin}])\p{L}/u;  // letters of another script: not English UI text
 const uiRoute = () => (location.hash.split("/")[1] || "").split("?")[0];
 
-// Russian-style word forms: 1 / 2–4 / 5+ (a language with one form gives one)
+// Russian-style word forms: 1 / 2–4 / 5+; two forms = 1 / other (Spanish); a language with one form gives one
 function uiPlural(n, forms) {
   const f = forms.split("|"), x = Math.abs(parseFloat(String(n).replace(",", ".")));
+  if (f.length === 2 && isFinite(x)) return x === 1 ? f[0] : f[1];
   if (f.length < 3 || !isFinite(x)) return f[f.length - 1];
   if (x % 1) return f[1];
   const d = x % 10, h = x % 100;

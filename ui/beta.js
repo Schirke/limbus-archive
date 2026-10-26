@@ -2,11 +2,17 @@
 // and next to the page's title, in the app and on the site. The same file's "off" = parts of pages switched off,
 // "human" = translations made by people without AI tools, "edited" = machine translations corrected by people (marks in
 // the language menu), "games" = the big games turned on for everyone, "links" = the ones open by link (biggames.js),
-// "ui" = interface languages on for everyone (i18n.js).
+// "ui" = interface languages on for everyone (i18n.js), "fu" = the owner's uses a turn of extra skills ("<id>.<skill>": n, team builder).
 "use strict";
 const BETA_URL = "https://raw.githubusercontent.com/Schirke/limbus-archive/community-config/beta.json";
-const betaReady = fetch(BETA_URL, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);  // (i18n.js waits for its "ui")
-const beta = { routes: new Set(), human: new Set(), edited: new Set(), raf: 0 };
+// a raw GitHub JSON file, or the site's copy of it (GitHub is out of reach in some countries); the site asks its copy first
+function ghGet(url, ms = 6000) {
+  const get = (u) => fetch(u, { cache: "no-cache", signal: AbortSignal.timeout ? AbortSignal.timeout(ms) : undefined }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+  const site = typeof SITE !== "undefined", copy = (site ? "/gh/" : "https://limbus-archive.com/gh/") + url.replace("https://raw.githubusercontent.com/", "");
+  return site ? get(copy).catch(() => get(url)) : get(url).catch(() => get(copy));
+}
+const betaReady = ghGet(BETA_URL).catch(() => null);  // (i18n.js waits for its "ui")
+const beta = { routes: new Set(), human: new Set(), edited: new Set(), fu: {}, raf: 0 };
 const langMark = (id) => beta.human.has(id) ? "human" : beta.edited.has(id) ? "edited" : "";
 document.head.insertAdjacentHTML("beforeend", `<style>
 .betatag, .newtag { display: inline-block; font: 11px/1 "LC Bebas", Impact, sans-serif; letter-spacing: .08em; color: #120e0b; background: #f8b400; padding: 3px 5px 2px; margin-left: 6px; vertical-align: middle; }
@@ -35,6 +41,10 @@ function betaHuman(list, edited) {
   try { localStorage.setItem("beta_human", JSON.stringify([[...beta.human], [...beta.edited]])); } catch (e) { /* read again next time */ }
   if (typeof supTranslators === "function") supTranslators();  // (the Support page's list, when it is open)
 }
+function betaFu(o) {
+  beta.fu = o && typeof o === "object" && !Array.isArray(o) ? Object.fromEntries(Object.entries(o).filter(([, v]) => typeof v === "number")) : {};
+  try { localStorage.setItem("beta_fu", JSON.stringify(beta.fu)); } catch (e) { /* read again next time */ }
+}
 function betaApply(list) {
   beta.routes = new Set(Array.isArray(list) ? list.filter((r) => typeof r === "string") : []);
   try { localStorage.setItem("beta", JSON.stringify([...beta.routes])); } catch (e) { /* read again next time */ }
@@ -47,8 +57,10 @@ function betaApply(list) {
 }
 (() => {
   try { betaApply(JSON.parse(localStorage.getItem("beta") || "[]")); betaOff(JSON.parse(localStorage.getItem("beta_off") || "[]"));
-    betaHuman(...JSON.parse(localStorage.getItem("beta_human") || "[[], []]")); } catch (e) { /* none until read */ }
-  betaReady.then((j) => { if (j) { betaApply(j.routes); betaOff(j.off); betaHuman(j.human, j.edited); if (typeof bigOn === "function") bigOn(j.games, j.links || []);
+    betaHuman(...JSON.parse(localStorage.getItem("beta_human") || "[[], []]")); betaFu(JSON.parse(localStorage.getItem("beta_fu") || "{}")); } catch (e) { /* none until read */ }
+  betaReady.then((j) => { if (j) { betaApply(j.routes); betaOff(j.off); betaHuman(j.human, j.edited); betaFu(j.fu);
+    if (document.querySelector("#builder") && typeof drawBuilder === "function") drawBuilder();
+    if (typeof bigOn === "function") bigOn(j.games, j.links || []);
     try { localStorage.setItem("beta_ui", JSON.stringify(Array.isArray(j.ui) ? j.ui : [])); } catch (e) { /* read again next time */ } } });
   const main = document.querySelector("#main");
   if (main) new MutationObserver(() => {

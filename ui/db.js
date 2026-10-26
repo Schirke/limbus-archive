@@ -198,10 +198,10 @@ function fmtDesc(text, plain = false) {
   // [TabExplain] is a wrap mark, not a keyword
   let s = String(text).replace(/\[TabExplain\]/g, "").replace(/<sprite[^>]*>/g, "")
     .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t.replace(/<[^>]+>/g, "")))
-    .replace(/<style="highlight">/g, "\u0006").replace(/<\/style>/g, "\u0007")
+    .replace(/<style="highlight">/g, "\u0006").replace(/<style="upgradeHighlight">/g, "\u0005").replace(/<\/style>/g, "\u0007")
     .replace(/<(color|mark)[= ](?:color=)?"?(#[0-9a-fA-F]{6,8})"?>/g, (_, t, c) => mark(`<span style="${t === "mark" ? "background" : "color"}:${c}">`))
     .replace(/<b>/g, () => mark(`<span style="font-weight:700">`)).replace(/<\/(color|mark|b)>/g, () => mark("</span>"))
-    .replace(/<[^>]+>/g, "");
+    .replace(/<\/?[A-Za-z][\w-]*(?:[= ][^>]*)?>/g, "");  // only tags: a translation's own "<Bloodfiend>" stays text, as in the game
   const pk = plain && UNITS && kwPlainOf();
   if (pk && pk.rx) s = s.split(/("[^"\n]*"|“[^”\n]*”|(?<![A-Za-z])'[^'\n]*'(?![A-Za-z]))/)
     .map((part, i) => i % 2 ? part : part.replace(pk.rx, (n) => kwSpan(pk.key[n], n))).join("");
@@ -209,9 +209,9 @@ function fmtDesc(text, plain = false) {
     ? mark(`<span class="tg" style="color:${TAG_COLOR[k] || "#93f13e"}">${esc(tags[k].replace(/<[^>]*>/g, ""))}</span>`) : kwSpan(k));
   // unbalanced spans dropped / closed
   let open = 0;
-  s = s.replace(/\u0001(\d+)\u0002|[\u0006\u0007]/g, (m, i) => {
-    const h = m === "\u0006" ? `<span class="hl">` : m === "\u0007" ? "</span>" : marks[i];
-    if (h === "</span>") { if (!open) return ""; open--; } else if (h.startsWith("<span style=") || h === `<span class="hl">`) open++;
+  s = s.replace(/\u0001(\d+)\u0002|[\u0005\u0006\u0007]/g, (m, i) => {
+    const h = m === "\u0005" ? `<span class="uph">` : m === "\u0006" ? `<span class="hl">` : m === "\u0007" ? "</span>" : marks[i];
+    if (h === "</span>") { if (!open) return ""; open--; } else if (h.startsWith("<span style=") || h === `<span class="hl">` || h === `<span class="uph">`) open++;
     return h;
   });
   return s.replace(/\n/g, "<br>") + "</span>".repeat(open);
@@ -509,8 +509,8 @@ function drawBuilder() {
       ${UNITS.statuses.filter((k) => st[k]).map((k) => `<span class="kwi small">${statusIcon(k, "s22")}<b>${st[k]}</b> ${esc(statusName(k))}</span>`).join("") || `<span class="muted small">no statuses yet</span>`}
       <span class="sep"></span>${Object.entries(atk).map(([k, n]) => `<span class="kwi small">${ico(`atk_${k}`, "s18", k, "")}<b>${n}</b> ${esc(k)}</span>`).join("")}
       <span class="grow"></span><button id="clearteam">Clear</button></div>
-    <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${s} ${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>
-    ${sides.field.length ? `<div class="tbrate"><span class="muted small" title="Each used skill gives one of its sin; on average, from the ${sides.field.length} on the field">Sins a turn ≈</span>${UNITS.sins.filter((s) => S.rate[s]).map((s) => `<span class="tbcost">${sinIcon(s, "s16")}${S.rate[s].toFixed(1)}</span>`).join("")}
+    <div class="sinbar">${UNITS.sins.filter((s) => sins[s]).map((s) => `<div style="flex:${sins[s]};background:${SIN_COLORS[s]}" title="${s}: ${sins[s]} skill copies"><span>${100 * sins[s] / total < 8 ? "" : s + " "}${Math.round(100 * sins[s] / total)}%</span></div>`).join("")}</div>
+    ${sides.field.length ? `<div class="tbrate"><span class="muted small" title="Each used skill gives one of its sin; on average, from the ${sides.field.length} on the field">Sins a turn ≈</span>${UNITS.sins.filter((s) => S.rate[s]).map((s) => `<span class="tbcost"${S.extra[s] ? ` title="${esc(`With extra skills: ${S.extra[s].map((f) => `${f.who} +${f.n.toFixed(1)}`).join(", ")}`)}"` : ""}>${sinIcon(s, "s16")}${S.rate[s].toFixed(1)}${S.extra[s] ? "*" : ""}</span>`).join("")}
       <span class="muted small">· E.G.O frame: <i class="tbkey slow"></i> slow to gather <i class="tbkey no"></i> no such sin on the field</span></div>` : ""}`;
   const P = tbPasList(sides, S);
   const panel = sides.field.length ? `<div class="card tbpanel"><div class="tbtabs">
@@ -588,19 +588,33 @@ function tbSides() {
   if (!field.length) field = all.filter(has);
   return { field, bench: all.filter((sid) => !field.includes(sid)) };
 }
-// rate: sins a turn on average; can: per Sinner, the chance a turn deals it a skill of that sin
+// rate: sins a turn on average (+ extra skills the kits use by name, x.fu); can: per Sinner, the chance a turn deals it a skill of that sin
 function tbSins(field) {
-  const rate = {}, can = {};
+  const rate = {}, can = {}, extra = {};
   for (const sid of field) {
-    const d = {};
-    unitById(MY.slots[sid]).skills.forEach((s) => { const n = s.copies ?? 1, sin = topUp(s).sin; if (n) d[sin] = (d[sin] || 0) + n; });
+    const d = {}, gives = {}, x = unitById(MY.slots[sid]);
+    x.skills.forEach((s) => { const n = s.copies ?? 1, sin = topUp(s).sin; if (n) { d[sin] = (d[sin] || 0) + n; if (!s.nores) gives[sin] = (gives[sin] || 0) + n; } });
     const tot = Object.values(d).reduce((a, b) => a + b, 0);
     for (const [sin, c] of Object.entries(d)) {
-      rate[sin] = (rate[sin] || 0) + c / tot;
+      if (gives[sin]) rate[sin] = (rate[sin] || 0) + gives[sin] / tot;
       (can[sin] = can[sin] || []).push(tot > 1 ? 1 - ((tot - c) * (tot - c - 1)) / (tot * (tot - 1)) : 1);
     }
+    for (const f of tbFollowUps(x, field.filter((o) => o !== sid).map((o) => unitById(MY.slots[o])))) {
+      rate[f.sin] = (rate[f.sin] || 0) + f.n;
+      (extra[f.sin] = extra[f.sin] || []).push(f);
+    }
   }
-  return { rate, can };
+  return { rate, can, extra };
+}
+// x's extra skills against its field mates: n = uses a turn (the owner's number from beta.json "fu" over the text's guess)
+function tbFollowUps(x, mates) {
+  return (x.fu || []).flatMap((f) => {
+    if (f.nores) return [];
+    const p = beta.fu[`${x.id}.${f.skill}`] ?? f.p, t = f.team;
+    const k = !t ? 1 : mates.filter((m) => t.kw ? (m.keywords || []).includes(t.kw) : mdFacs(m).includes(t.assoc)).length;
+    const n = p * (f.each ? k : Math.min(1, k)), sk = x.skills.find((s) => s.id === f.skill);
+    return n > 0 ? [{ sin: f.sin, n, who: `${x.sinnerName} · ${sk ? topUp(sk).name : f.skill}` }] : [];
+  });
 }
 function tbAtLeast(ps, n) {
   let dp = [1];

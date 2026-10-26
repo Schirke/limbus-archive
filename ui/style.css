@@ -1481,7 +1481,64 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpchead { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; } .mpchead img { width: 72px; height: 72px; object-fit: contain; }
 .mpchead h2 { margin: 0 28px 2px 0; color: var(--gold); }
 .mpcdesc { line-height: 1.55; } .mpcdesc .kw[data-kw] { cursor: pointer; }
+.mpup { display: inline-flex; gap: 4px; margin-left: 10px; vertical-align: 3px; }
+.mpup .toggle { font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; min-width: 34px; padding: 4px 9px 3px; }
+.mpuphint { font-size: 12.5px; color: var(--muted); margin: -4px 0 8px; }
+/* a gift upgrade's changed parts (the game's upgradeHighlight) */
+.uph { color: #ffd36b; background: rgba(248, 180, 0, .13); box-shadow: 0 0 0 2px rgba(248, 180, 0, .13); border-radius: 2px; }
+.uph.flash { animation: uphflash 1s ease-out; }
+@keyframes uphflash { from { background: rgba(255, 138, 0, .55); box-shadow: 0 0 0 3px rgba(255, 138, 0, .55); } }
 .mpcardx h4 { margin: 14px 0 6px; } .mpcardx .mdteam { margin-top: 6px; }
+/* MD planner: starting gift (button, picker mark, build rows, the choice) */
+.mpstartb { display: flex; align-items: center; gap: 8px; } .mpstartb .toggle { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; }
+.mpstartb img { width: 26px; height: 26px; object-fit: contain; margin: -4px 0; }
+.mpgift.st { outline: 2px solid var(--gold); outline-offset: -2px; }
+.mpgift em { position: absolute; right: 4px; top: 0; font: 16px "LC Bebas", sans-serif; font-style: normal; color: #ffd36b; text-shadow: 0 0 3px #000, 0 0 3px #000; }  /* has upgrades */
+/* Theme packs: the picker's second tab, a pack's card */
+.pvtabs { display: flex; margin: -2px 0 10px; } .pvtabs .toggle { flex: 1; font-size: 16px; padding: 7px 8px 6px; }
+.pvgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; max-height: calc(100vh - 330px); min-height: 240px; overflow: auto; margin-top: 10px; padding-right: 4px; }
+.pvc { position: relative; background: #0c0807; border: 1px solid var(--line); cursor: pointer; display: flex; flex-direction: column; }
+.pvc:hover { border-color: var(--gold); }
+.pvart { position: relative; aspect-ratio: 211 / 384; overflow: hidden; }
+.pvart > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pvart > img.boss { inset: auto; left: 50%; top: 47%; width: 150%; height: auto; transform: translate(-50%, -50%); object-fit: contain; }  /* wider than the card, on the octagon */
+.pvc .pvn { font-size: 12.5px; line-height: 1.25; padding: 5px 6px 6px; }
+.pvc .pvb { position: absolute; top: 4px; left: 4px; display: flex; gap: 3px; flex-wrap: wrap; z-index: 1; }
+.pvc .pvb span { font: 11px/1 "LC Bebas", sans-serif; letter-spacing: .06em; padding: 3px 4px 2px; background: #120d0bcc; border: 1px solid var(--line); color: var(--cream); }
+.pvc .pvb span.h { color: #ff8a7a; border-color: #7a2b22; }
+.mprow .nm[data-pvp] { cursor: pointer; } .mprow .nm[data-pvp]:hover { color: var(--gold); text-decoration: underline; }
+.pvx { width: min(760px, 88vw); max-width: 100%; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 18px; }
+.pvx .pvart { border: 1px solid var(--line); align-self: start; }
+.pvx h2 { margin: 0 30px 2px 0; color: var(--gold); }
+.pvx h4 { margin: 14px 0 6px; }
+.pvfl { display: flex; flex-wrap: wrap; gap: 6px; } .pvfl span { padding: 3px 8px; border: 1px solid var(--line); background: #0c0807; font-size: 12.5px; }
+.pvfl span b { color: var(--gold); font-weight: normal; margin-left: 4px; }
+.pvboss { display: flex; flex-wrap: wrap; gap: 8px; }
+.pvboss a { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border: 1px solid #7a2b22; background: linear-gradient(90deg, rgba(122, 43, 34, .35), #0c0807); text-decoration: none; color: var(--text); }
+.pvboss a:hover { border-color: #ff8a7a; } .pvboss img { width: 64px; height: 64px; object-fit: contain; background: #0c0807; }
+.pvboss b { display: block; color: #ffb3a8; } .pvboss small { color: var(--muted); }
+.pvgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 5px; } .pvgs .mpgift { cursor: pointer; }
+@media (max-width: 700px) { .pvx { grid-template-columns: minmax(0, 1fr); } .pvx .pvart { width: 150px; } .pvgrid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); max-height: none; } }
+.mpgift i { position: absolute; left: 2px; bottom: 2px; font: 11px "LC Bebas", sans-serif; font-style: normal; background: var(--gold); color: #120d0b; padding: 0 4px; letter-spacing: .06em; }
+.mpck.mpstart { border-left: 3px solid var(--gold); padding-left: 8px; }
+.mptag { display: inline-block; font: 12px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .08em; color: #120d0b; background: var(--gold); padding: 3px 5px 2px; margin-left: 6px; vertical-align: 2px; }
+.mpsx { width: min(760px, 88vw); max-width: 100%; }
+.mpsx h2 { margin: 0 30px 4px 0; color: var(--gold); }
+.mpskws { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 12px 0; }
+.mpskws .toggle { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 6px 6px; font-size: 15px; min-width: 0; }
+.mpskws .toggle .ico { margin: 0; flex: none; }
+.mpsgifts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.mpsgift { position: relative; background: #0c0807; border: 1px solid var(--line); padding: 10px; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.mpsgift:hover { border-color: #6b4a2c; }
+.mpsgift.on { border-color: var(--gold); box-shadow: inset 0 0 18px rgba(255, 138, 0, .35), 0 0 0 1px var(--gold); }
+.mpsgift.off { opacity: .45; }
+.mpsgift > i { position: absolute; top: 6px; right: 8px; color: var(--gold); font-style: normal; font-weight: 700; }
+.mpsh { display: flex; gap: 10px; align-items: center; } .mpsh img { width: 64px; height: 64px; object-fit: contain; flex: none; }
+.mpsh b { color: var(--gold); font: 17px/1.15 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.mpsd { font-size: 12.5px; line-height: 1.45; max-height: 11em; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
+.mpspicks { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 4px; } .mpspicks small span + span::before { content: " · "; }
+.mpsfoot { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; } .mpsfoot .grow { flex: 1; }
+@media (max-width: 700px) { .mpskws { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mpsgifts { grid-template-columns: minmax(0, 1fr); } .mpsd { max-height: none; } }
 .mpcrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; } .mpcrow > b { color: var(--muted); }
 .mpcchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); background: #0c0807; cursor: pointer; font-size: 13px; }
 .mpcchip:hover { border-color: var(--gold); } .mpcchip img { width: 26px; height: 26px; object-fit: contain; }
@@ -1870,3 +1927,24 @@ button.sndnav:hover { color: var(--gold); }
 #snapgate .hint { color: var(--muted); font-size: 12.5px; margin: 4px 0 14px 26px; }
 #snapgate .sggame { border: 1px solid var(--red); border-radius: 6px; padding: 10px 12px; margin-top: 12px; }
 #snapgate .sgtips { color: var(--muted); font-size: 13px; padding-left: 20px; margin: 14px 0 0; } #snapgate .sgtips li { margin: 5px 0; }
+/* Thai / Vietnamese: room for marks above and below; Thai without tracking */
+:is(:lang(th), :lang(vi)) :is(body, .hsay p) { line-height: 1.6; }
+:lang(th) *:not(.brand) { letter-spacing: 0 !important; }
+:is(:lang(th), :lang(vi)) :is(h1, .hname, .utitle, .enname, .vsname b) { line-height: 1.3; }
+:lang(vi) .ud .panel h4 { letter-spacing: .04em; padding-right: 24px; }
+/* "? Guide" by a page's title and its tour (guide.js) */
+.gdbtn { display: inline-flex; align-items: center; gap: 7px; vertical-align: middle; margin-left: 16px; position: relative; top: -4px; font: 15px/1 "LC Bebas", "Segoe UI", sans-serif;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--cream); background: #120d0b; border: 1px solid var(--line); padding: 6px 12px 5px; cursor: pointer; }
+.gdbtn b { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--gold); color: #120d0b; font-size: 14px; }
+.gdbtn:hover { color: var(--text); border-color: var(--gold); }
+.gdbtn.new { color: #fff3d0; border-color: var(--gold); background: linear-gradient(#6a4a1d, #3b2710); animation: gdpulse 1.6s ease-in-out infinite; }
+.gdbtn.new::after { content: "NEW"; position: absolute; top: -9px; right: -10px; font-size: 11px; background: #c0392b; color: #fff; padding: 2px 4px 1px; }
+@keyframes gdpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(248, 180, 0, .55), inset 0 0 8px rgba(255, 138, 0, .4); } 50% { box-shadow: 0 0 0 7px rgba(248, 180, 0, 0), inset 0 0 14px rgba(255, 138, 0, .7); } }
+.sttabs .gdbtn, .an-rhead .gdbtn { top: 0; margin: 0 0 0 8px; }
+#gdcatch { position: fixed; inset: 0; z-index: 89; }
+#gdhole { position: fixed; z-index: 90; border: 2px solid var(--gold); box-shadow: 0 0 0 9999px rgba(5, 3, 2, .78), 0 0 22px rgba(255, 138, 0, .6); pointer-events: none; transition: all .25s ease; }
+#gdbox { position: fixed; z-index: 91; width: min(340px, calc(100vw - 24px)); background: #17110e; border: 1px solid var(--gold); padding: 14px 16px 12px; box-shadow: 0 8px 30px #000; transition: top .25s ease, left .25s ease; }
+#gdbox .gdn { font: 13px "LC Bebas", sans-serif; letter-spacing: .1em; color: var(--gold); margin-bottom: 6px; }
+#gdbox p { margin: 0 0 12px; line-height: 1.5; }
+#gdbox .gdrow { display: flex; gap: 8px; align-items: center; } #gdbox .grow { flex: 1; }
+@media (max-width: 700px) { .gdbtn { margin-left: 10px; top: -2px; font-size: 13px; padding: 5px 9px 4px; } }

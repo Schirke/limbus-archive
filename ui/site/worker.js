@@ -1,7 +1,11 @@
 // The site's Worker: static files, /room/<code> live-match rooms (a Durable Object relaying messages in one order with
-// its clock), /stat/* visitor counts (daily sums, salted daily hashes), and /save: the games' progress under a code (D1).
+// its clock), /stat/* visitor counts (daily sums, salted daily hashes), /save: the games' progress under a code (D1), and
+// /gh/*: some GitHub files, for visitors who can't reach GitHub.
 import { DurableObject } from "cloudflare:workers";
 
+// /gh/<raw path>: our config / data branches (or a commit of them) and the calc's ID table; /gh/sha/<branch>: its commit
+const GH_FILE = /^(Schirke\/limbus-archive\/(community-config|community-data|lang-data|[0-9a-f]{40})|BaTyANl\/ElderCalc\/main)\/[\w.-]+\.json(\.gz)?$/;
+const GH_BRANCH = /^sha\/(community-config|community-data|lang-data)$/;
 const MOST = 8, ROOM_KEEP = 12 * 3600e3;
 const RATE_MS = 10e3, RATE_MOST = 80, RATE = new WeakMap();
 const what = (state) => [state.kind, state.game, state.mode].filter(Boolean).join(" ").slice(0, 40);
@@ -306,6 +310,20 @@ const MOVE_PAGE = `<!doctype html><meta charset="utf-8"><title>Limbus Archive</t
 })();
 </script>`;
 
+async function gh(path, closed) {
+  const head = { "Access-Control-Allow-Origin": "*" }, b = GH_BRANCH.exec(path);
+  if (closed || !(b || GH_FILE.test(path))) return new Response(null, { status: closed ? 503 : 404, headers: head });
+  if (b) {
+    const r = await fetch("https://github.com/Schirke/limbus-archive.git/info/refs?service=git-upload-pack", { headers: { "User-Agent": "git/2.45" }, cf: { cacheTtl: 60, cacheEverything: true } });
+    if (!r.ok) return new Response(null, { status: 502, headers: head });
+    const m = new RegExp("([0-9a-f]{40}) refs/heads/" + b[1] + "\n").exec(await r.text());
+    return new Response(JSON.stringify({ sha: m ? m[1] : "" }), { headers: { ...head, "Content-Type": "application/json", "Cache-Control": "max-age=60" } });
+  }
+  const keep = /\/[0-9a-f]{40}\//.test(path) ? 86400 : 60, r = await fetch("https://raw.githubusercontent.com/" + path, { cf: { cacheTtl: keep, cacheEverything: true } });
+  if (!r.ok) return new Response(null, { status: 502, headers: head });
+  return new Response(r.body, { headers: { ...head, "Content-Type": path.endsWith(".gz") ? "application/gzip" : "application/json; charset=utf-8", "Cache-Control": "max-age=" + keep } });
+}
+
 function moved(req, u, env) {
   let home;
   try { home = new URL(env.HOME); } catch { return null; }
@@ -332,6 +350,7 @@ export default {
         G.d += 3;  // (the connection, and its messages: twenty of them count as a request)
         return await env.ROOMS.get(env.ROOMS.idFromName(m[1])).fetch(req);
       }
+      if (u.pathname.startsWith("/gh/") && req.method === "GET") return await gh(u.pathname.slice(4), closed);
       if (u.pathname === "/save") {
         if (closed) return new Response(JSON.stringify({ error: "off" }), { status: 503, headers: saveCors(req, u) || {} });
         return await saves(req, u, env, ctx);
