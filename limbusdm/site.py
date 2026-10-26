@@ -568,15 +568,15 @@ def _big_made(ex) -> dict:
     for fn in names:
         with open(os.path.join(big, fn), "rb") as f:
             h.update(f.read())
-    ex._big = {"made": h.hexdigest()[:12]} if names else {}
+    ex._big = {"made": "2." + h.hexdigest()[:12]} if names else {}  # ("2.": once more over the list 0.12.7 cut)
     return ex._big
 
 
 def _big_start(ex, old: dict) -> list[str]:
     """The requests the big games make, as found by running them in a hidden window (bigNeeds); the old manifest's when
-    nothing they depend on changed or they can't run, plus the old ones when a game failed in the run."""
+    nothing they depend on changed or they can't run, always with the old ones on top."""
     made = _big_made(ex)
-    if made and (old.get("made") or "").rpartition("|")[2] != made["made"]:  # (older manifests: "<snapshot>|<scripts>")
+    if made and old.get("made") != made["made"]:
         try:
             keys, need = [], _big_needs(ex.base, ex.progress)
             for u in need.get("urls") or []:
@@ -585,9 +585,7 @@ def _big_start(ex, old: dict) -> list[str]:
                     keys.append(url_key(path, **dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))))
             for game, why in (need.get("bad") or {}).items():
                 ex.failed.append(("big games", f"{game}: {why}"))
-            if need.get("bad"):
-                keys += list(old.get("urls") or {})
-            return list(dict.fromkeys(keys))
+            return list(dict.fromkeys(keys + list(old.get("urls") or {})))  # (old sprites never change: a run that missed some keeps them)
         except Exception as e:
             ex.failed.append(("big games", str(e)))
             made.clear()  # (not recorded: tried again next time)
