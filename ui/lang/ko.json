@@ -3522,6 +3522,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}피해 (최상의 경우){2}",
 "calc|(the top)": "(최대)",
 "calc|% of the target's HP ({0}) the first Coin removes": "첫 코인이 깎는 대상 체력 ({0})의 %",
-"calc|the sum of both": "둘의 합"
+"calc|the sum of both": "둘의 합",
+"Leave the room": "방 나가기",
+"make host": "방장으로 지정",
+"away": "자리 비움",
+"Back to the room": "방으로 돌아가기",
+"Your place is still kept.": "자리가 아직 유지되고 있습니다.",
+"Players are still in it.": "방에 아직 플레이어가 있습니다.",
+"Forget this room": "이 방 잊기"
 }
 }

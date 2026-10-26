@@ -3561,6 +3561,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}伤害（最佳情况）{2}",
 "calc|(the top)": "（上限）",
 "calc|% of the target's HP ({0}) the first Coin removes": "首枚硬币造成的目标生命百分比（生命 {0}）",
-"calc|the sum of both": "两者之和"
+"calc|the sum of both": "两者之和",
+"Leave the room": "离开房间",
+"make host": "设为房主",
+"away": "暂离",
+"Back to the room": "回到房间",
+"Your place is still kept.": "你的位置还保留着。",
+"Players are still in it.": "房间里还有玩家。",
+"Forget this room": "忘记这个房间"
 }
 }

@@ -69,13 +69,15 @@ function vrFront() {
   const go = () => { const m = /([a-z0-9]{4,10})\s*$/i.exec($("#vrcode").value.trim()); m ? (location.hash = "#/vsroom/" + m[1].toLowerCase()) : toast("That is not a room's code."); };
   $("#vrgo").onclick = go;
   $("#vrcode").onkeydown = (e) => { if (e.key === "Enter") go(); };  // (a handler that returns false would swallow the key)
+  glBack();
 }
 
 // a message of the room
 function vrGot(m) {
   if (m.t === "full") { vr.full = true; return; }
   if (m.t === "room") {
-    const more = vr.room && m.players.length > vr.room.players.length;
+    const was = vr.room && vr.room.players.filter((p) => !p.away).map((p) => p.id), more = was && m.players.some((p) => !p.away && !was.includes(p.id));
+    if (!vr.room) glRemember(vr.code, "vs");
     vr.room = m;
     const s = m.state;
     if (s.kind !== "versus") {
@@ -182,8 +184,8 @@ function vrDraw() {
   if (!vrOn() || !vr.code) return;
   const code = vr.code, chip = (on, attr, text, off) => `<button class="toggle ${on ? "on" : ""}" ${attr} ${off ? "disabled" : ""}>${text}</button>`;
   const head = `<h1>Versus · online room</h1><div class="glroom"><span class="gmscore">ROOM <b>${esc(code.toUpperCase())}</b></span>
-    <button class="toggle" id="vrcopy">${GM_SWORDS}Copy the invite</button><span class="muted small">The link opens the room in a friend's app (or: Versus → Online room → the code).</span></div>`;
-  const invite = () => { if ($("#vrcopy")) $("#vrcopy").onclick = () => gmCopy(`Limbus Archive · a Versus room — pick a fighter and fight me:\n${GM_SITE}/#/vsroom/${code}\n(the page has a button that opens the app; or in the app: Versus → Online room → code ${code.toUpperCase()})`); };
+    <button class="toggle" id="vrcopy">${GM_SWORDS}Copy the invite</button>${vr.room ? `<button class="toggle" id="vrleave">Leave the room</button>` : ""}<span class="muted small">The link opens the room in a friend's app (or: Versus → Online room → the code).</span></div>`;
+  const invite = () => { if ($("#vrleave")) $("#vrleave").onclick = () => { vrSend({ t: "leave" }); glForget(); vrClose(); location.hash = "#/vsroom"; }; if ($("#vrcopy")) $("#vrcopy").onclick = () => gmCopy(`Limbus Archive · a Versus room — pick a fighter and fight me:\n${GM_SITE}/#/vsroom/${code}\n(the page has a button that opens the app; or in the app: Versus → Online room → code ${code.toUpperCase()})`); };
   if (!gl.nick || !vr.ws) {  // nickname, kept
     vr.sig = "";
     $("#main").innerHTML = `${head}${vr.error ? `<p class="glerr">${esc(vr.error)}</p>` : ""}
@@ -212,9 +214,10 @@ function vrDraw() {
   const tag = (p) => p.id === sides.left ? "LEFT" : p.id === sides.right ? "RIGHT" : "";
   $("#vrplayers").innerHTML = `<div class="gmgrp">Players <small>${r.players.length} / ${s.max || 8}</small></div>
     ${r.players.map((p) => { const t = tag(p), b = f.bets[p.id];
-      return `<div class="glrow ${p.id === gl.id ? "me" : ""}"><span>${esc(p.name)}</span>${t ? `<em class="vrtag">${t}</em>` : ""}${p.id === r.host ? "<em>HOST</em>" : ""}
+      return `<div class="glrow ${p.id === gl.id ? "me" : ""} ${p.away ? "gone" : ""}"><span>${esc(p.name)}</span>${p.away ? "<small>away</small>" : ""}${t ? `<em class="vrtag">${t}</em>` : ""}${p.id === r.host ? "<em>HOST</em>" : ""}${host && picking && !p.away && p.id !== gl.id ? `<button class="toggle" data-host="${esc(p.id)}">make host</button>` : ""}
         ${t ? (f.ready[p.id] ? `<i>ready</i>` : `<small>picking…</small>`) : b ? `<small>${b.amt} on ${b.side}</small>` : host && picking ? `<button class="toggle" data-right="${esc(p.id)}">make the opponent</button>` : `<small>watching</small>`}</div>`; }).join("")}`;
   document.querySelectorAll("#vrplayers [data-right]").forEach((b) => b.onclick = () => vrSet({ right: b.dataset.right }));
+  document.querySelectorAll("#vrplayers [data-host]").forEach((b) => b.onclick = () => vrSend({ t: "host", to: b.dataset.host }));
   // my corner: a fighter's pick, or a watcher's bet; the host's Start
   const both = sides.right && f.ready[sides.left] && f.ready[sides.right], c = vr.pick.id ? vsChar(vr.pick.id) : null, ready = !!f.ready[gl.id], bet = f.bets[gl.id];
   const sig = JSON.stringify([role, s.n, s.status, vr.pick, !!vr.skl, ready, bet, both, host, sides, gmW.lunacy, vr.bet]);

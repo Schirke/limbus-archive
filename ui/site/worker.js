@@ -6,7 +6,7 @@ import { DurableObject } from "cloudflare:workers";
 // /gh/<raw path>: our config / data branches (or a commit of them) and the calc's ID table; /gh/sha/<branch>: its commit
 const GH_FILE = /^(Schirke\/limbus-archive\/(community-config|community-data|lang-data|[0-9a-f]{40})|BaTyANl\/ElderCalc\/main)\/[\w.-]+\.json(\.gz)?$/;
 const GH_BRANCH = /^sha\/(community-config|community-data|lang-data)$/;
-const MOST = 8, ROOM_KEEP = 12 * 3600e3;
+const MOST = 8, ROOM_KEEP = 12 * 3600e3, GRACE = 60e3;  // (GRACE: a dropped player keeps their place this long)
 const RATE_MS = 10e3, RATE_MOST = 80, RATE = new WeakMap();
 const what = (state) => [state.kind, state.game, state.mode].filter(Boolean).join(" ").slice(0, 40);
 
@@ -21,23 +21,37 @@ export class Room extends DurableObject {
     return this.ctx.getWebSockets().map((ws) => ({ ws, ...(ws.deserializeAttachment() || {}) })).filter((p) => p.id).sort((a, b) => a.at - b.at);
   }
 
+  async away() { return (await this.ctx.storage.get("away")) || {}; }
+
+  // everybody in: the connected ones and the ones who dropped less than GRACE ago (away)
+  async everyone() {
+    const live = this.players(), away = await this.away();
+    return [...live.map(({ id, name, at }) => ({ id, name, at })),
+      ...Object.entries(away).filter(([id]) => !live.some((p) => p.id === id)).map(([id, a]) => ({ id, name: a.name, at: a.at, away: true }))].sort((a, b) => a.at - b.at);
+  }
+
   async fetch(req) {
-    if (req.headers.get("Upgrade") !== "websocket") return new Response("a room: connect with a WebSocket", { status: 426 });
     const u = new URL(req.url), code = u.pathname.split("/").pop(), q = u.searchParams, id = (q.get("id") || "").slice(0, 24), name = (q.get("name") || "").trim().slice(0, 20) || "Sinner";
-    const state = (await this.ctx.storage.get("state")) || {}, there = this.players();
+    if (q.has("peek")) {  // "back to the room": is anybody in, and am I still kept
+      const all = await this.everyone();
+      return new Response(JSON.stringify({ n: all.length, you: all.some((p) => p.id === id) }), { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+    if (req.headers.get("Upgrade") !== "websocket") return new Response("a room: connect with a WebSocket", { status: 426 });
+    const state = (await this.ctx.storage.get("state")) || {}, there = this.players(), away = await this.away(), back = away[id];
     const pair = new WebSocketPair(), [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
     const again = there.find((p) => p.id === id);  // the same player from a page opened anew: the old line goes
-    if (!id || (!again && there.length >= Math.min(MOST, state.max || MOST))) {
+    if (!id || (!again && !back && there.length + Object.keys(away).length >= Math.min(MOST, state.max || MOST))) {
       server.send(JSON.stringify({ t: "full" }));
       server.close(1000, "full");
       return new Response(null, { status: 101, webSocket: client });
     }
     if (again) { again.ws.serializeAttachment(null); try { again.ws.close(1000, "again"); } catch {} }
-    server.serializeAttachment({ id, name, at: again ? again.at : Date.now(), room: code });
-    if (!(await this.ctx.storage.get("host")) || !this.players().some((p) => p.id === state.host)) await this.host(state);
+    if (back) { delete away[id]; await this.ctx.storage.put("away", away); }
+    server.serializeAttachment({ id, name, at: again ? again.at : back ? back.at : Date.now(), room: code });
+    if (!state.host || !(await this.everyone()).some((p) => p.id === state.host)) await this.host(state);
     await this.tell();
-    if (!again) this.report(code, state);
+    if (!again && !back) this.report(code, state);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -57,7 +71,7 @@ export class Room extends DurableObject {
   }
 
   async tell() {
-    const state = (await this.ctx.storage.get("state")) || {}, all = this.players(), list = all.map(({ id, name }) => ({ id, name }));
+    const state = (await this.ctx.storage.get("state")) || {}, all = this.players(), list = (await this.everyone()).map(({ id, name, away }) => (away ? { id, name, away } : { id, name }));
     for (const p of all) try { p.ws.send(JSON.stringify({ t: "room", you: p.id, host: state.host, players: list, state, now: Date.now() })); } catch {}
   }
 
@@ -79,6 +93,19 @@ export class Room extends DurableObject {
       if (what(next) !== what(state)) this.report(me.room, next);
       return this.tell();
     }
+    if (m.t === "host") {  // the host hands the room to a player who is in
+      const state = (await this.ctx.storage.get("state")) || {};
+      if (state.host !== me.id || m.to === me.id || !this.players().some((p) => p.id === m.to)) return;
+      state.host = m.to;
+      await this.ctx.storage.put("state", state);
+      await this.ctx.storage.put("host", state.host);
+      return this.tell();
+    }
+    if (m.t === "leave") {  // left on purpose: no place kept
+      ws.serializeAttachment(null);
+      try { ws.close(1000, "left"); } catch {}
+      return this.gone(me, true);
+    }
     if (m.t === "msg") {
       const out = JSON.stringify({ t: "msg", from: me.id, data: m.data, now: Date.now() });
       for (const p of this.players()) try { p.ws.send(out); } catch {}
@@ -89,12 +116,40 @@ export class Room extends DurableObject {
     const me = ws.deserializeAttachment();
     ws.serializeAttachment(null);
     try { ws.close(); } catch {}
-    if (!me || !me.id) return;
-    const state = (await this.ctx.storage.get("state")) || {};
+    if (me && me.id) await this.gone(me, false);
+  }
+
+  // a player's line closed: on purpose (left) they go now, else they are away until GRACE runs out
+  async gone(me, left) {
+    if (this.players().some((p) => p.id === me.id)) return;  // (another line of theirs is open)
+    const state = (await this.ctx.storage.get("state")) || {}, away = await this.away();
+    if (left) delete away[me.id];
+    else {
+      away[me.id] = { name: me.name, at: me.at, until: Date.now() + GRACE };
+      if (!(await this.ctx.storage.getAlarm())) await this.ctx.storage.setAlarm(Date.now() + GRACE);
+    }
+    await this.ctx.storage.put("away", away);
     this.report(me.room, state);
-    if (!this.players().length) return this.ctx.storage.deleteAll();  // the last one left: the room is forgotten
-    if (state.host === me.id) await this.host(state);
+    if (!this.players().length && !Object.keys(away).length) return this.forget();  // the last one left: the room is forgotten
+    if (left && state.host === me.id) await this.host(state);
     await this.tell();
+  }
+
+  // the away ones whose time ran out go; the host passes on if it was one of them
+  async alarm() {
+    const away = await this.away(), now = Date.now(), state = (await this.ctx.storage.get("state")) || {};
+    for (const [id, a] of Object.entries(away)) if (a.until <= now) delete away[id];
+    await this.ctx.storage.put("away", away);
+    const next = Object.values(away).map((a) => a.until);
+    if (next.length) await this.ctx.storage.setAlarm(Math.min(...next));
+    if (!this.players().length && !next.length) return this.forget();
+    if (!(await this.everyone()).some((p) => p.id === state.host)) await this.host(state);
+    await this.tell();
+  }
+
+  async forget() {
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
   }
 
   webSocketError(ws) { return this.webSocketClose(ws); }

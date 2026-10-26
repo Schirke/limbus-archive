@@ -2,7 +2,7 @@
 // first-to-answer. The room only relays messages in one order.
 "use strict";
 
-const GL_KEEP = "games_live", GL_ROUND = 30, GL_WIN = 200;
+const GL_KEEP = "games_live", GL_LAST = "games_live_last", GL_ROUND = 30, GL_WIN = 200;
 const GL_FIRST = ["track", "id", "char", "skill", "enemy", "canto", "splash", "atlas", "buff"];  // the games "First to answer" can run
 const gl = { nick: "", id: "", ...(() => { try { return JSON.parse(localStorage.getItem(GL_KEEP) || "{}"); } catch { return {}; } })(),
   ws: null, code: "", room: null, match: null, n: 0, want: "", timer: 0, paid: 0, retry: 0, shut: true };
@@ -48,10 +48,48 @@ function glOpen(code) {
   ws.onclose = () => {  // a line lost in the middle is picked up again; the room keeps the player's place by id
     if (ws !== gl.ws || gl.shut) return;
     if (gl.full || ++gl.retry > 6) { gl.error = gl.full ? "The room is full." : "The room can't be reached — the live matches need the site's server."; gl.ws = null; return glLobby(); }
-    setTimeout(() => { if (ws === gl.ws && !gl.shut) { const c = gl.code, m = gl.match; glOpen(c); gl.match = m; if (m) { document.body.classList.add("gllive"); document.body.classList.toggle("glfirst", m.mode === "first"); } } }, 1500);
+    setTimeout(() => { if (ws === gl.ws && !gl.shut) glReopen(); }, 1500);
   };
   gl.timer = setInterval(glTick, 250);
   gl.error = gl.full = "";
+}
+function glReopen() {
+  const m = gl.match;
+  glOpen(gl.code);
+  gl.match = m;
+  if (m) { document.body.classList.add("gllive"); document.body.classList.toggle("glfirst", m.mode === "first"); }
+}
+// a phone that slept has a dead line: back in at once (the room keeps a dropped player's place for a minute)
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden || !gl.nick) return;
+  if (gl.code && !gl.shut && (!gl.ws || gl.ws.readyState > 1)) { gl.retry = 0; glReopen(); }
+  if (typeof vr !== "undefined" && vr.code && !vr.shut && (!vr.ws || vr.ws.readyState > 1)) { vr.retry = 0; vrOpen(vr.code); }
+});
+// "back to the room": the last room this browser was in, offered while somebody is still there
+function glRemember(code, kind) { try { localStorage.setItem(GL_LAST, JSON.stringify({ code, kind, at: Date.now() })); } catch {} }
+function glForget() { try { localStorage.removeItem(GL_LAST); } catch {} }
+async function glBack() {
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem(GL_LAST) || "null"); } catch {}
+  if (!last || !last.code || Date.now() - last.at > 6 * 3600e3) return glForget();
+  if (/^#\/(live|vsroom)\/([a-z0-9]+)/.exec(location.hash)?.[2] === last.code) return;
+  const page = location.hash;
+  let r;
+  try { r = await (await fetch(`${glServer().replace(/^ws/, "http")}/room/${last.code}?peek=1&id=${gl.id}`)).json(); } catch { return; }
+  const at = $("#main .gmhubhead") || $("#main h1");  // (the Games page: under its head row)
+  if (location.hash !== page || $("#glback") || !at) return;
+  if (!r.n) return glForget();
+  at.insertAdjacentHTML("afterend", `<div id="glback" class="glroom glback"><span class="gmscore">ROOM <b>${esc(last.code.toUpperCase())}</b></span>
+    <span class="muted">${r.you ? "Your place is still kept." : "Players are still in it."}</span><a class="gmbtn" href="${last.kind === "vs" ? "#/vsroom/" : "#/live/"}${esc(last.code)}">Back to the room</a>
+    <button class="toggle" id="glbackx" title="Forget this room">×</button></div>`);
+  $("#glbackx").onclick = () => { glForget(); $("#glback").remove(); };
+}
+// left on purpose: the room keeps no place
+function glLeave() {
+  glSend({ t: "leave" });
+  glForget();
+  glClose();
+  location.hash = "#/live";
 }
 window.addEventListener("hashchange", () => {
   const h = location.hash, game = gl.match && glGameOf(gl.match.game);
@@ -78,13 +116,14 @@ function glFront() {
   const go = () => { const m = /([a-z0-9]{4,10})\s*$/i.exec($("#glcode").value.trim()); m ? (location.hash = "#/live/" + m[1].toLowerCase()) : toast("That is not a room's code."); };
   $("#glgo").onclick = go;
   $("#glcode").onkeydown = (e) => { if (e.key === "Enter") go(); };  // (a handler that returns false would swallow the key)
+  glBack();
 }
 
 function glLobby() {
   if (!location.hash.startsWith("#/live/")) return;
   const code = gl.code, link = `${GM_SITE}/#/live/${code}`, chip = (on, attr, text, off) => `<button class="toggle ${on ? "on" : ""}" ${attr} ${off ? "disabled" : ""}>${text}</button>`;
   const head = `<h1>Live match</h1><div class="glroom"><span class="gmscore">ROOM <b>${esc(code.toUpperCase())}</b></span><input class="dbq glin" readonly value="${esc(link)}" onclick="this.select()">
-    <button class="toggle" id="glcopy">${GM_SWORDS}Copy the invite</button><span class="muted small">In the app: paste the link or the code on the Games page.</span></div>`;
+    <button class="toggle" id="glcopy">${GM_SWORDS}Copy the invite</button>${gl.room ? `<button class="toggle" id="glleave">Leave the room</button>` : ""}<span class="muted small">In the app: paste the link or the code on the Games page.</span></div>`;
   if (!gl.nick || !gl.ws) {  // who are you: asked on the way in, kept for the next time
     $("#main").innerHTML = `${head}${gl.error ? `<p class="glerr">${esc(gl.error)}</p>` : ""}
       <div class="gmstart"><span class="muted">Your nickname:</span><input id="glnick" class="dbq glin" maxlength="20" value="${esc(gl.nick)}" placeholder="nickname" autocomplete="off"><button class="gmbtn" id="gljoin">Come in</button></div>`;
@@ -95,30 +134,32 @@ function glLobby() {
   } else if (!gl.room) {
     $("#main").innerHTML = `${head}<p class="muted">Coming into the room…</p>`;
   } else {
-    const r = gl.room, s = r.state, host = glMe(), game = glGameOf(s.game) || glGameOf(gl.want) || GM_SCORED[0], mode = s.mode === "first" && GL_FIRST.includes(game[0]) ? "first" : "race", max = s.max || 8;
+    const r = gl.room, s = r.state, host = glMe(), on = r.players.filter((p) => !p.away), game = glGameOf(s.game) || glGameOf(gl.want) || GM_SCORED[0], mode = s.mode === "first" && GL_FIRST.includes(game[0]) ? "first" : "race", max = s.max || 8;
     const res = s.status === "over" && s.results ? Object.entries(s.results).map(([id, x]) => ({ id, ...x })).sort((a, b) => b.rank - a.rank) : null;
     $("#main").innerHTML = `${head}
       ${res ? `<div class="glres"><div class="gmkick">THE LAST MATCH · ${esc((glGameOf(s.game) || [])[2] || "")} · ${s.mode === "first" ? "FIRST TO ANSWER" : "RACE"}</div>
         ${res.map((x, i) => `<div class="glrow ${x.id === gl.id ? "me" : ""} ${i ? "" : "win"}"><b>${i + 1}</b>${glWho(x.id, x.name)}<i>${esc(String(x.score))}</i><em>${esc(x.grade || "")}</em></div>`).join("")}</div>` : ""}
       <div class="glcols"><div><div class="gmgrp">Players <small>${r.players.length} / ${max}</small></div>
-        ${r.players.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""}">${glWho(p.id, p.name)}${p.id === r.host ? "<em>HOST</em>" : ""}${p.id === gl.id ? `<button class="toggle" id="glrename">rename</button>` : ""}</div>`).join("")}
+        ${r.players.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""} ${p.away ? "gone" : ""}">${glWho(p.id, p.name)}${p.away ? "<small>away</small>" : ""}${p.id === r.host ? "<em>HOST</em>" : ""}${p.id === gl.id ? `<button class="toggle" id="glrename">rename</button>` : host && !p.away ? `<button class="toggle" data-host="${esc(p.id)}">make host</button>` : ""}</div>`).join("")}
         ${s.status === "play" ? `<p class="muted">A match is on${(s.ids || []).includes(gl.id) ? "" : " — the next one takes you in"}.</p>` : ""}</div>
       <div><div class="gmgrp">The match</div>
         ${host ? `<div class="dbrow">${GM_SCORED.map((g) => chip(g[0] === game[0], `data-game="${g[0]}"`, esc(g[2]))).join("")}</div>
           <div class="dbrow">${chip(mode === "race", 'data-mode="race"', "Race · each at their own pace")}${chip(mode === "first", 'data-mode="first"', "First to answer · rounds in step", !GL_FIRST.includes(game[0]))}</div>
           <div class="dbrow"><span class="muted">Players, up to</span>${[2, 3, 4, 5, 6, 7, 8].map((n) => chip(max === n, `data-max="${n}"`, n, n < r.players.length)).join("")}</div>
-          <div class="gmstart">${s.status === "play" ? `<button class="toggle" id="glstop">End the match</button>` : `<button class="gmbtn" id="glstart" ${r.players.length < 2 ? "disabled" : ""}>Start the match</button>`}
-            <span class="muted small">${s.status === "play" ? "Stops it for everybody, without a result — if it got stuck." : r.players.length < 2 ? "Waiting for somebody to come in." : mode === "first" ? `The first right answer takes a round; ${GL_ROUND} s a round.` : "The same rounds for everybody; the best result wins."}</span></div>`
+          <div class="gmstart">${s.status === "play" ? `<button class="toggle" id="glstop">End the match</button>` : `<button class="gmbtn" id="glstart" ${on.length < 2 ? "disabled" : ""}>Start the match</button>`}
+            <span class="muted small">${s.status === "play" ? "Stops it for everybody, without a result — if it got stuck." : on.length < 2 ? "Waiting for somebody to come in." : mode === "first" ? `The first right answer takes a round; ${GL_ROUND} s a round.` : "The same rounds for everybody; the best result wins."}</span></div>`
         : `<p><b>${esc(game[2])}</b> · ${mode === "first" ? "First to answer" : "Race"} · up to ${max} players</p><p class="muted">The host starts the match.</p>`}</div></div>`;
     if (host && (s.game !== game[0] || s.mode !== mode || !s.max)) glSet({ game: game[0], mode, max });  // (what the page shows is what the room has)
     const set = (sel, f) => document.querySelectorAll(sel).forEach((b) => b.onclick = () => glSet(f(b)));
     set("#main [data-game]", (b) => ({ game: b.dataset.game, mode: GL_FIRST.includes(b.dataset.game) ? mode : "race" }));
     set("#main [data-mode]", (b) => ({ mode: b.dataset.mode }));
     set("#main [data-max]", (b) => ({ max: +b.dataset.max }));
-    if ($("#glstart")) $("#glstart").onclick = () => glSet({ status: "play", n: Date.now(), seed: Math.random().toString(36).slice(2, 8).padEnd(6, "0"), ids: r.players.map((p) => p.id), results: null });
+    if ($("#glstart")) $("#glstart").onclick = () => glSet({ status: "play", n: Date.now(), seed: Math.random().toString(36).slice(2, 8).padEnd(6, "0"), ids: on.map((p) => p.id), results: null });
     if ($("#glstop")) $("#glstop").onclick = () => glSet({ status: "", results: null });
+    document.querySelectorAll("#main [data-host]").forEach((b) => b.onclick = () => glSend({ t: "host", to: b.dataset.host }));
     if ($("#glrename")) $("#glrename").onclick = () => { gl.ws.onclose = null; glClose(); gl.code = code; gl.nick = ""; glLobby(); };
   }
+  if ($("#glleave")) $("#glleave").onclick = glLeave;
   if ($("#glcopy")) $("#glcopy").onclick = () => gmCopy(`Limbus Archive · a live match — come in:\n${link}\n(in the app: Games → paste the code ${code.toUpperCase()})`);
 }
 
@@ -126,6 +167,8 @@ function glLobby() {
 function glGot(m) {
   if (m.t === "full") { gl.full = true; return; }
   if (m.t === "room") {
+    const was = gl.room && gl.room.players.filter((p) => !p.away).map((p) => p.id);
+    if (!gl.room) glRemember(gl.code, "live");
     gl.room = m;
     const s = m.state;
     if (s.status === "play" && s.n + "." + s.seed !== gl.n && (s.ids || []).includes(gl.id) && glGameOf(s.game)) {  // a match starts: the game's page, by the seed
@@ -143,6 +186,10 @@ function glGot(m) {
       document.body.classList.remove("gllive", "glfirst");
       $("#glpanel") && $("#glpanel").remove();
       if (!location.hash.startsWith("#/live")) { location.hash = "#/live/" + gl.code; return; }
+    }
+    if (gl.match && was && m.players.some((p) => !p.away && !was.includes(p.id))) {  // somebody came (back): they missed what was said
+      gl.match.sent = "";
+      if (gl.match.doneMsg) glSay(gl.match.doneMsg);
     }
     if (gl.match) glEnd();
     return location.hash.startsWith("#/live") ? glLobby() : glPanel();
@@ -197,7 +244,7 @@ function glOver(game, g, score) {
   x.over = true;
   const mine = x.mode === "first" ? x.pts[gl.id] || 0 : score;
   const rank = x.mode === "first" ? mine : game === "wordle" ? (g.tries.includes(g.ans) ? 100 - g.tries.length : 0) : game === "conn" ? (g.miss < GC_MISS ? 10 - g.miss : 0) : +score || 0;
-  glSay({ k: "done", n: x.n, score: mine, rank, grade: g.grade ? g.grade.name : "" });
+  glSay(x.doneMsg = { k: "done", n: x.n, score: mine, rank, grade: g.grade ? g.grade.name : "" });
 }
 // the host closes the match when everybody still in the room has finished
 function glEnd() {
@@ -212,9 +259,9 @@ function glPanel() {
   if (!x || !gl.room) return;
   let el = $("#glpanel");
   if (!el) { el = document.createElement("div"); el.id = "glpanel"; document.body.appendChild(el); }
-  const rows = x.ids.map((id) => ({ id, name: glName(id), gone: !gl.room.players.some((p) => p.id === id), ...(x.by[id] || {}), score: x.mode === "first" ? x.pts[id] || 0 : (x.by[id] || {}).score ?? 0 }))
+  const rows = x.ids.map((id) => ({ id, name: glName(id), gone: !gl.room.players.some((p) => p.id === id), away: gl.room.players.some((p) => p.id === id && p.away), ...(x.by[id] || {}), score: x.mode === "first" ? x.pts[id] || 0 : (x.by[id] || {}).score ?? 0 }))
     .sort((a, b) => (+b.score || 0) - (+a.score || 0));
   el.innerHTML = `<div class="glhead">${GM_SWORDS}LIVE · ${x.mode === "first" ? "FIRST TO ANSWER" : "RACE"}</div>
     ${x.mode === "first" ? `<div class="gltime"><i></i></div><div class="glsaid">${esc(x.said || "The first right answer takes the round.")}</div>` : ""}
-    ${rows.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""} ${p.gone ? "gone" : ""}">${glWho(p.id, p.name)}<small>${p.done ? "done" : p.gone ? "left" : `${p.at || 0} / ${p.of || "…"}`}</small><i>${esc(String(p.score))}</i></div>`).join("")}`;
+    ${rows.map((p) => `<div class="glrow ${p.id === gl.id ? "me" : ""} ${p.gone || p.away ? "gone" : ""}">${glWho(p.id, p.name)}<small>${p.done ? "done" : p.gone ? "left" : p.away ? "away" : `${p.at || 0} / ${p.of || "…"}`}</small><i>${esc(String(p.score))}</i></div>`).join("")}`;
 }

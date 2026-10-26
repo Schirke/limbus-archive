@@ -3522,6 +3522,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}daño (mejor caso){2}",
 "calc|(the top)": "(el máximo)",
 "calc|% of the target's HP ({0}) the first Coin removes": "% del HP del objetivo ({0}) que quita la primera Moneda",
-"calc|the sum of both": "la suma de ambos"
+"calc|the sum of both": "la suma de ambos",
+"Leave the room": "Salir de la sala",
+"make host": "hacer anfitrión",
+"away": "ausente",
+"Back to the room": "Volver a la sala",
+"Your place is still kept.": "Tu sitio sigue reservado.",
+"Players are still in it.": "Aún hay jugadores en ella.",
+"Forget this room": "Olvidar esta sala"
 }
 }

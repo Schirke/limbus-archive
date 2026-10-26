@@ -3561,6 +3561,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}урон (лучший случай){2}",
 "calc|(the top)": "(максимум)",
 "calc|% of the target's HP ({0}) the first Coin removes": "% HP цели ({0}), снятый первой монетой",
-"calc|the sum of both": "сумма обоих"
+"calc|the sum of both": "сумма обоих",
+"Leave the room": "Выйти из комнаты",
+"make host": "сделать хозяином",
+"away": "отошёл",
+"Back to the room": "Вернуться в комнату",
+"Your place is still kept.": "Ваше место ещё держат.",
+"Players are still in it.": "В ней ещё есть игроки.",
+"Forget this room": "Забыть эту комнату"
 }
 }

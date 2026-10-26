@@ -3522,6 +3522,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}ダメージ（最良の場合）{2}",
 "calc|(the top)": "（最大）",
 "calc|% of the target's HP ({0}) the first Coin removes": "最初のコインが削る対象の体力（{0}）の %",
-"calc|the sum of both": "両方の合計"
+"calc|the sum of both": "両方の合計",
+"Leave the room": "ルームを出る",
+"make host": "ホストにする",
+"away": "離席中",
+"Back to the room": "ルームに戻る",
+"Your place is still kept.": "あなたの席はまだ確保されています。",
+"Players are still in it.": "ルームにはまだプレイヤーがいます。",
+"Forget this room": "このルームを忘れる"
 }
 }

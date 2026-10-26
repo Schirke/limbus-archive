@@ -3522,6 +3522,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}sát thương (trường hợp tốt nhất){2}",
 "calc|(the top)": "(tối đa)",
 "calc|% of the target's HP ({0}) the first Coin removes": "% Máu của mục tiêu ({0}) mà Xu đầu tiên lấy đi",
-"calc|the sum of both": "tổng của cả hai"
+"calc|the sum of both": "tổng của cả hai",
+"Leave the room": "Rời phòng",
+"make host": "đặt làm chủ phòng",
+"away": "vắng mặt",
+"Back to the room": "Quay lại phòng",
+"Your place is still kept.": "Chỗ của bạn vẫn được giữ.",
+"Players are still in it.": "Trong phòng vẫn còn người chơi.",
+"Forget this room": "Quên phòng này"
 }
 }

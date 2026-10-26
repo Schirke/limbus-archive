@@ -357,6 +357,7 @@ function gmHub() {
     m ? (location.hash = m[0]) : room ? (location.hash = "#/live/" + v.toLowerCase()) : toast("That is neither a duel link nor a room's code.");
   };
   gmHubPics();
+  if (typeof glBack === "function") glBack();
 }
 
 // card pictures from /api/game_cards (preset); the drawn icon until they load

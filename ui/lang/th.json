@@ -3522,6 +3522,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}ความเสียหาย (กรณีดีที่สุด){2}",
 "calc|(the top)": "(สูงสุด)",
 "calc|% of the target's HP ({0}) the first Coin removes": "% HP ของเป้าหมาย ({0}) ที่เหรียญแรกตัดไป",
-"calc|the sum of both": "ผลรวมของทั้งสอง"
+"calc|the sum of both": "ผลรวมของทั้งสอง",
+"Leave the room": "ออกจากห้อง",
+"make host": "ตั้งเป็นเจ้าของห้อง",
+"away": "ไม่อยู่",
+"Back to the room": "กลับเข้าห้อง",
+"Your place is still kept.": "ที่ของคุณยังถูกเก็บไว้",
+"Players are still in it.": "ยังมีผู้เล่นอยู่ในห้อง",
+"Forget this room": "ลืมห้องนี้"
 }
 }

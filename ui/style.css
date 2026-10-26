@@ -1351,6 +1351,7 @@ button.toggle:has(.gmduelcopy) { padding: 9px 18px; background: var(--gold); bor
 #subnav .gmcrumb a.gmlivenav { margin-right: 10px; padding: 5px 12px; border: 1px solid var(--line); color: var(--gold); font: 13px Consolas, monospace; } #subnav .gmcrumb a.gmlivenav.active { border-color: var(--gold); }
 .glin { width: 300px; margin: 0; height: 34px; } .glerr { color: var(--rem); }
 .glroom { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 14px 0 6px; } .glroom .gmscore b { font: 24px "LC Bebas", "Segoe UI", sans-serif; letter-spacing: 4px; color: var(--gold); margin-left: 6px; }
+.glback { padding: 8px 12px; background: var(--panel); border: 1px solid var(--gold); } .glback .muted { flex: 1; min-width: 140px; }
 .glcols { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 26px; max-width: 1240px; } .glcols .gmgrp small { font: 12px Consolas, monospace; color: var(--muted); margin-left: 8px; }
 .glrow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 4px; background: var(--panel); border: 1px solid var(--line); } .glrow.me { border-color: var(--gold); } .glrow.gone { opacity: .45; }
 .glrow span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; } .glrow small { color: var(--muted); font: 12px Consolas, monospace; }

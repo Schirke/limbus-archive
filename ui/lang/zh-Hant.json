@@ -3561,6 +3561,13 @@
 "calc|{0} {1}damage (best case){2}": "{0} {1}傷害（最佳情況）{2}",
 "calc|(the top)": "（上限）",
 "calc|% of the target's HP ({0}) the first Coin removes": "首枚硬幣造成的目標生命百分比（生命 {0}）",
-"calc|the sum of both": "兩者之和"
+"calc|the sum of both": "兩者之和",
+"Leave the room": "離開房間",
+"make host": "設為房主",
+"away": "暫離",
+"Back to the room": "回到房間",
+"Your place is still kept.": "你的位置還保留著。",
+"Players are still in it.": "房間裡還有玩家。",
+"Forget this room": "忘記這個房間"
 }
 }
