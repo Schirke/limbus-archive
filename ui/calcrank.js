@@ -132,8 +132,8 @@ const DR_KIT = {
   11016: { form: 4 },  // Le Rouge Sinclair: Noble Dignity
   11009: { kills: [2], on: (t) => t >= 2, st: () => ({ g_cwheninavolatileegostate: 1 }), deck: () => ({ 3: "blazing strike" }) },  // Dawn Sinclair: Waxen Pinion after a won Clash; Faust and Gregor fall on turn 1
   10314: { on: (t) => t >= 2, st: () => ({ s_UnlockBuff_Base: 1 }), deck: () => ({ 1: "Skill 1.1", 2: "Skill 2.1", 3: "Skill 3.1" }) },  // Index Don: Procuration on turn 2
-  // Shi Faust: 4 turns of Defense to max Target Aim, then "Bow's Glimmer" in place of Skill 3
-  10213: { cyc: 1, idle: (t) => t % 5 > 0, on: (t) => t % 5 === 0, st: (t, on) => (on ? { s_AimForTheGoal: 4, s_SnipingArrowMode: 1 } : {}), card: () => "bow's glimmer", pas: ["Base Power +4", "Coin Power +4", "Deal +44% damage"] },
+  // Shi Faust: 4 turns of Defense to max Target Aim, then "Bow's Glimmer" in place of Skill 3 (its bonus for that: read from her passive); it gains 5 Poise an Aim → 20
+  10213: { cyc: 1, idle: (t) => t % 5 > 0, on: (t) => t % 5 === 0, st: (t, on) => (on ? { s_AimForTheGoal: 4, s_SnipingArrowMode: 1, s_Breath_p: 20 } : {}), card: () => "bow's glimmer" },
   // Big Rodion: Eye of Precognition 4 turns, then "Disposal" and 3 turns with the Overheat eye, again
   10916: { cyc: 1, on: (t) => (t - 1) % 7 >= 4, st: (t, on) => (on ? { s_FutureEyeOffRodion: 1, s_FutureEyeOnRodion: 0 } : { s_FutureEyeOnRodion: 30 - 8 * ((t - 1) % 7) }), card: (t) => ((t - 1) % 7 === 4 ? "disposal" : null) },
   // Middle Heathcliff: a Vengeance Tattoo an Envy Resonance, 15 of them every 4 turns → "COMPLETE AND TOTAL EXTERMINATION!!"
@@ -357,7 +357,7 @@ function drSim(x0, hit, mode, sp = null) {
       s99 = st(false);
       const sR = st(true), env = dcEnv(u), m2 = { ...bm.m, bursts: null };
       // Poise: crit chance 5% a Potency
-      const pc = Math.min(1, (me.s_Breath_p || 0) * 0.05), calc = (m, s, sd) => {
+      const pc = Math.min(1, (ov.s_Breath_p ?? me.s_Breath_p ?? 0) * 0.05), calc = (m, s, sd) => {
         const a = dcbCalc(m, u, { ...s, g_crit: 0, stdmg: sd }, o, env), b = pc > 0 ? dcbCalc(m, u, { ...s, g_crit: 1, stdmg: sd }, o, env) : a;
         return { total: a.total * (1 - pc) + b.total * pc, c: pc >= 0.5 ? b : a };
       };
