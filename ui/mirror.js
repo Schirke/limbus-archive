@@ -3,7 +3,7 @@
 let MIRROR = null;
 const MP_KEEP = "mirror";
 const MP_MODES = [["Normal", 5, "0"], ["Hard", 5, "1"], ["Hard", 10, "2"], ["Hard", 15, "3"]];  // (name, floors, the game's typeIndex)
-const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g", start: [], picks: 1 };
+const mp = { mode: 1, cap: 4, q: "", kw: "", only: "", sort: "kw", want: new Set(), lock: {}, open: -1, tab: "g", start: [], picks: 1, search: [] };
 const mpPv = { on: false, q: "", f: "" };  // the picker's "Theme packs" tab: a handbook of the packs, to look at only
 // a keyword chip's picture: the status icon, or the damage type's for Hit / Penetrate / Slash (the name on hover)
 const MP_ATK = { Hit: "Blunt", Penetrate: "Pierce", Slash: "Slash" };
@@ -12,8 +12,11 @@ const mpKwIco = (k) => (MP_ATK[k] ? ico(`atk_${MP_ATK[k]}`, "s22", mpKw(k), mpKw
 const MP_KW_ORDER = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath", "Charge", "Slash", "Penetrate", "Hit"];
 const mpKwRank = (k) => { const i = MP_KW_ORDER.indexOf(k); return i < 0 ? 50 : i; };
 const mpKwCmp = (a, b) => (!a - !b) || mpKwRank(a) - mpKwRank(b) || mpKw(a).localeCompare(mpKw(b));
-(() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {}, start: s.start || [], picks: s.picks || 1 }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
-const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want], start: mp.start, picks: mp.picks })); } catch { /* not kept */ } };
+(() => { try { const s = JSON.parse(localStorage.getItem(MP_KEEP) || "{}"); Object.assign(mp, { mode: s.mode ?? 1, cap: s.cap ?? 4, sort: s.sort || "kw", lock: s.lock || {}, start: s.start || [], picks: s.picks || 1, search: s.search || [] }); mp.want = new Set(s.want || []); } catch { /* a fresh build */ } })();
+const mpSave = () => { try { localStorage.setItem(MP_KEEP, JSON.stringify({ mode: mp.mode, cap: mp.cap, sort: mp.sort, lock: mp.lock, want: [...mp.want], start: mp.start, picks: mp.picks, search: mp.search })); } catch { /* not kept */ } };
+// owned before the first floor: starting gifts and the Gift search's
+const mpOwn = (g) => mp.start.includes(g) || mp.search.includes(g);
+const mpChip = (list) => (list.length ? list.map((g) => (mpG(g).tile ? `<img src="${mpG(g).tile}" alt="">` : "")).join("") + (list.length === 1 ? `<span>${esc(mpG(list[0]).name)}</span>` : "") : "Choose…");
 const mpG = (id) => MIRROR.gifts[id] || { name: "Gift " + id, tile: "", kw: "", tier: 0, desc: "" };
 const mpGi = (id, cls = "", info = true) => (mpG(id).tile ? `<img class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""} src="${mpG(id).tile}" loading="lazy">` : `<i class="mpgi ${cls}" data-g="${id}" ${info ? "data-info" : ""}></i>`);
 const MP_TAP = matchMedia("(hover: none)").matches;  // phones: a tap on a picker tile opens the gift's card
@@ -32,6 +35,7 @@ async function mpLoad() {
   m.deep = new Set(Object.keys(m.gifts).map(Number).filter((g) => (m.gifts[g].min || 0) >= 10 || (m.excl.has(g) && m.packs.filter((p) => p.excl.includes(g)).every(deep))));
   for (const g of [...mp.want]) if (!m.gifts[g]) mp.want.delete(g);
   mp.start = mp.start.filter((g) => m.gifts[g]);
+  mp.search = mp.search.filter((g) => m.gifts[g]);
   return (MIRROR = m);
 }
 routes.mirror = async () => {
@@ -49,7 +53,7 @@ function mpPlan() {
   // (a hidden pack shows up too rarely to plan on)
   const N = MP_MODES[mp.mode][1], floors = [...Array(N).keys()], packs = MIRROR.packs.filter((p) => !p.rare && floors.some((f) => mpAllowed(p, f)));
   const need = new Set(), fus = [];
-  const add = (id) => { if (need.has(id) || mp.start.includes(id)) return; need.add(id); const r = MIRROR.fus[id]; if (r) { fus.push([id, r[0]]); r[0].forEach(add); } };
+  const add = (id) => { if (need.has(id) || mpOwn(id)) return; need.add(id); const r = MIRROR.fus[id]; if (r) { fus.push([id, r[0]]); r[0].forEach(add); } };
   mp.want.forEach(add);
   const raw = [...need].filter((g) => !MIRROR.fus[g] && !mpG(g).how);
   const only = new Set(raw.filter((g) => packs.some((p) => p.excl.includes(g))));
@@ -115,7 +119,7 @@ function mpPicker() {
     <div class="mpchips">${tg(!mp.only, 'data-o=""', "All gifts")}${tg(mp.only === "fuse", 'data-o="fuse"', "Fusion · " + all.filter(([id]) => MIRROR.fus[id]).length, "fz")}${tg(mp.only === "pack", 'data-o="pack"', "Pack-only")}${N > 10 ? tg(mp.only === "deep", 'data-o="deep" title="Gifts found on floors 11–15 only"', "Floors 11–15") : ""}</div>
     <div class="mpchips">${tg(!mp.kw, 'data-k=""', "Any")}${kws.map((k) => tg(mp.kw === k, `data-k="${esc(k)}" title="${esc(mpKw(k))}"`, mpKwIco(k), "kwi")).join("")}${tg(mp.kw === "-", 'data-k="-" title="Gifts without a keyword"', "No keyword")}</div>
     <div class="mpchips"><select id="mpsort">${[["kw", "Keyword"], ["tier", "Tier"], ["name", "Name"]].map(([k, l]) => `<option value="${k}" ${mp.sort === k ? "selected" : ""}>Sort: ${l}</option>`).join("")}</select><span class="grow"></span><span class="muted small">${list.length} gifts</span></div>
-    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""} ${mp.start.includes(+id) ? "st" : ""}" data-g="${id}" data-pick>${g.tile ? `<img src="${g.tile}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${g.up ? `<em>${"+".repeat(g.up.length)}</em>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}${mp.start.includes(+id) ? "<i>START</i>" : ""}</div>`).join("")}</div></div>`;
+    <div class="mpgifts">${list.map(([id, g]) => `<div class="mpgift ${MIRROR.excl.has(+id) ? "ex" : ""} ${mp.want.has(+id) ? "on" : ""} ${mp.start.includes(+id) ? "st" : ""} ${mp.search.includes(+id) ? "se" : ""}" data-g="${id}" data-pick>${g.tile ? `<img src="${g.tile}" loading="lazy">` : ""}${g.tier ? `<u>${ROMAN[g.tier - 1] || g.tier}</u>` : ""}${g.up ? `<em>${"+".repeat(g.up.length)}</em>` : ""}${MIRROR.fus[id] ? "<s>FUSE</s>" : ""}${mp.start.includes(+id) ? "<i>START</i>" : mp.search.includes(+id) ? "<i>SEARCH</i>" : ""}</div>`).join("")}</div></div>`;
 }
 
 // the pack as the game draws it: its card; on the "WARNING" packs the boss over it
@@ -168,6 +172,7 @@ function mpBuild(r) {
   const line = (g) => {
     const s = r.src[g];
     if (mp.start.includes(g)) return '<small class="ok">Starting gift — owned from the start, no floor needed</small>';
+    if (mp.search.includes(g)) return '<small class="ok">From Gift search — owned from the start, no floor needed</small>';
     if (mpG(g).how) return `<small class="luck">${esc(mpG(g).how)}</small>`;
     if (s && s.luck) return `<small class="luck">${mpFloor(s.f)} · ${esc(s.p.name)} — over ${mp.cap} from one pack, needs luck</small>`;
     if (s) return `<small class="${s.only ? "gold" : "ok"}">${mpFloor(s.f)} · ${esc(s.p.name)}${s.only ? " — only there" : ""}</small>`;
@@ -177,9 +182,10 @@ function mpBuild(r) {
   const item = (g) => { const f = r.fus.find(([res]) => res === g); return `<div class="mpck">${mpGi(g)}<div><b data-g="${g}" data-info>${esc(mpG(g).name)}</b>${f ? `<small class="fz">Fusion of ${f[1].length} gifts</small>` : line(g)}${mdTeamLine(g)}</div>
       ${f ? `<div class="parts">${f[1].map((p) => `<div>${mpGi(p)}<span><a data-g="${p}" data-info>${esc(mpG(p).name)}</a><br>${MIRROR.fus[p] ? '<small class="fz">a fusion itself — below</small>' : line(p)}</span></div>`).join("")}</div>` : ""}</div>`; };
   const extra = r.fus.map(([res]) => res).filter((g) => !mp.want.has(g));
-  const start = mp.start.map((g) => `<div class="mpck mpstart">${mpGi(g)}<div><b data-g="${g}" data-info>${esc(mpG(g).name)}</b><span class="mptag">START</span>${line(g)}</div></div>`).join("");
+  const own = (g, se) => `<div class="mpck mpstart ${se ? "mpsearch" : ""}">${mpGi(g)}<div><b data-g="${g}" data-info>${esc(mpG(g).name)}</b><span class="mptag">${se ? "SEARCH" : "START"}</span>${line(g)}</div></div>`;
+  const start = mp.start.map((g) => own(g, false)).join("") + mp.search.map((g) => own(g, true)).join("");
   return `<div class="card mpcard"><div class="row"><span class="mpcap">Your build<small>${mp.want.size} gifts</small></span><span class="grow"></span>${mp.want.size ? "<button data-clear>Clear all</button>" : ""}</div>
-    ${start}${[...mp.want, ...extra].filter((g) => !mp.start.includes(g)).map(item).join("") || (start ? "" : '<div class="muted" style="margin:12px 0 4px">Pick gifts on the left — click one again to drop it.</div>')}</div>`;
+    ${start}${[...mp.want, ...extra].filter((g) => !mpOwn(g)).map(item).join("") || (start ? "" : '<div class="muted" style="margin:12px 0 4px">Pick gifts on the left — click one again to drop it.</div>')}</div>`;
 }
 
 function mpRoute(r) {
@@ -214,19 +220,20 @@ function mpDraw() {
   main.innerHTML = `<div id="mppage"><h1>Mirror Dungeon planner</h1><div class="sub">Pick the E.G.O gifts you want — the planner says which theme packs to take and on which floors. Gold frame: a gift found in certain packs only.</div>
     <div class="mpbar"><div class="seg">${MP_MODES.map(([n, f, t], i) => (MIRROR.modes[t] ? `<button data-m="${i}" class="toggle ${mp.mode === i ? "on" : ""}">${n} · ${f} floors</button>` : "")).join("")}</div>
       <span><label>Gifts counted from one pack</label><span class="seg">${[2, 3, 4, 0].map((c) => `<button data-c="${c}" class="toggle ${mp.cap === c ? "on" : ""}">${c || "All"}</button>`).join("")}</span></span>
-      ${(MIRROR.start || {}).pools && MIRROR.start.pools.length ? `<span class="mpstartb"><label>Starting gift</label><button class="toggle ${mp.start.length ? "on" : ""}" data-start>${mp.start.length
-        ? mp.start.map((g) => (mpG(g).tile ? `<img src="${mpG(g).tile}" alt="">` : "")).join("") + (mp.start.length === 1 ? `<span>${esc(mpG(mp.start[0]).name)}</span>` : "") : "Choose…"}</button></span>` : ""}</div>
+      ${(MIRROR.start || {}).pools && MIRROR.start.pools.length ? `<span class="mpstartb"><label>Starting gift</label><button class="toggle ${mp.start.length ? "on" : ""}" data-start>${mpChip(mp.start)}</button></span>` : ""}
+      <span class="mpstartb mpsearchb"><label>Gift search</label><button class="toggle ${mp.search.length ? "on" : ""}" data-gs>${mpChip(mp.search)}</button></span></div>
     <div class="mptabs">${[["g", "Gifts"], ["b", `Build${mp.want.size ? ` · ${mp.want.size}` : ""}`], ["f", "Floors"]].map(([k, t]) => `<button class="toggle ${mp.tab === k ? "on" : ""}" data-tab="${k}">${t}</button>`).join("")}</div>
     <div class="mpcols" data-tab="${mp.tab}">${mpPicker()}${mpBuild(r)}<div>${mpRoute(r)}</div></div>
     ${mp.want.size && mp.tab !== "f" ? `<button class="mpstrip" data-tab="f"><b>${mp.want.size}</b> in the build <span>Route ›</span></button>` : ""}</div>`;
   if ($(".mpgifts")) $(".mpgifts").scrollTop = top;
   const page = $("#mppage");
   page.onclick = (e) => {
-    const t = e.target.closest("[data-pv],[data-pvf],[data-pvp],[data-info],[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-start],button[data-tab]");
+    const t = e.target.closest("[data-pv],[data-pvf],[data-pvp],[data-info],[data-m],[data-c],[data-k],[data-o],[data-s],[data-pick],[data-pin],[data-open],[data-clear],[data-start],[data-gs],button[data-tab]");
     if (!t) return;
     const d = t.dataset;
     if ("info" in d || ("pick" in d && MP_TAP)) { mpTip(null); return mpCard(+d.g); }
     if ("start" in d) { mpTip(null); return mpStart(); }
+    if ("gs" in d) { mpTip(null); return mpSearch(); }
     if (d.pvp) { mpTip(null); return mpPack(+d.pvp); }
     if (d.pv) mpPv.on = d.pv === "1";
     else if ("pvf" in d) mpPv.f = d.pvf;
@@ -277,7 +284,58 @@ function mpStart() {
       return draw();
     }
     const done = e.target.closest("[data-sok]") ? sel : e.target.closest("[data-snone]") ? [] : null;
-    if (done) { mp.start = done; mp.picks = picks; closeModal(); if (location.hash.startsWith("#/mirror")) mpDraw(); }
+    if (done) { mp.start = done; mp.picks = picks; mp.search = mp.search.filter((x) => !done.includes(x)); closeModal(); if (location.hash.startsWith("#/mirror")) mpDraw(); }
+  };
+  draw();
+}
+
+// the game's "E.G.O Gift Search" before a run: up to 3 gifts of Tier I–III; a click takes / drops, the panel shows the hovered one
+const MP_SEARCH = 3;
+function mpSearch() {
+  const inPack = new Set(MIRROR.packs.flatMap((p) => [...p.pool, ...p.excl]));
+  const pool = Object.keys(MIRROR.gifts).map(Number).filter((g) => mpG(g).tier >= 1 && mpG(g).tier <= 3 && !MIRROR.fus[g] && inPack.has(g))
+    .sort((a, b) => mpG(a).name.localeCompare(mpG(b).name));
+  const tab = (g) => (MP_KW_ORDER.includes(mpG(g).kw) ? mpG(g).kw : "");
+  const kws = [...MP_KW_ORDER.filter((k) => pool.some((g) => tab(g) === k)), ""];
+  let sel = mp.search.filter((g) => pool.includes(g)), kw = sel.length ? tab(sel[0]) : kws[0], q = "", cur = sel[0] || 0, shown = cur;
+  const det = (id) => {
+    if (!id) return '<div class="muted small mpgs0">Click a gift to take it, click again to drop it. Up to 3 gifts of Tier I–III.</div>';
+    const g = mpG(id);
+    return `<div class="mpsh">${g.tile ? `<img src="${g.tile}" alt="">` : ""}<div><b>${esc(g.name)}</b><div class="muted small">${["Tier " + g.tier, g.kw && esc(mpKw(g.kw))].filter(Boolean).join(" · ")}</div></div></div>
+      <div class="mpgsd">${fmtDesc(g.desc)}</div>${mp.start.includes(id) ? '<div class="bad small">Already your starting gift</div>' : ""}`;
+  };
+  const draw = () => {
+    const full = sel.length >= MP_SEARCH, ql = q.trim().toLowerCase(), top = ($("#modal-body .mpgslist") || {}).scrollTop || 0;
+    const list = pool.filter((g) => (ql ? mpG(g).name.toLowerCase().includes(ql) : tab(g) === kw));
+    const tile = (g) => { const on = sel.includes(g), st = mp.start.includes(g); return `<div class="mpgift ${MIRROR.excl.has(g) ? "ex" : ""} ${on ? "on" : ""} ${st || (full && !on) ? "off" : ""}" data-gg="${g}">${mpG(g).tile ? `<img src="${mpG(g).tile}" loading="lazy">` : ""}<u>${ROMAN[mpG(g).tier - 1]}</u>${st ? "<i>START</i>" : ""}</div>`; };
+    const bands = [3, 2, 1].map((t) => { const l = list.filter((g) => mpG(g).tier === t); return l.length ? `<div class="mpgsband">${ROMAN[t - 1]}</div><div class="mpgsgrid">${l.map(tile).join("")}</div>` : ""; }).join("");
+    modal(`<div class="mpgsx"><h2>E.G.O Gift Search</h2><div class="muted small">As in the game: up to 3 gifts of Tier I–III. The planner counts them as owned: no floor is spent on them.</div>
+      <div class="mpgsw"><div>
+        <div class="mpgskws">${kws.map((k) => `<button class="toggle ${!ql && k === kw ? "on" : ""}" data-gk="${esc(k)}">${k ? mpKwIco(k) : '<span class="nk">◇</span>'}<span>${esc(k ? mpKw(k) : "No keyword")}</span></button>`).join("")}</div>
+        <input type="text" id="mpgsq" placeholder="Search a gift…" value="${esc(q)}">
+        <div class="mpgslist">${bands || '<div class="muted mpgs0">Nothing found</div>'}</div></div>
+      <div class="mpgsside"><h4>Selected E.G.O Gift</h4><div class="mpgsdet">${det(cur)}</div>
+        <div class="mpgsslots">${[0, 1, 2].map((i) => (sel[i] ? `<div class="full" data-grm="${sel[i]}" title="${esc(mpG(sel[i]).name)}">${mpG(sel[i]).tile ? `<img src="${mpG(sel[i]).tile}" alt="">` : ""}</div>` : `<div>${i + 1}</div>`)).join("")}</div>
+        <div class="mpgsfoot"><button data-gclear ${sel.length ? "" : "disabled"}>Clear</button><button class="primary" data-gok>Done · ${sel.length} / ${MP_SEARCH}</button></div></div></div></div>`);
+    shown = cur;
+    $("#modal-body .mpgslist").scrollTop = top;
+    $("#mpgsq").oninput = (e) => { q = e.target.value; draw(); const i = $("#mpgsq"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+  };
+  closeModal.then = () => { $("#modal-body").onclick = null; $("#modal-body").onmouseover = null; };
+  $("#modal-body").onclick = (e) => {
+    const t = e.target.closest("[data-gk],[data-gg],[data-grm],[data-gclear],[data-gok]");
+    if (!t) return;
+    const d = t.dataset;
+    if ("gk" in d) { kw = d.gk; q = ""; draw(); $("#modal-body .mpgslist").scrollTop = 0; return; }
+    if (d.gg) { const g = +d.gg; cur = g; if (sel.includes(g)) sel = sel.filter((x) => x !== g); else if (sel.length < MP_SEARCH && !mp.start.includes(g)) sel = [...sel, g]; return draw(); }
+    if (d.grm) { sel = sel.filter((x) => x !== +d.grm); return draw(); }
+    if ("gclear" in d) { sel = []; return draw(); }
+    if ("gok" in d) { mp.search = sel; closeModal(); if (location.hash.startsWith("#/mirror")) mpDraw(); }
+  };
+  $("#modal-body").onmouseover = (e) => {
+    if (MP_TAP) return;
+    const t = e.target.closest("[data-gg]"), id = t ? +t.dataset.gg : cur, box = $("#modal-body .mpgsdet");
+    if (box && id !== shown) { shown = id; box.innerHTML = det(id); }
   };
   draw();
 }

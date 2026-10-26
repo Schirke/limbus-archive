@@ -115,6 +115,7 @@ const GUIDE = {
     [".mpcols > .card:first-child", "Click the gifts you want for your run. Right-click a gift (tap on a phone) for its full card, with its + / ++ upgrades."],
     [".pvtabs", "Theme packs: every pack as the game draws it. Click one for its boss, the gifts found only in it and its floors."],
     [".mpstartb", "Starting gift: pick it as in the game. The planner won't look for it on the floors."],
+    [".mpsearchb", "Gift search: up to 3 gifts of Tier I–III picked before the run, as in the game. They don't need floors either."],
     [".mpcols > .card:nth-child(2)", "Your build: for every gift, the floor and the theme pack where it drops."],
     [".mpcols > div:last-child", "The route: which theme pack to take on each floor. Click a floor to see other packs and pin one."],
   ],

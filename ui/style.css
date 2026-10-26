@@ -1539,6 +1539,39 @@ body.glfirst #gmnext, body.glfirst #ginext, body.glfirst #gpnext, body.glfirst #
 .mpspicks { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 4px; } .mpspicks small span + span::before { content: " · "; }
 .mpsfoot { display: flex; gap: 8px; align-items: center; margin-top: 14px; flex-wrap: wrap; } .mpsfoot .grow { flex: 1; }
 @media (max-width: 700px) { .mpskws { grid-template-columns: repeat(2, minmax(0, 1fr)); } .mpsgifts { grid-template-columns: minmax(0, 1fr); } .mpsd { max-height: none; } }
+/* MD planner: Gift search (picker mark, build rows, the choice: keyword tabs + tier bands left, the panel right / below on phones) */
+.mpgift.se { outline: 2px solid #5aa9e6; outline-offset: -2px; } .mpgift.se i { background: #5aa9e6; }
+.mpck.mpsearch { border-left-color: #5aa9e6; } .mpsearch .mptag { background: #5aa9e6; }
+.mpgsx { width: min(1040px, 88vw); max-width: 100%; }
+.mpgsx h2 { margin: 0 30px 4px 0; color: var(--gold); }
+.mpgsw { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; margin-top: 12px; }
+.mpgskws { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+.mpgskws .toggle { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 2px 3px; font-size: 11px; min-width: 0; }
+.mpgskws .toggle .ico { margin: 0; } .mpgskws .nk { height: 22px; line-height: 22px; color: var(--muted); }
+.mpgskws .toggle span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#mpgsq { width: 100%; margin-top: 8px; }
+.mpgslist { margin-top: 8px; background: #0c0807; border: 1px solid var(--line); padding: 0 10px 10px; height: min(470px, 55vh); overflow-y: auto; overscroll-behavior: contain; }
+.mpgsband { position: sticky; top: 0; z-index: 2; margin: 0 -10px 8px; padding: 3px 10px 1px; background: linear-gradient(90deg, #4a3418, #0c0807 70%); color: var(--gold); font: 17px "LC Bebas", sans-serif; letter-spacing: .1em; }
+.mpgsgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-bottom: 12px; }
+.mpgsgrid .mpgift.off { opacity: .3; cursor: not-allowed; }
+.mpgs0 { padding: 24px 6px; text-align: center; }
+.mpgsside { display: flex; flex-direction: column; background: #0c0807; border: 1px solid var(--line); padding: 12px; }
+.mpgsside h4 { margin: 0 0 10px; text-align: center; font: 17px "LC Bebas", sans-serif; letter-spacing: .08em; color: var(--gold); }
+.mpgsdet { flex: 1; min-height: 180px; }
+.mpgsd { font-size: 12.5px; line-height: 1.45; margin-top: 8px; max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
+.mpgsslots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+.mpgsslots > div { aspect-ratio: 1; border: 1px dashed var(--line); display: grid; place-items: center; color: var(--line); font: 22px "LC Bebas", sans-serif; position: relative; }
+.mpgsslots > .full { border: 1px solid #5aa9e6; cursor: pointer; } .mpgsslots img { width: 84%; height: 84%; object-fit: contain; }
+.mpgsslots > .full:hover::after { content: "×"; position: absolute; top: 0; right: 5px; color: var(--rem); font: 18px sans-serif; }
+.mpgsfoot { display: grid; grid-template-columns: auto 1fr; gap: 8px; } .mpgsfoot button { white-space: nowrap; }
+@media (max-width: 700px) {
+  .mpgsw { grid-template-columns: minmax(0, 1fr); }
+  .mpgskws { display: flex; overflow-x: auto; scrollbar-width: none; } .mpgskws .toggle { flex: 0 0 62px; }
+  .mpgsgrid { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); }
+  .mpgsside { position: sticky; bottom: -18px; z-index: 3; padding: 10px; }
+  .mpgsdet { min-height: 0; } .mpgsd { max-height: 96px; }
+  .mpgsslots { grid-template-columns: repeat(3, 52px); justify-content: center; margin: 8px 0; }
+}
 .mpcrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 6px; } .mpcrow > b { color: var(--muted); }
 .mpcchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 3px; border: 1px solid var(--line); background: #0c0807; cursor: pointer; font-size: 13px; }
 .mpcchip:hover { border-color: var(--gold); } .mpcchip img { width: 26px; height: 26px; object-fit: contain; }
