@@ -118,6 +118,7 @@ const GUIDE = {
     [".mpsearchb", "Gift search: up to 3 gifts of Tier I–III picked before the run, as in the game. They don't need floors either."],
     [".mpcols > .card:nth-child(2)", "Your build: for every gift, the floor and the theme pack where it drops."],
     [".mpcols > div:last-child", "The route: which theme pack to take on each floor. Click a floor to see other packs and pin one."],
+    [".mprow:has([data-pvp])", "Didn't get this pack in the game? Click its floor and pick the one you got: it gets pinned and the rest of the route is re-planned. Packs are tied to their floors, so only the shown ones fit."],
   ],
   calc: [
     [".dcyou", "Your Identity or E.G.O, its Uptie and level."],
