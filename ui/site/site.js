@@ -420,6 +420,67 @@
     b.onclick = () => { sub.classList.toggle("open"); b.classList.toggle("open"); };
     sub.before(b);
   }).observe($("#main"), { childList: true, subtree: true });
+  // phones: a section on the bottom bar opens a sheet with all its pages
+  const sheet = Object.assign(document.createElement("div"), { id: "navsheet" });
+  document.body.appendChild(sheet);
+  const closeSheet = () => sheet.classList.remove("open");
+  sheet.onclick = (e) => { if (e.target === sheet || e.target.closest(".navtiles a")) closeSheet(); };
+  $("#nav").addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-group]");
+    if (!a || !phone()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const g = a.dataset.group;
+    if (sheet.classList.contains("open") && sheet.dataset.g === g) return closeSheet();
+    sheet.dataset.g = g;
+    sheet.innerHTML = `<div class="navpanel"><h3>${g === "more" ? "More" : esc(a.textContent.trim())}</h3>${navTiles(g)}</div>`;
+    sheet.classList.add("open");
+  }, true);
+  addEventListener("hashchange", closeSheet);
+  // phones: "? Guide" leaves the title for a row with "How it works"; the filters of a list fold behind one button
+  const filtBase = {};
+  const phoneHead = () => {
+    const m = $("#main"), h1 = m.querySelector("h1"), g = h1 && h1.querySelector(".gdbtn");
+    let help = m.querySelector(".helprow");
+    if (phone() && g) {
+      if (!help) { help = Object.assign(document.createElement("span"), { className: "helprow" }); h1.after(help); }
+      if (g.parentElement !== help) help.appendChild(g);
+    } else if (help && !phone()) {
+      const b = help.querySelector(".gdbtn");
+      if (b && h1) h1.appendChild(b);
+      help.remove();
+    }
+    const duel = $("#gmduel");
+    if (duel && phone() !== !!duel.dataset.short) {
+      duel.dataset.short = phone() ? "1" : "";
+      duel.placeholder = phone() ? "A duel link or a live room's code" : "A duel link or a live room's code — paste, Enter";
+    }
+    const q = m.querySelector(":scope > input.dbq"), rows = m.querySelectorAll(":scope > .dbrow");
+    let fb = m.querySelector(":scope > .filtbtn");
+    if (!q) return m.classList.remove("filtfold");
+    if (!rows.length) return;
+    if (!fb) {
+      fb = Object.assign(document.createElement("button"), { className: "filtbtn" });
+      q.after(fb);
+      m.classList.add("filtfold");
+      fb.onclick = () => { m.classList.toggle("filtfold"); phoneHead(); };
+    }
+    let n = 0;
+    rows.forEach((r) => r.querySelectorAll(".toggle.on").forEach((b) => { if (!/sort/.test(b.id)) n++; }));
+    rows.forEach((r) => r.querySelectorAll("select").forEach((s) => { if (s.selectedIndex > 0) n++; }));
+    const page = location.hash.split("/")[1] || "";
+    if (!(page in filtBase)) filtBase[page] = n;
+    n = Math.max(0, n - filtBase[page]);  // (what the page turns on by itself isn't a filter)
+    const open = !m.classList.contains("filtfold"), was = `${n}|${open}`;
+    fb.classList.toggle("open", open);
+    if (fb.dataset.was === was) return;  // (the language changes the text: compare the state, or it loops)
+    fb.dataset.was = was;
+    fb.innerHTML = `<span><span>Filters</span>${n ? ` · <b>${n}</b>` : ""}</span><span>${open ? "▴" : "▾"}</span>`;
+  };
+  let headT = 0;
+  new MutationObserver(() => { clearTimeout(headT); headT = setTimeout(phoneHead, 60); }).observe($("#main"), { childList: true, subtree: true });
+  matchMedia("(max-width: 900px)").addEventListener("change", phoneHead);
+  addEventListener("hashchange", () => setTimeout(phoneHead, 300));
   // an invite: offer to open it in the app
   const appBar = () => {
     const h = location.hash, on = /^#\/(game\w+|games\/track)\/duel\/[\w.%-]+$|^#\/(live|vsroom|gamewho)\/[a-z0-9]{4,10}$/i.test(h);

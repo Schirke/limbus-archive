@@ -460,6 +460,71 @@ function route() {
 }
 window.addEventListener("hashchange", route);
 
+// ------------------------------------------------------------------ menu: a section's pages as tiles with a line each
+const NAV_ABOUT = {
+  db: "Every Identity and E.G.O card", enemies: "Enemy handbook", buffs: "Every status effect", compare: "Two cards side by side",
+  anim: "Skills, idle poses, effects", sounds: "Every game sound", browse: "Game files", story: "Read the story with voices",
+  stages: "Every stage on a map", workshop: "Your own scenes", announcers: "Announcer lines", abnologs: "Abnormality records",
+  patches: "What each patch changed", news: "Official notices", changes: "How cards changed over time", snapshots: "Saved game versions",
+  games: "Daily quizzes and puzzles", biggames: "Survivors, Singing Machine…", live: "Play with friends", gamegacha: "Spend Lunacy on pulls",
+  banners: "Every past banner", versus: "Identities fight", community: "Live streams and videos", collection: "Your Identities",
+  teams: "Pick a team, share its code", mirror: "Gifts, builds, floors", calc: "Skill damage", growth: "What an upgrade costs",
+  sprites: "Edit game sprites", support: "Authors and translators", profile: "Save code, level, collection",
+};
+const NAV_TOOLS = ["teams", "mirror", "calc", "growth", "sprites", "collection"], NAV_SITE = ["community", "profile", "support"];
+function navLinks(g) {
+  const seen = new Set(), out = [];
+  document.querySelectorAll(`#subnav > div[data-group="${g}"]:not(.gmcrumb) a[data-route]`).forEach((a) => {
+    if (a.hidden || seen.has(a.dataset.route)) return;
+    seen.add(a.dataset.route);
+    out.push(a);
+  });
+  return out;
+}
+function navTile(a, route) {
+  const r = route || a.dataset.route, cur = location.hash.slice(2).split("/")[0] || "home", app = a && a.classList.contains("apponly");
+  return `<a href="#/${r}" class="${cur === r ? "on" : ""} ${app ? "app" : ""}"><b>${a ? a.innerHTML : "Profile"}</b><small>${NAV_ABOUT[r] ? `<span>${NAV_ABOUT[r]}</span>` : ""}${app ? `<span class="navapp">in the app</span>` : ""}</small></a>`;
+}
+function navTiles(g) {
+  if (g !== "more") return `<div class="navtiles">${navLinks(g).map((a) => navTile(a)).join("")}</div>`;
+  const by = Object.fromEntries(navLinks("more").map((a) => [a.dataset.route, a]));
+  const tools = NAV_TOOLS.filter((r) => by[r]).map((r) => navTile(by[r])).join("");
+  const site = NAV_SITE.map((r) => (r === "profile" ? navTile(null, "profile") : by[r] ? navTile(by[r]) : "")).join("");
+  return `<h4>Tools</h4><div class="navtiles">${tools}</div><h4>Site</h4><div class="navtiles">${site}</div>`;
+}
+// desktop: hover a section that isn't open = its pages in a menu UNDER the tab row (the tabs stay clickable)
+{
+  const drop = Object.assign(document.createElement("div"), { id: "navdrop" }), sub = $("#subnav"), wide = matchMedia("(min-width: 901px)");
+  document.body.appendChild(drop);
+  let showT = 0, hideT = 0;
+  const close = () => { clearTimeout(showT); clearTimeout(hideT); drop.classList.remove("open"); document.querySelectorAll("#nav a.navpv").forEach((x) => x.classList.remove("navpv")); };
+  const open = (a) => {
+    close();
+    if (a.classList.contains("active")) return;  // (its pages are the tabs already)
+    const r = a.getBoundingClientRect(), s = sub.getBoundingClientRect();
+    drop.innerHTML = navTiles(a.dataset.group);
+    drop.style.left = Math.max(8, Math.min(r.left - 20, innerWidth - 540)) + "px";
+    drop.style.top = Math.max(r.bottom, s.height ? s.bottom : 0) + 4 + "px";
+    drop.classList.add("open");
+    a.classList.add("navpv");
+  };
+  document.querySelectorAll("#nav a[data-group]").forEach((a) => a.addEventListener("mouseenter", () => {
+    if (!wide.matches) return;
+    clearTimeout(hideT);
+    clearTimeout(showT);
+    if (drop.classList.contains("open")) open(a);  // (already open: moving along the menu switches at once)
+    else showT = setTimeout(() => open(a), 220);
+  }));
+  // the way down to the menu crosses the tabs: header, tabs and menu count as one area
+  [$("#top"), sub, drop].forEach((el) => {
+    el.addEventListener("mouseleave", () => { clearTimeout(showT); hideT = setTimeout(close, 280); });
+    el.addEventListener("mouseenter", () => clearTimeout(hideT));
+  });
+  document.addEventListener("click", () => setTimeout(close, 0));
+  window.addEventListener("hashchange", close);
+  sub.querySelectorAll("a[data-route]").forEach((l) => { if (NAV_ABOUT[l.dataset.route] && !l.title) l.title = NAV_ABOUT[l.dataset.route]; });
+}
+
 // ------------------------------------------------------------------ jobs
 function jobBlock() {
   const j = STATE && STATE.job;

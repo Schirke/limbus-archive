@@ -326,3 +326,42 @@ a.gmdot:hover::after { background: url("/api/gacha_ui?n=New_MainUI_PersonalityLi
 @keyframes cmpulse { 50% { box-shadow: 0 0 3px rgba(255, 59, 36, .5); } }
 #nav #navcommunity.live { min-width: 136px; } #nav #navcommunity.live::before { transform: translateX(-40px); } .cmlive { margin-left: -22px; }
 #nav #navcommunity.live { min-width: 144px; } .cmlive { margin-left: -17px; }  /* (a little air between the camera and the streamer's picture) */
+
+/* ---------- UI 3: one set of controls (text buttons 34 high in Bebas, fields 38; no common padding: fixed-width buttons) ---------- */
+#main .toggle:not(:has(img)), #main .more, #main .pfbk, #main .pfbtns button, #main .gdbtn, .filtbtn {
+  min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+#main .toggle:has(img) { min-width: 34px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+#main input[type=text], #main input[type=search], #main input:not([type]), #main select {
+  height: 38px; padding: 0 12px; font: 14px "Segoe UI", sans-serif; background-color: #120d0b; border: 1px solid #3a2a20; border-radius: 0; color: #f1e3cc; }
+#main input:focus, #main select:focus { border-color: #c9a227; outline: 0; }
+#main .gdbtn { top: 0; }
+#main .gdbtn.new { animation: none; }
+#main .gdbtn.new::after { top: -8px; right: -8px; font-size: 10px; }
+.lvpanel button:not(:has(img)) { min-height: 34px; padding: 0 14px; font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+/* a new player's avatar: a sinner silhouette, not an empty box */
+#pfchip .pfava:not([style*="url"]) { background: #241a17 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='9' r='4.2' fill='%23c9a227'/%3E%3Cpath d='M3.5 23c.8-5 4.3-7.6 8.5-7.6s7.7 2.6 8.5 7.6z' fill='%23c9a227'/%3E%3C/svg%3E") center 70% / 78% no-repeat; }
+/* a section's pages as tiles with a line each (desktop menu, phone sheet) */
+.navtiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.navtiles a { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 62px; padding: 9px 12px; text-decoration: none;
+  background: #1a1210; border: 1px solid #3a2a20; color: #f1e3cc; }
+.navtiles a b { font: 17px/1.05 "LC Bebas", sans-serif; letter-spacing: .05em; font-weight: normal; text-transform: uppercase; }
+.navtiles a small { font-size: 11.5px; line-height: 1.25; color: #9c8a76; }
+.navtiles a.on { border-color: #c9a227; background: linear-gradient(#3b2710, #1a1210); }
+.navtiles a.on b { color: #f8b400; }
+.navtiles a.app { opacity: .5; }
+.navtiles a .navapp::before { content: " · "; }
+.navtiles a .newtag, .navtiles a .betatag { margin-left: 6px; }
+/* desktop: hover a section = its pages in a menu under the tab row */
+#navdrop, #nav #navmore .nvph, #subnav .navgap { display: none; }
+@media (min-width: 901px) {
+  #navdrop.open { display: block; position: fixed; z-index: 1500; width: 520px; padding: 12px; background: #110b09; border: 1px solid #5d3f25;
+    border-top: 2px solid #c9a227; box-shadow: 0 14px 40px #000d; }
+  #navdrop h4 { margin: 8px 2px 6px; font: 12px "LC Bebas", sans-serif; letter-spacing: .14em; color: #9c8a76; text-transform: uppercase; }
+  #navdrop h4:first-child { margin-top: 0; }
+  #navdrop .navtiles a { min-height: 54px; }
+  #navdrop .navtiles a:hover { border-color: #c9a227; }
+  #nav a.navpv { color: #f8b400; }
+  /* "Tools" row: tools first, then a gap, then Community and Support */
+  #subnav .navgap { display: block; flex: 0 0 26px; align-self: stretch; border-left: 1px solid #3a2a20; margin-left: 12px; }
+}

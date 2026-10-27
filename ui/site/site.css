@@ -9,11 +9,11 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   border-top: 1px solid rgba(255, 255, 255, .08); font-size: 12px; opacity: .7; }
 /* narrow screen: short footer, centred */
 @media (max-width: 900px) { #sitefoot { justify-content: center; text-align: center; gap: 2px 14px; margin: 24px -12px -40px; padding: 10px 12px 66px; font-size: 11px; } #sitefoot .fwide { display: none; } }
-/* phone: two-row header, nothing wider than the screen */
+/* phone: one-row header, nothing wider than the screen */
 @media (max-width: 900px) {
-  body.site #top { height: auto; flex-wrap: wrap; padding: 6px 10px; gap: 0 6px; }
-  body.site #top .brand { font-size: 19px; letter-spacing: 2px; margin-right: auto; }
-  body.site #top .logo { height: 28px; }
+  body.site #top { height: auto; flex-wrap: nowrap; padding: 6px 8px; gap: 0 6px; }
+  body.site #top .brand { font-size: 16px; letter-spacing: 1px; margin-right: auto; min-width: 0; }
+  body.site #top .logo { height: 24px; }
   body.site #nav::-webkit-scrollbar, body.site #subnav::-webkit-scrollbar { display: none; }
   body.site #subnav { padding: 12px 12px 0; }  /* (the header's red line above the tabs, not on them) */
   body.site #subnav div:not([hidden]) { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
@@ -22,10 +22,15 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site .hhero { margin: -14px -12px 0; }
   body.site .hart { background-position: 50% 20%; }
   body.site .hhero::before { background: linear-gradient(rgba(13, 10, 9, .62), rgba(13, 10, 9, .5) 45%, rgba(13, 10, 9, .85) 75%, var(--bg)); }
-  body.site #hstack { margin: 0 4px; }
-  body.site #timers, body.site #navlun { padding: 0 6px; }
+  body.site #hstack { margin: 0; }
+  body.site #timers, body.site #navlun { padding: 0 5px; }
+  body.site #timers b, body.site #navlun { font-size: 11px; }
+  body.site #sxbtn { flex: none; width: 34px; height: 34px; }
+  body.site #navlang { min-width: 34px; width: 34px; height: 34px; padding: 0; font-size: 14px; }
+  body.site #pfchip { margin: 0; }
+  body.site #main input[type=number] { min-height: 34px; }
   /* the five sections: a bar at the bottom that slides away while reading down */
-  body.site #nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; height: auto; display: flex; overflow: visible;
+  body.site #nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1600; height: auto; display: flex; overflow: visible;
     background: #0d0907; border-top: 1px solid #5d2a1c; padding: 4px 0 calc(4px + env(safe-area-inset-bottom)); transition: transform .22s ease; }
   body.site.navaway #nav { transform: translateY(100%); }
   body.site #nav a { flex: 1 1 0; min-width: 0; font-size: 11px; padding: 2px 0; }
@@ -41,9 +46,11 @@ a.apponly::after { content: "in the app"; font-size: 9px; letter-spacing: .06em;
   body.site #subnav div.more-r::after { content: "›"; right: 0; margin-left: -46px; padding: 0 6px 0 30px; background: linear-gradient(to right, transparent, #0d0a09 65%); }
   body.site #subnav div.more-l::before { content: "‹"; left: 0; margin-right: -46px; padding: 0 30px 0 6px; background: linear-gradient(to left, transparent, #0d0a09 65%); }
   /* a page's title smaller, its description behind "How it works" */
-  body.site #main h1 { font-size: 30px; line-height: 1.05; margin-bottom: 4px; }
+  body.site #main h1 { font-size: 28px; line-height: 1.05; margin-bottom: 8px; }
+  body.site #main h1 .gdbtn { display: none; }
   body.site #main h1::after { display: none; }
-  body.site .howto { display: inline-block; margin: 0 0 10px; padding: 3px 10px; font-size: 13px; background: none; color: var(--muted); border: 1px solid var(--line); }
+  body.site .howto { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; margin: 2px 0 12px; vertical-align: top;
+    font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #b9a98e; border: 1px solid #3a2a20; background: #150d0a; }
   body.site .howto.open { color: var(--cream); }
   body.site .howto + .sub:not(.open) { display: none; }
   /* Animations: the list, then the picked one over it with a way back (site.js sets .anopen) */
@@ -258,3 +265,52 @@ body.site #fxnote { flex-basis: 100%; }
   body.site .enwrap .enres:not(.sin) > div { flex-direction: column; gap: 3px; padding: 8px 4px; text-align: center; }
   body.site .enwrap .enres small { letter-spacing: 0.5px; }
 }
+/* UI 3, phone: "? Guide" + "How it works" in one row under the title; the filters fold behind one button; a bottom-bar
+   section opens a sheet of its pages */
+.helprow { display: inline-flex; gap: 8px; align-items: center; margin: 2px 8px 12px 0; vertical-align: top; }
+.helprow .gdbtn { margin: 0; }
+.filtbtn, #navsheet { display: none; }
+.sitelink { min-height: 34px; padding: 0 14px; font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+@media (min-width: 901px) { #main h1 + .helprow { display: none; } }
+@media (max-width: 900px) {
+  .filtbtn { display: inline-flex; width: 100%; padding: 0 14px; margin: 8px 0 4px; justify-content: space-between; background: #150d0a; border: 1px solid #3a2a20; color: #f1e3cc; cursor: pointer; }
+  .filtbtn b { font-weight: normal; color: #c9a227; }
+  .filtbtn.open { border-color: #c9a227; }
+  #main.filtfold > .dbrow { display: none; }
+  /* the music square slides away with the bottom bar */
+  body.site #player.min { transition: bottom .22s ease, transform .22s ease; }
+  body.site.navaway #player.min { transform: translateX(calc(100% + 24px)); }
+  body.site #player.min #mu-pill { padding: 4px 10px; }
+  #navsheet.open { display: block; position: fixed; inset: 0; z-index: 1500; background: rgba(5, 3, 2, .6); }
+  #navsheet .navpanel { position: absolute; left: 0; right: 0; bottom: 0; max-height: 78vh; overflow-y: auto; padding: 14px 12px calc(76px + env(safe-area-inset-bottom));
+    background: #110b09; border-top: 2px solid #c9a227; box-shadow: 0 -10px 40px #000; animation: navup .18s ease-out; }
+  #navsheet h3 { margin: 2px 4px 10px; font: 22px "LC Bebas", sans-serif; letter-spacing: .08em; color: #fff; text-transform: uppercase; }
+  #navsheet h4 { margin: 14px 4px 6px; font: 13px "LC Bebas", sans-serif; letter-spacing: .14em; color: #9c8a76; text-transform: uppercase; }
+  /* "More" on the bar, "Tools" on a desktop */
+  body.site #nav #navmore .nvph { display: inline; }
+  body.site #nav #navmore .nvpc { display: none; }
+  /* enemy card tabs fit the screen */
+  body.site .entabs { gap: 0; justify-content: space-between; }
+  body.site .entabs button { font-size: 14px; letter-spacing: .04em; padding: 6px 2px 8px; }
+  /* Identity card skill tabs: one row */
+  body.site .ud .sktabs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; grid-template-columns: none; gap: 2px; }
+  body.site .ud .sktabs button { padding: 7px 2px 6px; font-size: 14px; letter-spacing: .04em; clip-path: polygon(7px 0, 100% 0, 100% 100%, 0 100%, 0 7px); }
+  /* Compare: the table fits, long names wrap */
+  body.site .cqtab td, body.site .cqtab th { padding: 6px 3px; font-size: 12px; white-space: normal; }
+  body.site .cqtab tr > td:first-child, body.site .cqtab tr > td:last-child { overflow-wrap: anywhere; }
+  body.site .cqtab tr > :nth-child(2):not(:last-child) { white-space: nowrap; font-size: 11.5px; }
+  /* Games hub: the timer never breaks inside */
+  body.site .gmhubhead .gmscore i { white-space: nowrap; }
+  /* Extraction: stats as plates, two a row */
+  body.site .gastats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  body.site .gastats > span { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin: 0; padding: 8px 10px;
+    background: #150d0a; border: 1px solid #3a2a20; font-size: 12px; letter-spacing: .08em; }
+  body.site .gastats > span b { font-size: 16px; color: #fff; }
+  body.site .gastats > button { grid-column: 1 / -1; min-height: 38px; }
+  /* Calc: steppers and arrows big enough for a finger */
+  body.site #main:has(.dcnumin) button:not(:has(img)) { min-width: 32px; min-height: 32px; }
+  body.site .dcstep { align-items: center; }
+  /* footer links: easier to hit */
+  #sitefoot a { display: inline-block; padding: 7px 3px; }
+}
+@keyframes navup { from { transform: translateY(30px); opacity: 0; } }
