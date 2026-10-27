@@ -71,16 +71,20 @@ def _maps(svc) -> list[str]:
 
 def voices(svc) -> dict:
     """{"announcers": {name: [[bank, i, ms, text]]}, "egos": {E.G.O id: [[bank, i, ms, kind, text]]}}"""
-    from . import soundlib
+    from . import announcers, soundlib
     db = svc.sound_lib()
     out: dict = {"announcers": {}, "egos": {}}
+    real = {a["id"]: a["name"] for a in announcers.get(svc)["list"]}
     ann = soundlib.find(db, ["Voicefiles", "Battle announcers"])
     for k in (ann or {}).get("kids") or []:
         if re.match(r"Announcer \d", k["name"]):
             continue
         rows = [[r[0], r[1], r[3], r[6]] for r in soundlib.items(db, k) if r[3] >= 900]
+        # (bank folders carry internal names: "Pinky Chibi" is Araya)
+        ids = [int(m.group(1)) for r in soundlib.items(db, k) if (m := re.match(r"announcer_.+?_(\d+)_\d+(?:-\d+)?$", str(r[2]).lower())) and int(m.group(1)) in real]
+        name = real[max(set(ids), key=ids.count)] if ids else k["name"]
         if len(rows) >= 3:
-            out["announcers"][k["name"]] = rows
+            out["announcers"][name if name not in out["announcers"] else k["name"]] = rows
     for r in _walk(soundlib.find(db, ["Voicefiles", "E.G.O"]), db):
         m = re.search(r"_(\d{5})_", r[2])
         if m and r[3] >= 900:
