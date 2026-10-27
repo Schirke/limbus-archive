@@ -327,6 +327,14 @@ def _part_frames(objs, root) -> list:
         mm = _mul(m, n["m"])
         if PART_GROUP.match(n["name"]) and _has_sr(n):
             kids = [k for k in n["kids"] if _has_sr(k) and not re.search(r"_e\d*$", k["name"])]
+            # layers laid straight under the group (Papa Bongy's idle: idle_f1_l1_p1_nd, idle_f1_l2_p1_nd…): one frame per f
+            if kids and all(re.search(r"_f\d+_l\d+", k["name"]) for k in kids):
+                by = {}
+                for k in kids:
+                    by.setdefault(int(re.search(r"_f(\d+)_l\d+", k["name"]).group(1)), []).append(k)
+                found.append((n["name"], [({"name": f"{n['name']}_f{i}", "pid": ks[0]["pid"], "active": True, "sr": None,
+                                            "m": (1, 0, 0, 0, 1, 0), "kids": ks}, mm) for i, ks in sorted(by.items())]))
+                return
             # two children <group>_1 / _2 = two states of one frame; more = the frames in order
             if not kids or len(_variants(n)) == 2 == len(kids):
                 found.append((n["name"], [(n, m)]))
