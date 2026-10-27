@@ -576,19 +576,27 @@ def _big_start(ex, old: dict) -> list[str]:
     """The requests the big games make, as found by running them in a hidden window (bigNeeds); the old manifest's when
     nothing they depend on changed or they can't run, always with the old ones on top."""
     made = _big_made(ex)
+
+    def keys_of(us):
+        out = []
+        for u in us:
+            path, _, qs = u.partition("?")
+            if path in BIG_ASKS:
+                out.append(url_key(path, **dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))))
+        return out
     if made and old.get("made") != made["made"]:
         try:
-            keys, need = [], _big_needs(ex.base, ex.progress)
-            for u in need.get("urls") or []:
-                path, _, qs = u.partition("?")
-                if path in BIG_ASKS:
-                    keys.append(url_key(path, **dict((k, unquote(v)) for k, _, v in (p.partition("=") for p in qs.split("&") if p))))
+            need = _big_needs(ex.base, ex.progress)
+            keys = keys_of(need.get("urls") or [])
+            made["per"] = {game: list(dict.fromkeys(keys_of(us))) for game, us in (need.get("per") or {}).items()}  # (each game's own: pack() lists its files)
             for game, why in (need.get("bad") or {}).items():
                 ex.failed.append(("big games", f"{game}: {why}"))
             return list(dict.fromkeys(keys + list(old.get("urls") or {})))  # (old sprites never change: a run that missed some keeps them)
         except Exception as e:
             ex.failed.append(("big games", str(e)))
             made.clear()  # (not recorded: tried again next time)
+    if made and old.get("per"):
+        made["per"] = old["per"]
     return list(old.get("urls") or {})
 
 
@@ -2588,6 +2596,26 @@ def move(svc, dst: str, progress=None) -> dict:
     return {"dir": dst, "moved": moved}
 
 
+def _big_files(dst: str, ms: dict, packed_urls: dict) -> dict:
+    """Each big game's files as the site holds them, for its "download everything": {game: {keep, plain, bytes}}; keep =
+    what sw.js keeps in the browser's cache (packs, media, parts), plain = files it fetches as they are."""
+    where = {k: f for urls in packed_urls.values() for k, f in urls.items()}
+    out = {}
+    for game, keys in ((ms.get("biggames") or {}).get("per") or {}).items():
+        keep, plain = set(), set()
+        for k in keys:
+            f = where.get(k)
+            if isinstance(f, list):
+                keep.add("p/" + f[0])
+            elif isinstance(f, dict):
+                keep.update(f["parts"])
+            elif isinstance(f, str):
+                (keep if re.search(r"\.(mp4|webm|ogg|wav|mp3)$", f) else plain).add(f)
+        n = sum(os.path.getsize(os.path.join(dst, "d", rel)) for rel in keep | plain if os.path.exists(os.path.join(dst, "d", rel)))
+        out[game] = {"keep": sorted(keep), "plain": sorted(plain), "bytes": n}
+    return out
+
+
 def pack(src: str, dst: str, index: str | None = None) -> dict:
     """The site as it goes up: small files glued into content-named packs ([pack, offset, length, ext] in the manifest), in
     page order; big files stay alone."""
@@ -2670,11 +2698,13 @@ def pack(src: str, dst: str, index: str | None = None) -> dict:
         os.replace(full + ".tmp", full)
     loose = (loose - whole) | set(parts)
     shards = _key_shards(dst, packed_urls)
+    big = _big_files(dst, ms, packed_urls)
     files = sorted({"p/" + n for n in packs} | loose | {"k/" + n for n in shards["f"] if n})
     shards["files"] = _put_shard(dst, files)
     with open(os.path.join(dst, "d", "index.json"), encoding="utf-8") as f:
         ix = json.load(f)
     ix["keys"] = shards
+    ix.setdefault("inline", {})["/api/big_files"] = big
     with open(os.path.join(dst, "d", "index.json"), "w", encoding="utf-8") as f:
         json.dump(ix, f, ensure_ascii=False)
     with open(os.path.join(dst, "_headers"), "w", encoding="utf-8") as f:

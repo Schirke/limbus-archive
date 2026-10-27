@@ -64,13 +64,15 @@ function bigSync() {
 async function bigNeeds() {
   performance.setResourceTimingBufferSize(1e6);
   performance.clearResourceTimings();
-  const own = location.origin + "/api/", asked = () => performance.getEntriesByType("resource").filter((e) => e.name.startsWith(own)).length, bad = {};
+  const own = location.origin + "/api/", bad = {}, per = {};
+  const urls = () => performance.getEntriesByType("resource").map((e) => e.name).filter((u) => u.startsWith(own)).map((u) => u.slice(location.origin.length));
   for (const g of BIG) if (g.need) {
-    const n = asked();
-    try { await g.need(); if (asked() === n) bad[g.key] = "asked nothing"; } catch (e) { bad[g.key] = String(e); }
+    const n = urls().length;
+    try { await g.need(); if (urls().length === n) bad[g.key] = "asked nothing"; } catch (e) { bad[g.key] = String(e); }
+    per[g.key] = [...new Set(urls().slice(n))];  // (what this game asked: its "download everything" list on the site)
   }
   for (const f of BIG_ASK) try { await f(); } catch (e) { console.warn(e); }
-  return { urls: [...new Set(performance.getEntriesByType("resource").map((e) => e.name).filter((u) => u.startsWith(own)).map((u) => u.slice(location.origin.length)))], bad };
+  return { urls: [...new Set(urls())], bad, per };
 }
 
 routes.biggames = () => {
