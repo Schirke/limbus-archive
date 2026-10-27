@@ -333,7 +333,7 @@ a.gmdot:hover::after { background: url("/api/gacha_ui?n=New_MainUI_PersonalityLi
   font: 15px/1 "LC Bebas", "Segoe UI", sans-serif; letter-spacing: .06em; text-transform: uppercase; }
 #main .toggle:has(img) { min-width: 34px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
 #main input[type=text], #main input[type=search], #main input:not([type]), #main select {
-  height: 38px; padding: 0 12px; font: 14px "Segoe UI", sans-serif; background-color: #120d0b; border: 1px solid #3a2a20; border-radius: 0; color: #f1e3cc; }
+  height: 38px; padding: 0 12px; font-size: 14px; background-color: #120d0b; border: 1px solid #3a2a20; border-radius: 0; color: #f1e3cc; }
 #main input:focus, #main select:focus { border-color: #c9a227; outline: 0; }
 #main .gdbtn { top: 0; }
 #main .gdbtn.new { animation: none; }

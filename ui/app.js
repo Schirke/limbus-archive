@@ -59,7 +59,8 @@ function langFonts(f) {
   f = f || {};
   // a cut font comes after its whole one: the browser fetches the whole font only for a letter the cut one lacks
   const face = (fam, x) => (x.full ? face(fam, { ...x, url: x.full, full: "" }) : "") + `@font-face { font-family: "${fam}"; src: url(${x.url || x}); font-display: swap; ${x.all ? "" : LANG_RANGE} ${x.css || ""} }`;
-  st.textContent = (f.title ? face("LC Bebas", f.title) : "")
+  // (a pack without a title font: its text font for the titles' own letters, not the system's)
+  st.textContent = (f.title ? face("LC Bebas", f.title) : f.text ? face("LC Bebas", { ...f.text, all: false }) : "")
     + (f.text ? `${face("LC Lang", f.text)}
       html, body { font-family: "LC Lang", "Segoe UI", system-ui, sans-serif; }` : "");
   try { localStorage.setItem("lang_fonts", JSON.stringify({ id: LANG.id, f })); } catch {}
