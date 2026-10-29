@@ -164,8 +164,9 @@ PARTS = {
     "sounds": {"cfg": "audio", "uses": ["shared sounds"], "crawl": {"stage": "Sounds", "start": ["/api/sounds"], "elsewhere": SOUNDS_ELSEWHERE,
                "packs": [(r"/api/sounds\b", PACK), (r"/api/(asset_thumb|ui_icon)\?", GAME_PACK), (r"/api/((quiz|story|music)_audio|bank)\?", VOICE_PACK)]}},
     # the big games (ui/big, built): every request they make, found by running them in a hidden window; the lists are asked every time
+    # (sorted: that window asks in another order each run, and an order kept keeps the packs' names)
     "biggames": {"taken": True, "uses": ["big games"], "crawl": {"stage": "Big games", "start": "biggames", "versions": "biggames", "ask": r"/api/(frames|sounds)\b",
-                 "packs": [(r"/api/(frames|sounds)\b", PACK), (r"/api/(?!frames\b|sounds\b|bank\b)", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
+                 "sort": True, "packs": [(r"/api/(frames|sounds)\b", PACK), (r"/api/(?!frames\b|sounds\b|bank\b)", GAME_PACK), (r"/api/bank\?", VOICE_PACK)]}},
     "extra": {"taken": True, "by": "verify"},  # (requests the check found unanswered: Exporter.extra)
 }
 TAKEN_PARTS = tuple(n for n, p in PARTS.items() if p.get("taken"))
@@ -2612,7 +2613,9 @@ def _big_files(dst: str, ms: dict, packed_urls: dict) -> dict:
             elif isinstance(f, str):
                 (keep if re.search(r"\.(mp4|webm|ogg|wav|mp3)$", f) else plain).add(f)
         n = sum(os.path.getsize(os.path.join(dst, "d", rel)) for rel in keep | plain if os.path.exists(os.path.join(dst, "d", rel)))
-        out[game] = {"keep": sorted(keep), "plain": sorted(plain), "bytes": n}
+        keep = sorted(keep)
+        sizes = [os.path.getsize(os.path.join(dst, "d", rel)) if os.path.exists(os.path.join(dst, "d", rel)) else 0 for rel in keep]
+        out[game] = {"keep": keep, "sizes": sizes, "plain": sorted(plain), "bytes": n}
     return out
 
 
