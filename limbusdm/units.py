@@ -14,7 +14,7 @@ STATUSES = ["Combustion", "Laceration", "Vibration", "Burst", "Sinking", "Breath
 SINNERS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault", "Hong Lu", "Heathcliff", "Ishmael",
            "Rodion", "Sinclair", "Outis", "Gregor"]
 ASSET = "Assets/Resources_moved/Sprite/"
-VERSION = 21  # bump when the database layout changes (cached per snapshot)
+VERSION = 22  # bump when the database layout changes (cached per snapshot)
 NO_RES = re.compile(r"cannot gain E\.G\.O resources?", re.I)
 
 
@@ -131,7 +131,8 @@ def skill_info(sid: int, skills: dict, loc_skills: dict, copies: int | None = No
     rec = skills.get(sid)
     if not rec:
         return None
-    lv, tx = skill_levels(rec), _text_levels(loc_skills.get(sid))
+    # hidden counters (Le Noir Hong Lu, Middle Little Brother...) take their text from textID
+    lv, tx = skill_levels(rec), _text_levels(loc_skills.get(sid) or loc_skills.get(rec.get("textID")))
     ups = {}
     for n, d in lv.items():
         t = tx.get(n) or tx.get(max(tx) if tx else 0) or {}
