@@ -121,7 +121,7 @@ Stop-Transcript | Out-Null
 """)
     if progress:
         progress("installing", 1, 1, f"restarting into {info['latest']}")
-    cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script]
+    cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File", script]
     # the script must outlive the app
     base = 0x08000000 | 0x00000200  # CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
     try:

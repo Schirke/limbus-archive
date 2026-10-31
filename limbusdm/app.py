@@ -60,8 +60,8 @@ NET_CONFIG = """<?xml version="1.0" encoding="utf-8"?>
 """
 
 
-def _unblock(root: str = ""):
-    """Removes Windows' "downloaded" mark from the app's files and writes <exe>.config, so .NET loads the DLLs."""
+def _net_config(root: str = ""):
+    """Writes <exe>.config, so .NET loads the app's DLLs from a downloaded zip."""
     if not root:
         if not getattr(sys, "frozen", False) or sys.platform != "win32":
             return
@@ -73,15 +73,6 @@ def _unblock(root: str = ""):
                 f.write(NET_CONFIG)
     except OSError:
         pass
-    for d, dirs, files in os.walk(root):
-        if d == root:
-            dirs[:] = [x for x in dirs if x.lower() != "data"]  # (the app's data may sit next to the exe: nothing to load there)
-        for f in files:
-            if f.lower().endswith((".dll", ".exe", ".pyd")):
-                try:
-                    os.remove(os.path.join(d, f) + ":Zone.Identifier")
-                except OSError:
-                    pass
 
 
 def _window_place(w: int = 1400, h: int = 900) -> dict:
@@ -110,7 +101,7 @@ def main():
     if _already_running(link):  # (the window that is open goes to the link's page)
         return
     _register()
-    _unblock()
+    _net_config()
 
     import webview
 

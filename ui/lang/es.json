@@ -1315,6 +1315,7 @@
 "game {0}": "juego {0}",
 "game {0}{1}": "juego {0}{1}",
 "Game: {0}": "Juego: {0}",
+"Game data: {0}": "Datos del juego: {0}",
 "Games": "Juegos",
 "Games opened": "Juegos abiertos",
 "Games pay lunacy — spend it in Extraction": "Los juegos dan Lunacy: gástala en Extracción",

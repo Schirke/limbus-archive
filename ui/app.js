@@ -396,7 +396,7 @@ function renderStatus() {
       ? ` <button class="primary toggle" onclick="installUpdate()" ${j && j.running ? "disabled" : ""}>Install</button>`
       : ` — <a href="${esc(up.page || "#")}" target="_blank">download</a>`}</div>`;
   }
-  h += `<div title="${esc(s.watch.last_check || "")}">Game: ${esc(s.watch.state)}</div>
+  h += `<div title="${esc(s.watch.last_check || "")}">Game data: ${esc(s.watch.state)}</div>
     <button class="toggle" style="margin-top:6px" onclick="checkAll()" ${j && j.running ? "disabled" : ""}>Check for updates</button>
     <button class="toggle" style="margin-top:6px" onclick="showAppHistory()">What's new</button>`;
   if (j && j.running) h += `<div style="margin-top:6px">${esc(j.kind)}: ${esc(j.stage)} ${j.total ? `${j.done}/${j.total}` : ""}</div><div class="progress"><div style="width:${j.total ? (100 * j.done / j.total) : 5}%"></div></div>`;
@@ -405,7 +405,7 @@ function renderStatus() {
   b.className = up && up.newer ? "news" : "";
   b.innerHTML = j && j.running ? `${esc(j.kind)} ${j.total ? Math.floor(100 * j.done / j.total) + "%" : "…"}`
     : up && up.newer ? `Update ${esc(up.latest)}`
-    : `<span class="${s.game.ok ? "ok" : "bad"}">●</span> ${s.game.ok ? esc(s.watch.state) : "Game not found"}`;
+    : `<span class="${s.game.ok ? "ok" : "bad"}">●</span> ${s.game.ok ? `Game data: ${esc(s.watch.state)}` : "Game not found"}`;
 }
 $("#statusbtn").onclick = () => $("#status").classList.toggle("hidden");
 document.addEventListener("click", (e) => { if (!e.target.closest("#statusbox")) $("#status").classList.add("hidden"); });
@@ -566,7 +566,7 @@ async function checkAll() {
   ]);
   const appLine = app.error ? `could not check (${esc(app.error)})` : app.newer
     ? `<b>${esc(app.latest)} is available</b> — press Install in the status menu at the top` : `latest version (${esc(app.current)})`;
-  toast(`<div>Game: ${esc(game.state)}</div><div>App: ${appLine}</div>`, 8000);
+  toast(`<div>Game data: ${esc(game.state)}</div><div>App: ${appLine}</div>`, 8000);
   refresh();
 }
 async function checkVersion() {
