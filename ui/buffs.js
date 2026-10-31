@@ -5,7 +5,7 @@ const bfv = { q: "", type: "", who: "", sort: "name", sel: "" };
 const BF_TYPES = [["", "All"], ["pos", "Buffs"], ["neg", "Debuffs"], ["neu", "Neutral"]];
 const BF_WHO = [["", "Anyone"], ["id", "Identities"], ["ego", "E.G.O"], ["enemy", "Enemies"]];
 const BF_WORD = { pos: "Buff", neg: "Debuff", neu: "Neutral" };
-const bfName = (b) => b.name || b.id;
+const bfName = (b) => plainName(b.name) || b.id;
 const bfSafe = (n) => n.replace(/[^\w.-]/g, "_");  // (the video's file name, as the app writes it)
 const bfHas = (n) => BUFFS.have.includes(bfSafe(n));
 const bfFailed = (n) => BUFFS.failed.includes(n);
@@ -58,7 +58,7 @@ function drawBuffGrid() {
   const arr = bfFiltered();
   $("#bfcount").textContent = `${arr.length} of ${bfShown().length}`;
   $("#bfgrid").innerHTML = arr.map((b) => `<a class="entile bftile ${b.type}" href="#/buffs/${encodeURIComponent(b.id)}" data-b="${esc(b.id)}" title="${esc(`${bfName(b)} · ${BF_WORD[b.type]}`)}">
-      ${b.icon ? `<img loading="lazy" src="${b.iconUrl || imgThumb(b.icon)}" onerror="this.remove()">` : ""}<span>${BF_WORD[b.type]}</span><b>${esc(bfName(b))}</b></a>`).join("")
+      ${b.icon ? `<img loading="lazy" src="${b.iconUrl || imgThumb(b.icon)}" onerror="this.remove()">` : ""}<span>${BF_WORD[b.type]}</span><b>${richName(b.name || b.id)}</b></a>`).join("")
     || `<div class="empty">Nothing matches.</div>`;
   if (!arr.some((b) => b.id === bfv.sel) && arr.length) bfv.sel = arr[0].id;
   bfMark();
@@ -117,12 +117,12 @@ function drawBuff() {
       `<a href="${link(w)}" title="${esc(wn(w))}">${pic(w)}<span>${esc(wn(w))}</span></a>`).join("")}</div>` : "";
   };
   box.innerHTML = `<div class="bfhead">${b.icon ? `<img src="${b.iconUrl || imgThumb(b.icon)}" onerror="this.remove()">` : ""}
-      <div class="grow"><h2 class="${b.type}">${esc(bfName(b))}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div>${typeof siteLink === "function" ? siteLink(`buffs/${b.id}`) : ""}<span id="bfsaveall">${bfSaveBtn(b)}</span></div>
+      <div class="grow"><h2 class="${b.type}">${richName(b.name || b.id)}</h2><div class="muted small">${BF_WORD[b.type]} · <span class="mono">${esc(b.id)}</span></div></div>${typeof siteLink === "function" ? siteLink(`buffs/${b.id}`) : ""}<span id="bfsaveall">${bfSaveBtn(b)}</span></div>
     <div class="bfvids">${b.fx.map((n) => `<figure data-fx="${esc(n)}">${bfFig(b, n)}</figure>`).join("")}</div>
     ${b.desc ? `<div class="panel"><div class="kwdesc">${fmtDesc(b.desc)}</div>${b.flavor ? `<div class="kwflavor">${esc(b.flavor)}</div>` : ""}</div>` : ""}
     ${b.who.length ? `<div class="panel">${group("id", "Identities")}${group("ego", "E.G.O")}${group("enemy", "Enemies")}</div>`
       : `<div class="muted small">No Identity or handbook enemy names this buff in its skills.</div>`}
-    ${same.length ? `<div class="panel"><h4>Same effect</h4><div class="kwrow">${same.map((x) => `<a class="kw ${x.type} big" href="#/buffs/${encodeURIComponent(x.id)}">${esc(bfName(x))}</a>`).join("")}</div></div>` : ""}`;
+    ${same.length ? `<div class="panel"><h4>Same effect</h4><div class="kwrow">${same.map((x) => `<a class="kw ${x.type} big" href="#/buffs/${encodeURIComponent(x.id)}">${richName(x.name || x.id)}</a>`).join("")}</div></div>` : ""}`;
   box.onclick = (e) => {
     const t = e.target.closest("[data-bsaveall], [data-bsave], [data-bgif], [data-bpng]");
     if (!t) return;

@@ -12,6 +12,9 @@ const unitById = (id) => UNITS && (UNITS.ids.find((x) => x.id === id) || UNITS.e
 // the Database tab's list: Identities, E.G.O or an event's own Identities (Sinnerlings)
 const dbList = () => dbv.tab === "egos" ? UNITS.egos : dbv.tab === "events" ? UNITS.events || [] : UNITS.ids;
 const statusName = (k) => (UNITS && UNITS.keywords[k]) || k;
+// game names keep <s> (struck through, "<s>The Middle</s> - Grudge"); other tags dropped
+const richName = (n) => esc(String(n ?? "").replace(/<(?!\/?s>)\/?[A-Za-z][\w-]*(?:[= ][^>]*)?>/g, "")).replace(/&lt;(\/?s)&gt;/g, "<$1>");
+const plainName = (n) => String(n ?? "").replace(/<\/?[A-Za-z][\w-]*(?:[= ][^>]*)?>/g, "");
 const imgThumb = (path) => `/api/asset_thumb?path=${encodeURIComponent(path)}`;
 const imgFull = (path) => `/api/asset_img?path=${encodeURIComponent(path)}`;
 // Skill icons in their sin frames (community PSD layers); click to save.
@@ -192,12 +195,12 @@ function fmtDesc(text, plain = false) {
   const mark = (html) => { marks.push(html); return `\u0001${marks.length - 1}\u0002`; };
   const kwSpan = (k, label) => {
     const g = gl[k];
-    if (!g) return mark(`<span class="kw neu">${esc(label || k)}</span>`);
-    return mark(`<span class="kw ${g.type}" data-kw="${esc(k)}">${g.iconUrl ? `<img class="kwico" src="${g.iconUrl}" onerror="this.remove()">` : ""}${esc(label || g.name)}</span>`);
+    if (!g) return mark(`<span class="kw neu">${richName(label || k)}</span>`);
+    return mark(`<span class="kw ${g.type}" data-kw="${esc(k)}">${g.iconUrl ? `<img class="kwico" src="${g.iconUrl}" onerror="this.remove()">` : ""}${richName(label || g.name)}</span>`);
   };
   // [TabExplain] is a wrap mark, not a keyword
   let s = String(text).replace(/\[TabExplain\]/g, "").replace(/<sprite[^>]*>/g, "")
-    .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t.replace(/<[^>]+>/g, "")))
+    .replace(/<link="([^"]+)">([\s\S]*?)<\/link>/g, (_, k, t) => kwSpan(k, t))
     .replace(/<style="highlight">/g, "\u0006").replace(/<style="upgradeHighlight">/g, "\u0005").replace(/<\/style>/g, "\u0007")
     .replace(/<(color|mark)[= ](?:color=)?"?(#[0-9a-fA-F]{6,8})"?>/g, (_, t, c) => mark(`<span style="${t === "mark" ? "background" : "color"}:${c}">`))
     .replace(/<b>/g, () => mark(`<span style="font-weight:700">`)).replace(/<\/(color|mark|b)>/g, () => mark("</span>"))
@@ -225,7 +228,7 @@ document.addEventListener("click", (e) => {
   const g = UNITS && UNITS.glossary[kw.dataset.kw];
   if (!g) return;
   let t = tip || Object.assign(document.createElement("div"), { id: "kwtip" });
-  t.innerHTML = `<div class="kwhead">${g.iconUrl ? `<img src="${g.iconUrl}">` : ""}<b class="${g.type}">${esc(g.name)}</b></div>
+  t.innerHTML = `<div class="kwhead">${g.iconUrl ? `<img src="${g.iconUrl}">` : ""}<b class="${g.type}">${richName(g.name)}</b></div>
     <div class="kwdesc">${fmtDesc(g.desc)}</div>${g.flavor ? `<div class="kwflavor">${esc(g.flavor)}</div>` : ""}`;
   document.body.appendChild(t);
   const r = kw.getBoundingClientRect(), w = Math.min(380, window.innerWidth - 20);
@@ -305,7 +308,7 @@ const threadspinText = (t) => !t || !t.length ? ""
   : ` · Threadspin ${ROMAN[t[0] - 1] || t[0]}${t[1] ? (t[1] === t[0] ? "" : `–${ROMAN[t[1] - 1] || t[1]}`) : "+"}`;
 function passiveHtml(p, plain = false) {
   const cost = p.cost.map((c) => `${sinIcon(c.sin, "s18")}<b>×${c.n}</b>`).join(" ");
-  return `<div class="passive"><div class="row"><b class="grow">${esc(p.name)}</b>
+  return `<div class="passive"><div class="row"><b class="grow">${richName(p.name)}</b>
       ${cost ? `<span class="pcost"><span class="muted small">${p.mode === "res" ? "Resonance" : "Owned"}</span> ${cost}</span>` : ""}</div>
     <div class="muted small">${p.kind === "support" ? "Support passive" : p.kind === "ego" ? `E.G.O passive${threadspinText(p.threadspin)}` : "Battle passive"}</div>
     <div class="skdesc">${fmtDesc(p.desc, plain)}</div></div>`;
@@ -772,7 +775,7 @@ function tbFind() {
         .flatMap((x) => x.passives.filter((p) => p.kind === "support").map((p) => ({ x, p, pr: tbPrice(p.cost, p.mode, S) })))
         .filter(({ p, pr }) => (!st || p.desc.includes(`[${st}]`)) && (!works || !pr || pr.v !== "no"));
       return rows.length ? `<div class="tbsub">${esc(UNITS.sinners[sid - 1])}</div>` + rows.map(({ x, p, pr }) => `<div class="tbrow tbpick ${pr ? pr.v : ""} ${MY.slots[sid] === x.id ? "on" : ""}" data-tbpick="${sid}:${x.id}">
-        <img src="${x.pics.thumb}" onerror="this.style.visibility='hidden'"><div class="tbtx"><b>${esc(p.name)}</b><small>${esc(x.title)}${MY.slots[sid] === x.id ? " · in the team" : ""}</small>
+        <img src="${x.pics.thumb}" onerror="this.style.visibility='hidden'"><div class="tbtx"><b>${richName(p.name)}</b><small>${esc(x.title)}${MY.slots[sid] === x.id ? " · in the team" : ""}</small>
         ${pr ? `<small class="tbv">${esc(pr.text)}</small>` : ""}<div class="tbdesc">${fmtDesc(p.desc)}</div></div><span class="tbcosts">${tbCosts(p.cost, p.mode, S)}</span></div>`).join("") : "";
     }).join("");
     modal(`<h2 style="margin-top:0">Support passives for the backup</h2>
